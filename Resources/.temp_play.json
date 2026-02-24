@@ -1,0 +1,111 @@
+{
+  "objects": [
+    {
+      "name": "Cube",
+      "locked": false,
+      "modelPath": "Resources/cube/cube.obj",
+      "texturePath": "Resources\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\white1x1.png",
+      "translate": [0.465648, 6.2413, 0.47511],
+      "rotate": [0.25, 1.03, 0.67],
+      "scale": [7.92, 1, 1],
+      "color": [0.837838, 0.278201, 0.278201, 1],
+      "components": [
+
+      ]
+    },
+    {
+      "name": "Cube",
+      "locked": false,
+      "modelPath": "Resources/cube/cube.obj",
+      "texturePath": "Resources/white1x1.png",
+      "translate": [-1.62106, 3.67229, 0.22422],
+      "rotate": [1.26, 0.43, 0.5],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "components": [
+
+      ]
+    },
+    {
+      "name": "Cube (Copy)",
+      "locked": false,
+      "modelPath": "Resources/cube/cube.obj",
+      "texturePath": "Resources/white1x1.png",
+      "translate": [6.89081, 7.09269, 0.445037],
+      "rotate": [0.25, 1.03, 0.00999999],
+      "scale": [7.92, 1, 1],
+      "color": [0.837838, 0.278201, 0.278201, 1],
+      "components": [
+        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [2,2,2]},
+        {"type": "Rigidbody", "enabled": true, "velocity": [0,0,0], "useGravity": true, "isKinematic": false}
+      ]
+    },
+    {
+      "name": "Cube (Copy)",
+      "locked": false,
+      "modelPath": "Resources/cube/cube.obj",
+      "texturePath": "Resources/white1x1.png",
+      "translate": [-7.56369, 4.48056, 0.810026],
+      "rotate": [1.26, 0.43, 0.5],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "components": [
+
+      ]
+    },
+    {
+      "name": "Cube_1",
+      "locked": false,
+      "modelPath": "Resources/cube/cube.obj",
+      "texturePath": "Resources/white1x1.png",
+      "translate": [-11.3283, 4.0993, 1.22071],
+      "rotate": [1.26, 0.43, 0.5],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "components": [
+
+      ]
+    },
+    {
+      "name": "Cube_2",
+      "locked": true,
+      "modelPath": "Resources/cube/cube.obj",
+      "texturePath": "Resources/white1x1.png",
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [100, 0.1, 100],
+      "color": [0.899614, 0.496698, 0.496698, 1],
+      "components": [
+        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [2,2,2]}
+      ]
+    },
+    {
+      "name": "Model",
+      "locked": false,
+      "modelPath": "Resources\\walk.gltf",
+      "texturePath": "",
+      "translate": [-3.01501, 0.516537, -11.1399],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources\\walk.gltf", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "lightmapPath": ""},
+        {"type": "BoxCollider", "enabled": true, "center": [0,0.8,0], "size": [0.7,1.6,0.7]},
+        {"type": "Animator", "enabled": true, "currentAnimation": "Armature|mixamo.com|Layer0", "isPlaying": true, "loop": true, "speed": [10], "time": [267.347]}
+      ]
+    },
+    {
+      "name": "Empty",
+      "locked": false,
+      "modelPath": "",
+      "texturePath": "Resources/white1x1.png",
+      "translate": [-8.97559, 8.55363, -6.14252],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "components": [
+        {"type": "ParticleEmitter", "enabled": true, "isPlaying": false, "emitRate": 10, "burstCount": 0, "lifeTime": 1, "lifeTimeVariance": 0.2, "startVelocity": [0,1,0], "velocityVariance": [0.5,0.5,0.5], "acceleration": [0,-9.8,0], "startSize": [1,1,1], "endSize": [0,0,0], "startColor": [1,1,1,1], "endColor": [1,1,1,0], "isAdditive": false}
+      ]
+    }
+  ]
+}

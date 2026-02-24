@@ -183,6 +183,15 @@ void Renderer::Shutdown() {
 	ppSrvGpu_ = {};
 	ppRtv_ = {};
 	ppSceneState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+	// ★追加: 最終描画先の解放
+	finalSceneColor_.Reset();
+	finalRtvHeap_.Reset();
+	finalSrvGpu_ = {};
+	finalRtv_ = {};
+	finalSceneState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+	psoCopy_.Reset();
+
 	ppEnabled_ = true;
 	ppParams_ = PostProcessParams{};
 
@@ -237,24 +246,8 @@ void Renderer::BeginFrame(const float clearColorRGBA[4]) {
 		}
 	}
 
-	if (!framePPEnabled_) {
-		ID3D12Resource* backBuffer = window_->GetCurrentBackBufferResource();
-		auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(backBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		list_->ResourceBarrier(1, &barrier);
-		backBufferBarrierState_ = true;
-
-		auto rtv = window_->GetCurrentRTV();
-		auto dsv = window_->DSV_CPU(0);
-		list_->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
-
-		list_->ClearRenderTargetView(rtv, clearColorRGBA, 0, nullptr);
-		list_->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-		list_->RSSetViewports(1, &viewport_);
-		list_->RSSetScissorRects(1, &scissor_);
-		return;
-	}
-
+	// ★修正: 常に ppSceneColor_ (Render To Texture) に描画するように変更する
+	// これにより、後続のEndFrameでPostProcessやコピーパスを経て finalSceneColor_ に焼き付けられる
 	if (ppSceneState_ != D3D12_RESOURCE_STATE_RENDER_TARGET) {
 		auto b = CD3DX12_RESOURCE_BARRIER::Transition(ppSceneColor_.Get(), ppSceneState_, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		list_->ResourceBarrier(1, &b);
@@ -268,35 +261,74 @@ void Renderer::BeginFrame(const float clearColorRGBA[4]) {
 	list_->ClearRenderTargetView(rtv, clearColorRGBA, 0, nullptr);
 	list_->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-	list_->RSSetViewports(1, &viewport_);
-	list_->RSSetScissorRects(1, &scissor_);
+	// GameSceneの描画時は常に画面全体(1920x1080)のViewportを使用する
+	D3D12_VIEWPORT fullVP = { 0.0f, 0.0f, static_cast<float>(window_->kW), static_cast<float>(window_->kH), 0.0f, 1.0f };
+	D3D12_RECT fullScissor = { 0, 0, static_cast<LONG>(window_->kW), static_cast<LONG>(window_->kH) };
+	list_->RSSetViewports(1, &fullVP);
+	list_->RSSetScissorRects(1, &fullScissor);
+}
+
+void Renderer::SetGameViewport(float x, float y, float w, float h) {
+	viewport_.TopLeftX = x;
+	viewport_.TopLeftY = y;
+	viewport_.Width = w;
+	viewport_.Height = h;
+	viewport_.MinDepth = 0.0f;
+	viewport_.MaxDepth = 1.0f;
+
+	scissor_.left = static_cast<LONG>(x);
+	scissor_.top = static_cast<LONG>(y);
+	scissor_.right = static_cast<LONG>(x + w);
+	scissor_.bottom = static_cast<LONG>(y + h);
+}
+
+void Renderer::ResetGameViewport() {
+	if (!window_) return;
+	float w = static_cast<float>(window_->kW);
+	float h = static_cast<float>(window_->kH);
+
+	viewport_.TopLeftX = 0.0f;
+	viewport_.TopLeftY = 0.0f;
+	viewport_.Width = w;
+	viewport_.Height = h;
+	viewport_.MinDepth = 0.0f;
+	viewport_.MaxDepth = 1.0f;
+
+	scissor_.left = 0;
+	scissor_.top = 0;
+	scissor_.right = static_cast<LONG>(w);
+	scissor_.bottom = static_cast<LONG>(h);
 }
 
 void Renderer::EndFrame() {
 	if (cbFrameAddr_ == 0)
 		return;
 
-	if (!framePPEnabled_) {
-		if (backBufferBarrierState_) {
-			backBufferBarrierState_ = false;
-		}
-		return;
-	}
-
+	// --- 1. sceneBaseColor_ (ppSceneColor_) をShaderResourceStateに遷移 ---
 	if (ppSceneState_ != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
 		auto b = CD3DX12_RESOURCE_BARRIER::Transition(ppSceneColor_.Get(), ppSceneState_, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		list_->ResourceBarrier(1, &b);
 		ppSceneState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 	}
 
-	ID3D12Resource* backBuffer = window_->GetCurrentBackBufferResource();
-	auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(backBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	list_->ResourceBarrier(1, &barrier);
+	// --- 2. finalSceneColor_ をRenderTargetStateに遷移し描画 ---
+	if (finalSceneState_ != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+		auto b = CD3DX12_RESOURCE_BARRIER::Transition(finalSceneColor_.Get(), finalSceneState_, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		list_->ResourceBarrier(1, &b);
+		finalSceneState_ = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	}
 
-	auto rtv = window_->GetCurrentRTV();
-	list_->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+	auto rtvFinal = finalRtv_;
+	list_->OMSetRenderTargets(1, &rtvFinal, FALSE, nullptr);
+	
+	const float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f }; // 余白等があれば黒で埋める
+	list_->ClearRenderTargetView(rtvFinal, clearColor, 0, nullptr);
 
-	list_->SetPipelineState(psoPP_.Get());
+	if (framePPEnabled_) {
+		list_->SetPipelineState(psoPP_.Get());
+	} else {
+		list_->SetPipelineState(psoCopy_.Get());
+	}
 	list_->SetGraphicsRootSignature(rootSigPP_.Get());
 
 	list_->RSSetViewports(1, &viewport_);
@@ -305,45 +337,76 @@ void Renderer::EndFrame() {
 	ID3D12DescriptorHeap* heaps[] = {srvHeap_};
 	list_->SetDescriptorHeaps(1, heaps);
 
-	ppParams_.time += 1.0f / 60.0f;
+	if (framePPEnabled_) {
+		ppParams_.time += 1.0f / 60.0f;
 #ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable : 4324)
 #endif
-	struct alignas(256) CBPost {
-		float time;
-		float noiseStrength;
-		float distortion;
-		float chromaShift;
-		float vignette;
-		float scanline;
-		float san;
-		float pad0;
-		float pad[8];
-	};
+		struct alignas(256) CBPost {
+			float time;
+			float noiseStrength;
+			float distortion;
+			float chromaShift;
+			float vignette;
+			float scanline;
+			float san;
+			float pad0;
+			float pad[8];
+		};
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
+		CBPost cb{};
+		cb.time = ppParams_.time;
+		cb.noiseStrength = ppParams_.noiseStrength;
+		cb.distortion = ppParams_.distortion;
+		cb.chromaShift = ppParams_.chromaShift;
+		cb.vignette = ppParams_.vignette;
+		cb.scanline = ppParams_.scanline;
+		cb.san = ppParams_.san;
 
-	CBPost cb{};
-	cb.time = ppParams_.time;
-	cb.noiseStrength = ppParams_.noiseStrength;
-	cb.distortion = ppParams_.distortion;
-	cb.chromaShift = ppParams_.chromaShift;
-	cb.vignette = ppParams_.vignette;
-	cb.scanline = ppParams_.scanline;
-	cb.san = ppParams_.san;
-
-	const uint32_t fi = window_->FrameIndex();
-	const uint32_t off = upload_[fi].Allocate(sizeof(CBPost), 256);
-	if (off != UINT32_MAX) {
-		std::memcpy(upload_[fi].mapped + off, &cb, sizeof(CBPost));
-		const D3D12_GPU_VIRTUAL_ADDRESS cbAddr = upload_[fi].buffer->GetGPUVirtualAddress() + off;
-		list_->SetGraphicsRootConstantBufferView(0, cbAddr);
+		const uint32_t fi = window_->FrameIndex();
+		const uint32_t off = upload_[fi].Allocate(sizeof(CBPost), 256);
+		if (off != UINT32_MAX) {
+			std::memcpy(upload_[fi].mapped + off, &cb, sizeof(CBPost));
+			const D3D12_GPU_VIRTUAL_ADDRESS cbAddr = upload_[fi].buffer->GetGPUVirtualAddress() + off;
+			list_->SetGraphicsRootConstantBufferView(0, cbAddr);
+		}
 	}
 
 	list_->SetGraphicsRootDescriptorTable(1, ppSrvGpu_);
 	list_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	list_->DrawInstanced(3, 1, 0, 0);
+
+	// --- 3. finalSceneColor_ をShaderResourceStateに遷移 ---
+	if (finalSceneState_ != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+		auto b = CD3DX12_RESOURCE_BARRIER::Transition(finalSceneColor_.Get(), finalSceneState_, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		list_->ResourceBarrier(1, &b);
+		finalSceneState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+	}
+
+	// --- 4. BackBufferをRenderTargetStateに遷移し、全体をコピー描画 ---
+	ID3D12Resource* backBuffer = window_->GetCurrentBackBufferResource();
+	auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(backBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	list_->ResourceBarrier(1, &barrier);
+
+	auto rtvBack = window_->GetCurrentRTV();
+	list_->OMSetRenderTargets(1, &rtvBack, FALSE, nullptr);
+
+	// エディタの隙間等を目立たなくする暗い背景色でバックバッファをクリア
+	const float bgClearColor[] = { 0.06f, 0.06f, 0.06f, 1.0f };
+	list_->ClearRenderTargetView(rtvBack, bgClearColor, 0, nullptr);
+
+	// フルスクリーンで描画
+	D3D12_VIEWPORT fullVP = { 0.0f, 0.0f, static_cast<float>(window_->kW), static_cast<float>(window_->kH), 0.0f, 1.0f };
+	D3D12_RECT fullScissor = { 0, 0, static_cast<LONG>(window_->kW), static_cast<LONG>(window_->kH) };
+	list_->RSSetViewports(1, &fullVP);
+	list_->RSSetScissorRects(1, &fullScissor);
+
+	list_->SetPipelineState(psoCopy_.Get());
+	list_->SetGraphicsRootSignature(rootSigPP_.Get());
+	list_->SetGraphicsRootDescriptorTable(1, finalSrvGpu_);
 	list_->DrawInstanced(3, 1, 0, 0);
 }
 
@@ -507,9 +570,9 @@ bool Renderer::CreatePSO_Transparent(const std::string& name, ID3DBlob* vsBlob, 
 	pso.PS = {psBlob->GetBufferPointer(), psBlob->GetBufferSize()};
 
 	D3D12_INPUT_ELEMENT_DESC layout[] = {
-	    {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-	    {"NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-	    {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+	    {"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}, // XMFLOAT4
+	    {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}, // XMFLOAT2
+	    {"NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0}, // XMFLOAT3
 	};
 	pso.InputLayout = {layout, _countof(layout)};
 	pso.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
@@ -800,6 +863,70 @@ VSOut main(VSIn v) {
 		if (FAILED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&pso2D_))))
 			return false;
 	}
+
+	// ---------------------------------------------------------
+	// ★追加: 3Dライン描画用パイプライン (Position + Color)
+	// ---------------------------------------------------------
+	{
+		static const char* kVSLine = R"(
+cbuffer CBFrame : register(b0) { row_major float4x4 gView; row_major float4x4 gProj; row_major float4x4 gViewProj; float3 gCamPos; float gTime; };
+struct VSIn { float3 pos : POSITION; float4 color : COLOR; };
+struct VSOut { float4 svpos : SV_POSITION; float4 color : COLOR; };
+VSOut main(VSIn v) {
+    VSOut o;
+    float4 wp = float4(v.pos, 1.0f);
+    float4 vp = mul(wp, gView);
+    o.svpos = mul(vp, gProj);
+    o.color = v.color;
+    return o;
+})";
+		static const char* kPSLine = R"(
+struct PSIn { float4 svpos : SV_POSITION; float4 color : COLOR; };
+float4 main(PSIn i) : SV_TARGET { return i.color; }
+)";
+		auto vsBlob = CompileShader(kVSLine, "main", "vs_5_0");
+		auto psBlob = CompileShader(kPSLine, "main", "ps_5_0");
+		if (!vsBlob || !psBlob) return false;
+
+		D3D12_INPUT_ELEMENT_DESC layout[] = {
+			{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+			{"COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+		};
+
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC pso{};
+		pso.pRootSignature = rootSig3D_.Get(); // b0(CBFrame)を利用するため3DのRootSigを流用
+		pso.VS = {vsBlob->GetBufferPointer(), vsBlob->GetBufferSize()};
+		pso.PS = {psBlob->GetBufferPointer(), psBlob->GetBufferSize()};
+		pso.InputLayout = {layout, _countof(layout)};
+		pso.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+		pso.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+		pso.NumRenderTargets = 1;
+		pso.SampleDesc.Count = 1;
+		pso.SampleMask = UINT_MAX;
+		pso.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+		pso.RasterizerState.AntialiasedLineEnable = TRUE;
+		auto blend = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+		blend.RenderTarget[0].BlendEnable = TRUE;
+		blend.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+		blend.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+		blend.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+		blend.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+		blend.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+		blend.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+		blend.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+		pso.BlendState = blend;
+		pso.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+		pso.DepthStencilState.DepthEnable = FALSE; // ★ラインは最前面(透けて)表示するため深度テスト無効
+		pso.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO; // ラインは深度書き込みしない
+		pso.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+		if (FAILED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoLine3D_))))
+			return false;
+	}
+
+	// ★追加: Particle用シェーダーのコンパイルと登録 (RootSignature作成後に行う必要がある)
+	CreateShaderPipelineTransparent("Particle", L"Resources/shaders/ParticleVS.hlsl", L"Resources/shaders/ParticlePS.hlsl", false);
+	CreateShaderPipelineTransparent("ParticleAdditive", L"Resources/shaders/ParticleVS.hlsl", L"Resources/shaders/ParticlePS.hlsl", true);
+
 	return true;
 }
 
@@ -1008,6 +1135,65 @@ void Renderer::DrawMesh(MeshHandle meshH, TextureHandle texH, const Transform& t
 	model->Draw(list_, 3);
 }
 
+// ★追加: UVスケール・オフセット付きパーティクル描画
+void Renderer::DrawParticle(MeshHandle meshH, TextureHandle texH, const Transform& tr, 
+							const Vector4& mulColor, const Vector4& uvScaleOffset, 
+							const std::string& shaderName) {
+	if (meshH == 0 || meshH >= models_.size())
+		return;
+
+	auto& model = models_[meshH];
+	const uint32_t fi = window_->FrameIndex();
+
+#pragma warning(push)
+#pragma warning(disable : 4324)
+	struct alignas(256) CBParticle {
+		Matrix4x4 world;
+		float color[4];
+		float uvScaleOffset[4];
+	};
+#pragma warning(pop)
+
+	CBParticle cb{};
+	cb.world = tr.ToMatrix();
+	cb.color[0] = mulColor.x; cb.color[1] = mulColor.y; cb.color[2] = mulColor.z; cb.color[3] = mulColor.w;
+	cb.uvScaleOffset[0] = uvScaleOffset.x; cb.uvScaleOffset[1] = uvScaleOffset.y;
+	cb.uvScaleOffset[2] = uvScaleOffset.z; cb.uvScaleOffset[3] = uvScaleOffset.w;
+
+	const uint32_t cbOff = upload_[fi].Allocate(sizeof(CBParticle), 256);
+	if (cbOff == UINT32_MAX) return;
+	std::memcpy(upload_[fi].mapped + cbOff, &cb, sizeof(CBParticle));
+	const D3D12_GPU_VIRTUAL_ADDRESS cbObjAddr = upload_[fi].buffer->GetGPUVirtualAddress() + cbOff;
+
+	ID3D12DescriptorHeap* heaps[] = {srvHeap_};
+	list_->SetDescriptorHeaps(1, heaps);
+
+	ID3D12PipelineState* pso = pipelines_[shaderName].Get();
+	if (!pso) return;
+
+	list_->SetPipelineState(pso);
+	list_->SetGraphicsRootSignature(rootSig3D_.Get());
+
+	list_->RSSetViewports(1, &viewport_);
+	list_->RSSetScissorRects(1, &scissor_);
+
+	list_->SetGraphicsRootConstantBufferView(0, cbFrameAddr_); // b0
+	list_->SetGraphicsRootConstantBufferView(1, cbObjAddr);    // b1
+	list_->SetGraphicsRootConstantBufferView(2, cbLightAddr_); // b2
+
+	if (texH != 0 && texH < textures_.size()) {
+		list_->SetGraphicsRootDescriptorTable(3, textures_[texH].srvGpu); // t0
+	} else if (model->GetSrvGpu().ptr != 0) {
+		list_->SetGraphicsRootDescriptorTable(3, model->GetSrvGpu()); // t0
+	} else {
+		list_->SetGraphicsRootDescriptorTable(3, textures_[0].srvGpu);
+	}
+
+	list_->SetGraphicsRootConstantBufferView(4, cbObjAddr); // b3(dummt)
+
+	model->Draw(list_, 3);
+}
+
 void Renderer::DrawSkinnedMesh(MeshHandle meshH, TextureHandle texH, const Transform& tr, const std::vector<Matrix4x4>& bones, const Vector4& mulColor) {
 	if (meshH == 0 || meshH >= models_.size())
 		return;
@@ -1177,6 +1363,47 @@ void Renderer::DrawSprite(TextureHandle texH, const SpriteDesc& s) {
 	list_->DrawInstanced(6, 1, 0, 0);
 }
 
+// ★追加: 3Dライン描画（蓄積API）
+void Renderer::DrawLine3D(const Vector3& p0, const Vector3& p1, const Vector4& color) {
+	if (lineVertices_.size() + 2 > kMaxLineVertices) return; // 溢れ防止
+	lineVertices_.push_back({p0.x, p0.y, p0.z, color.x, color.y, color.z, color.w});
+	lineVertices_.push_back({p1.x, p1.y, p1.z, color.x, color.y, color.z, color.w});
+}
+
+// ★追加: 蓄積した3Dラインを一括描画
+void Renderer::FlushLines() {
+	if (lineVertices_.empty()) return;
+
+	const uint32_t vertCount = static_cast<uint32_t>(lineVertices_.size());
+	const uint32_t bytesNeeded = vertCount * sizeof(LineVertex);
+
+	const uint32_t fi = window_->FrameIndex();
+	const uint32_t off = upload_[fi].Allocate(bytesNeeded, 16);
+	if (off == UINT32_MAX) {
+		lineVertices_.clear();
+		return;
+	}
+	std::memcpy(upload_[fi].mapped + off, lineVertices_.data(), bytesNeeded);
+
+	ID3D12DescriptorHeap* heaps[] = { srvHeap_ };
+	list_->SetDescriptorHeaps(1, heaps);
+
+	list_->SetPipelineState(psoLine3D_.Get());
+	list_->SetGraphicsRootSignature(rootSig3D_.Get());
+	list_->SetGraphicsRootConstantBufferView(0, cbFrameAddr_);
+	list_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+
+	D3D12_VERTEX_BUFFER_VIEW vbv{};
+	vbv.BufferLocation = upload_[fi].buffer->GetGPUVirtualAddress() + off;
+	vbv.SizeInBytes = bytesNeeded;
+	vbv.StrideInBytes = sizeof(LineVertex);
+	list_->IASetVertexBuffers(0, 1, &vbv);
+
+	list_->DrawInstanced(vertCount, 1, 0, 0);
+
+	lineVertices_.clear();
+}
+
 bool Renderer::InitPostProcess_() {
 	{
 		const UINT W = Engine::WindowDX::kW;
@@ -1236,7 +1463,7 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
     col -= sin(uv.y * 900.0).xxx * gScanline;
     col += (hash(uv * 1000.0 + gTime) - 0.5).xxx * gNoiseStrength;
     float2 d = uv - 0.5;
-    col *= saturate(1.0 - dot(d,d) * (1.5 / max(gVignette, 0.001)));
+    col *= saturate(1.0 - dot(d,d) * gVignette);
     return float4(col, 1);
 })";
 		auto vs = CompileShader(kVSPP, "main", "vs_5_0");
@@ -1274,7 +1501,62 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 		pso.DSVFormat = DXGI_FORMAT_UNKNOWN;
 		if (FAILED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoPP_))))
 			return false;
+
+		// ★追加：PostProcessと同様、そのままテクスチャをコピーするだけのパイプライン
+		static const char* kPSCopy = R"(
+Texture2D gScene : register(t0); SamplerState gSmp : register(s0);
+float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
+    return float4(gScene.Sample(gSmp, uv).rgb, 1.0f);
+})";
+		auto psCopy = CompileShader(kPSCopy, "main", "ps_5_0");
+		if (psCopy) {
+			pso.PS = { psCopy->GetBufferPointer(), psCopy->GetBufferSize() };
+			dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoCopy_));
+		}
 	}
+
+	// ★追加: 最終描画用テクスチャの作成
+	{
+		const UINT W = Engine::WindowDX::kW;
+		const UINT H = Engine::WindowDX::kH;
+		D3D12_RESOURCE_DESC rd{};
+		rd.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		rd.Width = W;
+		rd.Height = H;
+		rd.DepthOrArraySize = 1;
+		rd.MipLevels = 1;
+		rd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		rd.SampleDesc.Count = 1;
+		rd.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+		D3D12_CLEAR_VALUE cv{};
+		cv.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		cv.Color[0] = 0.0f;
+		cv.Color[1] = 0.0f;
+		cv.Color[2] = 0.0f;
+		cv.Color[3] = 1.0f;
+
+		CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_DEFAULT);
+		dev_->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &cv, IID_PPV_ARGS(&finalSceneColor_));
+		finalSceneState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+		D3D12_DESCRIPTOR_HEAP_DESC hd{};
+		hd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+		hd.NumDescriptors = 1;
+		dev_->CreateDescriptorHeap(&hd, IID_PPV_ARGS(&finalRtvHeap_));
+		finalRtv_ = finalRtvHeap_->GetCPUDescriptorHandleForHeapStart();
+		dev_->CreateRenderTargetView(finalSceneColor_.Get(), nullptr, finalRtv_);
+
+		const uint32_t idx = AllocateSrvIndex();
+		D3D12_CPU_DESCRIPTOR_HANDLE cpu = window_->SRV_CPU((int)idx);
+		finalSrvGpu_ = window_->SRV_GPU((int)idx);
+		D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
+		srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srv.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srv.Texture2D.MipLevels = 1;
+		dev_->CreateShaderResourceView(finalSceneColor_.Get(), &srv, cpu);
+	}
+
 	return true;
 }
 

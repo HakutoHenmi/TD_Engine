@@ -18,6 +18,12 @@ namespace Engine {
 
 class SceneManager {
 public:
+	SceneManager() { instance_ = this; }
+	~SceneManager() { if (instance_ == this) instance_ = nullptr; }
+
+public:
+	static SceneManager* GetInstance();
+
 	using Factory = std::function<std::unique_ptr<IScene>()>;
 
 public:
@@ -47,6 +53,8 @@ private:
 	std::string currentName_;
 	std::string pendingNext_;
 	WindowDX* dx_ = nullptr;
+
+	static SceneManager* instance_;
 };
 
 } // namespace Engine

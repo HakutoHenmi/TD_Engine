@@ -188,6 +188,8 @@ exit /b 0
     <ClCompile Include="Engine\Input.cpp" />
     <ClCompile Include="Engine\Model.cpp" />
     <ClCompile Include="Engine\Particle.cpp" />
+    <ClCompile Include="Engine\ParticleEmitter.cpp" />
+    <ClCompile Include="Engine\ParticleEditor.cpp" />
     <ClCompile Include="Engine\Renderer.cpp" />
     <ClCompile Include="Engine\SceneManager.cpp" />
     <ClCompile Include="Engine\TextureManager.cpp" />
@@ -200,26 +202,9 @@ exit /b 0
     <ClCompile Include="externals\imgui\imgui_impl_win32.cpp" />
     <ClCompile Include="externals\imgui\imgui_tables.cpp" />
     <ClCompile Include="externals\imgui\imgui_widgets.cpp" />
-    <ClCompile Include="Game\Actors\Collision.cpp" />
-    <ClCompile Include="Game\Actors\PlayerBall.cpp" />
-    <ClCompile Include="Game\Actors\World.cpp" />
-    <ClCompile Include="Game\gimmick\BoostRingGimmick.cpp" />
-    <ClCompile Include="Game\gimmick\GoalGimmick.cpp" />
-    <ClCompile Include="Game\gimmick\Hammer.cpp" />
-    <ClCompile Include="Game\gimmick\JumpPad.cpp" />
-    <ClCompile Include="Game\gimmick\JumpPadGimmick.cpp" />
-    <ClCompile Include="Game\gimmick\MovingLiftGimmick.cpp" />
-    <ClCompile Include="Game\gimmick\OnOffComponent.cpp" />
-    <ClCompile Include="Game\gimmick\RespawnPoint.cpp" />
-    <ClCompile Include="Game\gimmick\TimedBlock.cpp" />
-    <ClCompile Include="Game\Scenes\GameOverScene.cpp" />
-    <ClCompile Include="Game\Scenes\ResultScene.cpp" />
     <ClCompile Include="Game\Scenes\GameScene.cpp" />
-    <ClCompile Include="Game\Scenes\SelectScene.cpp" />
     <ClCompile Include="Game\Scenes\TitleScene.cpp" />
-    <ClCompile Include="Game\Stage\src\StageBuilder.cpp" />
-    <ClCompile Include="Game\Stage\src\StageLoader.cpp" />
-    <ClCompile Include="Game\Stage\src\StageSystem.cpp" />
+    <ClCompile Include="Game\Editor\EditorUI.cpp" />
     <ClCompile Include="main.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">MaxSpeed</Optimization>
       <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</WholeProgramOptimization>
@@ -492,6 +477,8 @@ exit /b 0
     <ClInclude Include="Engine\Matrix4x4.h" />
     <ClInclude Include="Engine\Model.h" />
     <ClInclude Include="Engine\Particle.h" />
+    <ClInclude Include="Engine\ParticleEmitter.h" />
+    <ClInclude Include="Engine\ParticleEditor.h" />
     <ClInclude Include="Engine\Renderer.h" />
     <ClInclude Include="Engine\SceneManager.h" />
     <ClInclude Include="Engine\TextureManager.h" />

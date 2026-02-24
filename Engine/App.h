@@ -11,7 +11,7 @@
 
 // GameSceneの中身を知るためにインクルードが必要な場合がありますが、
 // ここでは前方宣言でも大丈夫です。メンバ変数としては削除します。
-#include "../Game/Actors/World.h"
+
 
 #include <Windows.h>
 #include <chrono>
