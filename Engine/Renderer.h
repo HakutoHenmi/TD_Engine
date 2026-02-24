@@ -102,6 +102,8 @@ public:
 		PointLight pointLights[kMaxPointLights];
 		SpotLight spotLights[kMaxSpotLights];
 		AreaLight areaLights[kMaxAreaLights];
+		
+		Matrix4x4 shadowMatrix; // 追加: シャドウマッピング用行列
 	};
 #ifdef _MSC_VER
 #pragma warning(pop)
@@ -153,6 +155,21 @@ public:
 	// ★追加: 描画領域を元（フルスクリーン）に戻すメソッド
 	void ResetGameViewport();
 
+	// ★追加: 外部（ParticleEditorなど）用のカスタムレンダーターゲット
+	struct CustomRenderTarget {
+		Microsoft::WRL::ComPtr<ID3D12Resource> texture;
+		Microsoft::WRL::ComPtr<ID3D12Resource> depth;
+		D3D12_CPU_DESCRIPTOR_HANDLE rtv;
+		D3D12_CPU_DESCRIPTOR_HANDLE dsv;
+		D3D12_GPU_DESCRIPTOR_HANDLE srvGpu;
+		uint32_t width;
+		uint32_t height;
+	};
+
+	CustomRenderTarget CreateRenderTarget(uint32_t width, uint32_t height);
+	void BeginCustomRenderTarget(const CustomRenderTarget& target);
+	void EndCustomRenderTarget();
+
 	void SetCamera(const Camera& camera);
 
 	void SetAmbientColor(const Vector3& color);
@@ -190,8 +207,11 @@ public:
 	void DrawSprite(TextureHandle texture, const SpriteDesc& sprite);
 
 	// ★追加: 3Dライン描画（エディタ用ギズモ・グリッドなど）
-	void DrawLine3D(const Vector3& p0, const Vector3& p1, const Vector4& color);
+	void DrawLine3D(const Vector3& p0, const Vector3& p1, const Vector4& color, bool xray = false);
 	void FlushLines();
+
+	// ★追加: 現在のドローコールを直ちにフラッシュ（描画発行）し、キューをクリアする
+	void FlushDrawCalls();
 
 	bool CreateShaderPipeline(const std::string& shaderName, const std::wstring& vsPath, const std::wstring& psPath);
 	const std::vector<std::string>& GetShaderNames() const { return shaderNames_; }
@@ -212,6 +232,18 @@ private:
 		D3D12_VERTEX_BUFFER_VIEW vbView{};
 		D3D12_INDEX_BUFFER_VIEW ibView{};
 		uint32_t indexCount = 0;
+	};
+
+	struct DrawCall {
+		MeshHandle mesh;
+		TextureHandle tex;
+		Transform tr;
+		Vector4 color;
+		std::string shaderName;
+		bool isSkinned = false;
+		std::vector<Matrix4x4> bones;
+		bool isParticle = false;
+		Vector4 uvScaleOffset;
 	};
 
 private:
@@ -256,6 +288,10 @@ private:
 	uint32_t srvInc_ = 0;
 
 	uint32_t srvCursor_ = 10;
+	
+	// ★追加: RTV割り当て用
+	uint32_t rtvCursor_ = WindowDX::kBackBufferCount; // スワップチェーンの分をスキップ
+	uint32_t dsvCursor_ = 1; // メイン深度バッファの分をスキップ
 
 	static constexpr uint32_t kFrameCount = 2;
 	UploadRing upload_[kFrameCount]{};
@@ -270,12 +306,14 @@ private:
 
 	// ★追加: 3Dライン描画用
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoLine3D_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoLine3DXRay_;
 	struct LineVertex {
 		float x, y, z;    // position
 		float r, g, b, a; // color
 	};
 	static constexpr uint32_t kMaxLineVertices = 65536;
 	std::vector<LineVertex> lineVertices_;
+	std::vector<LineVertex> lineVerticesXRay_;
 
 	D3D12_VIEWPORT viewport_{};
 	D3D12_RECT scissor_{};
@@ -289,6 +327,9 @@ private:
 	D3D12_GPU_DESCRIPTOR_HANDLE ppSrvGpu_{};
 	D3D12_RESOURCE_STATES ppSceneState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 
+	// ★追加: カスタムレンダーターゲットのトラッキング
+	const CustomRenderTarget* currentCustomTarget_ = nullptr;
+
 	// ★追加: 最終描画先(エディタで表示、または画面にコピーする用)
 	Microsoft::WRL::ComPtr<ID3D12Resource> finalSceneColor_;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> finalRtvHeap_;
@@ -301,6 +342,14 @@ private:
 
 	// ★追加: 最終テクスチャをバックバッファにそのままコピーして映すパイプライン
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoCopy_;
+
+	// ★追加: シャドウマップ用リソース
+	Microsoft::WRL::ComPtr<ID3D12Resource> shadowMap_;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> shadowDsvHeap_;
+	D3D12_CPU_DESCRIPTOR_HANDLE shadowDsv_{};
+	D3D12_GPU_DESCRIPTOR_HANDLE shadowSrv_{};
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> shadowPso_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> shadowSkinPso_;
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -324,6 +373,8 @@ private:
 
 	bool framePPEnabled_ = false;
 	bool backBufferBarrierState_ = false;
+
+	std::vector<DrawCall> drawCalls_; // ★追加: ドローコールバッファ
 
 	// ★変更: Mesh構造体ではなくModelクラスへのスマートポインタで管理
 	std::vector<std::shared_ptr<Model>> models_;

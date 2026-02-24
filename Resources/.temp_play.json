@@ -91,7 +91,7 @@
       "components": [
         {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources\\walk.gltf", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "lightmapPath": ""},
         {"type": "BoxCollider", "enabled": true, "center": [0,0.8,0], "size": [0.7,1.6,0.7]},
-        {"type": "Animator", "enabled": true, "currentAnimation": "Armature|mixamo.com|Layer0", "isPlaying": true, "loop": true, "speed": [10], "time": [267.347]}
+        {"type": "Animator", "enabled": true, "currentAnimation": "Armature|mixamo.com|Layer0", "isPlaying": true, "loop": true, "speed": [10], "time": [802.589]}
       ]
     },
     {
@@ -104,7 +104,7 @@
       "scale": [1, 1, 1],
       "color": [1, 1, 1, 1],
       "components": [
-        {"type": "ParticleEmitter", "enabled": true, "isPlaying": false, "emitRate": 10, "burstCount": 0, "lifeTime": 1, "lifeTimeVariance": 0.2, "startVelocity": [0,1,0], "velocityVariance": [0.5,0.5,0.5], "acceleration": [0,-9.8,0], "startSize": [1,1,1], "endSize": [0,0,0], "startColor": [1,1,1,1], "endColor": [1,1,1,0], "isAdditive": false}
+        {"type": "ParticleEmitter", "enabled": true, "isPlaying": false, "emitRate": 0, "burstCount": 0, "lifeTime": 0, "lifeTimeVariance": 0, "startVelocity": [0,1,0], "velocityVariance": [0.5,0.5,0.5], "acceleration": [0,-9.8,0], "startSize": [1,1,1], "endSize": [0,0,0], "startColor": [1,1,1,1], "endColor": [1,1,1,0], "isAdditive": false, "assetPath": ""}
       ]
     }
   ]

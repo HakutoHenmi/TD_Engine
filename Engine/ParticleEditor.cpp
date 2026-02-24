@@ -1,29 +1,95 @@
 #include "ParticleEditor.h"
 #include "../externals/imgui/imgui.h"
+#include <algorithm>
 
 namespace Engine {
 
 void ParticleEditor::Initialize() {
 	previewEmitter_.Initialize(*Renderer::GetInstance(), "PreviewEmitter");
 	targetEmitter = &previewEmitter_;
+
+	// ★追加: プレビュー用レンダーターゲットとカメラの初期化
+	previewTarget_ = Renderer::GetInstance()->CreateRenderTarget(512, 512);
+
+	previewCamera_.Initialize();
+	// ★修正: 透視投影行列を設定（これがないと何も描画されない）
+	previewCamera_.SetProjection(0.7854f, 1.0f, 0.1f, 200.0f); // FOV=45度, aspect=1:1
+	previewCamera_.SetPosition(0, 2, -10);
 }
 
 void ParticleEditor::Update(float dt) {
 	if (targetEmitter == &previewEmitter_) {
 		previewEmitter_.Update(dt);
 	}
+
+	// ★追加: カメラ操作 (ImGuiウィンドウ上でドラッグ可能にする)
+	if (ImGui::IsMouseDragging(ImGuiMouseButton_Right)) {
+		ImVec2 delta = ImGui::GetIO().MouseDelta;
+		camRotX_ -= delta.y * 0.01f;
+		camRotY_ -= delta.x * 0.01f;
+	}
+	camDist_ -= ImGui::GetIO().MouseWheel * 1.0f;
+	camDist_ = (std::max)(1.0f, camDist_);
+
+	// カメラ座標の計算 (極座標から直交座標)
+	Vector3 pos;
+	pos.x = camDist_ * cosf(camRotX_) * sinf(camRotY_);
+	pos.y = camDist_ * sinf(camRotX_);
+	pos.z = camDist_ * cosf(camRotX_) * cosf(camRotY_);
+	
+	previewCamera_.SetPosition(pos.x, pos.y, pos.z);
+	// ★修正: LookAtで常に原点方向を向かせる（SetRotationだとズレやすい）
+	previewCamera_.LookAt(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
 }
 
 void ParticleEditor::DrawPreview(const Camera& cam) {
-	if (targetEmitter == &previewEmitter_) {
-		previewEmitter_.Draw(cam);
-	}
+	(void)cam; // unused
+	// ★変更: このDrawPreview自体はメイン描画からは呼ばれないが、
+	// Renderer内部の独自パスでオフスクリーン描画を実行する
 }
 
 void ParticleEditor::DrawUI() {
 	if (!targetEmitter) return;
 
 	ImGui::Begin("Particle Editor");
+
+	// ★追加: プレビュー映像の描画
+	ImGui::Text("Preview (Right-click drag to rotate, Scroll to zoom)");
+	ImVec2 previewSize(512, 512);
+	
+	// レンダリング先をこのウィンドウのテクスチャに変更
+	Renderer::GetInstance()->BeginCustomRenderTarget(previewTarget_);
+
+	// ★追加: プレビュー用カメラを適用
+	Renderer::GetInstance()->SetCamera(previewCamera_);
+
+	// ★追加: グリッド線の描画（XZ平面、-5〜+5）
+	auto* r = Renderer::GetInstance();
+	const float gridSize = 5.0f;
+	const float gridStep = 1.0f;
+	Vector4 gridColor = {0.35f, 0.35f, 0.35f, 1.0f};
+	for (float i = -gridSize; i <= gridSize; i += gridStep) {
+		r->DrawLine3D({i, 0, -gridSize}, {i, 0, gridSize}, gridColor);
+		r->DrawLine3D({-gridSize, 0, i}, {gridSize, 0, i}, gridColor);
+	}
+
+	// ★追加: 原点ギズモ（XYZ軸の表示）
+	const float axisLen = 2.0f;
+	r->DrawLine3D({0,0,0}, {axisLen,0,0}, {1.0f, 0.2f, 0.2f, 1.0f}); // X: 赤
+	r->DrawLine3D({0,0,0}, {0,axisLen,0}, {0.2f, 1.0f, 0.2f, 1.0f}); // Y: 緑
+	r->DrawLine3D({0,0,0}, {0,0,axisLen}, {0.3f, 0.3f, 1.0f, 1.0f}); // Z: 青
+
+	// パーティクルの描画
+	if (targetEmitter == &previewEmitter_) {
+		previewEmitter_.Draw(previewCamera_);
+	}
+
+	// ★即座に描画コマンドを発行して、プレビューターゲットに書き込む
+	r->FlushDrawCalls();
+	Renderer::GetInstance()->EndCustomRenderTarget();
+
+	// ImGui上に画像として表示
+	ImGui::Image((ImTextureID)previewTarget_.srvGpu.ptr, previewSize);
 
 	if (ImGui::CollapsingHeader("File", ImGuiTreeNodeFlags_DefaultOpen)) {
 		ImGui::InputText("File Path", filePathBuf_, sizeof(filePathBuf_));

@@ -1501,9 +1501,7 @@ void EditorUI::DrawSelectionGizmo(Engine::Renderer* renderer, GameScene* scene) 
 			for (auto& eg : edges) renderer->DrawLine3D(cv[eg[0]], cv[eg[1]], colColor);
 		}
 	}
-	renderer->FlushLines();
 }
-
 // ====== ★ Animation Window ======
 void EditorUI::ShowAnimationWindow(Engine::Renderer* renderer, GameScene* scene) {
 	(void)renderer;
