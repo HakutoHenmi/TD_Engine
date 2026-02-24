@@ -7,6 +7,16 @@
 int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int cmdShow) {
 	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
+	// ★追加: 実行ファイルのディレクトリにCWDを設定
+	// （ビルド後のコピー先に Resources/ があるため、相対パスが正しく解決される）
+	{
+		wchar_t exePath[MAX_PATH];
+		GetModuleFileNameW(nullptr, exePath, MAX_PATH);
+		wchar_t* lastSlash = wcsrchr(exePath, L'\\');
+		if (lastSlash) *lastSlash = L'\0';
+		SetCurrentDirectoryW(exePath);
+	}
+
 	Engine::App app;
 
 	app.SetSceneRegistrar([](Engine::SceneManager& sm, Engine::WindowDX& dx) {

@@ -290,7 +290,7 @@ bool WindowDX::CreateRTVDSV_() {
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC d{};
 		d.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-		d.NumDescriptors = kBackBufferCount;
+		d.NumDescriptors = kBackBufferCount + 64; // ★拡張: カスタムRTV用に余裕を持たせる
 		if (FAILED(dev_->CreateDescriptorHeap(&d, IID_PPV_ARGS(&rtvH_))))
 			return false;
 		rtvInc_ = dev_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
@@ -306,7 +306,7 @@ bool WindowDX::CreateRTVDSV_() {
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC d{};
 		d.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-		d.NumDescriptors = 1;
+		d.NumDescriptors = 1 + 64; // ★拡張: カスタムDSV用に余裕を持たせる
 		if (FAILED(dev_->CreateDescriptorHeap(&d, IID_PPV_ARGS(&dsvH_))))
 			return false;
 		dsvInc_ = dev_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);

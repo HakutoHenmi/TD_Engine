@@ -19,6 +19,13 @@ public:
 
 private:
 	char filePathBuf_[256] = "Resources/particle.json";
+
+	// ★追加: プレビュー用のレンダーターゲットとカメラ
+	Renderer::CustomRenderTarget previewTarget_;
+	Camera previewCamera_;
+	float camRotX_ = 0.5f;
+	float camRotY_ = -0.5f;
+	float camDist_ = 10.0f;
 };
 
 } // namespace Engine

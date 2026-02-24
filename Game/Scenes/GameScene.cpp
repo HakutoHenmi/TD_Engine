@@ -213,9 +213,6 @@ void GameScene::Draw() {
     DrawEditorGizmos();
 #endif
 
-    // ★追加: スタンドアロンエディタのプレビュー描画
-    particleEditor_.DrawPreview(camera_);
-
     for (const auto& obj : objects_) {
         bool hasMeshRenderer = false;
         for (const auto& mr : obj.meshRenderers) {
@@ -331,7 +328,7 @@ void GameScene::DrawSelectionHighlight() {
             DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&v[i]), p);
         }
         int edges[][2] = {{0,1},{1,2},{2,3},{3,0},{4,5},{5,6},{6,7},{7,4},{0,4},{1,5},{2,6},{3,7}};
-        for (auto& eg : edges) renderer_->DrawLine3D(v[eg[0]], v[eg[1]], hlColor);
+        for (auto& eg : edges) renderer_->DrawLine3D(v[eg[0]], v[eg[1]], hlColor, true); // ★ ハイライトはX-Ray
 
         // ★追加: コライダー可視化 (緑色のワイヤーフレーム)
         for (const auto& bc : obj.boxColliders) {
@@ -349,7 +346,7 @@ void GameScene::DrawSelectionHighlight() {
                 DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(cv[i].x, cv[i].y, cv[i].z, 1.0f), worldMat);
                 DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&cv[i]), p);
             }
-            for (auto& eg : edges) renderer_->DrawLine3D(cv[eg[0]], cv[eg[1]], colColor);
+            for (auto& eg : edges) renderer_->DrawLine3D(cv[eg[0]], cv[eg[1]], colColor, true); // ★ コライダーもX-Ray
         }
 
         // ★ ギズモ軸描画 (ローカル座標ベースで回転を適用)
@@ -360,7 +357,7 @@ void GameScene::DrawSelectionHighlight() {
             Engine::Vector3 wp0, wp1;
             DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&wp0), p0);
             DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&wp1), p1);
-            renderer_->DrawLine3D(wp0, wp1, col);
+            renderer_->DrawLine3D(wp0, wp1, col, true); // ★ ギズモ軸はX-Ray
         };
 
         const float al = 2.0f, ar = 0.3f;
@@ -407,27 +404,31 @@ void GameScene::DrawSelectionHighlight() {
             drawLocalLine({0,e,al-e}, {0,-e,al+e}, cZ);
         }
     }
-    renderer_->FlushLines();
 }
 
 void GameScene::DrawEditorGizmos() {
     if (!renderer_) return;
-    const float gridSize = 50.0f, step = 1.0f;
+    const float gridSize = 100.0f, step = 1.0f; // Unity style large grid
     for (float i = -gridSize; i <= gridSize; i += step) {
-        float alpha = 0.15f;
-        if (std::fabs(i) < 0.01f) continue;
-        if (std::fmod(std::fabs(i), 10.0f) < 0.01f) alpha = 0.35f;
-        else if (std::fmod(std::fabs(i), 5.0f) < 0.01f) alpha = 0.25f;
-        Engine::Vector4 gc = {0.5f, 0.5f, 0.5f, alpha};
-        renderer_->DrawLine3D({-gridSize, 0.0f, i}, {gridSize, 0.0f, i}, gc);
-        renderer_->DrawLine3D({i, 0.0f, -gridSize}, {i, 0.0f, gridSize}, gc);
+        if (std::fabs(i) < 0.01f) continue; // Skip axes
+        
+        // Major lines every 10 units
+        bool isMajor = std::fmod(std::fabs(i), 10.0f) < 0.01f;
+        float alpha = isMajor ? 0.35f : 0.15f;
+        Engine::Vector4 gc = {0.6f, 0.6f, 0.6f, alpha}; // Gray lines
+        
+        renderer_->DrawLine3D({-gridSize, 0.0f, i}, {gridSize, 0.0f, i}, gc, false);
+        renderer_->DrawLine3D({i, 0.0f, -gridSize}, {i, 0.0f, gridSize}, gc, false);
     }
-    renderer_->DrawLine3D({-gridSize, 0.0f, 0.0f}, {gridSize, 0.0f, 0.0f}, {0.8f, 0.2f, 0.2f, 0.6f});
-    renderer_->DrawLine3D({0.0f, 0.0f, -gridSize}, {0.0f, 0.0f, gridSize}, {0.2f, 0.2f, 0.8f, 0.6f});
-    renderer_->DrawLine3D({0, 0, 0}, {1.5f, 0, 0}, {1.f, 0.2f, 0.2f, 1.f});
-    renderer_->DrawLine3D({0, 0, 0}, {0, 1.5f, 0}, {0.2f, 1.f, 0.2f, 1.f});
-    renderer_->DrawLine3D({0, 0, 0}, {0, 0, 1.5f}, {0.2f, 0.2f, 1.f, 1.f});
-    renderer_->FlushLines();
+    
+    // Unity Style Main Axes
+    renderer_->DrawLine3D({-gridSize, 0.0f, 0.0f}, {gridSize, 0.0f, 0.0f}, {0.8f, 0.2f, 0.2f, 0.7f}, false); // X-Axis (Red)
+    renderer_->DrawLine3D({0.0f, 0.0f, -gridSize}, {0.0f, 0.0f, gridSize}, {0.2f, 0.2f, 0.8f, 0.7f}, false); // Z-Axis (Blue)
+    
+    // 原点の中心ギズモ (X-Ray)
+    renderer_->DrawLine3D({0, 0, 0}, {1.5f, 0, 0}, {1.f, 0.2f, 0.2f, 1.f}, true);
+    renderer_->DrawLine3D({0, 0, 0}, {0, 1.5f, 0}, {0.2f, 1.f, 0.2f, 1.f}, true);
+    renderer_->DrawLine3D({0, 0, 0}, {0, 0, 1.5f}, {0.2f, 0.2f, 1.f, 1.f}, true);
 }
 
 void GameScene::DrawEditor() {
