@@ -1,8 +1,6 @@
 #include "App.h"
 #include <Windows.h>
 
-// ★GameSceneを知るために必要
-#include "GameScene.h"
 
 namespace Engine {
 
@@ -10,6 +8,7 @@ bool App::Initialize(HINSTANCE hInst, int cmdShow) {
 	sceneManager_.SetDX(&dx_);
 	if (!dx_.Initialize(hInst, cmdShow, hwnd_))
 		return false;
+
 
 	if (!renderer_.Initialize(&dx_))
 		return false;
@@ -19,12 +18,8 @@ bool App::Initialize(HINSTANCE hInst, int cmdShow) {
 	audio_.Initialize();
 
 	// ImGui初期化
-	const uint32_t kImGuiFontSrvIndex = 0;
-	ID3D12DescriptorHeap* srvHeap = dx_.SRV();
-	D3D12_CPU_DESCRIPTOR_HANDLE fontCpuHandle = dx_.SRV_CPU(kImGuiFontSrvIndex);
-	D3D12_GPU_DESCRIPTOR_HANDLE fontGpuHandle = dx_.SRV_GPU(kImGuiFontSrvIndex);
-
-	if (!imgui_.Initialize(hwnd_, dx_, srvHeap, fontCpuHandle, fontGpuHandle)) {
+	// ImGui
+	if (!imgui_.Initialize(hwnd_, dx_, dx_.SRV(), dx_.SRV_CPU(0), dx_.SRV_GPU(0), 18.0f, "Resources/fonts/Huninn/Huninn-Regular.ttf")) {
 		return false;
 	}
 
@@ -75,15 +70,10 @@ void App::Run() {
 		renderer_.EndFrame();
 
 		// 3. エディター表示
-		Engine::IScene* currentScene = sceneManager_.Current();
-		auto* gameScene = dynamic_cast<Game::GameScene*>(currentScene);
-
-		if (gameScene) {
-			// ★修正: gameSceneポインタそのものを渡す (ShowEditorUIの引数変更に対応)
-			imgui_.ShowEditorUI(renderer_.GetPostProcessSRV(), gameScene);
-		} else {
-			// GameScene以外では表示しない、または空のUIなどを検討
-		}
+ 		Engine::IScene* currentScene = sceneManager_.Current();
+ 		if (currentScene) {
+ 			currentScene->DrawEditor();
+ 		}
 
 		imgui_.Render(dx_);
 		dx_.EndFrame();

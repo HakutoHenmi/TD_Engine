@@ -3,6 +3,11 @@
 
 namespace Engine {
 
+
+SceneManager* SceneManager::instance_ = nullptr;
+
+SceneManager* SceneManager::GetInstance() { return instance_; }
+
 void SceneManager::Register(const std::string& name, Factory factory) { factories_[name] = std::move(factory); }
 
 bool SceneManager::Has(const std::string& name) const { return factories_.find(name) != factories_.end(); }

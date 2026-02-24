@@ -1,0 +1,9 @@
+{
+  "name": "Model",
+  "modelPath": "Resources\\walk.gltf",
+  "texturePath": "",
+  "translate": [-4.84315, 1.20886, -16.1033],
+  "rotate": [0, 0, 0],
+  "scale": [1, 1, 1],
+  "color": [1, 1, 1, 1]
+}

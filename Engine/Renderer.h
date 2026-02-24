@@ -109,11 +109,11 @@ public:
 
 	struct PostProcessParams {
 		float time = 0.0f;
-		float noiseStrength = 0.06f;
-		float distortion = 0.0025f;
-		float chromaShift = 0.0015f;
-		float vignette = 0.75f;
-		float scanline = 0.20f;
+		float noiseStrength = 0.0f;
+		float distortion = 0.0f;
+		float chromaShift = 0.0f;
+		float vignette = 0.0f;
+		float scanline = 0.0f;
 		float san = 0.0f;
 	};
 
@@ -143,6 +143,16 @@ public:
 
 	D3D12_GPU_DESCRIPTOR_HANDLE GetPostProcessSRV() const { return ppSrvGpu_; }
 
+	// ★追加: Gameシーンの最終出力テクスチャ。エディタUIからここを描画する。
+	D3D12_GPU_DESCRIPTOR_HANDLE GetGameFinalSRV() const { return finalSrvGpu_; }
+
+	// ★追加: 描画領域を強制上書きするメソッド
+	// これを呼び出すと、次回の BeginFrame()/EndFrame() において指定領域に描画される
+	void SetGameViewport(float x, float y, float w, float h);
+
+	// ★追加: 描画領域を元（フルスクリーン）に戻すメソッド
+	void ResetGameViewport();
+
 	void SetCamera(const Camera& camera);
 
 	void SetAmbientColor(const Vector3& color);
@@ -160,13 +170,28 @@ public:
 	TextureHandle LoadTexture2D(const std::string& filePath, bool sRGB = true);
 	MeshHandle LoadObjMesh(const std::string& objFilePath);
 
+	// ★追加: テクスチャのSRVハンドルを取得 (ImGui::Imageでサムネイル表示用)
+	D3D12_GPU_DESCRIPTOR_HANDLE GetTextureSrvGpu(TextureHandle handle) const {
+		if (handle < textures_.size()) return textures_[handle].srvGpu;
+		return D3D12_GPU_DESCRIPTOR_HANDLE{0};
+	}
+
 	// 通常メッシュ描画
 	void DrawMesh(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, const std::string& shaderName = "Default");
+
+	// ★追加: パーティクル描画 (UVスケール・オフセット付き)
+	void DrawParticle(MeshHandle mesh, TextureHandle texture, const Transform& transform, 
+					  const Vector4& mulColor, const Vector4& uvScaleOffset, 
+					  const std::string& shaderName = "Particle");
 
 	// ★スキニングメッシュ描画
 	void DrawSkinnedMesh(MeshHandle mesh, TextureHandle texture, const Transform& transform, const std::vector<Matrix4x4>& bones, const Vector4& mulColor = {1, 1, 1, 1});
 
 	void DrawSprite(TextureHandle texture, const SpriteDesc& sprite);
+
+	// ★追加: 3Dライン描画（エディタ用ギズモ・グリッドなど）
+	void DrawLine3D(const Vector3& p0, const Vector3& p1, const Vector4& color);
+	void FlushLines();
 
 	bool CreateShaderPipeline(const std::string& shaderName, const std::wstring& vsPath, const std::wstring& psPath);
 	const std::vector<std::string>& GetShaderNames() const { return shaderNames_; }
@@ -243,6 +268,15 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSig2D_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> pso2D_;
 
+	// ★追加: 3Dライン描画用
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoLine3D_;
+	struct LineVertex {
+		float x, y, z;    // position
+		float r, g, b, a; // color
+	};
+	static constexpr uint32_t kMaxLineVertices = 65536;
+	std::vector<LineVertex> lineVertices_;
+
 	D3D12_VIEWPORT viewport_{};
 	D3D12_RECT scissor_{};
 
@@ -255,8 +289,18 @@ private:
 	D3D12_GPU_DESCRIPTOR_HANDLE ppSrvGpu_{};
 	D3D12_RESOURCE_STATES ppSceneState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 
+	// ★追加: 最終描画先(エディタで表示、または画面にコピーする用)
+	Microsoft::WRL::ComPtr<ID3D12Resource> finalSceneColor_;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> finalRtvHeap_;
+	D3D12_CPU_DESCRIPTOR_HANDLE finalRtv_{};
+	D3D12_GPU_DESCRIPTOR_HANDLE finalSrvGpu_{};
+	D3D12_RESOURCE_STATES finalSceneState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSigPP_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoPP_;
+
+	// ★追加: 最終テクスチャをバックバッファにそのままコピーして映すパイプライン
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoCopy_;
 
 #ifdef _MSC_VER
 #pragma warning(push)

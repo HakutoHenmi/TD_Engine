@@ -24,6 +24,9 @@ public:
 	// 毎フレーム描画（3D/2D/UI をここで）
 	virtual void Draw() = 0;
 
+	// エディターUI描画（デバッグ用）
+	virtual void DrawEditor() {}
+
 	// このシーンを終了するか？（true で次のシーンへ）
 	// ※ ゲーム側が任意の条件で true を返す
 	virtual bool IsEnd() const { return false; }

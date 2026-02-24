@@ -10,10 +10,6 @@
 #include <string>
 #include <vector>
 
-// GameSceneの前方宣言
-namespace Game {
-class GameScene;
-}
 
 namespace Engine {
 
@@ -24,8 +20,6 @@ public:
 	    const char* jpFontPath = "Resources/fonts/Huninn/Huninn-Regular.ttf");
 
 	void NewFrame(WindowDX& dx);
-
-	void ShowEditorUI(D3D12_GPU_DESCRIPTOR_HANDLE sceneTextureHandle, Game::GameScene* gameScene);
 
 	void Render(WindowDX& dx);
 	void Shutdown();

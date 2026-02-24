@@ -93,6 +93,12 @@
     <ClCompile Include="Engine\Particle.cpp">
       <Filter>ソース ファイル\Engine</Filter>
     </ClCompile>
+    <ClCompile Include="Engine\ParticleEmitter.cpp">
+      <Filter>ソース ファイル\Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="Engine\ParticleEditor.cpp">
+      <Filter>ソース ファイル\Engine</Filter>
+    </ClCompile>
     <ClCompile Include="Engine\TextureManager.cpp">
       <Filter>ソース ファイル\Engine</Filter>
     </ClCompile>
@@ -302,6 +308,12 @@
       <Filter>ソース ファイル\Game\Actor</Filter>
     </ClInclude>
     <ClInclude Include="Engine\Particle.h">
+      <Filter>ソース ファイル\Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\ParticleEmitter.h">
+      <Filter>ソース ファイル\Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\ParticleEditor.h">
       <Filter>ソース ファイル\Engine</Filter>
     </ClInclude>
     <ClInclude Include="Engine\TextureManager.h">
