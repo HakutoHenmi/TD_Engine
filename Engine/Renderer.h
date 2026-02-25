@@ -213,6 +213,12 @@ public:
 	// ★追加: 現在のドローコールを直ちにフラッシュ（描画発行）し、キューをクリアする
 	void FlushDrawCalls();
 
+	// ★追加: コンピュートシェーダーで衝突判定を実行
+	void BeginCollisionCheck(uint32_t maxPairs = 1024);
+	void DispatchCollision(MeshHandle meshA, const Transform& trA, MeshHandle meshB, const Transform& trB, uint32_t resultIndex);
+	void EndCollisionCheck();
+	bool GetCollisionResult(uint32_t resultIndex) const;
+
 	bool CreateShaderPipeline(const std::string& shaderName, const std::wstring& vsPath, const std::wstring& psPath);
 	const std::vector<std::string>& GetShaderNames() const { return shaderNames_; }
 
@@ -297,6 +303,14 @@ private:
 	UploadRing upload_[kFrameCount]{};
 
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSig3D_;
+
+	// ★追加: コンピュート用
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSigCompute_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoCollision_;
+	Microsoft::WRL::ComPtr<ID3D12Resource> collisionResultBuffer_;
+	Microsoft::WRL::ComPtr<ID3D12Resource> collisionReadbackBuffer_;
+	uint32_t* collisionReadbackMapped_ = nullptr;
+	uint32_t collisionMaxPairs_ = 0;
 
 	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D12PipelineState>> pipelines_;
 	std::vector<std::string> shaderNames_;

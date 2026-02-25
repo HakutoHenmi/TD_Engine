@@ -1,6 +1,7 @@
 #include "GameScene.h"
 #include "../Editor/EditorUI.h"
 #include "imgui.h"
+#include "Audio.h"
 #include <cmath>
 
 namespace Game {
@@ -12,7 +13,14 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
     camera_.SetPosition(0, 2, -5);
     camera_.SetRotation(0.2f, 0, 0);
     renderer_->SetAmbientColor({0.4f, 0.4f, 0.45f});
-    renderer_->SetDirectionalLight({0.3f, -1.0f, 0.5f}, {1.0f, 0.95f, 0.9f}, true);
+
+    // デフォルトの太陽光オブジェクトを作成
+    SceneObject sun;
+    sun.name = "Sun";
+    sun.translate = {0, 10, 0};
+    sun.rotate = {DirectX::XMConvertToRadians(45.0f), DirectX::XMConvertToRadians(30.0f), 0};
+    sun.directionalLights.push_back(DirectionalLightComponent());
+    objects_.push_back(sun);
 
     SceneObject plane;
     plane.name = "Plane";
@@ -28,8 +36,247 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 }
 
 void GameScene::Update() {
-    // ★追加: アニメーションの更新 (エディタモードでも時間が進むようにする)
     float dt = ImGui::GetIO().DeltaTime;
+    auto* input = Engine::Input::GetInstance();
+
+    // -------------------------------------------------------------
+    // ★ 1. Player Input System (意思決定)
+    // -------------------------------------------------------------
+    if (isPlaying_) {
+        for (auto& obj : objects_) {
+            for (auto& pi : obj.playerInputs) {
+                if (!pi.enabled) continue;
+
+            // WASD入力から移動ベクトルを作成
+            DirectX::XMFLOAT2 moveDir = {0.0f, 0.0f};
+            if (input->Down(DIK_W)) moveDir.y += 1.0f;
+            if (input->Down(DIK_S)) moveDir.y -= 1.0f;
+            if (input->Down(DIK_A)) moveDir.x -= 1.0f;
+            if (input->Down(DIK_D)) moveDir.x += 1.0f;
+
+            // 正規化
+            float len = std::sqrt(moveDir.x * moveDir.x + moveDir.y * moveDir.y);
+            if (len > 0.001f) {
+                moveDir.x /= len;
+                moveDir.y /= len;
+            }
+            pi.moveDir = moveDir;
+
+            // ジャンプ入力
+            			if (input->Trigger(DIK_SPACE)) pi.jumpRequested = true;
+			else pi.jumpRequested = false;
+
+            // 攻撃入力など (現在はマウス左クリックの代わりにJキーなどを使用)
+            if (input->Trigger(DIK_J)) pi.attackRequested = true;
+            else pi.attackRequested = false;
+
+            // マウス視点操作 (右ドラッグ中のみ旋回)
+            pi.cameraYaw = 0.0f;
+            pi.cameraPitch = 0.0f;
+            
+            // DirectInputのMouse Stateを直接持っているわけではないが、通常 VK_RBUTTON 等はGetKeyStateなどで取れる。
+            // しかしInputクラスにMouse Buttonの取得メソッドがないため、Windows APIの GetAsyncKeyState を使うか、Inputを拡張する。
+            if (GetAsyncKeyState(VK_RBUTTON) & 0x8000) {
+                float dx = input->GetMouseDeltaX();
+                float dy = input->GetMouseDeltaY();
+                pi.cameraYaw = dx * 0.005f;   // 感度調整
+                pi.cameraPitch = dy * 0.005f;
+            }
+        }
+    }
+    } // end isPlaying_ Input System
+
+    // -------------------------------------------------------------
+    // ★ 2. Character Movement System (実際の移動処理)
+    // -------------------------------------------------------------
+    if (isPlaying_) {
+        for (auto& obj : objects_) {
+            // PlayerInput がある場合はその意思を受け取る
+            DirectX::XMFLOAT2 moveDir = {0, 0};
+            bool wantJump = false;
+        if (!obj.playerInputs.empty() && obj.playerInputs[0].enabled) {
+            moveDir = obj.playerInputs[0].moveDir;
+            wantJump = obj.playerInputs[0].jumpRequested;
+        }
+
+        for (auto& cm : obj.characterMovements) {
+            if (!cm.enabled) continue;
+
+            // カメラのY軸回転を利用して、移動方向をカメラ基準にする
+            auto camRot = camera_.Rotation();
+            float cy = std::cos(camRot.y);
+            float sy = std::sin(camRot.y);
+
+            // X->Right, Y->Forward
+            float moveX = moveDir.x * cy + moveDir.y * sy;
+            float moveZ = -moveDir.x * sy + moveDir.y * cy;
+
+            // 平面移動
+            obj.translate.x += moveX * cm.speed * dt;
+            obj.translate.z += moveZ * cm.speed * dt;
+
+            // オブジェクトの向き(Y軸回転)を移動方向に向ける (SmoothDamp等の補間があるとより良い)
+            if (std::abs(moveDir.x) > 0.01f || std::abs(moveDir.y) > 0.01f) {
+                float targetYaw = std::atan2(moveX, moveZ);
+                // 簡易的に即座に振り向く
+                obj.rotate.y = targetYaw;
+            }
+
+            // 重力とジャンプ
+            if (!cm.isGrounded) {
+                cm.velocityY += cm.gravity * dt;
+            }
+
+            if (cm.isGrounded && wantJump) {
+                cm.velocityY = cm.jumpPower;
+                cm.isGrounded = false;
+            }
+
+            obj.translate.y += cm.velocityY * dt;
+
+            // 簡易的な床判定 (Y=0を床とする。GpuMeshColliderと連携する場合はそちらを使用)
+            if (obj.translate.y <= 0.0f) {
+                obj.translate.y = 0.0f;
+                cm.velocityY = 0.0f;
+                cm.isGrounded = true;
+            } else {
+                cm.isGrounded = false;
+            }
+        }
+    }
+    } // end isPlaying_ Movement System
+
+    // -------------------------------------------------------------
+    // ★ 3. Camera Follow System (カメラ追従)
+    // -------------------------------------------------------------
+    if (isPlaying_) {
+        for (const auto& obj : objects_) {
+            for (const auto& ct : obj.cameraTargets) {
+                if (!ct.enabled) continue;
+
+            // オブジェクトの座標
+            DirectX::XMFLOAT3 targetPos = obj.translate;
+
+            // 現在のカメラの角度（マウス右ドラッグ等で変更されている前提）
+            DirectX::XMFLOAT3 camRot = camera_.Rotation();
+
+            // 追従目標の計算（オブジェクトの後ろ・上に配置）
+            // 視点の更新 (PlayerInputなどで設定した回転量を適用)
+            // この簡易実装では、オブジェクトの最初の PlayerInput の intent をそのまま使用します。
+            if (!obj.playerInputs.empty() && obj.playerInputs[0].enabled) {
+                auto rot = camera_.Rotation();
+                rot.y += obj.playerInputs[0].cameraYaw;
+                rot.x += obj.playerInputs[0].cameraPitch;
+                
+                // ピッチの制限 (上下を見すぎないように)
+                const float PITCH_LIMIT = 1.5f; // 約85度
+                if (rot.x > PITCH_LIMIT) rot.x = PITCH_LIMIT;
+                if (rot.x < -PITCH_LIMIT) rot.x = -PITCH_LIMIT;
+                
+                camera_.SetRotation(rot);
+            }
+
+            // カメラの現在の回転から、ターゲットに対するオフセットを計算
+            auto curRot = camera_.Rotation();
+            // Y軸回転 (Yaw) と X軸回転 (Pitch) を考慮したオフセット
+            float camSy = std::sin(curRot.y);
+            float camCy = std::cos(curRot.y);
+            float camSx = std::sin(curRot.x);
+            float camCx = std::cos(curRot.x);
+
+            // カメラはターゲットから後方(-cy, -sy) かつ 上方(sx)に配置
+            // 球面座標系ベースのオフセット計算
+            DirectX::XMFLOAT3 offset = {
+                -camSy * camCx * ct.distance,
+                ct.height + camSx * ct.distance,
+                -camCy * camCx * ct.distance
+            };
+            // ※ 元の実装は単純に Z に distance でしたが、旋回に対応するため変更しました。
+            // Engine::Camera の仕様（Pitch=X, Yaw=Y）に合わせた想定の回転オフセット計算です。
+            // 注意: TD_EngineのCamera実装によっては xyz の軸マッピングが異なる可能性があります。
+
+            DirectX::XMFLOAT3 desiredPos = {
+                targetPos.x + offset.x,
+                targetPos.y + offset.y,
+                targetPos.z + offset.z
+            };
+
+            // スムーズなカメラ移動 (Lerp)
+            DirectX::XMFLOAT3 currentPos = camera_.Position();
+            float t = ct.smoothSpeed * dt;
+            if (t > 1.0f) t = 1.0f;
+
+            DirectX::XMFLOAT3 newPos = {
+                currentPos.x + (desiredPos.x - currentPos.x) * t,
+                currentPos.y + (desiredPos.y - currentPos.y) * t,
+                currentPos.z + (desiredPos.z - currentPos.z) * t
+            };
+
+            camera_.SetPosition(newPos);
+            break; // 1つのカメラターゲットのみ追従
+        }
+    }
+    } // end isPlaying_ Camera System
+
+    // ★追加: 前フレームのGPUポリゴン当たり判定結果の読み取りと、今フレームのディスパッチ
+    if (renderer_) {
+        // 結果の反映
+        uint32_t pairIndex = 0;
+        for (size_t i = 0; i < objects_.size(); ++i) {
+            auto& objA = objects_[i];
+            for (auto& mc : objA.gpuMeshColliders) mc.isIntersecting = false;
+        }
+
+        for (size_t i = 0; i < objects_.size(); ++i) {
+            auto& objA = objects_[i];
+            if (objA.gpuMeshColliders.empty() || !objA.gpuMeshColliders[0].enabled) continue;
+
+            for (size_t j = i + 1; j < objects_.size(); ++j) {
+                auto& objB = objects_[j];
+                if (objB.gpuMeshColliders.empty() || !objB.gpuMeshColliders[0].enabled) continue;
+
+                if (renderer_->GetCollisionResult(pairIndex)) {
+                    objA.gpuMeshColliders[0].isIntersecting = true;
+                    objB.gpuMeshColliders[0].isIntersecting = true;
+                }
+                pairIndex++;
+            }
+        }
+
+        // 今フレームのディスパッチ
+        uint32_t numPairs = 0;
+        for (size_t i = 0; i < objects_.size(); ++i) {
+            if (!objects_[i].gpuMeshColliders.empty() && objects_[i].gpuMeshColliders[0].enabled) {
+                for (size_t j = i + 1; j < objects_.size(); ++j) {
+                    if (!objects_[j].gpuMeshColliders.empty() && objects_[j].gpuMeshColliders[0].enabled) numPairs++;
+                }
+            }
+        }
+
+        renderer_->BeginCollisionCheck(numPairs);
+        pairIndex = 0;
+        for (size_t i = 0; i < objects_.size(); ++i) {
+            auto& objA = objects_[i];
+            if (objA.gpuMeshColliders.empty() || !objA.gpuMeshColliders[0].enabled) continue;
+
+            for (size_t j = i + 1; j < objects_.size(); ++j) {
+                auto& objB = objects_[j];
+                if (objB.gpuMeshColliders.empty() || !objB.gpuMeshColliders[0].enabled) continue;
+
+                uint32_t meshA = objA.gpuMeshColliders[0].meshHandle;
+                uint32_t meshB = objB.gpuMeshColliders[0].meshHandle;
+                
+                if (meshA == 0) meshA = objA.modelHandle;
+                if (meshB == 0) meshB = objB.modelHandle;
+
+                if (meshA != 0 && meshB != 0) {
+                    renderer_->DispatchCollision(meshA, objA.GetTransform(), meshB, objB.GetTransform(), pairIndex);
+                }
+                pairIndex++;
+            }
+        }
+        renderer_->EndCollisionCheck();
+    }
 
     for (auto& obj : objects_) {
         for (auto& anim : obj.animators) {
@@ -187,6 +434,59 @@ void GameScene::Update() {
         }
     }
 
+    // -------------------------------------------------------------
+    // ★ 4. Light System (ライト情報の Renderer への送信)
+    // -------------------------------------------------------------
+    if (renderer_) {
+        int plCount = 0;
+        int slCount = 0;
+        bool hasDirLight = false;
+
+        for (const auto& obj : objects_) {
+            for (const auto& dl : obj.directionalLights) {
+                if (dl.enabled && !hasDirLight) {
+                    // Y軸回転等を考慮したZ軸(前方向)を取得
+                    Engine::Matrix4x4 mat = obj.GetTransform().ToMatrix();
+                    Engine::Vector3 dir = {mat.m[2][0], mat.m[2][1], mat.m[2][2]};
+                    Engine::Vector3 color = {dl.color.x * dl.intensity, dl.color.y * dl.intensity, dl.color.z * dl.intensity};
+                    renderer_->SetDirectionalLight(dir, color, true);
+                    hasDirLight = true;
+                }
+            }
+            for (const auto& pl : obj.pointLights) {
+                if (pl.enabled && plCount < Engine::Renderer::kMaxPointLights) {
+                    Engine::Vector3 pos = {obj.translate.x, obj.translate.y, obj.translate.z};
+                    Engine::Vector3 color = {pl.color.x * pl.intensity, pl.color.y * pl.intensity, pl.color.z * pl.intensity};
+                    Engine::Vector3 atten = {pl.atten.x, pl.atten.y, pl.atten.z};
+                    renderer_->SetPointLight(plCount, pos, color, pl.range, atten, true);
+                    plCount++;
+                }
+            }
+            for (const auto& sl : obj.spotLights) {
+                if (sl.enabled && slCount < Engine::Renderer::kMaxSpotLights) {
+                    Engine::Matrix4x4 mat = obj.GetTransform().ToMatrix();
+                    Engine::Vector3 dir = {mat.m[2][0], mat.m[2][1], mat.m[2][2]};
+                    Engine::Vector3 pos = {obj.translate.x, obj.translate.y, obj.translate.z};
+                    Engine::Vector3 color = {sl.color.x * sl.intensity, sl.color.y * sl.intensity, sl.color.z * sl.intensity};
+                    Engine::Vector3 atten = {sl.atten.x, sl.atten.y, sl.atten.z};
+                    renderer_->SetSpotLight(slCount, pos, dir, color, sl.range, sl.innerCos, sl.outerCos, atten, true);
+                    slCount++;
+                }
+            }
+        }
+
+        // 見つからなかったスロットのライトを無効化
+        if (!hasDirLight) {
+            renderer_->SetDirectionalLight({0, -1, 0}, {0, 0, 0}, false);
+        }
+        for (int i = plCount; i < Engine::Renderer::kMaxPointLights; ++i) {
+            renderer_->SetPointLight(i, {0, 0, 0}, {0, 0, 0}, 0, {1, 0, 0}, false);
+        }
+        for (int i = slCount; i < Engine::Renderer::kMaxSpotLights; ++i) {
+            renderer_->SetSpotLight(i, {0, 0, 0}, {0, -1, 0}, {0, 0, 0}, 0, 0.0f, 0.0f, {1, 0, 0}, false);
+        }
+    }
+
     // ★追加: パーティクルの更新 (Transformを追従させる)
     for (auto& obj : objects_) {
         for (auto& emitterComp : obj.particleEmitters) {
@@ -203,6 +503,77 @@ void GameScene::Update() {
             // エミッターの位置をオブジェクトの位置に合わせる
             emitterComp.emitter.params.position = {obj.translate.x, obj.translate.y, obj.translate.z};
             emitterComp.emitter.Update(dt);
+        }
+    }
+
+    // ★追加: AudioSource の Play モード開始時自動再生 & 3D距離減衰
+    if (isPlaying_) {
+        // AudioListener の位置を取得 (最初に見つかったものを使用、なければカメラ位置)
+        DirectX::XMFLOAT3 listenerPos = camera_.Position();
+        for (const auto& obj : objects_) {
+            for (const auto& al : obj.audioListeners) {
+                if (al.enabled) {
+                    listenerPos = obj.translate;
+                    goto found_listener;
+                }
+            }
+        }
+        found_listener:
+
+        auto* audio = Engine::Audio::GetInstance();
+        if (audio) {
+            for (auto& obj : objects_) {
+                for (auto& as : obj.audioSources) {
+                    if (!as.enabled) continue;
+
+                    // playOnStart で未再生ならば再生開始
+                    if (as.playOnStart && !as.isPlaying && as.soundHandle != 0xFFFFFFFF) {
+                        as.voiceHandle = audio->Play(as.soundHandle, as.loop, as.volume);
+                        as.isPlaying = true;
+                    }
+
+                    // 音量更新 & 3D距離減衰 (再生中のみ)
+                    if (as.isPlaying && as.voiceHandle != 0) {
+                        float finalVol = as.volume;
+                        if (as.is3D) {
+                            float dx = obj.translate.x - listenerPos.x;
+                            float dy = obj.translate.y - listenerPos.y;
+                            float dz = obj.translate.z - listenerPos.z;
+                            float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+                            if (as.maxDistance > 0.001f) {
+                                float atten = 1.0f - (dist / as.maxDistance);
+                                if (atten < 0.0f) atten = 0.0f;
+                                // より自然な減衰にするため2乗減衰を適用
+                                atten = atten * atten;
+                                finalVol *= atten;
+                            }
+                        }
+                        audio->SetVolume(as.voiceHandle, finalVol);
+                    }
+                }
+            }
+        }
+    }
+
+    // ★追加: Health の更新処理 (無敵時間のカウントダウン等)
+    if (isPlaying_) {
+        for (auto& obj : objects_) {
+            for (auto& hc : obj.healths) {
+                if (!hc.enabled || hc.isDead) continue;
+
+                // 無敵時間の減少
+                if (hc.invincibleTime > 0.0f) {
+                    hc.invincibleTime -= dt;
+                    if (hc.invincibleTime < 0.0f) hc.invincibleTime = 0.0f;
+                }
+
+                // 簡易的な死亡判定
+                if (hc.hp <= 0.0f && !hc.isDead) {
+                    hc.isDead = true;
+                    // TODO: 死亡時のエフェクト生成やオブジェクト削除フラグ立てなど
+                    // EditorUI::Log("Object Died: " + obj.name); // GameSceneからEditorUIの機能は直接呼べないので必要ならリスナー経由で
+                }
+            }
         }
     }
 }
@@ -286,6 +657,7 @@ void GameScene::Draw() {
 #ifdef _DEBUG
     // ★ 選択ハイライトをDraw()内で描画（ゲームテクスチャに描画されるように）
     DrawSelectionHighlight();
+    DrawLightGizmos();
 #endif
     // ★追加: パーティクルの描画 (各オブジェクトのコンポーネント)
     for (auto& obj : objects_) {
@@ -347,6 +719,61 @@ void GameScene::DrawSelectionHighlight() {
                 DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&cv[i]), p);
             }
             for (auto& eg : edges) renderer_->DrawLine3D(cv[eg[0]], cv[eg[1]], colColor, true); // ★ コライダーもX-Ray
+        }
+
+        // ★追加: GPUメッシュコライダーの可視化 (交差時は赤、通常時は青)
+        for (const auto& gmc : obj.gpuMeshColliders) {
+            if (!gmc.enabled) continue;
+            Engine::Vector4 gColor = gmc.isIntersecting ? Engine::Vector4{1.0f, 0.2f, 0.2f, 0.8f} : Engine::Vector4{0.2f, 0.2f, 1.0f, 0.8f};
+            // とりあえずAABBだけ描画する (実際のメッシュワイヤーは見づらいため)
+            float hs = 1.0f; // 簡易描画用
+            Engine::Vector3 cv[8] = {
+                {-hs,-hs,-hs},{hs,-hs,-hs},{hs,hs,-hs},{-hs,hs,-hs},
+                {-hs,-hs,hs},{hs,-hs,hs},{hs,hs,hs},{-hs,hs,hs},
+            };
+            for(int i=0; i<8; ++i) {
+                DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(cv[i].x, cv[i].y, cv[i].z, 1.0f), worldMat);
+                DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&cv[i]), p);
+            }
+            for (auto& eg : edges) renderer_->DrawLine3D(cv[eg[0]], cv[eg[1]], gColor, true); 
+        }
+
+        // ★追加: Hitbox 可視化 (赤色ワイヤーフレーム)
+        for (const auto& hb : obj.hitboxes) {
+            if (!hb.enabled) continue;
+            float hx = hb.size.x * 0.5f;
+            float hy = hb.size.y * 0.5f;
+            float hz = hb.size.z * 0.5f;
+            Engine::Vector3 cp = {hb.center.x, hb.center.y, hb.center.z};
+            Engine::Vector4 hbColor = hb.isActive ? Engine::Vector4{1.0f, 0.2f, 0.2f, 1.0f} : Engine::Vector4{1.0f, 0.2f, 0.2f, 0.3f};
+            Engine::Vector3 hv[8] = {
+                {cp.x-hx,cp.y-hy,cp.z-hz},{cp.x+hx,cp.y-hy,cp.z-hz},{cp.x+hx,cp.y+hy,cp.z-hz},{cp.x-hx,cp.y+hy,cp.z-hz},
+                {cp.x-hx,cp.y-hy,cp.z+hz},{cp.x+hx,cp.y-hy,cp.z+hz},{cp.x+hx,cp.y+hy,cp.z+hz},{cp.x-hx,cp.y+hy,cp.z+hz},
+            };
+            for(int i=0; i<8; ++i) {
+                DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(hv[i].x, hv[i].y, hv[i].z, 1.0f), worldMat);
+                DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&hv[i]), p);
+            }
+            for (auto& eg : edges) renderer_->DrawLine3D(hv[eg[0]], hv[eg[1]], hbColor, true);
+        }
+
+        // ★追加: Hurtbox 可視化 (緑色ワイヤーフレーム)
+        for (const auto& hb : obj.hurtboxes) {
+            if (!hb.enabled) continue;
+            float hx = hb.size.x * 0.5f;
+            float hy = hb.size.y * 0.5f;
+            float hz = hb.size.z * 0.5f;
+            Engine::Vector3 cp = {hb.center.x, hb.center.y, hb.center.z};
+            Engine::Vector4 hbColor = {0.2f, 1.0f, 0.5f, 0.6f};
+            Engine::Vector3 hv[8] = {
+                {cp.x-hx,cp.y-hy,cp.z-hz},{cp.x+hx,cp.y-hy,cp.z-hz},{cp.x+hx,cp.y+hy,cp.z-hz},{cp.x-hx,cp.y+hy,cp.z-hz},
+                {cp.x-hx,cp.y-hy,cp.z+hz},{cp.x+hx,cp.y-hy,cp.z+hz},{cp.x+hx,cp.y+hy,cp.z+hz},{cp.x-hx,cp.y+hy,cp.z+hz},
+            };
+            for(int i=0; i<8; ++i) {
+                DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(hv[i].x, hv[i].y, hv[i].z, 1.0f), worldMat);
+                DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&hv[i]), p);
+            }
+            for (auto& eg : edges) renderer_->DrawLine3D(hv[eg[0]], hv[eg[1]], hbColor, true);
         }
 
         // ★ ギズモ軸描画 (ローカル座標ベースで回転を適用)
@@ -438,6 +865,52 @@ void GameScene::DrawEditor() {
     // ★追加: スタンドアロンパーティクルエディタのUI
     particleEditor_.DrawUI();
 #endif
+}
+
+void GameScene::DrawLightGizmos() {
+    if (!renderer_) return;
+
+    for (size_t i = 0; i < objects_.size(); ++i) {
+        auto& obj = objects_[i];
+        Engine::Vector3 pos = {obj.translate.x, obj.translate.y, obj.translate.z};
+        Engine::Matrix4x4 mat = obj.GetTransform().ToMatrix();
+        // Z axis is forward
+        Engine::Vector3 fwd = {mat.m[2][0], mat.m[2][1], mat.m[2][2]};
+
+        bool isSelected = (selectedIndices_.find((int)i) != selectedIndices_.end());
+        float alpha = isSelected ? 1.0f : 0.4f;
+
+        for (const auto& dl : obj.directionalLights) {
+            if (!dl.enabled) continue;
+            Engine::Vector4 col = {1.0f, 0.9f, 0.2f, alpha}; // Yellow
+            // 太陽光の方向を示すライン (長さ5)
+            renderer_->DrawLine3D(pos, {pos.x + fwd.x * 5.0f, pos.y + fwd.y * 5.0f, pos.z + fwd.z * 5.0f}, col, true);
+            // 太陽アイコンの代わりのボックス
+            float s = 0.5f;
+            renderer_->DrawLine3D({pos.x-s, pos.y, pos.z}, {pos.x+s, pos.y, pos.z}, col, true);
+            renderer_->DrawLine3D({pos.x, pos.y-s, pos.z}, {pos.x, pos.y+s, pos.z}, col, true);
+        }
+
+        for (const auto& pl : obj.pointLights) {
+            if (!pl.enabled) continue;
+            Engine::Vector4 col = {0.2f, 0.9f, 0.2f, alpha}; // Green
+            float s = 0.5f;
+            renderer_->DrawLine3D({pos.x-s, pos.y, pos.z}, {pos.x+s, pos.y, pos.z}, col, true);
+            renderer_->DrawLine3D({pos.x, pos.y-s, pos.z}, {pos.x, pos.y+s, pos.z}, col, true);
+            renderer_->DrawLine3D({pos.x, pos.y, pos.z-s}, {pos.x, pos.y, pos.z+s}, col, true);
+        }
+
+        for (const auto& sl : obj.spotLights) {
+            if (!sl.enabled) continue;
+            Engine::Vector4 col = {0.2f, 0.8f, 1.0f, alpha}; // Blue
+            // 方向を示すライン
+            renderer_->DrawLine3D(pos, {pos.x + fwd.x * 5.0f, pos.y + fwd.y * 5.0f, pos.z + fwd.z * 5.0f}, col, true);
+            // アイコン代わりのクロス
+            float s = 0.5f;
+            renderer_->DrawLine3D({pos.x-s, pos.y, pos.z}, {pos.x+s, pos.y, pos.z}, col, true);
+            renderer_->DrawLine3D({pos.x, pos.y-s, pos.z}, {pos.x, pos.y+s, pos.z}, col, true);
+        }
+    }
 }
 
 } // namespace Game

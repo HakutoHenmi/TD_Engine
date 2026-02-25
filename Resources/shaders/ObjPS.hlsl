@@ -22,31 +22,82 @@ float4 main(VSOutput input) : SV_TARGET
     float3 N = normalize(input.normal);
     float3 V = normalize(cameraPos - input.worldpos.xyz);
     
-    // ベースカラー（テクスチャ * オブジェクト色 * アンビエント）
+    // ベースカラー
     float3 albedo = texcolor.rgb * color.rgb;
+    // アンビエント成分
     float3 finalColor = albedo * ambientColor;
 
-    // スポットライト計算
-    if (spotLight.enabled != 0)
+    // ----------------------------------------------------
+    // Directional Lights
+    // ----------------------------------------------------
+    for (int i = 0; i < MAX_DIR_LIGHTS; ++i)
     {
-        float3 Lvec = spotLight.position - input.worldpos.xyz;
-        float d = length(Lvec);
-        
-        if (d < spotLight.range)
+        if (dirLights[i].enabled != 0)
         {
-            float3 L = Lvec / max(d, 1e-5);
-            float cosAng = dot(L, normalize(spotLight.direction));
-            float ang = smoothstep(spotLight.outerCos, spotLight.innerCos, cosAng);
-            float att = AttenDist(spotLight.atten, d);
-
+            float3 L = normalize(-dirLights[i].direction);
             float NdotL = saturate(dot(N, L));
-            float3 H = normalize(L + V);
-            float spec = pow(saturate(dot(N, H)), 32.0f); // Shininess 32.0
             
-            float3 diffuse = albedo * NdotL;
-            float3 specular = float3(spec, spec, spec) * m_specular;
+            float3 H = normalize(L + V);
+            float spec = pow(saturate(dot(N, H)), 32.0f); // Shininess=32
 
-            finalColor += (diffuse + specular) * spotLight.color * att * ang;
+            float3 diffuse = albedo * NdotL;
+            float3 specular = m_specular * spec;
+
+            finalColor += (diffuse + specular) * dirLights[i].color;
+        }
+    }
+
+    // ----------------------------------------------------
+    // Point Lights
+    // ----------------------------------------------------
+    for (int j = 0; j < MAX_POINT_LIGHTS; ++j)
+    {
+        if (pointLights[j].enabled != 0)
+        {
+            float3 Lvec = pointLights[j].position - input.worldpos.xyz;
+            float d = length(Lvec);
+            if (d < pointLights[j].range)
+            {
+                float3 L = Lvec / max(d, 1e-5);
+                float att = AttenDist(pointLights[j].atten, d);
+
+                float NdotL = saturate(dot(N, L));
+                float3 H = normalize(L + V);
+                float spec = pow(saturate(dot(N, H)), 32.0f);
+
+                float3 diffuse = albedo * NdotL;
+                float3 specular = m_specular * spec;
+
+                finalColor += (diffuse + specular) * pointLights[j].color * att;
+            }
+        }
+    }
+
+    // ----------------------------------------------------
+    // Spot Lights
+    // ----------------------------------------------------
+    for (int k = 0; k < MAX_SPOT_LIGHTS; ++k)
+    {
+        if (spotLights[k].enabled != 0)
+        {
+            float3 Lvec = spotLights[k].position - input.worldpos.xyz;
+            float d = length(Lvec);
+            if (d < spotLights[k].range)
+            {
+                float3 L = Lvec / max(d, 1e-5);
+                float cosAng = dot(L, normalize(spotLights[k].direction));
+                float ang = smoothstep(spotLights[k].outerCos, spotLights[k].innerCos, cosAng);
+                float att = AttenDist(spotLights[k].atten, d);
+
+                float NdotL = saturate(dot(N, L));
+                float3 H = normalize(L + V);
+                float spec = pow(saturate(dot(N, H)), 32.0f);
+
+                float3 diffuse = albedo * NdotL;
+                float3 specular = m_specular * spec;
+
+                finalColor += (diffuse + specular) * spotLights[k].color * att * ang;
+            }
         }
     }
 

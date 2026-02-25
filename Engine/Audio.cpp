@@ -120,6 +120,24 @@ void Audio::Stop(size_t voiceHandle) {
 	}
 }
 
+void Audio::SetVolume(size_t voiceHandle, float volume) {
+	auto it = activeVoices_.find(voiceHandle);
+	if (it != activeVoices_.end() && it->second.source) {
+		it->second.source->SetVolume(volume);
+	}
+}
+
+void Audio::StopAll() {
+	for(auto& pair : activeVoices_) {
+		if(pair.second.source) {
+			pair.second.source->Stop();
+			pair.second.source->FlushSourceBuffers();
+			pair.second.source->DestroyVoice();
+		}
+	}
+	activeVoices_.clear();
+}
+
 void Audio::GarbageCollect() {
 	// 再生が終了している非ループボイスを削除
 	for (auto it = activeVoices_.begin(); it != activeVoices_.end();) {

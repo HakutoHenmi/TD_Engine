@@ -14,6 +14,8 @@ public:
 	void Update();
 	void Shutdown();
 
+	static Input* GetInstance() { return instance_; }
+
 	// ===== Keyboard =====
 	bool Down(BYTE k) const { return (keyState_[k] & 0x80) != 0; }
 	bool Trigger(BYTE k) const { return Down(k) && !(prevKey_[k] & 0x80); }
@@ -40,6 +42,8 @@ private:
 	float mouseX_ = 0.0f;
 	float mouseY_ = 0.0f;
 	float wheel_ = 0.0f;
+
+	static Input* instance_;
 };
 
 } // namespace Engine

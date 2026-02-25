@@ -23,8 +23,10 @@ public:
     void DrawEditorGizmos();
     // ★追加: 選択オブジェクトのハイライトとギズモを描画
     void DrawSelectionHighlight();
+    // ★追加: ライト用ギズモの描画
+    void DrawLightGizmos();
 
-    bool isPlaying_ = false;
+    // The original public `isPlaying_` is removed as per the instruction's implied move to private.
 
 private:
     Engine::WindowDX* dx_ = nullptr;
@@ -33,6 +35,11 @@ private:
     std::vector<SceneObject> objects_;
     std::set<int> selectedIndices_;
     int selectedObjectIndex_ = -1;
+
+    const std::vector<SceneObject>& GetObjects() const { return objects_; }
+    void SetObjects(const std::vector<SceneObject>& o) { objects_ = o; }
+
+    bool isPlaying_ = false; // ★追加: エディタからのPlayモード管理
 
     // ★追加: 個別のパーティクルエディター
     Engine::ParticleEditor particleEditor_;

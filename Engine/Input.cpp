@@ -5,7 +5,10 @@
 
 namespace Engine {
 
+Input* Input::instance_ = nullptr;
+
 void Input::Initialize(HINSTANCE hInst, HWND hwnd) {
+	instance_ = this;
 	HRESULT hr;
 
 	// --- DirectInput本体 ---
@@ -75,6 +78,7 @@ void Input::Shutdown() {
 	kb_.Reset();
 	mouse_.Reset();
 	di_.Reset();
+	instance_ = nullptr;
 }
 
 } // namespace Engine
