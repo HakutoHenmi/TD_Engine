@@ -17,26 +17,82 @@ cbuffer WorldTransform : register(b1)
     float4 color; // オブジェクトカラー
 };
 
+// 方向光源構造体
+struct DirectionalLight
+{
+    float3 direction;
+    float pad0;
+    float3 color;
+    float pad1;
+    uint enabled;
+    float3 pad2;
+};
+
+// 点光源構造体
+struct PointLight
+{
+    float3 position;
+    float pad0;
+    float3 color;
+    float range;
+    float3 atten;
+    float pad1;
+    uint enabled;
+    float3 pad2;
+};
+
 // スポットライト構造体
 struct SpotLight
 {
-    float3 position; // 座標
-    float range; // 範囲
-    float3 direction; // 方向
-    float innerCos; // 内側コサイン
-    float3 color; // 色
-    float outerCos; // 外側コサイン
-    float3 atten; // 減衰
-    uint enabled; // 有効フラグ
+    float3 position;
+    float pad0;
+    float3 direction;
+    float range;
+    float3 color;
+    float innerCos;
+    float3 atten;
+    float outerCos;
+    uint enabled;
     float3 pad;
 };
+
+// エリアライト構造体 (現状未使用だがバッファ一致用)
+struct AreaLight
+{
+    float3 position;
+    float pad0;
+    float3 color;
+    float range;
+    float3 right;
+    float halfWidth;
+    float3 up;
+    float halfHeight;
+    float3 direction;
+    float pad1;
+    float3 atten;
+    float pad2;
+    uint enabled;
+    float3 pad3;
+};
+
+// 最大ライト数 (Renderer.h と一致)
+#define MAX_DIR_LIGHTS 1
+#define MAX_POINT_LIGHTS 4
+#define MAX_SPOT_LIGHTS 4
+#define MAX_AREA_LIGHTS 4
 
 // b2: ライト情報 (Renderer::LightCB に対応)
 cbuffer LightGroup : register(b2)
 {
     float3 ambientColor;
     float pad0;
-    SpotLight spotLight; // 単一のスポットライト
+
+    DirectionalLight dirLights[MAX_DIR_LIGHTS];
+    PointLight pointLights[MAX_POINT_LIGHTS];
+    SpotLight spotLights[MAX_SPOT_LIGHTS];
+    AreaLight areaLights[MAX_AREA_LIGHTS];
+    
+    matrix shadowMatrix;
 };
 
 // マテリアル定数 (固定値)

@@ -233,6 +233,13 @@ void Renderer::Shutdown() {
 	finalSceneState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 	psoCopy_.Reset();
 
+	if (collisionReadbackBuffer_ && collisionReadbackMapped_) {
+		collisionReadbackBuffer_->Unmap(0, nullptr);
+		collisionReadbackMapped_ = nullptr;
+	}
+	collisionResultBuffer_.Reset();
+	collisionReadbackBuffer_.Reset();
+
 	ppEnabled_ = true;
 	ppParams_ = PostProcessParams{};
 
@@ -904,6 +911,26 @@ bool Renderer::InitPipelines() {
 			return false;
 	}
 
+	// ★追加: コンピュート RootSignature
+	{
+		CD3DX12_ROOT_PARAMETER computeParams[6]{};
+		computeParams[0].InitAsConstantBufferView(0); // b0: Constants
+		computeParams[1].InitAsShaderResourceView(0); // t0: MeshA Vertices
+		computeParams[2].InitAsShaderResourceView(1); // t1: MeshA Indices
+		computeParams[3].InitAsShaderResourceView(2); // t2: MeshB Vertices
+		computeParams[4].InitAsShaderResourceView(3); // t3: MeshB Indices
+		computeParams[5].InitAsUnorderedAccessView(0); // u0: Result
+
+		CD3DX12_ROOT_SIGNATURE_DESC rsDescCompute;
+		rsDescCompute.Init(_countof(computeParams), computeParams, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_NONE);
+
+		ComPtr<ID3DBlob> sigCompute, errCompute;
+		if (FAILED(D3D12SerializeRootSignature(&rsDescCompute, D3D_ROOT_SIGNATURE_VERSION_1, &sigCompute, &errCompute)))
+			return false;
+		if (FAILED(dev_->CreateRootSignature(0, sigCompute->GetBufferPointer(), sigCompute->GetBufferSize(), IID_PPV_ARGS(&rootSigCompute_))))
+			return false;
+	}
+
 	// ---------------------------------------------------------
 	// Default Shader
 	// ---------------------------------------------------------
@@ -1250,6 +1277,15 @@ float4 main(PSIn i) : SV_TARGET { return i.color; }
 		pso.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_ALWAYS;
 		if (FAILED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoLine3DXRay_))))
 			return false;
+	}
+
+	// ★追加: コンピュート PSOの作成
+	auto csBlob = CompileShaderFromFile(L"Resources/shaders/CollisionCompute.hlsl", "main", "cs_5_0");
+	if (csBlob) {
+		D3D12_COMPUTE_PIPELINE_STATE_DESC computePsoDesc{};
+		computePsoDesc.pRootSignature = rootSigCompute_.Get();
+		computePsoDesc.CS = {csBlob->GetBufferPointer(), csBlob->GetBufferSize()};
+		dev_->CreateComputePipelineState(&computePsoDesc, IID_PPV_ARGS(&psoCollision_)); // 失敗しても続行
 	}
 
 	// ★追加: Particle用シェーダーのコンパイルと登録 (RootSignature作成後に行う必要がある)
@@ -1868,6 +1904,108 @@ void Renderer::EndCustomRenderTarget() {
 	ResetGameViewport();
 	list_->RSSetViewports(1, &viewport_);
 	list_->RSSetScissorRects(1, &scissor_);
+}
+
+void Renderer::BeginCollisionCheck(uint32_t maxPairs) {
+	if (collisionMaxPairs_ != maxPairs) {
+		if (collisionReadbackBuffer_ && collisionReadbackMapped_) {
+			collisionReadbackBuffer_->Unmap(0, nullptr);
+			collisionReadbackMapped_ = nullptr;
+		}
+		collisionResultBuffer_.Reset();
+		collisionReadbackBuffer_.Reset();
+		collisionMaxPairs_ = maxPairs;
+
+		if (maxPairs > 0) {
+			uint32_t bufferSize = maxPairs * sizeof(uint32_t);
+			
+			D3D12_HEAP_PROPERTIES defaultHeap = {D3D12_HEAP_TYPE_DEFAULT};
+			D3D12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+			dev_->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &resDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&collisionResultBuffer_));
+
+			D3D12_HEAP_PROPERTIES readbackHeap = {D3D12_HEAP_TYPE_READBACK};
+			D3D12_RESOURCE_DESC readbackDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize);
+			dev_->CreateCommittedResource(&readbackHeap, D3D12_HEAP_FLAG_NONE, &readbackDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&collisionReadbackBuffer_));
+			
+			collisionReadbackBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&collisionReadbackMapped_));
+		}
+	}
+
+	if (collisionResultBuffer_ && maxPairs > 0) {
+		uint32_t bufferSize = maxPairs * sizeof(uint32_t);
+		const uint32_t fi = window_->FrameIndex();
+		uint32_t off = upload_[fi].Allocate(bufferSize, 256);
+		if (off != UINT32_MAX) {
+			std::memset(upload_[fi].mapped + off, 0, bufferSize);
+			auto b1 = CD3DX12_RESOURCE_BARRIER::Transition(collisionResultBuffer_.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
+			list_->ResourceBarrier(1, &b1);
+			list_->CopyBufferRegion(collisionResultBuffer_.Get(), 0, upload_[fi].buffer.Get(), off, bufferSize);
+			auto b2 = CD3DX12_RESOURCE_BARRIER::Transition(collisionResultBuffer_.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			list_->ResourceBarrier(1, &b2);
+		}
+	}
+}
+
+void Renderer::DispatchCollision(MeshHandle meshA, const Transform& trA, MeshHandle meshB, const Transform& trB, uint32_t resultIndex) {
+	if (!psoCollision_ || !rootSigCompute_ || !collisionResultBuffer_) return;
+	auto* modelA = GetModel(meshA);
+	auto* modelB = GetModel(meshB);
+	if (!modelA || !modelB) return;
+
+	list_->SetPipelineState(psoCollision_.Get());
+	list_->SetComputeRootSignature(rootSigCompute_.Get());
+
+	struct CBCollision {
+		Matrix4x4 worldA;
+		Matrix4x4 worldB;
+		uint32_t numTrianglesA;
+		uint32_t numTrianglesB;
+		uint32_t resultIndex;
+		uint32_t pad1;
+	};
+	CBCollision cb{};
+	cb.worldA = trA.ToMatrix();
+	cb.worldB = trB.ToMatrix();
+	cb.numTrianglesA = modelA->GetIBV().SizeInBytes / sizeof(uint32_t) / 3;
+	cb.numTrianglesB = modelB->GetIBV().SizeInBytes / sizeof(uint32_t) / 3;
+	cb.resultIndex = resultIndex;
+
+	const uint32_t fi = window_->FrameIndex();
+	uint32_t off = upload_[fi].Allocate(sizeof(CBCollision), 256);
+	if (off == UINT32_MAX) return;
+	std::memcpy(upload_[fi].mapped + off, &cb, sizeof(CBCollision));
+	D3D12_GPU_VIRTUAL_ADDRESS cbAddr = upload_[fi].buffer->GetGPUVirtualAddress() + off;
+
+	list_->SetComputeRootConstantBufferView(0, cbAddr);
+	list_->SetComputeRootShaderResourceView(1, modelA->GetVBV().BufferLocation);
+	list_->SetComputeRootShaderResourceView(2, modelA->GetIBV().BufferLocation);
+	list_->SetComputeRootShaderResourceView(3, modelB->GetVBV().BufferLocation);
+	list_->SetComputeRootShaderResourceView(4, modelB->GetIBV().BufferLocation);
+	list_->SetComputeRootUnorderedAccessView(5, collisionResultBuffer_->GetGPUVirtualAddress());
+
+	uint32_t dispatchX = (cb.numTrianglesA + 7) / 8;
+	uint32_t dispatchY = (cb.numTrianglesB + 7) / 8;
+	if (dispatchX == 0 || dispatchY == 0) return;
+	list_->Dispatch(dispatchX, dispatchY, 1);
+}
+
+void Renderer::EndCollisionCheck() {
+	if (!collisionResultBuffer_ || !collisionReadbackBuffer_ || collisionMaxPairs_ == 0) return;
+	
+	auto b1 = CD3DX12_RESOURCE_BARRIER::Transition(collisionResultBuffer_.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+	list_->ResourceBarrier(1, &b1);
+	
+	list_->CopyBufferRegion(collisionReadbackBuffer_.Get(), 0, collisionResultBuffer_.Get(), 0, collisionMaxPairs_ * sizeof(uint32_t));
+	
+	auto b2 = CD3DX12_RESOURCE_BARRIER::Transition(collisionResultBuffer_.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	list_->ResourceBarrier(1, &b2);
+}
+
+bool Renderer::GetCollisionResult(uint32_t resultIndex) const {
+	if (resultIndex < collisionMaxPairs_ && collisionReadbackMapped_) {
+		return collisionReadbackMapped_[resultIndex] > 0;
+	}
+	return false;
 }
 
 } // namespace Engine

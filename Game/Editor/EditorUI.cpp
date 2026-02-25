@@ -4,6 +4,7 @@
 #include "../Scenes/GameScene.h"
 #include "SceneManager.h"
 #include "WindowDX.h"
+#include "Audio.h"
 #include <filesystem>
 #include <string>
 #include <deque>
@@ -127,6 +128,58 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 		ss<<", \"isAdditive\": "<<(p.isAdditive?"true":"false");
 		ss<<", \"assetPath\": \""<<EscapeJson(pe.assetPath)<<"\"";
 		ss<<"}";
+	}
+	for(const auto& gmc : o.gpuMeshColliders) {
+		if(!first) ss<<",\n"; first = false;
+		ss<<"        {\"type\": \"GpuMeshCollider\", \"enabled\": "<<(gmc.enabled?"true":"false")<<", \"isTrigger\": "<<(gmc.isTrigger?"true":"false")<<", \"meshPath\": \""<<EscapeJson(gmc.meshPath)<<"\"}";
+	}
+	// ★追加: PlayerInput
+	for(const auto& pi : o.playerInputs) {
+		if(!first) ss<<",\n"; first = false;
+		ss<<"        {\"type\": \"PlayerInput\", \"enabled\": "<<(pi.enabled?"true":"false")<<"}";
+	}
+	// ★追加: CharacterMovement
+	for(const auto& cm : o.characterMovements) {
+		if(!first) ss<<",\n"; first = false;
+		ss<<"        {\"type\": \"CharacterMovement\", \"enabled\": "<<(cm.enabled?"true":"false")<<", \"speed\": "<<cm.speed<<", \"jumpPower\": "<<cm.jumpPower<<", \"gravity\": "<<cm.gravity<<"}";
+	}
+	// ★追加: CameraTarget
+	for(const auto& ct : o.cameraTargets) {
+		if(!first) ss<<",\n"; first = false;
+		ss<<"        {\"type\": \"CameraTarget\", \"enabled\": "<<(ct.enabled?"true":"false")<<", \"distance\": "<<ct.distance<<", \"height\": "<<ct.height<<", \"smoothSpeed\": "<<ct.smoothSpeed<<"}";
+	}
+	// ★追加: Light Components
+	for(const auto& dl : o.directionalLights) {
+		if(!first) ss<<",\n"; first = false;
+		ss<<"        {\"type\": \"DirectionalLight\", \"enabled\": "<<(dl.enabled?"true":"false")<<", \"color\": ["<<dl.color.x<<","<<dl.color.y<<","<<dl.color.z<<"], \"intensity\": "<<dl.intensity<<"}";
+	}
+	for(const auto& pl : o.pointLights) {
+		if(!first) ss<<",\n"; first = false;
+		ss<<"        {\"type\": \"PointLight\", \"enabled\": "<<(pl.enabled?"true":"false")<<", \"color\": ["<<pl.color.x<<","<<pl.color.y<<","<<pl.color.z<<"], \"intensity\": "<<pl.intensity<<", \"range\": "<<pl.range<<", \"atten\": ["<<pl.atten.x<<","<<pl.atten.y<<","<<pl.atten.z<<"]}";
+	}
+	for(const auto& sl : o.spotLights) {
+		if(!first) ss<<",\n"; first = false;
+		ss<<"        {\"type\": \"SpotLight\", \"enabled\": "<<(sl.enabled?"true":"false")<<", \"color\": ["<<sl.color.x<<","<<sl.color.y<<","<<sl.color.z<<"], \"intensity\": "<<sl.intensity<<", \"range\": "<<sl.range<<", \"innerCos\": "<<sl.innerCos<<", \"outerCos\": "<<sl.outerCos<<", \"atten\": ["<<sl.atten.x<<","<<sl.atten.y<<","<<sl.atten.z<<"]}";
+	}
+	// ★追加: AudioSource
+	for(const auto& as : o.audioSources) {
+		if(!first) ss<<",\n"; first = false;
+		ss<<"        {\"type\": \"AudioSource\", \"enabled\": "<<(as.enabled?"true":"false")<<", \"soundPath\": \""<<EscapeJson(as.soundPath)<<"\", \"volume\": "<<as.volume<<", \"loop\": "<<(as.loop?"true":"false")<<", \"playOnStart\": "<<(as.playOnStart?"true":"false")<<", \"is3D\": "<<(as.is3D?"true":"false")<<", \"maxDistance\": "<<as.maxDistance<<"}";
+	}
+	// ★追加: AudioListener
+	for(const auto& al : o.audioListeners) {
+		if(!first) ss<<",\n"; first = false;
+		ss<<"        {\"type\": \"AudioListener\", \"enabled\": "<<(al.enabled?"true":"false")<<"}";
+	}
+	// ★追加: Hitbox
+	for(const auto& hb : o.hitboxes) {
+		if(!first) ss<<",\n"; first = false;
+		ss<<"        {\"type\": \"Hitbox\", \"enabled\": "<<(hb.enabled?"true":"false")<<", \"center\": ["<<hb.center.x<<","<<hb.center.y<<","<<hb.center.z<<"], \"size\": ["<<hb.size.x<<","<<hb.size.y<<","<<hb.size.z<<"], \"damage\": "<<hb.damage<<", \"isActive\": "<<(hb.isActive?"true":"false")<<", \"tag\": \""<<EscapeJson(hb.tag)<<"\"}";
+	}
+	// ★追加: Hurtbox
+	for(const auto& hb : o.hurtboxes) {
+		if(!first) ss<<",\n"; first = false;
+		ss<<"        {\"type\": \"Hurtbox\", \"enabled\": "<<(hb.enabled?"true":"false")<<", \"center\": ["<<hb.center.x<<","<<hb.center.y<<","<<hb.center.z<<"], \"size\": ["<<hb.size.x<<","<<hb.size.y<<","<<hb.size.z<<"], \"tag\": \""<<EscapeJson(hb.tag)<<"\", \"damageMultiplier\": "<<hb.damageMultiplier<<"}";
 	}
 	ss<<"\n      ]\n";
 	ss<<"    }";
@@ -281,6 +334,99 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 			auto ec = ExtractArray(cblock, "endColor"); if(ec.size()>=4) p.endColor = {ec[0],ec[1],ec[2],ec[3]};
 			if (cblock.find("\"isAdditive\"") != std::string::npos) p.isAdditive = boolCheck("isAdditive", false);
 			obj.particleEmitters.push_back(pe);
+		} else if (type == "GpuMeshCollider") { // ★追加
+			GpuMeshColliderComponent gmc; gmc.enabled = enabled;
+			auto tPos = cblock.find("\"isTrigger\""); if(tPos!=std::string::npos && cblock.find("true",tPos)!=std::string::npos && cblock.find("true",tPos)<tPos+30) gmc.isTrigger=true; else gmc.isTrigger=false;
+			gmc.meshPath = ExtractString(cblock, "meshPath");
+			if (!gmc.meshPath.empty()) gmc.meshHandle = renderer->LoadObjMesh(gmc.meshPath);
+			obj.gpuMeshColliders.push_back(gmc);
+		} else if (type == "PlayerInput") { // ★追加
+			PlayerInputComponent pi; pi.enabled = enabled;
+			obj.playerInputs.push_back(pi);
+		} else if (type == "CharacterMovement") { // ★追加
+			CharacterMovementComponent cm; cm.enabled = enabled;
+			auto floatCheck = [&](const std::string& k, float def) { auto a = ExtractArray(cblock, k); return a.empty() ? def : a[0]; };
+			if (cblock.find("\"speed\"") != std::string::npos) cm.speed = floatCheck("speed", 5.0f);
+			if (cblock.find("\"jumpPower\"") != std::string::npos) cm.jumpPower = floatCheck("jumpPower", 6.0f);
+			if (cblock.find("\"gravity\"") != std::string::npos) cm.gravity = floatCheck("gravity", -9.8f);
+			obj.characterMovements.push_back(cm);
+		} else if (type == "CameraTarget") { // ★追加
+			CameraTargetComponent ct; ct.enabled = enabled;
+			auto floatCheck = [&](const std::string& k, float def) { auto a = ExtractArray(cblock, k); return a.empty() ? def : a[0]; };
+			if (cblock.find("\"distance\"") != std::string::npos) ct.distance = floatCheck("distance", 10.0f);
+			if (cblock.find("\"height\"") != std::string::npos) ct.height = floatCheck("height", 3.0f);
+			if (cblock.find("\"smoothSpeed\"") != std::string::npos) ct.smoothSpeed = floatCheck("smoothSpeed", 5.0f);
+			obj.cameraTargets.push_back(ct);
+		} else if (type == "DirectionalLight") { // ★追加
+			DirectionalLightComponent dl; dl.enabled = enabled;
+			auto floatCheck = [&](const std::string& k, float def) { auto a = ExtractArray(cblock, k); return a.empty() ? def : a[0]; };
+			auto col = ExtractArray(cblock, "color"); if (col.size() >= 3) dl.color = {col[0], col[1], col[2]};
+			if (cblock.find("\"intensity\"") != std::string::npos) dl.intensity = floatCheck("intensity", 1.0f);
+			obj.directionalLights.push_back(dl);
+		} else if (type == "PointLight") { // ★追加
+			PointLightComponent pl; pl.enabled = enabled;
+			auto floatCheck = [&](const std::string& k, float def) { auto a = ExtractArray(cblock, k); return a.empty() ? def : a[0]; };
+			auto col = ExtractArray(cblock, "color"); if (col.size() >= 3) pl.color = {col[0], col[1], col[2]};
+			if (cblock.find("\"intensity\"") != std::string::npos) pl.intensity = floatCheck("intensity", 1.0f);
+			if (cblock.find("\"range\"") != std::string::npos) pl.range = floatCheck("range", 10.0f);
+			auto atten = ExtractArray(cblock, "atten"); if (atten.size() >= 3) pl.atten = {atten[0], atten[1], atten[2]};
+			obj.pointLights.push_back(pl);
+		} else if (type == "SpotLight") { // ★追加
+			SpotLightComponent sl; sl.enabled = enabled;
+			auto floatCheck = [&](const std::string& k, float def) { auto a = ExtractArray(cblock, k); return a.empty() ? def : a[0]; };
+			auto col = ExtractArray(cblock, "color"); if (col.size() >= 3) sl.color = {col[0], col[1], col[2]};
+			if (cblock.find("\"intensity\"") != std::string::npos) sl.intensity = floatCheck("intensity", 1.0f);
+			if (cblock.find("\"range\"") != std::string::npos) sl.range = floatCheck("range", 20.0f);
+			if (cblock.find("\"innerCos\"") != std::string::npos) sl.innerCos = floatCheck("innerCos", 0.98f);
+			if (cblock.find("\"outerCos\"") != std::string::npos) sl.outerCos = floatCheck("outerCos", 0.90f);
+			auto atten = ExtractArray(cblock, "atten"); if (atten.size() >= 3) sl.atten = {atten[0], atten[1], atten[2]};
+			obj.spotLights.push_back(sl);
+		} else if (type == "AudioSource") { // ★追加
+			AudioSourceComponent as; as.enabled = enabled;
+			as.soundPath = ExtractString(cblock, "soundPath");
+			auto floatCheck = [&](const std::string& k, float def) { auto a = ExtractArray(cblock, k); return a.empty() ? def : a[0]; };
+			auto boolCheck = [&](const std::string& k, bool def) { auto pos = cblock.find("\""+k+"\""); if(pos==std::string::npos) return def; return cblock.find("true",pos)<pos+30; };
+			if (cblock.find("\"volume\"") != std::string::npos) as.volume = floatCheck("volume", 1.0f);
+			if (cblock.find("\"loop\"") != std::string::npos) as.loop = boolCheck("loop", false);
+			if (cblock.find("\"playOnStart\"") != std::string::npos) as.playOnStart = boolCheck("playOnStart", false);
+			if (cblock.find("\"is3D\"") != std::string::npos) as.is3D = boolCheck("is3D", true);
+			if (cblock.find("\"maxDistance\"") != std::string::npos) as.maxDistance = floatCheck("maxDistance", 50.0f);
+			// 音声ファイルをロード
+			if (!as.soundPath.empty()) {
+				auto* audio = Engine::Audio::GetInstance();
+				if (audio) as.soundHandle = audio->Load(as.soundPath);
+			}
+			obj.audioSources.push_back(as);
+		} else if (type == "AudioListener") { // ★追加
+			AudioListenerComponent al; al.enabled = enabled;
+			obj.audioListeners.push_back(al);
+		} else if (type == "Hitbox") { // ★追加
+			HitboxComponent hb; hb.enabled = enabled;
+			auto cen = ExtractArray(cblock, "center"); if(cen.size()>=3) hb.center={cen[0],cen[1],cen[2]};
+			auto sz = ExtractArray(cblock, "size"); if(sz.size()>=3) hb.size={sz[0],sz[1],sz[2]};
+			auto floatCheck = [&](const std::string& k, float def) { auto a = ExtractArray(cblock, k); return a.empty() ? def : a[0]; };
+			if (cblock.find("\"damage\"") != std::string::npos) hb.damage = floatCheck("damage", 10.0f);
+			auto aPos = cblock.find("\"isActive\""); if(aPos!=std::string::npos && cblock.find("true",aPos)!=std::string::npos && cblock.find("true",aPos)<aPos+30) hb.isActive=true; else hb.isActive=false;
+			hb.tag = ExtractString(cblock, "tag"); if(hb.tag.empty()) hb.tag = "Default";
+			obj.hitboxes.push_back(hb);
+		} else if (type == "Hurtbox") { // ★追加
+			HurtboxComponent hb; hb.enabled = enabled;
+			auto cen = ExtractArray(cblock, "center"); if(cen.size()>=3) hb.center={cen[0],cen[1],cen[2]};
+			auto sz = ExtractArray(cblock, "size"); if(sz.size()>=3) hb.size={sz[0],sz[1],sz[2]};
+			auto floatCheck = [&](const std::string& k, float def) { auto a = ExtractArray(cblock, k); return a.empty() ? def : a[0]; };
+			hb.tag = ExtractString(cblock, "tag"); if(hb.tag.empty()) hb.tag = "Body";
+			if (cblock.find("\"damageMultiplier\"") != std::string::npos) hb.damageMultiplier = floatCheck("damageMultiplier", 1.0f);
+			obj.hurtboxes.push_back(hb);
+		} else if (type == "Health") { // ★追加
+			HealthComponent hc; hc.enabled = enabled;
+			auto floatCheck = [&](const std::string& k, float def) { auto a = ExtractArray(cblock, k); return a.empty() ? def : a[0]; };
+			if (cblock.find("\"hp\"") != std::string::npos) hc.hp = floatCheck("hp", 100.0f);
+			if (cblock.find("\"maxHp\"") != std::string::npos) hc.maxHp = floatCheck("maxHp", 100.0f);
+			if (cblock.find("\"stamina\"") != std::string::npos) hc.stamina = floatCheck("stamina", 100.0f);
+			if (cblock.find("\"maxStamina\"") != std::string::npos) hc.maxStamina = floatCheck("maxStamina", 100.0f);
+			if (cblock.find("\"invincibleTime\"") != std::string::npos) hc.invincibleTime = floatCheck("invincibleTime", 0.0f);
+			auto aPos = cblock.find("\"isDead\""); if(aPos!=std::string::npos && cblock.find("true",aPos)!=std::string::npos && cblock.find("true",aPos)<aPos+30) hc.isDead=true; else hc.isDead=false;
+			obj.healths.push_back(hc);
 		}
 		pos = endPos + 1;
 	}
@@ -522,6 +668,8 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				if (ImGui::SmallButton("Stop")) {
 					gameScene->isPlaying_ = false;
 					LoadScene(gameScene, "Resources/.temp_play.json");
+					auto* audio = Engine::Audio::GetInstance();
+					if (audio) audio->StopAll();
 					Log("Play mode stopped. Scene restored.");
 				}
 				ImGui::PopStyleColor();
@@ -1116,7 +1264,183 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					if(ImGui::Button("Remove##PE")){obj.particleEmitters.erase(obj.particleEmitters.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}
 					ImGui::TreePop();
 				}ImGui::PopID();}
-			end_comp:
+			// ★追加: GpuMeshCollider コンポーネント
+			for(size_t ci=0;ci<obj.gpuMeshColliders.size();++ci){auto&gmc=obj.gpuMeshColliders[ci];ImGui::PushID(6000+(int)ci);
+				if(ImGui::TreeNode("GpuMeshCollider")){
+					ImGui::Checkbox("Enabled##GMC",&gmc.enabled);
+					ImGui::Checkbox("Is Trigger##GMC",&gmc.isTrigger);
+					ImGui::Text("Mesh: %s", gmc.meshPath.empty()?"(none)":gmc.meshPath.c_str());
+					if(ImGui::BeginDragDropTarget()){
+						if(const ImGuiPayload*pl=ImGui::AcceptDragDropPayload("RESOURCE_PATH")){
+							std::string path((const char*)pl->Data,pl->DataSize-1);
+							if(path.find(".obj")!=std::string::npos||path.find(".gltf")!=std::string::npos){
+								gmc.meshHandle=Engine::Renderer::GetInstance()->LoadObjMesh(path);gmc.meshPath=path;Log("GpuMeshCollider Mesh: "+path);
+							}
+						}ImGui::EndDragDropTarget();
+					}
+					if(gmc.isIntersecting) ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "[Intersection Detected!]");
+					else ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "No Intersection");
+					if(ImGui::Button("Remove##GMC")){obj.gpuMeshColliders.erase(obj.gpuMeshColliders.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+			
+			// ★追加: PlayerInput コンポーネント
+			for(size_t ci=0;ci<obj.playerInputs.size();++ci){auto&pi=obj.playerInputs[ci];ImGui::PushID(7000+(int)ci);
+				if(ImGui::TreeNode("PlayerInput")){
+					ImGui::Checkbox("Enabled##PI",&pi.enabled);
+					ImGui::Text("MoveDir: (%.2f, %.2f)", pi.moveDir.x, pi.moveDir.y);
+					ImGui::Text("JumpRequested: %s", pi.jumpRequested ? "true" : "false");
+					ImGui::Text("AttackRequested: %s", pi.attackRequested ? "true" : "false");
+					if(ImGui::Button("Remove##PI")){obj.playerInputs.erase(obj.playerInputs.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+
+			// ★追加: CharacterMovement コンポーネント
+			for(size_t ci=0;ci<obj.characterMovements.size();++ci){auto&cm=obj.characterMovements[ci];ImGui::PushID(8000+(int)ci);
+				if(ImGui::TreeNode("CharacterMovement")){
+					ImGui::Checkbox("Enabled##CM",&cm.enabled);
+					ImGui::DragFloat("Speed##CM",&cm.speed,0.1f);
+					ImGui::DragFloat("JumpPower##CM",&cm.jumpPower,0.1f);
+					ImGui::DragFloat("Gravity##CM",&cm.gravity,0.1f);
+					ImGui::Text("VelocityY: %.2f", cm.velocityY);
+					ImGui::Text("IsGrounded: %s", cm.isGrounded ? "true" : "false");
+					if(ImGui::Button("Remove##CM")){obj.characterMovements.erase(obj.characterMovements.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+
+			// ★追加: CameraTarget コンポーネント
+			for(size_t ci=0;ci<obj.cameraTargets.size();++ci){auto&ct=obj.cameraTargets[ci];ImGui::PushID(9000+(int)ci);
+				if(ImGui::TreeNode("CameraTarget")){
+					ImGui::Checkbox("Enabled##CT",&ct.enabled);
+					ImGui::DragFloat("Distance##CT",&ct.distance,0.1f);
+					ImGui::DragFloat("Height##CT",&ct.height,0.1f);
+					ImGui::DragFloat("SmoothSpeed##CT",&ct.smoothSpeed,0.1f);
+					if(ImGui::Button("Remove##CT")){obj.cameraTargets.erase(obj.cameraTargets.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+
+			// ★追加: DirectionalLight コンポーネント
+			for(size_t ci=0;ci<obj.directionalLights.size();++ci){auto&dl=obj.directionalLights[ci];ImGui::PushID(10000+(int)ci);
+				if(ImGui::TreeNode("DirectionalLight")){
+					ImGui::Checkbox("Enabled##DL",&dl.enabled);
+					ImGui::ColorEdit3("Color##DL",&dl.color.x);
+					ImGui::DragFloat("Intensity##DL",&dl.intensity,0.01f, 0.0f, 100.0f);
+					if(ImGui::Button("Remove##DL")){obj.directionalLights.erase(obj.directionalLights.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+
+			// ★追加: PointLight コンポーネント
+			for(size_t ci=0;ci<obj.pointLights.size();++ci){auto&pl=obj.pointLights[ci];ImGui::PushID(11000+(int)ci);
+				if(ImGui::TreeNode("PointLight")){
+					ImGui::Checkbox("Enabled##PL",&pl.enabled);
+					ImGui::ColorEdit3("Color##PL",&pl.color.x);
+					ImGui::DragFloat("Intensity##PL",&pl.intensity,0.01f, 0.0f, 100.0f);
+					ImGui::DragFloat("Range##PL",&pl.range,0.1f, 0.0f, 1000.0f);
+					ImGui::DragFloat3("Attenuation##PL",&pl.atten.x,0.001f, 0.0f, 1.0f);
+					if(ImGui::Button("Remove##PL")){obj.pointLights.erase(obj.pointLights.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+
+			// ★追加: SpotLight コンポーネント
+			for(size_t ci=0;ci<obj.spotLights.size();++ci){auto&sl=obj.spotLights[ci];ImGui::PushID(12000+(int)ci);
+				if(ImGui::TreeNode("SpotLight")){
+					ImGui::Checkbox("Enabled##SL",&sl.enabled);
+					ImGui::ColorEdit3("Color##SL",&sl.color.x);
+					ImGui::DragFloat("Intensity##SL",&sl.intensity,0.01f, 0.0f, 100.0f);
+					ImGui::DragFloat("Range##SL",&sl.range,0.1f, 0.0f, 1000.0f);
+					ImGui::DragFloat("Inner Cos##SL",&sl.innerCos,0.01f, -1.0f, 1.0f);
+					ImGui::DragFloat("Outer Cos##SL",&sl.outerCos,0.01f, -1.0f, 1.0f);
+					ImGui::DragFloat3("Attenuation##SL",&sl.atten.x,0.001f, 0.0f, 1.0f);
+				if(ImGui::Button("Remove##SL")){obj.spotLights.erase(obj.spotLights.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+
+		// ★追加: AudioSource コンポーネント
+		for(size_t ci=0;ci<obj.audioSources.size();++ci){auto&as=obj.audioSources[ci];ImGui::PushID(13000+(int)ci);
+			if(ImGui::TreeNode("AudioSource")){
+				ImGui::Checkbox("Enabled##AS",&as.enabled);
+				// サウンドファイルパス
+				char pathBuf[256]; strcpy_s(pathBuf, as.soundPath.c_str());
+				if(ImGui::InputText("Sound Path##AS", pathBuf, sizeof(pathBuf))) {
+					as.soundPath = pathBuf;
+					// パス変更時に再ロード
+					if(!as.soundPath.empty()) {
+						auto* audio = Engine::Audio::GetInstance();
+						if(audio) as.soundHandle = audio->Load(as.soundPath);
+					}
+				}
+				if(ImGui::BeginDragDropTarget()){
+					if(const ImGuiPayload*pl=ImGui::AcceptDragDropPayload("RESOURCE_PATH")){
+						std::string path((const char*)pl->Data,pl->DataSize-1);
+						if(path.find(".mp3")!=std::string::npos||path.find(".wav")!=std::string::npos){
+							as.soundPath = path;
+							auto* audio = Engine::Audio::GetInstance();
+							if(audio) as.soundHandle = audio->Load(path);
+							EditorUI::Log("AudioSource: " + path);
+						}
+					}ImGui::EndDragDropTarget();
+				}
+				if (ImGui::DragFloat("Volume##AS",&as.volume,0.01f,0.0f,1.0f)) {
+					if (as.isPlaying && as.voiceHandle) {
+						auto* audio = Engine::Audio::GetInstance();
+						if (audio) audio->SetVolume(as.voiceHandle, as.volume);
+					}
+				}
+				ImGui::Checkbox("Loop##AS",&as.loop);
+				ImGui::Checkbox("Play On Start##AS",&as.playOnStart);
+				ImGui::Checkbox("3D Sound##AS",&as.is3D);
+				if(as.is3D) ImGui::DragFloat("Max Distance##AS",&as.maxDistance,0.5f,0.0f,500.0f);
+				// Play/Stop ボタン
+				if(as.isPlaying) {
+					if(ImGui::Button("Stop##AS")){
+						auto* audio = Engine::Audio::GetInstance();
+						if(audio && as.voiceHandle) { audio->Stop(as.voiceHandle); as.voiceHandle = 0; }
+						as.isPlaying = false;
+					}
+					ImGui::SameLine(); ImGui::TextColored(ImVec4(0.3f,1.0f,0.3f,1.0f),"Playing...");
+				} else {
+					if(ImGui::Button("Play##AS")){
+						auto* audio = Engine::Audio::GetInstance();
+						if(audio && as.soundHandle != 0xFFFFFFFF) {
+							as.voiceHandle = audio->Play(as.soundHandle, as.loop, as.volume);
+							as.isPlaying = true;
+						}
+					}
+				}
+				if(ImGui::Button("Remove##AS")){obj.audioSources.erase(obj.audioSources.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+
+		// ★追加: AudioListener コンポーネント
+		for(size_t ci=0;ci<obj.audioListeners.size();++ci){auto&al=obj.audioListeners[ci];ImGui::PushID(14000+(int)ci);
+			if(ImGui::TreeNode("AudioListener")){
+				ImGui::Checkbox("Enabled##AL",&al.enabled);
+				ImGui::TextColored(ImVec4(0.6f,0.8f,1.0f,1.0f),"This object receives audio.");
+				if(ImGui::Button("Remove##AL")){obj.audioListeners.erase(obj.audioListeners.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+
+		// ★追加: Hitbox コンポーネント (攻撃判定)
+		for(size_t ci=0;ci<obj.hitboxes.size();++ci){auto&hb=obj.hitboxes[ci];ImGui::PushID(15000+(int)ci);
+			if(ImGui::TreeNode("Hitbox (Attack)")){
+				ImGui::Checkbox("Enabled##HB",&hb.enabled);
+				ImGui::Checkbox("Active##HB",&hb.isActive);
+				if(hb.isActive) ImGui::TextColored(ImVec4(1.0f,0.3f,0.3f,1.0f),"[ACTIVE]");
+				else ImGui::TextColored(ImVec4(0.5f,0.5f,0.5f,1.0f),"[Inactive]");
+				ImGui::DragFloat3("Center##HB",&hb.center.x,0.1f);
+				ImGui::DragFloat3("Size##HB",&hb.size.x,0.1f,0.01f,100.0f);
+				ImGui::DragFloat("Damage##HB",&hb.damage,0.1f,0.0f,9999.0f);
+				char tagBuf[128]; strcpy_s(tagBuf, hb.tag.c_str());
+				if(ImGui::InputText("Tag##HB", tagBuf, sizeof(tagBuf))) hb.tag = tagBuf;
+				if(ImGui::Button("Remove##HB")){obj.hitboxes.erase(obj.hitboxes.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+
+		// ★追加: Hurtbox コンポーネント (食らい判定)
+		for(size_t ci=0;ci<obj.hurtboxes.size();++ci){auto&hb=obj.hurtboxes[ci];ImGui::PushID(16000+(int)ci);
+			if(ImGui::TreeNode("Hurtbox (Damage)")){
+				ImGui::Checkbox("Enabled##HU",&hb.enabled);
+				ImGui::DragFloat3("Center##HU",&hb.center.x,0.1f);
+				ImGui::DragFloat3("Size##HU",&hb.size.x,0.1f,0.01f,100.0f);
+				char tagBuf[128]; strcpy_s(tagBuf, hb.tag.c_str());
+				if(ImGui::InputText("Tag##HU", tagBuf, sizeof(tagBuf))) hb.tag = tagBuf;
+				ImGui::DragFloat("Damage Multiplier##HU",&hb.damageMultiplier,0.01f,0.0f,10.0f);
+				if(ImGui::Button("Remove##HU")){obj.hurtboxes.erase(obj.hurtboxes.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+
+		// ★追加: Health コンポーネント (ステータス管理)
+		for(size_t ci=0;ci<obj.healths.size();++ci){auto&hc=obj.healths[ci];ImGui::PushID(17000+(int)ci);
+			if(ImGui::TreeNode("Health (Status)")){
+				ImGui::Checkbox("Enabled##HC",&hc.enabled);
+				ImGui::DragFloat("HP##HC",&hc.hp, 1.0f, 0.0f, hc.maxHp);
+				ImGui::DragFloat("Max HP##HC",&hc.maxHp, 1.0f, 1.0f, 9999.0f);
+				ImGui::DragFloat("Stamina##HC",&hc.stamina, 1.0f, 0.0f, hc.maxStamina);
+				ImGui::DragFloat("Max Stamina##HC",&hc.maxStamina, 1.0f, 1.0f, 9999.0f);
+				ImGui::DragFloat("Invincible Time##HC",&hc.invincibleTime, 0.1f, 0.0f, 10.0f);
+				ImGui::Checkbox("Is Dead##HC",&hc.isDead);
+				if(ImGui::Button("Remove##HC")){obj.healths.erase(obj.healths.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+
+
+		end_comp:
 			if(ImGui::Button("Add Component"))ImGui::OpenPopup("AddComp");
 			if(ImGui::BeginPopup("AddComp")){
 				if(ImGui::MenuItem("MeshRenderer")){MeshRendererComponent mr;obj.meshRenderers.push_back(mr);} 
@@ -1129,6 +1453,27 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					pe.emitter.Initialize(*Engine::Renderer::GetInstance(), "NewEmitter");
 					obj.particleEmitters.push_back(pe);
 				}
+				if(ImGui::MenuItem("GpuMeshCollider")){ // ★追加
+					GpuMeshColliderComponent gmc;
+					gmc.meshHandle = obj.modelHandle; // デフォルトでオブジェクトのメッシュを使用
+					gmc.meshPath = obj.modelPath;
+					obj.gpuMeshColliders.push_back(gmc);
+				}
+				if(ImGui::MenuItem("PlayerInput")){ obj.playerInputs.push_back({}); } // ★追加
+				if(ImGui::MenuItem("CharacterMovement")){ obj.characterMovements.push_back({}); } // ★追加
+				if(ImGui::MenuItem("CameraTarget")){ obj.cameraTargets.push_back({}); } // ★追加
+				ImGui::Separator();
+				if(ImGui::MenuItem("DirectionalLight")){ obj.directionalLights.push_back({}); } // ★追加
+				if(ImGui::MenuItem("PointLight")){ obj.pointLights.push_back({}); } // ★追加
+				if(ImGui::MenuItem("SpotLight")){ obj.spotLights.push_back({}); } // ★追加
+				ImGui::Separator();
+				if(ImGui::MenuItem("AudioSource")){ obj.audioSources.push_back({}); } // ★追加
+				if(ImGui::MenuItem("AudioListener")){ obj.audioListeners.push_back({}); } // ★追加
+				ImGui::Separator();
+				if(ImGui::MenuItem("Hitbox")){ obj.hitboxes.push_back({}); } // ★追加
+				if(ImGui::MenuItem("Hurtbox")){ obj.hurtboxes.push_back({}); } // ★追加
+				ImGui::Separator();
+				if(ImGui::MenuItem("Health")){ obj.healths.push_back({}); } // ★追加
 				ImGui::EndPopup();
 			}
 		}
@@ -1153,6 +1498,16 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 	static uint32_t playingSoundHandle = 0xFFFFFFFF;
 	static size_t playingVoiceHandle = 0;
 	static std::string playingAudioPath;
+
+	// ★ ファイル操作用の状態変数
+	static bool renaming = false;
+	static std::string renamingPath;          // 名前変更対象のフルパス
+	static char renameBuffer[256] = {};
+	static bool showDeleteConfirm = false;
+	static std::string deletingPath;          // 削除対象のフルパス
+	static std::string deletingName;          // 削除対象の表示名
+	static bool creatingFolder = false;
+	static char newFolderNameBuf[256] = {};
 
 	if (!fs::exists(currentDir)) currentDir = "Resources";
 
@@ -1185,6 +1540,15 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 		}
 	}
 
+	// ★ ツールバー: + ボタン (新規フォルダ作成)
+	ImGui::SameLine(0, 8);
+	if (ImGui::SmallButton("+##createFolder")) {
+		creatingFolder = true;
+		memset(newFolderNameBuf, 0, sizeof(newFolderNameBuf));
+		strncpy_s(newFolderNameBuf, "NewFolder", sizeof(newFolderNameBuf) - 1);
+	}
+	if (ImGui::IsItemHovered()) { ImGui::BeginTooltip(); ImGui::Text("Create Folder"); ImGui::EndTooltip(); }
+
 	ImGui::SameLine(ImGui::GetWindowWidth() - 160);
 	ImGui::PushItemWidth(100);
 	ImGui::SliderFloat("##iconSz", &iconSize, 48.0f, 128.0f, "%.0f");
@@ -1192,6 +1556,109 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 	ImGui::SameLine(); ImGui::Text("Size");
 
 	ImGui::Separator();
+
+	// --- ★ 新規フォルダ作成ダイアログ ---
+	if (creatingFolder) {
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.15f, 0.15f, 0.2f, 1.0f));
+		ImGui::BeginChild("##createFolderPanel", ImVec2(0, 32), true);
+		ImGui::Text("Folder Name:");
+		ImGui::SameLine();
+		ImGui::PushItemWidth(200);
+		bool enterPressed = ImGui::InputText("##newFolderName", newFolderNameBuf, sizeof(newFolderNameBuf),
+			ImGuiInputTextFlags_EnterReturnsTrue);
+		ImGui::PopItemWidth();
+		ImGui::SameLine();
+		if (ImGui::SmallButton("OK") || enterPressed) {
+			std::string newPath = currentDir + "/" + std::string(newFolderNameBuf);
+			if (strlen(newFolderNameBuf) > 0 && !fs::exists(newPath)) {
+				fs::create_directories(newPath);
+				Log("Folder created: " + newPath);
+			} else if (fs::exists(newPath)) {
+				LogWarning("Folder already exists: " + newPath);
+			}
+			creatingFolder = false;
+		}
+		ImGui::SameLine();
+		if (ImGui::SmallButton("Cancel")) {
+			creatingFolder = false;
+		}
+		ImGui::EndChild();
+		ImGui::PopStyleColor();
+	}
+
+	// --- ★ 名前変更インラインUI ---
+	if (renaming) {
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.15f, 0.2f, 0.15f, 1.0f));
+		ImGui::BeginChild("##renamePanel", ImVec2(0, 32), true);
+		ImGui::Text("Rename:");
+		ImGui::SameLine();
+		ImGui::PushItemWidth(250);
+		bool enterPressed = ImGui::InputText("##renameInput", renameBuffer, sizeof(renameBuffer),
+			ImGuiInputTextFlags_EnterReturnsTrue);
+		ImGui::PopItemWidth();
+		ImGui::SameLine();
+		if (ImGui::SmallButton("OK##ren") || enterPressed) {
+			std::string newName(renameBuffer);
+			if (!newName.empty() && newName != fs::path(renamingPath).filename().string()) {
+				std::string newPath = (fs::path(renamingPath).parent_path() / newName).string();
+				if (!fs::exists(newPath)) {
+					std::error_code ec;
+					fs::rename(renamingPath, newPath, ec);
+					if (!ec) {
+						Log("Renamed: " + renamingPath + " -> " + newPath);
+						// サムネイルキャッシュの更新
+						auto it = thumbnailCache.find(renamingPath);
+						if (it != thumbnailCache.end()) {
+							auto handle = it->second;
+							thumbnailCache.erase(it);
+							thumbnailCache[newPath] = handle;
+						}
+					} else {
+						LogError("Rename failed: " + ec.message());
+					}
+				} else {
+					LogWarning("A file with that name already exists: " + newPath);
+				}
+			}
+			renaming = false;
+		}
+		ImGui::SameLine();
+		if (ImGui::SmallButton("Cancel##ren")) {
+			renaming = false;
+		}
+		ImGui::EndChild();
+		ImGui::PopStyleColor();
+	}
+
+	// --- ★ 削除確認ダイアログ ---
+	if (showDeleteConfirm) {
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.25f, 0.1f, 0.1f, 1.0f));
+		ImGui::BeginChild("##deleteConfirm", ImVec2(0, 36), true);
+		ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Delete \"%s\"?", deletingName.c_str());
+		ImGui::SameLine();
+		if (ImGui::SmallButton("Yes##del")) {
+			std::error_code ec;
+			if (fs::is_directory(deletingPath)) {
+				fs::remove_all(deletingPath, ec);
+			} else {
+				fs::remove(deletingPath, ec);
+			}
+			if (!ec) {
+				Log("Deleted: " + deletingPath);
+				// サムネイルキャッシュのクリア
+				thumbnailCache.erase(deletingPath);
+			} else {
+				LogError("Delete failed: " + ec.message());
+			}
+			showDeleteConfirm = false;
+		}
+		ImGui::SameLine();
+		if (ImGui::SmallButton("No##del")) {
+			showDeleteConfirm = false;
+		}
+		ImGui::EndChild();
+		ImGui::PopStyleColor();
+	}
 
 	// --- ファイル一覧を収集 ---
 	struct ProjectEntry {
@@ -1266,12 +1733,61 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 				currentDir = pe.path;
 			}
 			ImGui::PopStyleColor(2);
+
+			// ★ フォルダへのドラッグ＆ドロップ受け入れ（ファイル移動）
+			if (ImGui::BeginDragDropTarget()) {
+				if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
+					std::string srcPath((const char*)pl->Data, pl->DataSize - 1);
+					std::string fileName = fs::path(srcPath).filename().string();
+					std::string destPath = pe.path + "/" + fileName;
+					if (srcPath != destPath && !fs::exists(destPath)) {
+						std::error_code ec;
+						fs::rename(srcPath, destPath, ec);
+						if (!ec) {
+							Log("Moved: " + srcPath + " -> " + destPath);
+							// サムネイルキャッシュの移動
+							auto it = thumbnailCache.find(srcPath);
+							if (it != thumbnailCache.end()) {
+								auto handle = it->second;
+								thumbnailCache.erase(it);
+								thumbnailCache[destPath] = handle;
+							}
+						} else {
+							LogError("Move failed: " + ec.message());
+						}
+					}
+				}
+				// ★ フォルダのドラッグ＆ドロップ移動にも対応
+				if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_DIR")) {
+					std::string srcPath((const char*)pl->Data, pl->DataSize - 1);
+					std::string dirName = fs::path(srcPath).filename().string();
+					std::string destPath = pe.path + "/" + dirName;
+					if (srcPath != destPath && srcPath != pe.path && !fs::exists(destPath)) {
+						std::error_code ec;
+						fs::rename(srcPath, destPath, ec);
+						if (!ec) {
+							Log("Moved folder: " + srcPath + " -> " + destPath);
+						} else {
+							LogError("Move folder failed: " + ec.message());
+						}
+					}
+				}
+				ImGui::EndDragDropTarget();
+			}
+
 			// フォルダアイコンのテキスト
 			ImVec2 bmin = ImGui::GetItemRectMin();
 			ImVec2 bmax = ImGui::GetItemRectMax();
 			float cx = (bmin.x + bmax.x) * 0.5f;
 			float cy = (bmin.y + bmax.y) * 0.5f;
 			ImGui::GetWindowDrawList()->AddText(ImVec2(cx - 8, cy - 10), IM_COL32(255, 220, 80, 255), "D");
+
+			// ★ フォルダのドラッグ＆ドロップソース
+			if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
+				ImGui::SetDragDropPayload("RESOURCE_DIR", pe.path.c_str(), pe.path.size() + 1);
+				ImGui::Text("[Dir] %s", pe.name.c_str());
+				ImGui::EndDragDropSource();
+			}
 		} else if (isTexture) {
 			// ★ テクスチャ: サムネイルプレビュー
 			Engine::Renderer::TextureHandle th = 0;
@@ -1357,11 +1873,33 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 			ImGui::GetWindowDrawList()->AddText(ImVec2(cx - 6, cy - 10), IM_COL32(180, 180, 180, 255), "F");
 		}
 
-		// ★ ドラッグ＆ドロップソース (ファイルのみ)
+		// ★ ドラッグ＆ドロップソース (ファイルのみ — フォルダは上で別途処理)
 		if (!pe.isDir && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
 			ImGui::SetDragDropPayload("RESOURCE_PATH", pe.path.c_str(), pe.path.size() + 1);
 			ImGui::Text("%s", pe.name.c_str());
 			ImGui::EndDragDropSource();
+		}
+
+		// ★ 右クリックコンテキストメニュー (アイテム上)
+		if (ImGui::BeginPopupContextItem("##itemCtx")) {
+			if (ImGui::MenuItem("Rename")) {
+				renaming = true;
+				renamingPath = pe.path;
+				memset(renameBuffer, 0, sizeof(renameBuffer));
+				strncpy_s(renameBuffer, pe.name.c_str(), sizeof(renameBuffer) - 1);
+			}
+			if (ImGui::MenuItem("Delete")) {
+				showDeleteConfirm = true;
+				deletingPath = pe.path;
+				deletingName = pe.name;
+			}
+			ImGui::Separator();
+			if (ImGui::MenuItem("Show in Explorer")) {
+				std::string cmd = "explorer /select,\"" + pe.path + "\"";
+				std::replace(cmd.begin(), cmd.end(), '/', '\\');
+				system(cmd.c_str());
+			}
+			ImGui::EndPopup();
 		}
 
 		// ファイル名 (切り詰めて表示)
@@ -1388,6 +1926,51 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 		col++;
 
 		ImGui::PopID();
+	}
+
+	// ★ 背景の右クリックメニュー（何もない場所で右クリック）
+	if (ImGui::BeginPopupContextWindow("##bgCtx", ImGuiPopupFlags_NoOpenOverItems | ImGuiPopupFlags_MouseButtonRight)) {
+		if (ImGui::MenuItem("Create Folder")) {
+			creatingFolder = true;
+			memset(newFolderNameBuf, 0, sizeof(newFolderNameBuf));
+			strncpy_s(newFolderNameBuf, "NewFolder", sizeof(newFolderNameBuf) - 1);
+		}
+		if (ImGui::BeginMenu("Create File")) {
+			if (ImGui::MenuItem(".prefab")) {
+				std::string path = currentDir + "/New.prefab";
+				int num = 1;
+				while (fs::exists(path)) { path = currentDir + "/New_" + std::to_string(num++) + ".prefab"; }
+				std::ofstream f(path); f << "{\n  \"name\": \"NewObject\",\n  \"translate\": [0, 0, 0],\n  \"rotate\": [0, 0, 0],\n  \"scale\": [1, 1, 1],\n  \"color\": [1, 1, 1, 1],\n  \"components\": []\n}\n"; f.close();
+				Log("Created: " + path);
+			}
+			if (ImGui::MenuItem(".json (empty)")) {
+				std::string path = currentDir + "/NewFile.json";
+				int num = 1;
+				while (fs::exists(path)) { path = currentDir + "/NewFile_" + std::to_string(num++) + ".json"; }
+				std::ofstream f(path); f << "{\n}\n"; f.close();
+				Log("Created: " + path);
+			}
+			if (ImGui::MenuItem(".txt (empty)")) {
+				std::string path = currentDir + "/NewFile.txt";
+				int num = 1;
+				while (fs::exists(path)) { path = currentDir + "/NewFile_" + std::to_string(num++) + ".txt"; }
+				std::ofstream f(path); f.close();
+				Log("Created: " + path);
+			}
+			ImGui::EndMenu();
+		}
+		ImGui::Separator();
+		if (ImGui::MenuItem("Open in Explorer")) {
+			std::string cmd = "explorer \"" + currentDir + "\"";
+			std::replace(cmd.begin(), cmd.end(), '/', '\\');
+			system(cmd.c_str());
+		}
+		if (ImGui::MenuItem("Refresh")) {
+			// サムネイルキャッシュクリア（再読み込み）
+			thumbnailCache.clear();
+			Log("Refreshed project view.");
+		}
+		ImGui::EndPopup();
 	}
 
 	ImGui::End();

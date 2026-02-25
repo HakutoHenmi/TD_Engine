@@ -52,6 +52,12 @@ public:
 	// 停止
 	void Stop(size_t voiceHandle);
 
+	// ★追加: ボイスの音量変更
+	void SetVolume(size_t voiceHandle, float volume);
+
+	// ★追加: 全てのボイスを停止 (Playモード終了時用)
+	void StopAll();
+
 private:
 	// 内部用ロード関数
 	bool LoadViaMF(const std::wstring& path, SoundData& outData);

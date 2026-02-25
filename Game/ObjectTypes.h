@@ -22,7 +22,12 @@ struct CollisionMeshData {
 };
 
 // コンポーネント
-enum class ComponentType { MeshRenderer, BoxCollider, Tag, Animator, Rigidbody, ParticleEmitter };
+enum class ComponentType { 
+	MeshRenderer, BoxCollider, Tag, Animator, Rigidbody, ParticleEmitter, 
+	GpuMeshCollider, PlayerInput, CharacterMovement, CameraTarget,
+	DirectionalLight, PointLight, SpotLight,
+	AudioSource, AudioListener, Hitbox, Hurtbox, Health // ★追加: 音響 & 戦闘判定 & ステータス
+};
 struct Component { ComponentType type; bool enabled = true; };
 
 struct MeshRendererComponent : public Component {
@@ -46,6 +51,15 @@ struct BoxColliderComponent : public Component {
 	BoxColliderComponent() { type = ComponentType::BoxCollider; }
 };
 
+// ★追加: GPUメッシュコライダーコンポーネント
+struct GpuMeshColliderComponent : public Component {
+	uint32_t meshHandle = 0;
+	std::string meshPath = "";
+	bool isTrigger = false;
+	bool isIntersecting = false; // 衝突結果格納用
+	GpuMeshColliderComponent() { type = ComponentType::GpuMeshCollider; }
+};
+
 // ★追加: アニメーターコンポーネント
 struct AnimatorComponent : public Component {
 	std::string currentAnimation;
@@ -59,6 +73,36 @@ struct AnimatorComponent : public Component {
 struct TagComponent : public Component {
 	std::string tag = "Untagged";
 	TagComponent() { type = ComponentType::Tag; }
+};
+
+// ★追加: プレイヤー入力 (意思)
+struct PlayerInputComponent : public Component {
+	DirectX::XMFLOAT2 moveDir = {0, 0};
+	bool jumpRequested = false;
+	bool attackRequested = false;
+
+	// ★追加: マウス操作によるカメラの旋回量（intent）
+	float cameraYaw = 0.0f;
+	float cameraPitch = 0.0f;
+	PlayerInputComponent() { type = ComponentType::PlayerInput; }
+};
+
+// ★追加: キャラクター移動 (能力)
+struct CharacterMovementComponent : public Component {
+	float speed = 5.0f;
+	float jumpPower = 6.0f;
+	float gravity = -9.8f;
+	float velocityY = 0.0f;
+	bool isGrounded = false;
+	CharacterMovementComponent() { type = ComponentType::CharacterMovement; }
+};
+
+// ★追加: カメラ追従対象 (属性)
+struct CameraTargetComponent : public Component {
+	float distance = 10.0f;
+	float height = 3.0f;
+	float smoothSpeed = 5.0f;
+	CameraTargetComponent() { type = ComponentType::CameraTarget; }
 };
 
 struct RigidbodyComponent : public Component {
@@ -75,6 +119,80 @@ struct ParticleEmitterComponent : public Component {
 	bool isInitialized = false;
 
 	ParticleEmitterComponent() { type = ComponentType::ParticleEmitter; }
+};
+
+// ★追加: ライトコンポーネント (Directional, Point, Spot)
+struct DirectionalLightComponent : public Component {
+	DirectX::XMFLOAT3 color = {1.0f, 1.0f, 1.0f};
+	float intensity = 1.0f;
+	DirectionalLightComponent() { type = ComponentType::DirectionalLight; }
+};
+
+struct PointLightComponent : public Component {
+	DirectX::XMFLOAT3 color = {1.0f, 1.0f, 1.0f};
+	float intensity = 1.0f;
+	float range = 10.0f;
+	DirectX::XMFLOAT3 atten = {1.0f, 0.1f, 0.01f}; // 減衰(一定, 線形, 二次)
+	PointLightComponent() { type = ComponentType::PointLight; }
+};
+
+struct SpotLightComponent : public Component {
+	DirectX::XMFLOAT3 color = {1.0f, 1.0f, 1.0f};
+	float intensity = 1.0f;
+	float range = 20.0f;
+	float innerCos = 0.98f; // cos(内側角度)
+	float outerCos = 0.90f; // cos(外側角度)
+	DirectX::XMFLOAT3 atten = {1.0f, 0.1f, 0.01f};
+	SpotLightComponent() { type = ComponentType::SpotLight; }
+};
+
+// ★追加: AudioSource コンポーネント (音の発信源)
+struct AudioSourceComponent : public Component {
+	std::string soundPath = "";       // 音声ファイルパス
+	uint32_t soundHandle = 0xFFFFFFFF; // Audio::Load()で取得したハンドル
+	size_t voiceHandle = 0;            // 再生中のボイスハンドル
+	float volume = 1.0f;               // 音量 (0.0〜1.0)
+	bool loop = false;                 // ループ再生
+	bool playOnStart = false;          // Play時に自動再生
+	bool is3D = true;                  // 3Dサウンド（距離減衰あり）
+	float maxDistance = 50.0f;         // 減衰最大距離
+	bool isPlaying = false;            // 再生中フラグ
+	AudioSourceComponent() { type = ComponentType::AudioSource; }
+};
+
+// ★追加: AudioListener コンポーネント (音の聞き取り位置、通常はカメラにアタッチ)
+struct AudioListenerComponent : public Component {
+	AudioListenerComponent() { type = ComponentType::AudioListener; }
+};
+
+// ★追加: Hitbox コンポーネント (攻撃判定)
+struct HitboxComponent : public Component {
+	DirectX::XMFLOAT3 center = {0, 0, 0}; // ローカルオフセット
+	DirectX::XMFLOAT3 size = {1, 1, 1};    // 判定サイズ
+	float damage = 10.0f;                  // ダメージ量
+	bool isActive = false;                 // 有効フラグ（攻撃アニメ中のみtrue等）
+	std::string tag = "Default";           // 識別タグ ("Sword", "Projectile"等)
+	HitboxComponent() { type = ComponentType::Hitbox; }
+};
+
+// ★追加: Hurtbox コンポーネント (食らい判定)
+struct HurtboxComponent : public Component {
+	DirectX::XMFLOAT3 center = {0, 0, 0}; // ローカルオフセット
+	DirectX::XMFLOAT3 size = {1, 1, 1};    // 判定サイズ
+	std::string tag = "Body";              // 識別タグ ("Body", "Head"等)
+	float damageMultiplier = 1.0f;         // ダメージ倍率 (頭部=2.0等)
+	HurtboxComponent() { type = ComponentType::Hurtbox; }
+};
+
+// ★追加: Health コンポーネント (ステータス管理)
+struct HealthComponent : public Component {
+	float hp = 100.0f;               // 現在の体力
+	float maxHp = 100.0f;            // 最大体力
+	float stamina = 100.0f;          // スタミナ
+	float maxStamina = 100.0f;       // 最大スタミナ
+	float invincibleTime = 0.0f;     // 残り無敵時間（ゼロ以上なら無敵）
+	bool isDead = false;             // 死亡フラグ
+	HealthComponent() { type = ComponentType::Health; }
 };
 
 // ★ エディター用オブジェクト構造体
@@ -98,6 +216,26 @@ struct SceneObject {
 	std::vector<AnimatorComponent> animators;
 	std::vector<RigidbodyComponent> rigidbodies;
 	std::vector<ParticleEmitterComponent> particleEmitters; // ★追加: パーティクルエミッター
+	std::vector<GpuMeshColliderComponent> gpuMeshColliders; // ★追加: GPUメッシュコライダー
+	std::vector<PlayerInputComponent> playerInputs;
+	std::vector<CharacterMovementComponent> characterMovements;
+	std::vector<CameraTargetComponent> cameraTargets;
+
+	// ★追加: ライトコンポーネント
+	std::vector<DirectionalLightComponent> directionalLights;
+	std::vector<PointLightComponent> pointLights;
+	std::vector<SpotLightComponent> spotLights;
+
+	// ★追加: 音響コンポーネント
+	std::vector<AudioSourceComponent> audioSources;
+	std::vector<AudioListenerComponent> audioListeners;
+
+	// ★追加: 戦闘判定コンポーネント
+	std::vector<HitboxComponent> hitboxes;
+	std::vector<HurtboxComponent> hurtboxes;
+
+	// ★追加: ステータス管理コンポーネント
+	std::vector<HealthComponent> healths;
 
 	Engine::Transform GetTransform() const {
 		Engine::Transform t;

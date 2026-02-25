@@ -5,53 +5,53 @@ SamplerState smp : register(s0);
 
 float4 main(VSOutput input) : SV_TARGET
 {
-    // 1. ƒeƒNƒXƒ`ƒƒ‚ÆƒIƒuƒWƒFƒNƒgF‚Ìæ“¾
+    // 1. ãƒ†ã‚¯ã‚¹ãƒãƒ£ã¨ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆè‰²ã®å–å¾—
     float4 texColor = tex.Sample(smp, input.uv);
     float3 baseColor = texColor.rgb * color.rgb;
 
-    // 2. Œõ‚ÌŒvZ€”õ
-    float3 N = normalize(input.normal); // –@ü
-    float3 L = normalize(float3(1.0, 1.0, -1.0)); // ‰¼‚Ìƒ‰ƒCƒg•ûŒü (‰Eã‘O‚©‚ç)
-    float3 lightColor = float3(1.0, 1.0, 1.0); // ƒ‰ƒCƒg‚ÌF
+    // 2. å…‰ã®è¨ˆç®—æº–å‚™
+    float3 N = normalize(input.normal); // æ³•ç·š
+    float3 L = normalize(float3(1.0, 1.0, -1.0)); // ä»®ã®ãƒ©ã‚¤ãƒˆæ–¹å‘ (å³ä¸Šå‰ã‹ã‚‰)
+    float3 lightColor = float3(1.0, 1.0, 1.0); // ãƒ©ã‚¤ãƒˆã®è‰²
 
-    // ƒXƒ|ƒbƒgƒ‰ƒCƒg‚ª—LŒø‚È‚çA‚»‚ÌˆÊ’u‚ğg—p‚·‚é
-    if (spotLight.enabled != 0)
+    // ã‚¹ãƒãƒƒãƒˆãƒ©ã‚¤ãƒˆãŒæœ‰åŠ¹ãªã‚‰ã€ãã®ä½ç½®ã‚’ä½¿ç”¨ã™ã‚‹
+    if (dirLights[0].enabled != 0)
     {
-        L = normalize(spotLight.position - input.worldpos.xyz);
-        lightColor = spotLight.color;
+        L = normalize(-dirLights[0].direction);
+        lightColor = dirLights[0].color;
     }
 
-    // 3. ŠgU”½Ë (N‚ÆL‚Ì“àÏ) - Œõ‚Ì“–‚½‚è‹ï‡ (0.0 ` 1.0)
+    // 3. æ‹¡æ•£åå°„ (Nã¨Lã®å†…ç©) - å…‰ã®å½“ãŸã‚Šå…·åˆ (0.0 ï½ 1.0)
     float diffuse = saturate(dot(N, L));
 
-    // šƒgƒD[ƒ“ˆ—‚ÌŠj: Œõ‚Ì‹­‚³‚ğŠK’ió‚É‚·‚é
+    // â˜…ãƒˆã‚¥ãƒ¼ãƒ³å‡¦ç†ã®æ ¸: å…‰ã®å¼·ã•ã‚’éšæ®µçŠ¶ã«ã™ã‚‹
     float toonDiffuse = 0.0f;
     if (diffuse > 0.6f)
     {
-        toonDiffuse = 1.0f; // –¾‚é‚¢
+        toonDiffuse = 1.0f; // æ˜ã‚‹ã„
     }
     else if (diffuse > 0.2f)
     {
-        toonDiffuse = 0.6f; // •’Êi‰e‚Ì‹«–Új
+        toonDiffuse = 0.6f; // æ™®é€šï¼ˆå½±ã®å¢ƒç›®ï¼‰
     }
     else
     {
-        toonDiffuse = 0.3f; // ˆÃ‚¢i‰ej
+        toonDiffuse = 0.3f; // æš—ã„ï¼ˆå½±ï¼‰
     }
 
-    // 4. ƒŠƒ€ƒ‰ƒCƒg (—ÖŠsŒõ) - ƒLƒƒƒ‰ƒNƒ^‚Ì‰‚ğŒõ‚ç‚¹‚é
-    float3 V = normalize(cameraPos - input.worldpos.xyz); // ƒJƒƒ‰‚Ö‚Ì•ûŒü
-    float rim = 1.0 - saturate(dot(N, V)); // ‰‚Ù‚Ç’l‚ª‘å‚«‚­‚È‚é
+    // 4. ãƒªãƒ ãƒ©ã‚¤ãƒˆ (è¼ªéƒ­å…‰) - ã‚­ãƒ£ãƒ©ã‚¯ã‚¿ã®ç¸ã‚’å…‰ã‚‰ã›ã‚‹
+    float3 V = normalize(cameraPos - input.worldpos.xyz); // ã‚«ãƒ¡ãƒ©ã¸ã®æ–¹å‘
+    float rim = 1.0 - saturate(dot(N, V)); // ç¸ã»ã©å€¤ãŒå¤§ãããªã‚‹
     float rimIntensity = 0.0f;
     
-    // ‰‚ªˆê’èˆÈã‚È‚çŒõ‚ç‚¹‚é
+    // ç¸ãŒä¸€å®šä»¥ä¸Šãªã‚‰å…‰ã‚‰ã›ã‚‹
     if (rim > 0.7f)
     {
         rimIntensity = 0.5f;
     }
 
-    // 5. ÅIƒJƒ‰[‚Ì‡¬
-    // (ƒx[ƒXF * (ƒgƒD[ƒ“–¾“x * ƒ‰ƒCƒgF + ŠÂ‹«Œõ)) + ƒŠƒ€ƒ‰ƒCƒg
+    // 5. æœ€çµ‚ã‚«ãƒ©ãƒ¼ã®åˆæˆ
+    // (ãƒ™ãƒ¼ã‚¹è‰² * (ãƒˆã‚¥ãƒ¼ãƒ³æ˜åº¦ * ãƒ©ã‚¤ãƒˆè‰² + ç’°å¢ƒå…‰)) + ãƒªãƒ ãƒ©ã‚¤ãƒˆ
     float3 finalColor = baseColor * (toonDiffuse * lightColor + ambientColor) + rimIntensity;
 
     return float4(finalColor, texColor.a * color.a);
