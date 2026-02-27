@@ -25,6 +25,11 @@ public:
 	float GetMouseDeltaY() const { return mouseY_; }
 	float GetMouseWheelDelta() const { return wheel_; }
 
+	// ★追加: 絶対座標とボタン状態
+	void GetMousePos(int& x, int& y) const { x = (int)absMouseX_; y = (int)absMouseY_; }
+	bool IsMouseDown(int button) const { return (mouseState_.rgbButtons[button] & 0x80) != 0; }
+	bool IsMouseTrigger(int button) const { return IsMouseDown(button) && !(prevMouseState_.rgbButtons[button] & 0x80); }
+
 private:
 	// --- DirectInput Core ---
 	Microsoft::WRL::ComPtr<IDirectInput8> di_;
@@ -41,6 +46,8 @@ private:
 
 	float mouseX_ = 0.0f;
 	float mouseY_ = 0.0f;
+	float absMouseX_ = 0.0f; // ★追加
+	float absMouseY_ = 0.0f; // ★追加
 	float wheel_ = 0.0f;
 
 	static Input* instance_;

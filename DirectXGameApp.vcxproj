@@ -182,9 +182,12 @@ exit /b 0
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Game\Editor\EditorUI.cpp" />
+    <ClCompile Include="Game\KamikazeEnemyScript.cpp" />
     <ClCompile Include="Game\Scenes\GameScene.cpp" />
     <ClCompile Include="Game\Scenes\TitleScene.cpp" />
-    <ClCompile Include="Game\ScriptEngine.cpp" /> <!-- ★追加 -->
+    <ClCompile Include="Game\ScriptEngine.cpp" />
+    <!-- ★追加 -->
+    <ClCompile Include="Game\Systems\UISystem.cpp" />
     <ClCompile Include="Game\PlayerScript.cpp" />
     <ClCompile Include="Game\EnemyAIScript.cpp" />
     <ClCompile Include="Game\BulletScript.cpp" />
@@ -195,10 +198,13 @@ exit /b 0
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Editor\EditorUI.h" />
+    <ClInclude Include="Game\KamikazeEnemyScript.h" />
     <ClInclude Include="Game\Scenes\GameScene.h" />
     <ClInclude Include="Game\Scenes\TitleScene.h" />
     <ClInclude Include="Game\ObjectTypes.h" />
-    <ClInclude Include="Game\ScriptEngine.h" /> <!-- ★追加 -->
+    <ClInclude Include="Game\ScriptEngine.h" />
+    <!-- ★追加 -->
+    <ClInclude Include="Game\Systems\UISystem.h" />
     <ClInclude Include="Game\IScript.h" />
     <ClInclude Include="Game\PlayerScript.h" />
     <ClInclude Include="Game\EnemyAIScript.h" />
@@ -219,7 +225,7 @@ exit /b 0
       <Project>{12345678-ABCD-1234-EF00-111111111111}</Project>
     </ProjectReference>
     <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">
-       <Project>{371b9fa9-4c90-4ac6-a123-aced756d6c77}</Project>
+      <Project>{371b9fa9-4c90-4ac6-a123-aced756d6c77}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

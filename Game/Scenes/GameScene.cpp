@@ -13,6 +13,7 @@
 #include "../Systems/PhysicsSystem.h"
 #include "../Systems/PlayerInputSystem.h"
 #include "../Systems/ScriptSystem.h"
+#include "../Systems/UISystem.h"
 #include "Audio.h"
 #include "imgui.h"
 #include <Windows.h> // OutputDebugStringA
@@ -81,6 +82,7 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 
 	systems_.push_back(std::make_unique<CombatSystem>());
 	systems_.push_back(std::make_unique<AudioSystem>());
+	systems_.push_back(std::make_unique<UISystem>());
 	systems_.push_back(std::make_unique<CleanupSystem>());
 
 	// 前回プレイで動的に生成されたオブジェクトの削除
@@ -390,6 +392,11 @@ void GameScene::Draw() {
 				emitterComp.emitter.Draw(camera_);
 			}
 		}
+	}
+
+	// ★ 各Systemの描画処理を呼び出す（UISystem等）
+	for (auto& system : systems_) {
+		system->Draw(objects_, ctx_);
 	}
 }
 

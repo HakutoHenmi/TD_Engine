@@ -207,6 +207,7 @@ exit /b 0
     <ClCompile Include="Game\Scenes\TitleScene.cpp" />
     <ClCompile Include="Game\Editor\EditorUI.cpp" />
     <ClCompile Include="Game\ScriptEngine.cpp" />
+    <ClCompile Include="Game\Systems\UISystem.cpp" />
     <ClCompile Include="Game\PlayerScript.cpp" />
     <ClCompile Include="Game\EnemyAIScript.cpp" />
     <ClCompile Include="Game\BulletScript.cpp" />
@@ -524,6 +525,7 @@ exit /b 0
     <ClInclude Include="Game\Scenes\TemplateScene.h" />
     <ClInclude Include="Game\Scenes\TitleScene.h" />
     <ClInclude Include="Game\ScriptEngine.h" />
+    <ClInclude Include="Game\Systems\UISystem.h" />
     <ClInclude Include="Game\IScript.h" />
     <ClInclude Include="Game\PlayerScript.h" />
     <ClInclude Include="Game\EnemyAIScript.h" />

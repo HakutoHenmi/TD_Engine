@@ -11,6 +11,14 @@
     <ClCompile Include="Game\Editor\EditorUI.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Systems\UISystem.cpp">
+      <Filter>Systems</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\ScriptEngine.cpp" />
+    <ClCompile Include="Game\PlayerScript.cpp" />
+    <ClCompile Include="Game\EnemyAIScript.cpp" />
+    <ClCompile Include="Game\BulletScript.cpp" />
+    <ClCompile Include="Game\KamikazeEnemyScript.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
@@ -25,6 +33,25 @@
     <ClInclude Include="Game\ObjectTypes.h">
       <Filter>Game</Filter>
     </ClInclude>
+    <ClInclude Include="Game\Systems\UISystem.h">
+      <Filter>Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\ScriptEngine.h" />
+    <ClInclude Include="Game\IScript.h" />
+    <ClInclude Include="Game\PlayerScript.h" />
+    <ClInclude Include="Game\EnemyAIScript.h" />
+    <ClInclude Include="Game\BulletScript.h" />
+    <ClInclude Include="Game\Systems\ISystem.h" />
+    <ClInclude Include="Game\Systems\PlayerInputSystem.h" />
+    <ClInclude Include="Game\Systems\CharacterMovementSystem.h" />
+    <ClInclude Include="Game\Systems\CameraFollowSystem.h" />
+    <ClInclude Include="Game\Systems\PhysicsSystem.h" />
+    <ClInclude Include="Game\Systems\CombatSystem.h" />
+    <ClInclude Include="Game\Systems\HealthSystem.h" />
+    <ClInclude Include="Game\Systems\AudioSystem.h" />
+    <ClInclude Include="Game\Systems\ScriptSystem.h" />
+    <ClInclude Include="Game\Systems\CleanupSystem.h" />
+    <ClInclude Include="Game\KamikazeEnemyScript.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">
@@ -35,6 +62,9 @@
     </Filter>
     <Filter Include="Game">
       <UniqueIdentifier>{ee71b5c8-f3af-4fc9-a7fd-53443e145be0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Systems">
+      <UniqueIdentifier>{f2a3b4c5-d6e7-48a9-b0c1-d2e3f4a5b6c7}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>
