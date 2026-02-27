@@ -2964,12 +2964,22 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 			std::string className(newScriptNameBuf);
 			if (!className.empty()) {
 				// Game/ フォルダにヘッダーとソースを生成
-				std::string hPath = "Game/" + className + ".h";
-				std::string cppPath = "Game/" + className + ".cpp";
+				// ★修正: 実行ディレクトリ(x64/Debug等)にGameフォルダがない場合、親ディレクトリを探索して正しいパスを特定する
+				std::string gameDir = "Game";
+				if (!fs::exists(gameDir)) {
+					if (fs::exists("../../Game")) gameDir = "../../Game";
+					else if (fs::exists("../Game")) gameDir = "../Game";
+				}
+				if (!fs::exists(gameDir)) fs::create_directories(gameDir);
+
+				std::string hPath = gameDir + "/" + className + ".h";
+				std::string cppPath = gameDir + "/" + className + ".cpp";
+
 				if (!fs::exists(hPath) && !fs::exists(cppPath)) {
 						// ヘッダーファイル
 						{
 							std::ofstream f(hPath);
+							if (f.is_open()) {
 							f << "#pragma once\n";
 							f << "#include \"IScript.h\"\n\n";
 							f << "namespace Game {\n\n";
@@ -2984,10 +2994,14 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 							f << "};\n\n";
 							f << "} // namespace Game\n";
 							f.close();
+							} else {
+								LogError("Failed to write header: " + hPath);
+							}
 						}
 						// ソースファイル
 						{
 							std::ofstream f(cppPath);
+							if (f.is_open()) {
 							f << "#include \"" << className << ".h\"\n";
 							f << "#include \"ObjectTypes.h\"\n";
 							f << "#include \"Scenes/GameScene.h\"\n";
@@ -3006,6 +3020,9 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 							f << "REGISTER_SCRIPT(" << className << ");\n\n";
 							f << "} // namespace Game\n";
 							f.close();
+							} else {
+								LogError("Failed to write source: " + cppPath);
+							}
 						}
 					Log("Script created: " + hPath + " / " + cppPath);
 					// VS Codeで開く
