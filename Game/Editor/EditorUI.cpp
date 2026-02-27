@@ -166,7 +166,7 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 			ss << ",\n";
 		first = false;
 		ss << "        {\"type\": \"BoxCollider\", \"enabled\": " << (bc.enabled ? "true" : "false") << ", \"center\": [" << bc.center.x << "," << bc.center.y << "," << bc.center.z << "], \"size\": ["
-		   << bc.size.x << "," << bc.size.y << "," << bc.size.z << "]}";
+		   << bc.size.x << "," << bc.size.y << "," << bc.size.z << "], \"isTrigger\": " << (bc.isTrigger ? "true" : "false") << "}";
 	}
 	for (const auto& tg : o.tags) {
 		if (!first)
@@ -284,6 +284,14 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 		   << hb.size.x << "," << hb.size.y << "," << hb.size.z << "], \"damage\": " << hb.damage << ", \"isActive\": " << (hb.isActive ? "true" : "false") << ", \"tag\": \"" << EscapeJson(hb.tag)
 		   << "\"}";
 	}
+	// ★追加: Hurtbox
+	for (const auto& hb : o.hurtboxes) {
+		if (!first)
+			ss << ",\n";
+		first = false;
+		ss << "        {\"type\": \"Hurtbox\", \"enabled\": " << (hb.enabled ? "true" : "false") << ", \"center\": [" << hb.center.x << "," << hb.center.y << "," << hb.center.z << "], \"size\": ["
+		   << hb.size.x << "," << hb.size.y << "," << hb.size.z << "], \"tag\": \"" << EscapeJson(hb.tag) << "\", \"damageMultiplier\": " << hb.damageMultiplier << "}";
+	}
 	// ★追加: Health
 	for (const auto& hc : o.healths) {
 		if (!first)
@@ -312,7 +320,17 @@ void EditorUI::SaveScene(GameScene* scene, const std::string& path) {
 		LogError("Save failed: " + path);
 		return;
 	}
-	f << "{\n  \"objects\": [\n";
+	f << "{\n  \"settings\": {\n";
+	auto* r = Engine::Renderer::GetInstance();
+	auto pp = r->GetPostProcessParams();
+	f << "    \"postProcessEnabled\": " << (r->GetPostProcessEnabled() ? "true" : "false") << ",\n";
+	f << "    \"vignette\": " << pp.vignette << ",\n";
+	f << "    \"distortion\": " << pp.distortion << ",\n";
+	f << "    \"noiseStrength\": " << pp.noiseStrength << ",\n";
+	f << "    \"chromaShift\": " << pp.chromaShift << ",\n";
+	f << "    \"scanline\": " << pp.scanline << "\n";
+	f << "  },\n";
+	f << "  \"objects\": [\n";
 
 	// ★追加: Gitでの競合(コンフリクト)を防ぐため、オブジェクトを名前順にソートして保存する
 	std::vector<SceneObject> sortedObjects = scene->objects_;
@@ -420,17 +438,26 @@ static float ExtractFloat(const std::string& block, const std::string& key, floa
 	auto pos = block.find("\"" + key + "\"");
 	if (pos == std::string::npos)
 		return defaultVal;
-	auto colon = block.find(":", pos);
-	if (colon == std::string::npos)
+	auto col = block.find(":", pos);
+	if (col == std::string::npos)
 		return defaultVal;
-	size_t numStart = block.find_first_of("0123456789.-+", colon);
-	if (numStart == std::string::npos)
+	std::string s = block.substr(col + 1);
+	// Skip spaces, commas
+	size_t start = 0;
+	while (start < s.size() && (std::isspace((unsigned char)s[start]) || s[start] == ':' || s[start] == ','))
+		start++;
+	return (float)std::atof(s.c_str() + start);
+}
+
+static bool ExtractBool(const std::string& block, const std::string& key, bool defaultVal) {
+	auto pos = block.find("\"" + key + "\"");
+	if (pos == std::string::npos)
 		return defaultVal;
-	try {
-		return std::stof(block.substr(numStart));
-	} catch (...) {
-		return defaultVal;
-	}
+	if (block.find("true", pos) != std::string::npos && block.find("true", pos) < pos + 30)
+		return true;
+	if (block.find("false", pos) != std::string::npos && block.find("false", pos) < pos + 30)
+		return false;
+	return defaultVal;
 }
 
 static void ParseComponents(SceneObject& obj, const std::string& block, Engine::Renderer* renderer) {
@@ -490,6 +517,7 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 			auto sz = ExtractArray(cblock, "size");
 			if (sz.size() >= 3)
 				bc.size = {sz[0], sz[1], sz[2]};
+			bc.isTrigger = ExtractBool(cblock, "isTrigger", false);
 			obj.boxColliders.push_back(bc);
 		} else if (type == "Tag") {
 			TagComponent tg;
@@ -768,10 +796,32 @@ void EditorUI::LoadScene(GameScene* scene, const std::string& path) {
 	}
 	std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
 	f.close();
+
+	auto* renderer = Engine::Renderer::GetInstance();
+	// ★追加: Scene Settings の読み込み
+	auto settingsStart = content.find("\"settings\"");
+	if (settingsStart != std::string::npos) {
+		auto blockStart = content.find("{", settingsStart);
+		if (blockStart != std::string::npos) {
+			auto blockEnd = FindBlockEnd(content, blockStart);
+			if (blockEnd != std::string::npos) {
+				std::string sblock = content.substr(blockStart, blockEnd - blockStart + 1);
+				bool en = ExtractBool(sblock, "postProcessEnabled", renderer->GetPostProcessEnabled());
+				renderer->SetPostProcessEnabled(en);
+				auto pp = renderer->GetPostProcessParams();
+				pp.vignette = ExtractFloat(sblock, "vignette", pp.vignette);
+				pp.distortion = ExtractFloat(sblock, "distortion", pp.distortion);
+				pp.noiseStrength = ExtractFloat(sblock, "noiseStrength", pp.noiseStrength);
+				pp.chromaShift = ExtractFloat(sblock, "chromaShift", pp.chromaShift);
+				pp.scanline = ExtractFloat(sblock, "scanline", pp.scanline);
+				renderer->SetPostProcessParams(pp);
+			}
+		}
+	}
+
 	scene->objects_.clear();
 	scene->selectedIndices_.clear();
 	scene->selectedObjectIndex_ = -1;
-	auto* renderer = Engine::Renderer::GetInstance();
 	auto arrStart = content.find("[", content.find("\"objects\""));
 	if (arrStart == std::string::npos) {
 		LogError("Invalid scene file");
@@ -2008,6 +2058,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					ImGui::Checkbox("Enabled", &bc.enabled);
 					ImGui::DragFloat3("Center", &bc.center.x, 0.1f);
 					ImGui::DragFloat3("Size", &bc.size.x, 0.1f);
+					ImGui::Checkbox("Is Trigger", &bc.isTrigger);
 					if (ImGui::Button("Remove##BC")) {
 						obj.boxColliders.erase(obj.boxColliders.begin() + ci);
 						ImGui::TreePop();
