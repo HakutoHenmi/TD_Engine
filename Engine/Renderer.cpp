@@ -279,6 +279,7 @@ void Renderer::BeginFrame(const float clearColorRGBA[4]) {
 
 	drawCalls_.clear(); // ★追加: ドローコールをクリア
 	instancedDrawCalls_.clear(); // ★追加
+	spriteDrawCalls_.clear(); // ★スプライトもクリア
 
 	cbFrameAddr_ = 0;
 	backBufferBarrierState_ = false;
@@ -660,6 +661,9 @@ void Renderer::EndFrame() {
 	list_->SetGraphicsRootDescriptorTable(1, ppSrvGpu_);
 	list_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	list_->DrawInstanced(3, 1, 0, 0);
+
+	// ポストアフェクトが完了した最終ターゲットに対してUIを描画
+	FlushSprites();
 
 	// --- 3. finalSceneColor_ をShaderResourceStateに遷移 ---
 	if (finalSceneState_ != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
@@ -1582,11 +1586,17 @@ void Renderer::DrawSkinnedMesh(MeshHandle meshH, TextureHandle texH, const Trans
 void Renderer::DrawSprite(TextureHandle texH, const SpriteDesc& s) {
 	if (texH == 0 || texH >= textures_.size())
 		return;
+	spriteDrawCalls_.push_back({texH, s});
+}
+
+void Renderer::FlushSprites() {
+	if (spriteDrawCalls_.empty()) return;
+
 	const float W = (float)Engine::WindowDX::kW;
 	const float H = (float)Engine::WindowDX::kH;
 	const uint32_t fi = window_->FrameIndex();
 
-	ID3D12DescriptorHeap* heaps[] = {srvHeap_};
+	ID3D12DescriptorHeap* heaps[] = { srvHeap_ };
 	list_->SetDescriptorHeaps(1, heaps);
 	list_->SetPipelineState(pso2D_.Get());
 	list_->SetGraphicsRootSignature(rootSig2D_.Get());
@@ -1594,81 +1604,86 @@ void Renderer::DrawSprite(TextureHandle texH, const SpriteDesc& s) {
 	list_->RSSetScissorRects(1, &scissor_);
 	list_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+	for (const auto& dc : spriteDrawCalls_) {
+		const auto& s = dc.desc;
+		auto texH = dc.tex;
+
 #ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable : 4324)
 #endif
-	struct alignas(256) CBSprite {
-		Matrix4x4 mvp;
-		float color[4];
-	};
+		struct alignas(256) CBSprite {
+			Matrix4x4 mvp;
+			float color[4];
+		};
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
 
-	CBSprite cb{};
-	cb.mvp = Matrix4x4::Identity();
-	cb.color[0] = s.color.x;
-	cb.color[1] = s.color.y;
-	cb.color[2] = s.color.z;
-	cb.color[3] = s.color.w;
+		CBSprite cb{};
+		cb.mvp = Matrix4x4::Identity();
+		cb.color[0] = s.color.x;
+		cb.color[1] = s.color.y;
+		cb.color[2] = s.color.z;
+		cb.color[3] = s.color.w;
 
-	const uint32_t cbOff = upload_[fi].Allocate(sizeof(CBSprite), 256);
-	if (cbOff == UINT32_MAX)
-		return;
-	std::memcpy(upload_[fi].mapped + cbOff, &cb, sizeof(CBSprite));
-	list_->SetGraphicsRootConstantBufferView(0, upload_[fi].buffer->GetGPUVirtualAddress() + cbOff);
+		const uint32_t cbOff = upload_[fi].Allocate(sizeof(CBSprite), 256);
+		if (cbOff == UINT32_MAX)
+			continue;
+		std::memcpy(upload_[fi].mapped + cbOff, &cb, sizeof(CBSprite));
+		list_->SetGraphicsRootConstantBufferView(0, upload_[fi].buffer->GetGPUVirtualAddress() + cbOff);
 
-	auto ToNDCX = [&](float x) { return (x / W) * 2.0f - 1.0f; };
-	auto ToNDCY = [&](float y) { return 1.0f - (y / H) * 2.0f; };
-	const float cx = s.x + s.w * 0.5f;
-	const float cy = s.y + s.h * 0.5f;
+		auto ToNDCX = [&](float x) { return (x / W) * 2.0f - 1.0f; };
+		auto ToNDCY = [&](float y) { return 1.0f - (y / H) * 2.0f; };
+		const float cx = s.x + s.w * 0.5f;
+		const float cy = s.y + s.h * 0.5f;
 
-	struct V {
-		float x, y;
-		float u, v;
-	};
-	auto Rot = [&](float x, float y) {
-		float px = x - cx;
-		float py = y - cy;
-		const float c = cosf(s.rotationRad);
-		const float si = sinf(s.rotationRad);
-		float rx = px * c - py * si;
-		float ry = px * si + py * c;
-		return std::pair<float, float>(cx + rx, cy + ry);
-	};
-	auto P = [&](float sx, float sy) {
-		auto [rx, ry] = Rot(sx, sy);
-		return std::pair<float, float>(ToNDCX(rx), ToNDCY(ry));
-	};
+		struct V {
+			float x, y;
+			float u, v;
+		};
+		auto Rot = [&](float x, float y) {
+			float px = x - cx;
+			float py = y - cy;
+			const float c = cosf(s.rotationRad);
+			const float si = sinf(s.rotationRad);
+			float rx = px * c - py * si;
+			float ry = px * si + py * c;
+			return std::pair<float, float>(cx + rx, cy + ry);
+		};
+		auto P = [&](float sx, float sy) {
+			auto [rx, ry] = Rot(sx, sy);
+			return std::pair<float, float>(ToNDCX(rx), ToNDCY(ry));
+		};
 
-	auto p00 = P(s.x, s.y);
-	auto p10 = P(s.x + s.w, s.y);
-	auto p01 = P(s.x, s.y + s.h);
-	auto p11 = P(s.x + s.w, s.y + s.h);
+		auto p00 = P(s.x, s.y);
+		auto p10 = P(s.x + s.w, s.y);
+		auto p01 = P(s.x, s.y + s.h);
+		auto p11 = P(s.x + s.w, s.y + s.h);
 
-	V vtx[6] = {
-	    {p00.first, p00.second, 0.0f, 0.0f},
-        {p10.first, p10.second, 1.0f, 0.0f},
-        {p01.first, p01.second, 0.0f, 1.0f},
-	    {p01.first, p01.second, 0.0f, 1.0f},
-        {p10.first, p10.second, 1.0f, 0.0f},
-        {p11.first, p11.second, 1.0f, 1.0f},
-	};
+		V vtx[6] = {
+			{p00.first, p00.second, 0.0f, 0.0f},
+			{p10.first, p10.second, 1.0f, 0.0f},
+			{p01.first, p01.second, 0.0f, 1.0f},
+			{p01.first, p01.second, 0.0f, 1.0f},
+			{p10.first, p10.second, 1.0f, 0.0f},
+			{p11.first, p11.second, 1.0f, 1.0f},
+		};
 
-	const uint32_t vbOff = upload_[fi].Allocate(sizeof(vtx), 16);
-	if (vbOff == UINT32_MAX)
-		return;
-	std::memcpy(upload_[fi].mapped + vbOff, vtx, sizeof(vtx));
+		const uint32_t vbOff = upload_[fi].Allocate(sizeof(vtx), 16);
+		if (vbOff == UINT32_MAX)
+			continue;
+		std::memcpy(upload_[fi].mapped + vbOff, vtx, sizeof(vtx));
 
-	D3D12_VERTEX_BUFFER_VIEW vbv{};
-	vbv.BufferLocation = upload_[fi].buffer->GetGPUVirtualAddress() + vbOff;
-	vbv.SizeInBytes = sizeof(vtx);
-	vbv.StrideInBytes = sizeof(V);
+		D3D12_VERTEX_BUFFER_VIEW vbv{};
+		vbv.BufferLocation = upload_[fi].buffer->GetGPUVirtualAddress() + vbOff;
+		vbv.SizeInBytes = sizeof(vtx);
+		vbv.StrideInBytes = sizeof(V);
 
-	list_->IASetVertexBuffers(0, 1, &vbv);
-	list_->SetGraphicsRootDescriptorTable(1, textures_[texH].srvGpu);
-	list_->DrawInstanced(6, 1, 0, 0);
+		list_->IASetVertexBuffers(0, 1, &vbv);
+		list_->SetGraphicsRootDescriptorTable(1, textures_[texH].srvGpu);
+		list_->DrawInstanced(6, 1, 0, 0);
+	}
 }
 
 // ★追加: 3Dライン描画（蓄積API）

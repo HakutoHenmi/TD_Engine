@@ -1,5 +1,7 @@
 #include "Input.h"
+#include "WindowDX.h"
 #include <cassert>
+#include <algorithm>
 #pragma comment(lib, "dinput8.lib")
 #pragma comment(lib, "dxguid.lib")
 
@@ -45,6 +47,7 @@ void Input::Initialize(HINSTANCE hInst, HWND hwnd) {
 	ZeroMemory(&mouseState_, sizeof(mouseState_));
 	ZeroMemory(&prevMouseState_, sizeof(prevMouseState_));
 	mouseX_ = mouseY_ = wheel_ = 0.0f;
+	absMouseX_ = absMouseY_ = 0.0f;
 }
 
 void Input::Update() {
@@ -65,6 +68,13 @@ void Input::Update() {
 	// マウスの移動差分
 	mouseX_ = static_cast<float>(mouseState_.lX);
 	mouseY_ = static_cast<float>(mouseState_.lY);
+
+	// ★絶対座標の更新（簡易版。本来はウィンドウメッセージから取るのが望ましいが、一旦差分で蓄積）
+	absMouseX_ += mouseX_;
+	absMouseY_ += mouseY_;
+	// クランプ処理（仮）
+	absMouseX_ = (std::max)(0.0f, (std::min)(absMouseX_, (float)WindowDX::kW));
+	absMouseY_ = (std::max)(0.0f, (std::min)(absMouseY_, (float)WindowDX::kH));
 
 	// ホイール量（上:+、下:-）
 	wheel_ = static_cast<float>(mouseState_.lZ) / WHEEL_DELTA;

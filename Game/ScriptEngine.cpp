@@ -1,6 +1,7 @@
 #include "ScriptEngine.h"
 #include "Scenes/GameScene.h"
 #include <iostream>
+#include <Windows.h> // OutputDebugStringA
 
 // ★ 個別のスクリプトの include はもう不要です！
 
@@ -35,6 +36,11 @@ std::shared_ptr<IScript> ScriptEngine::CreateScript(const std::string& className
 	if (it != scriptFactory_.end()) {
 		return it->second();
 	}
+	// ★ エラーログ強化: クラスが見つからない場合
+	std::string msg = "[ScriptEngine] CRITICAL ERROR: Script class '" + className + "' is NOT registered!\n";
+	msg += "  -> Did you write REGISTER_SCRIPT(" + className + "); in your .cpp file?\n";
+	msg += "  -> Is the .cpp file included in your Visual Studio project?\n";
+	OutputDebugStringA(msg.c_str());
 	return nullptr;
 }
 

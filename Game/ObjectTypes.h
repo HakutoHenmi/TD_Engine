@@ -31,7 +31,8 @@ enum class ComponentType {
 	GpuMeshCollider, PlayerInput, CharacterMovement, CameraTarget,
 	DirectionalLight, PointLight, SpotLight,
 	AudioSource, AudioListener, Hitbox, Hurtbox, Health, // ★追加: 音響 & 戦闘判定 & ステータス
-	Script // ★追加: スクリプトコンポーネント
+	Script, // ★追加: スクリプトコンポーネント
+	RectTransform, UIImage, UIText, UIButton // ★追加: UIコンポーネント
 };
 struct Component { ComponentType type; bool enabled = true; };
 
@@ -200,6 +201,40 @@ struct HealthComponent : public Component {
 	HealthComponent() { type = ComponentType::Health; }
 };
 
+// ★追加: UIコンポーネント
+struct RectTransformComponent : public Component {
+	DirectX::XMFLOAT2 pos = {0, 0};   // スクリーン座標
+	DirectX::XMFLOAT2 size = {100, 100};
+	DirectX::XMFLOAT2 anchor = {0.5f, 0.5f}; // 0.0〜1.0
+	DirectX::XMFLOAT2 pivot = {0.5f, 0.5f};
+	float rotation = 0.0f;
+	RectTransformComponent() { type = ComponentType::RectTransform; }
+};
+
+struct UIImageComponent : public Component {
+	uint32_t textureHandle = 0;
+	std::string texturePath = "";
+	DirectX::XMFLOAT4 color = {1, 1, 1, 1};
+	UIImageComponent() { type = ComponentType::UIImage; }
+};
+
+struct UITextComponent : public Component {
+	std::string text = "New Text";
+	float fontSize = 24.0f;
+	DirectX::XMFLOAT4 color = {1, 1, 1, 1};
+	UITextComponent() { type = ComponentType::UIText; }
+};
+
+struct UIButtonComponent : public Component {
+	bool isHovered = false;
+	bool isPressed = false;
+	DirectX::XMFLOAT4 normalColor = {1, 1, 1, 1};
+	DirectX::XMFLOAT4 hoverColor = {0.8f, 0.8f, 0.8f, 1.0f};
+	DirectX::XMFLOAT4 pressedColor = {0.6f, 0.6f, 0.6f, 1.0f};
+	std::string onClickCallback = ""; // スクリプト側のメソッド名など
+	UIButtonComponent() { type = ComponentType::UIButton; }
+};
+
 // ★変更: Script コンポーネント (ロジックの外部化)
 struct ScriptComponent : public Component {
 	std::string scriptPath = ""; // スクリプトのクラス名 (例: "PlayerScript")
@@ -251,6 +286,12 @@ struct SceneObject {
 
 	// ★追加: スクリプトコンポーネント
 	std::vector<ScriptComponent> scripts;
+
+	// ★追加: UIコンポーネント
+	std::vector<RectTransformComponent> rectTransforms;
+	std::vector<UIImageComponent> images;
+	std::vector<UITextComponent> texts;
+	std::vector<UIButtonComponent> buttons;
 
 	Engine::Transform GetTransform() const {
 		Engine::Transform t;

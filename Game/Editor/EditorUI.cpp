@@ -2525,6 +2525,113 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
+			// ★追加: RectTransform コンポーネント
+			for (size_t ci = 0; ci < obj.rectTransforms.size(); ++ci) {
+				auto& rt = obj.rectTransforms[ci];
+				ImGui::PushID(14000 + (int)ci);
+				if (ImGui::TreeNode("RectTransform")) {
+					ImGui::Checkbox("Enabled##RT", &rt.enabled);
+					ImGui::DragFloat2("Pos##RT", &rt.pos.x, 1.0f);
+					ImGui::DragFloat2("Size##RT", &rt.size.x, 1.0f);
+					ImGui::DragFloat2("Anchor##RT", &rt.anchor.x, 0.01f, 0.0f, 1.0f);
+					ImGui::DragFloat2("Pivot##RT", &rt.pivot.x, 0.01f, 0.0f, 1.0f);
+					ImGui::DragFloat("Rotation##RT", &rt.rotation, 0.5f);
+					if (ImGui::Button("Remove##RT")) {
+						obj.rectTransforms.erase(obj.rectTransforms.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+
+			// ★追加: UIImage コンポーネント
+			for (size_t ci = 0; ci < obj.images.size(); ++ci) {
+				auto& img = obj.images[ci];
+				auto* renderer = scene->GetRenderer(); // ★追加
+				ImGui::PushID(15000 + (int)ci);
+				if (ImGui::TreeNode("UIImage")) {
+					ImGui::Checkbox("Enabled##Img", &img.enabled);
+					ImGui::ColorEdit4("Color##Img", &img.color.x);
+					// テクスチャ
+					char pathBuf[256];
+					strcpy_s(pathBuf, img.texturePath.c_str());
+					if (ImGui::InputText("Texture##Img", pathBuf, sizeof(pathBuf))) {
+						img.texturePath = pathBuf;
+						if (renderer && !img.texturePath.empty())
+							img.textureHandle = renderer->LoadTexture2D(img.texturePath);
+					}
+					if (ImGui::BeginDragDropTarget()) {
+						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
+							std::string path((const char*)pl->Data, pl->DataSize - 1);
+							if (path.find(".png") != std::string::npos || path.find(".jpg") != std::string::npos) {
+								img.texturePath = path;
+								img.textureHandle = renderer->LoadTexture2D(path);
+							}
+						}
+						ImGui::EndDragDropTarget();
+					}
+					if (img.textureHandle != 0) {
+						ImGui::Image((ImTextureID)renderer->GetTextureSrvGpu(img.textureHandle).ptr, ImVec2(64, 64));
+					}
+					if (ImGui::Button("Remove##Img")) {
+						obj.images.erase(obj.images.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+
+			// ★追加: UIButton コンポーネント
+			for (size_t ci = 0; ci < obj.buttons.size(); ++ci) {
+				auto& btn = obj.buttons[ci];
+				ImGui::PushID(16000 + (int)ci);
+				if (ImGui::TreeNode("UIButton")) {
+					ImGui::Checkbox("Enabled##Btn", &btn.enabled);
+					ImGui::ColorEdit4("Normal Color##Btn", &btn.normalColor.x);
+					ImGui::ColorEdit4("Hover Color##Btn", &btn.hoverColor.x);
+					ImGui::ColorEdit4("Pressed Color##Btn", &btn.pressedColor.x);
+					ImGui::Text("State: %s", btn.isPressed ? "Pressed" : (btn.isHovered ? "Hovered" : "Normal"));
+					if (ImGui::Button("Remove##Btn")) {
+						obj.buttons.erase(obj.buttons.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+
+			// ★追加: UIText コンポーネント
+			for (size_t ci = 0; ci < obj.texts.size(); ++ci) {
+				auto& txt = obj.texts[ci];
+				ImGui::PushID(17000 + (int)ci);
+				if (ImGui::TreeNode("UIText")) {
+					ImGui::Checkbox("Enabled##Txt", &txt.enabled);
+					char txtBuf[1024];
+					strcpy_s(txtBuf, txt.text.c_str());
+					if (ImGui::InputTextMultiline("Text##Txt", txtBuf, sizeof(txtBuf))) {
+						txt.text = txtBuf;
+					}
+					ImGui::DragFloat("Font Size##Txt", &txt.fontSize, 0.5f, 1.0f, 256.0f);
+					ImGui::ColorEdit4("Color##Txt", &txt.color.x);
+					if (ImGui::Button("Remove##Txt")) {
+						obj.texts.erase(obj.texts.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+
 			// ★追加: Hitbox コンポーネント (攻撃判定)
 			for (size_t ci = 0; ci < obj.hitboxes.size(); ++ci) {
 				auto& hb = obj.hitboxes[ci];
@@ -2698,6 +2805,19 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					obj.hurtboxes.push_back({});
 				} // ★追加
 				ImGui::Separator();
+				if (ImGui::MenuItem("RectTransform")) {
+					obj.rectTransforms.push_back({});
+				}
+				if (ImGui::MenuItem("UIImage")) {
+					obj.images.push_back({});
+				}
+				if (ImGui::MenuItem("UIButton")) {
+					obj.buttons.push_back({});
+				}
+				if (ImGui::MenuItem("UIText")) {
+					obj.texts.push_back({});
+				}
+				ImGui::Separator();
 				if (ImGui::MenuItem("Health")) {
 					obj.healths.push_back({});
 				} // ★追加
@@ -2847,38 +2967,46 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 				std::string hPath = "Game/" + className + ".h";
 				std::string cppPath = "Game/" + className + ".cpp";
 				if (!fs::exists(hPath) && !fs::exists(cppPath)) {
-					// ヘッダーファイル
-					{
-						std::ofstream f(hPath);
-						f << "#pragma once\n";
-						f << "#include \"IScript.h\"\n\n";
-						f << "namespace Game {\n\n";
-						f << "class " << className << " : public IScript {\n";
-						f << "public:\n";
-						f << "\tvoid Start(SceneObject& obj, GameScene* scene) override {\n";
-						f << "\t\t// 初期化処理（シーン開始時に1回呼ばれる）\n";
-						f << "\t}\n\n";
-						f << "\tvoid Update(SceneObject& obj, GameScene* scene, float dt) override {\n";
-						f << "\t\t// 毎フレーム処理\n";
-						f << "\t}\n\n";
-						f << "\tvoid OnDestroy(SceneObject& obj, GameScene* scene) override {\n";
-						f << "\t\t// オブジェクト破棄時の処理\n";
-						f << "\t}\n";
-						f << "};\n\n";
-						f << "} // namespace Game\n";
-						f.close();
-					}
-					// ソースファイル
-					{
-						std::ofstream f(cppPath);
-						f << "#include \"" << className << ".h\"\n";
-						f << "#include \"ObjectTypes.h\"\n";
-						f << "#include \"Scenes/GameScene.h\"\n";
-						f << "#include \"ScriptEngine.h\"\n\n";
-						f << "// ★ スクリプト自動登録\n";
-						f << "REGISTER_SCRIPT(Game::" << className << ");\n";
-						f.close();
-					}
+						// ヘッダーファイル
+						{
+							std::ofstream f(hPath);
+							f << "#pragma once\n";
+							f << "#include \"IScript.h\"\n\n";
+							f << "namespace Game {\n\n";
+							f << "class " << className << " : public IScript {\n";
+							f << "public:\n";
+							f << "\t// 初期化処理（シーン開始時に1回呼ばれる）\n";
+							f << "\tvoid Start(SceneObject& obj, GameScene* scene) override;\n\n";
+							f << "\t// 毎フレーム処理\n";
+							f << "\tvoid Update(SceneObject& obj, GameScene* scene, float dt) override;\n\n";
+							f << "\t// オブジェクト破棄時の処理\n";
+							f << "\tvoid OnDestroy(SceneObject& obj, GameScene* scene) override;\n";
+							f << "};\n\n";
+							f << "} // namespace Game\n";
+							f.close();
+						}
+						// ソースファイル
+						{
+							std::ofstream f(cppPath);
+							f << "#include \"" << className << ".h\"\n";
+							f << "#include \"ObjectTypes.h\"\n";
+							f << "#include \"Scenes/GameScene.h\"\n";
+							f << "#include \"ScriptEngine.h\"\n\n";
+							f << "namespace Game {\n\n";
+							f << "void " << className << "::Start(SceneObject& /*obj*/, GameScene* /*scene*/) {\n";
+							f << "\t// ここに初期設定を記述\n";
+							f << "}\n\n";
+							f << "void " << className << "::Update(SceneObject& obj, GameScene* scene, float dt) {\n";
+							f << "\t// ここに毎フレームの挙動を記述\n";
+							f << "}\n\n";
+							f << "void " << className << "::OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {\n";
+							f << "\t// 終了時のクリーンアップなどを記述\n";
+							f << "}\n\n";
+							f << "// ★ スクリプト自動登録\n";
+							f << "REGISTER_SCRIPT(" << className << ");\n\n";
+							f << "} // namespace Game\n";
+							f.close();
+						}
 					Log("Script created: " + hPath + " / " + cppPath);
 					// VS Codeで開く
 					std::string cmd = "code . " + hPath + " " + cppPath;
@@ -3581,6 +3709,15 @@ void EditorUI::ShowPlayModeMonitor(GameScene* scene) {
 		return;
 
 	ImGui::Begin("Play Mode Monitor");
+
+	// ★ FPSカウンター
+	float fps = ImGui::GetIO().Framerate;
+	ImVec4 col = {0.0f, 1.0f, 0.0f, 1.0f};
+	if (fps < 55.0f) col = {1.0f, 1.0f, 0.0f, 1.0f};
+	if (fps < 30.0f) col = {1.0f, 0.0f, 0.0f, 1.0f};
+	ImGui::TextColored(col, "FPS: %.1f", fps);
+	ImGui::Separator();
+
 	static std::map<size_t, std::vector<float>> hpHistories;
 
 	if (ImGui::BeginTable("MonitorTable", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable)) {

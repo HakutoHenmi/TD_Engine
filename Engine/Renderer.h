@@ -207,7 +207,13 @@ public:
 	// ★スキニングメッシュ描画
 	void DrawSkinnedMesh(MeshHandle mesh, TextureHandle texture, const Transform& transform, const std::vector<Matrix4x4>& bones, const Vector4& mulColor = {1, 1, 1, 1});
 
-	void DrawSprite(TextureHandle texture, const SpriteDesc& sprite);
+	// スプライト描画
+	struct SpriteDrawCall {
+		TextureHandle tex;
+		SpriteDesc desc;
+	};
+	void DrawSprite(TextureHandle texH, const SpriteDesc& s);
+	void FlushSprites(); // スプライトの描画実行
 
 	// ★追加: 3Dライン描画（エディタ用ギズモ・グリッドなど）
 	void DrawLine3D(const Vector3& p0, const Vector3& p1, const Vector4& color, bool xray = false);
@@ -405,6 +411,7 @@ private:
 
 	std::vector<DrawCall> drawCalls_; // ★追加: ドローコールバッファ
 	std::vector<InstancedDrawCall> instancedDrawCalls_; // ★追加: インスタンスドローコール
+	std::vector<SpriteDrawCall> spriteDrawCalls_; // ★追加: スプライト用
 
 	// ★変更: Mesh構造体ではなくModelクラスへのスマートポインタで管理
 	std::vector<std::shared_ptr<Model>> models_;

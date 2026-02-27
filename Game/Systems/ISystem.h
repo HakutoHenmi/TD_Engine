@@ -22,6 +22,7 @@ class ISystem {
 public:
 	virtual ~ISystem() = default;
 	virtual void Update(std::vector<SceneObject>& objects, GameContext& ctx) = 0;
+	virtual void Draw(std::vector<SceneObject>& /*objects*/, GameContext& /*ctx*/) {} // 描画処理用
 	virtual void Reset(std::vector<SceneObject>& /*objects*/) {} // Play開始時のリセット
 };
 
