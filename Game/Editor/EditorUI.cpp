@@ -2,19 +2,19 @@
 #include "../../externals/imgui/imgui.h"
 #include "../../externals/imgui/imgui_internal.h"
 #include "../Scenes/GameScene.h"
+#include "Audio.h"
 #include "SceneManager.h"
 #include "WindowDX.h"
-#include "Audio.h"
-#include <filesystem>
-#include <string>
-#include <deque>
-#include <cmath>
-#include <fstream>
-#include <sstream>
 #include <algorithm>
-#include <cfloat>
-#include <map>
 #include <cctype>
+#include <cfloat>
+#include <cmath>
+#include <deque>
+#include <filesystem>
+#include <fstream>
+#include <map>
+#include <sstream>
+#include <string>
 
 namespace Game {
 namespace fs = std::filesystem;
@@ -31,10 +31,10 @@ static float globalTime = 0.0f;
 
 // ★ ビューポート操作用の状態 (non-static: extern参照)
 bool gizmoDragging = false;
-int gizmoDragAxis = -1;       // 0=X, 1=Y, 2=Z
+int gizmoDragAxis = -1; // 0=X, 1=Y, 2=Z
 static std::map<int, Engine::Transform> dragStartTransforms = {};
 static ImVec2 gizmoDragStartMouse = {};
-static bool objectDragging = false;  // ★ 自由ドラッグ中フラグ
+static bool objectDragging = false;               // ★ 自由ドラッグ中フラグ
 static std::vector<SceneObject> clipboardObjects; // Ctrl+C コピー用
 
 // ★ Gameウィンドウの画像座標 (ピッキング用)
@@ -46,155 +46,288 @@ static std::string GenerateCopyName(const std::string& baseName, const std::vect
 	// 末尾の "_数字" や " (Copy)" を除去してベース名を取得
 	std::string base = baseName;
 	// " (Copy)" の繰り返しを除去
-	while (base.size() > 7 && base.substr(base.size() - 7) == " (Copy)") base = base.substr(0, base.size() - 7);
+	while (base.size() > 7 && base.substr(base.size() - 7) == " (Copy)")
+		base = base.substr(0, base.size() - 7);
 	// "_数字" を除去
 	{
 		auto pos = base.rfind('_');
 		if (pos != std::string::npos && pos + 1 < base.size()) {
 			bool allDigit = true;
-			for (size_t i = pos + 1; i < base.size(); ++i) if (!isdigit((unsigned char)base[i])) { allDigit = false; break; }
-			if (allDigit) base = base.substr(0, pos);
+			for (size_t i = pos + 1; i < base.size(); ++i)
+				if (!isdigit((unsigned char)base[i])) {
+					allDigit = false;
+					break;
+				}
+			if (allDigit)
+				base = base.substr(0, pos);
 		}
 	}
-	if (base.empty()) base = "Object";
+	if (base.empty())
+		base = "Object";
 	// 既存のオブジェクト名から最大番号を探す
 	int maxNum = 0;
 	for (const auto& obj : objects) {
 		if (obj.name.size() > base.size() + 1 && obj.name.substr(0, base.size()) == base && obj.name[base.size()] == '_') {
 			std::string numPart = obj.name.substr(base.size() + 1);
 			bool allDigit = true;
-			for (char c : numPart) if (!isdigit((unsigned char)c)) { allDigit = false; break; }
-			if (allDigit && !numPart.empty()) { int n = std::stoi(numPart); if (n > maxNum) maxNum = n; }
+			for (char c : numPart)
+				if (!isdigit((unsigned char)c)) {
+					allDigit = false;
+					break;
+				}
+			if (allDigit && !numPart.empty()) {
+				int n = std::stoi(numPart);
+				if (n > maxNum)
+					maxNum = n;
+			}
 		}
 	}
 	return base + "_" + std::to_string(maxNum + 1);
 }
 
 // ====== Undo/Redo ======
-void EditorUI::PushUndo(const UndoCommand& cmd) { undoStack.push_back(cmd); if (undoStack.size()>kMaxUndoDepth) undoStack.pop_front(); redoStack.clear(); }
-void EditorUI::Undo() { if(undoStack.empty()) return; auto c=undoStack.back(); undoStack.pop_back(); c.undo(); redoStack.push_back(c); }
-void EditorUI::Redo() { if(redoStack.empty()) return; auto c=redoStack.back(); redoStack.pop_back(); c.redo(); undoStack.push_back(c); }
+void EditorUI::PushUndo(const UndoCommand& cmd) {
+	undoStack.push_back(cmd);
+	if (undoStack.size() > kMaxUndoDepth)
+		undoStack.pop_front();
+	redoStack.clear();
+}
+void EditorUI::Undo() {
+	if (undoStack.empty())
+		return;
+	auto c = undoStack.back();
+	undoStack.pop_back();
+	c.undo();
+	redoStack.push_back(c);
+}
+void EditorUI::Redo() {
+	if (redoStack.empty())
+		return;
+	auto c = redoStack.back();
+	redoStack.pop_back();
+	c.redo();
+	undoStack.push_back(c);
+}
 
 // ====== Console ======
-void EditorUI::Log(const std::string& msg) { consoleLog.push_back({LogLevel::Info, msg, globalTime}); if(consoleLog.size()>kMaxConsoleLines) consoleLog.pop_front(); }
-void EditorUI::LogWarning(const std::string& msg) { consoleLog.push_back({LogLevel::Warning, msg, globalTime}); if(consoleLog.size()>kMaxConsoleLines) consoleLog.pop_front(); }
-void EditorUI::LogError(const std::string& msg) { consoleLog.push_back({LogLevel::Error, msg, globalTime}); if(consoleLog.size()>kMaxConsoleLines) consoleLog.pop_front(); }
+void EditorUI::Log(const std::string& msg) {
+	consoleLog.push_back({LogLevel::Info, msg, globalTime});
+	if (consoleLog.size() > kMaxConsoleLines)
+		consoleLog.pop_front();
+}
+void EditorUI::LogWarning(const std::string& msg) {
+	consoleLog.push_back({LogLevel::Warning, msg, globalTime});
+	if (consoleLog.size() > kMaxConsoleLines)
+		consoleLog.pop_front();
+}
+void EditorUI::LogError(const std::string& msg) {
+	consoleLog.push_back({LogLevel::Error, msg, globalTime});
+	if (consoleLog.size() > kMaxConsoleLines)
+		consoleLog.pop_front();
+}
 
 // ====== JSON Save ======
-static std::string EscapeJson(const std::string& s) { std::string o; for(char c:s){if(c=='"')o+="\\\""; else if(c=='\\')o+="\\\\"; else o+=c;} return o; }
+static std::string EscapeJson(const std::string& s) {
+	std::string o;
+	for (char c : s) {
+		if (c == '"')
+			o += "\\\"";
+		else if (c == '\\')
+			o += "\\\\";
+		else
+			o += c;
+	}
+	return o;
+}
 
 static std::string SerializeSceneObject(const SceneObject& o) {
 	std::stringstream ss;
-	ss<<"    {\n";
-	ss<<"      \"name\": \""<<EscapeJson(o.name)<<"\",\n";
-	ss<<"      \"locked\": "<<(o.locked?"true":"false")<<",\n";
-	ss<<"      \"modelPath\": \""<<EscapeJson(o.modelPath)<<"\",\n";
-	ss<<"      \"texturePath\": \""<<EscapeJson(o.texturePath)<<"\",\n";
-	ss<<"      \"translate\": ["<<o.translate.x<<", "<<o.translate.y<<", "<<o.translate.z<<"],\n";
-	ss<<"      \"rotate\": ["<<o.rotate.x<<", "<<o.rotate.y<<", "<<o.rotate.z<<"],\n";
-	ss<<"      \"scale\": ["<<o.scale.x<<", "<<o.scale.y<<", "<<o.scale.z<<"],\n";
-	ss<<"      \"color\": ["<<o.color.x<<", "<<o.color.y<<", "<<o.color.z<<", "<<o.color.w<<"],\n";
-	ss<<"      \"components\": [\n";
+	ss << "    {\n";
+	ss << "      \"name\": \"" << EscapeJson(o.name) << "\",\n";
+	ss << "      \"locked\": " << (o.locked ? "true" : "false") << ",\n";
+	ss << "      \"modelPath\": \"" << EscapeJson(o.modelPath) << "\",\n";
+	ss << "      \"texturePath\": \"" << EscapeJson(o.texturePath) << "\",\n";
+	ss << "      \"translate\": [" << o.translate.x << ", " << o.translate.y << ", " << o.translate.z << "],\n";
+	ss << "      \"rotate\": [" << o.rotate.x << ", " << o.rotate.y << ", " << o.rotate.z << "],\n";
+	ss << "      \"scale\": [" << o.scale.x << ", " << o.scale.y << ", " << o.scale.z << "],\n";
+	ss << "      \"color\": [" << o.color.x << ", " << o.color.y << ", " << o.color.z << ", " << o.color.w << "],\n";
+	ss << "      \"components\": [\n";
 	bool first = true;
-	for(const auto& mr : o.meshRenderers) {
-		if(!first) ss<<",\n"; first = false;
-		ss<<"        {\"type\": \"MeshRenderer\", \"enabled\": "<<(mr.enabled?"true":"false")<<", \"modelPath\": \""<<EscapeJson(mr.modelPath)<<"\", \"texturePath\": \""<<EscapeJson(mr.texturePath)<<"\", \"color\": ["<<mr.color.x<<","<<mr.color.y<<","<<mr.color.z<<","<<mr.color.w<<"], \"uvTiling\": ["<<mr.uvTiling.x<<","<<mr.uvTiling.y<<"], \"uvOffset\": ["<<mr.uvOffset.x<<","<<mr.uvOffset.y<<"], \"lightmapPath\": \""<<EscapeJson(mr.lightmapPath)<<"\"}";
+	for (const auto& mr : o.meshRenderers) {
+		if (!first)
+			ss << ",\n";
+		first = false;
+		ss << "        {\"type\": \"MeshRenderer\", \"enabled\": " << (mr.enabled ? "true" : "false") << ", \"modelPath\": \"" << EscapeJson(mr.modelPath) << "\", \"texturePath\": \""
+		   << EscapeJson(mr.texturePath) << "\", \"color\": [" << mr.color.x << "," << mr.color.y << "," << mr.color.z << "," << mr.color.w << "], \"uvTiling\": [" << mr.uvTiling.x << ","
+		   << mr.uvTiling.y << "], \"uvOffset\": [" << mr.uvOffset.x << "," << mr.uvOffset.y << "], \"lightmapPath\": \"" << EscapeJson(mr.lightmapPath) << "\"}";
 	}
-	for(const auto& bc : o.boxColliders) {
-		if(!first) ss<<",\n"; first = false;
-		ss<<"        {\"type\": \"BoxCollider\", \"enabled\": "<<(bc.enabled?"true":"false")<<", \"center\": ["<<bc.center.x<<","<<bc.center.y<<","<<bc.center.z<<"], \"size\": ["<<bc.size.x<<","<<bc.size.y<<","<<bc.size.z<<"]}";
+	for (const auto& bc : o.boxColliders) {
+		if (!first)
+			ss << ",\n";
+		first = false;
+		ss << "        {\"type\": \"BoxCollider\", \"enabled\": " << (bc.enabled ? "true" : "false") << ", \"center\": [" << bc.center.x << "," << bc.center.y << "," << bc.center.z << "], \"size\": ["
+		   << bc.size.x << "," << bc.size.y << "," << bc.size.z << "]}";
 	}
-	for(const auto& tg : o.tags) {
-		if(!first) ss<<",\n"; first = false;
-		ss<<"        {\"type\": \"Tag\", \"enabled\": "<<(tg.enabled?"true":"false")<<", \"tag\": \""<<EscapeJson(tg.tag)<<"\"}";
+	for (const auto& tg : o.tags) {
+		if (!first)
+			ss << ",\n";
+		first = false;
+		ss << "        {\"type\": \"Tag\", \"enabled\": " << (tg.enabled ? "true" : "false") << ", \"tag\": \"" << EscapeJson(tg.tag) << "\"}";
 	}
-	for(const auto& an : o.animators) {
-		if(!first) ss<<",\n"; first = false;
-		ss<<"        {\"type\": \"Animator\", \"enabled\": "<<(an.enabled?"true":"false")<<", \"currentAnimation\": \""<<EscapeJson(an.currentAnimation)<<"\", \"isPlaying\": "<<(an.isPlaying?"true":"false")<<", \"loop\": "<<(an.loop?"true":"false")<<", \"speed\": ["<<an.speed<<"], \"time\": ["<<an.time<<"]}";
+	for (const auto& an : o.animators) {
+		if (!first)
+			ss << ",\n";
+		first = false;
+		ss << "        {\"type\": \"Animator\", \"enabled\": " << (an.enabled ? "true" : "false") << ", \"currentAnimation\": \"" << EscapeJson(an.currentAnimation)
+		   << "\", \"isPlaying\": " << (an.isPlaying ? "true" : "false") << ", \"loop\": " << (an.loop ? "true" : "false") << ", \"speed\": [" << an.speed << "], \"time\": [" << an.time << "]}";
 	}
-	for(const auto& rb : o.rigidbodies) {
-		if(!first) ss<<",\n"; first = false;
-		ss<<"        {\"type\": \"Rigidbody\", \"enabled\": "<<(rb.enabled?"true":"false")<<", \"velocity\": ["<<rb.velocity.x<<","<<rb.velocity.y<<","<<rb.velocity.z<<"], \"useGravity\": "<<(rb.useGravity?"true":"false")<<", \"isKinematic\": "<<(rb.isKinematic?"true":"false")<<"}";
+	for (const auto& rb : o.rigidbodies) {
+		if (!first)
+			ss << ",\n";
+		first = false;
+		ss << "        {\"type\": \"Rigidbody\", \"enabled\": " << (rb.enabled ? "true" : "false") << ", \"velocity\": [" << rb.velocity.x << "," << rb.velocity.y << "," << rb.velocity.z
+		   << "], \"useGravity\": " << (rb.useGravity ? "true" : "false") << ", \"isKinematic\": " << (rb.isKinematic ? "true" : "false") << "}";
 	}
 	// ★追加: ParticleEmitterのシリアライズ
-	for(const auto& pe : o.particleEmitters) {
-		if(!first) ss<<",\n"; first = false;
+	for (const auto& pe : o.particleEmitters) {
+		if (!first)
+			ss << ",\n";
+		first = false;
 		const auto& p = pe.emitter.params;
-		ss<<"        {\"type\": \"ParticleEmitter\", \"enabled\": "<<(pe.enabled?"true":"false")<<", \"isPlaying\": "<<(pe.emitter.isPlaying?"true":"false")<<", \"emitRate\": "<<p.emitRate<<", \"burstCount\": "<<p.burstCount;
-		ss<<", \"lifeTime\": "<<p.lifeTime<<", \"lifeTimeVariance\": "<<p.lifeTimeVariance;
-		ss<<", \"startVelocity\": ["<<p.startVelocity.x<<","<<p.startVelocity.y<<","<<p.startVelocity.z<<"], \"velocityVariance\": ["<<p.velocityVariance.x<<","<<p.velocityVariance.y<<","<<p.velocityVariance.z<<"], \"acceleration\": ["<<p.acceleration.x<<","<<p.acceleration.y<<","<<p.acceleration.z<<"]";
-		ss<<", \"startSize\": ["<<p.startSize.x<<","<<p.startSize.y<<","<<p.startSize.z<<"], \"endSize\": ["<<p.endSize.x<<","<<p.endSize.y<<","<<p.endSize.z<<"]";
-		ss<<", \"startColor\": ["<<p.startColor.x<<","<<p.startColor.y<<","<<p.startColor.z<<","<<p.startColor.w<<"], \"endColor\": ["<<p.endColor.x<<","<<p.endColor.y<<","<<p.endColor.z<<","<<p.endColor.w<<"]";
-		ss<<", \"isAdditive\": "<<(p.isAdditive?"true":"false");
-		ss<<", \"assetPath\": \""<<EscapeJson(pe.assetPath)<<"\"";
-		ss<<"}";
+		ss << "        {\"type\": \"ParticleEmitter\", \"enabled\": " << (pe.enabled ? "true" : "false") << ", \"isPlaying\": " << (pe.emitter.isPlaying ? "true" : "false")
+		   << ", \"emitRate\": " << p.emitRate << ", \"burstCount\": " << p.burstCount;
+		ss << ", \"lifeTime\": " << p.lifeTime << ", \"lifeTimeVariance\": " << p.lifeTimeVariance;
+		ss << ", \"startVelocity\": [" << p.startVelocity.x << "," << p.startVelocity.y << "," << p.startVelocity.z << "], \"velocityVariance\": [" << p.velocityVariance.x << ","
+		   << p.velocityVariance.y << "," << p.velocityVariance.z << "], \"acceleration\": [" << p.acceleration.x << "," << p.acceleration.y << "," << p.acceleration.z << "]";
+		ss << ", \"startSize\": [" << p.startSize.x << "," << p.startSize.y << "," << p.startSize.z << "], \"endSize\": [" << p.endSize.x << "," << p.endSize.y << "," << p.endSize.z << "]";
+		ss << ", \"startColor\": [" << p.startColor.x << "," << p.startColor.y << "," << p.startColor.z << "," << p.startColor.w << "], \"endColor\": [" << p.endColor.x << "," << p.endColor.y << ","
+		   << p.endColor.z << "," << p.endColor.w << "]";
+		ss << ", \"isAdditive\": " << (p.isAdditive ? "true" : "false");
+		ss << ", \"assetPath\": \"" << EscapeJson(pe.assetPath) << "\"";
+		ss << "}";
 	}
-	for(const auto& gmc : o.gpuMeshColliders) {
-		if(!first) ss<<",\n"; first = false;
-		ss<<"        {\"type\": \"GpuMeshCollider\", \"enabled\": "<<(gmc.enabled?"true":"false")<<", \"isTrigger\": "<<(gmc.isTrigger?"true":"false")<<", \"meshPath\": \""<<EscapeJson(gmc.meshPath)<<"\"}";
+	for (const auto& gmc : o.gpuMeshColliders) {
+		if (!first)
+			ss << ",\n";
+		first = false;
+		ss << "        {\"type\": \"GpuMeshCollider\", \"enabled\": " << (gmc.enabled ? "true" : "false") << ", \"isTrigger\": " << (gmc.isTrigger ? "true" : "false") << ", \"meshPath\": \""
+		   << EscapeJson(gmc.meshPath) << "\"}";
 	}
 	// ★追加: PlayerInput
-	for(const auto& pi : o.playerInputs) {
-		if(!first) ss<<",\n"; first = false;
-		ss<<"        {\"type\": \"PlayerInput\", \"enabled\": "<<(pi.enabled?"true":"false")<<"}";
+	for (const auto& pi : o.playerInputs) {
+		if (!first)
+			ss << ",\n";
+		first = false;
+		ss << "        {\"type\": \"PlayerInput\", \"enabled\": " << (pi.enabled ? "true" : "false") << "}";
 	}
 	// ★追加: CharacterMovement
-	for(const auto& cm : o.characterMovements) {
-		if(!first) ss<<",\n"; first = false;
-		ss<<"        {\"type\": \"CharacterMovement\", \"enabled\": "<<(cm.enabled?"true":"false")<<", \"speed\": "<<cm.speed<<", \"jumpPower\": "<<cm.jumpPower<<", \"gravity\": "<<cm.gravity<<"}";
+	for (const auto& cm : o.characterMovements) {
+		if (!first)
+			ss << ",\n";
+		first = false;
+		ss << "        {\"type\": \"CharacterMovement\", \"enabled\": " << (cm.enabled ? "true" : "false") << ", \"speed\": " << cm.speed << ", \"jumpPower\": " << cm.jumpPower
+		   << ", \"gravity\": " << cm.gravity << "}";
 	}
 	// ★追加: CameraTarget
-	for(const auto& ct : o.cameraTargets) {
-		if(!first) ss<<",\n"; first = false;
-		ss<<"        {\"type\": \"CameraTarget\", \"enabled\": "<<(ct.enabled?"true":"false")<<", \"distance\": "<<ct.distance<<", \"height\": "<<ct.height<<", \"smoothSpeed\": "<<ct.smoothSpeed<<"}";
+	for (const auto& ct : o.cameraTargets) {
+		if (!first)
+			ss << ",\n";
+		first = false;
+		ss << "        {\"type\": \"CameraTarget\", \"enabled\": " << (ct.enabled ? "true" : "false") << ", \"distance\": " << ct.distance << ", \"height\": " << ct.height
+		   << ", \"smoothSpeed\": " << ct.smoothSpeed << "}";
 	}
 	// ★追加: Light Components
-	for(const auto& dl : o.directionalLights) {
-		if(!first) ss<<",\n"; first = false;
-		ss<<"        {\"type\": \"DirectionalLight\", \"enabled\": "<<(dl.enabled?"true":"false")<<", \"color\": ["<<dl.color.x<<","<<dl.color.y<<","<<dl.color.z<<"], \"intensity\": "<<dl.intensity<<"}";
+	for (const auto& dl : o.directionalLights) {
+		if (!first)
+			ss << ",\n";
+		first = false;
+		ss << "        {\"type\": \"DirectionalLight\", \"enabled\": " << (dl.enabled ? "true" : "false") << ", \"color\": [" << dl.color.x << "," << dl.color.y << "," << dl.color.z
+		   << "], \"intensity\": " << dl.intensity << "}";
 	}
-	for(const auto& pl : o.pointLights) {
-		if(!first) ss<<",\n"; first = false;
-		ss<<"        {\"type\": \"PointLight\", \"enabled\": "<<(pl.enabled?"true":"false")<<", \"color\": ["<<pl.color.x<<","<<pl.color.y<<","<<pl.color.z<<"], \"intensity\": "<<pl.intensity<<", \"range\": "<<pl.range<<", \"atten\": ["<<pl.atten.x<<","<<pl.atten.y<<","<<pl.atten.z<<"]}";
+	for (const auto& pl : o.pointLights) {
+		if (!first)
+			ss << ",\n";
+		first = false;
+		ss << "        {\"type\": \"PointLight\", \"enabled\": " << (pl.enabled ? "true" : "false") << ", \"color\": [" << pl.color.x << "," << pl.color.y << "," << pl.color.z
+		   << "], \"intensity\": " << pl.intensity << ", \"range\": " << pl.range << ", \"atten\": [" << pl.atten.x << "," << pl.atten.y << "," << pl.atten.z << "]}";
 	}
-	for(const auto& sl : o.spotLights) {
-		if(!first) ss<<",\n"; first = false;
-		ss<<"        {\"type\": \"SpotLight\", \"enabled\": "<<(sl.enabled?"true":"false")<<", \"color\": ["<<sl.color.x<<","<<sl.color.y<<","<<sl.color.z<<"], \"intensity\": "<<sl.intensity<<", \"range\": "<<sl.range<<", \"innerCos\": "<<sl.innerCos<<", \"outerCos\": "<<sl.outerCos<<", \"atten\": ["<<sl.atten.x<<","<<sl.atten.y<<","<<sl.atten.z<<"]}";
+	for (const auto& sl : o.spotLights) {
+		if (!first)
+			ss << ",\n";
+		first = false;
+		ss << "        {\"type\": \"SpotLight\", \"enabled\": " << (sl.enabled ? "true" : "false") << ", \"color\": [" << sl.color.x << "," << sl.color.y << "," << sl.color.z
+		   << "], \"intensity\": " << sl.intensity << ", \"range\": " << sl.range << ", \"innerCos\": " << sl.innerCos << ", \"outerCos\": " << sl.outerCos << ", \"atten\": [" << sl.atten.x << ","
+		   << sl.atten.y << "," << sl.atten.z << "]}";
 	}
 	// ★追加: AudioSource
-	for(const auto& as : o.audioSources) {
-		if(!first) ss<<",\n"; first = false;
-		ss<<"        {\"type\": \"AudioSource\", \"enabled\": "<<(as.enabled?"true":"false")<<", \"soundPath\": \""<<EscapeJson(as.soundPath)<<"\", \"volume\": "<<as.volume<<", \"loop\": "<<(as.loop?"true":"false")<<", \"playOnStart\": "<<(as.playOnStart?"true":"false")<<", \"is3D\": "<<(as.is3D?"true":"false")<<", \"maxDistance\": "<<as.maxDistance<<"}";
+	for (const auto& as : o.audioSources) {
+		if (!first)
+			ss << ",\n";
+		first = false;
+		ss << "        {\"type\": \"AudioSource\", \"enabled\": " << (as.enabled ? "true" : "false") << ", \"soundPath\": \"" << EscapeJson(as.soundPath) << "\", \"volume\": " << as.volume
+		   << ", \"loop\": " << (as.loop ? "true" : "false") << ", \"playOnStart\": " << (as.playOnStart ? "true" : "false") << ", \"is3D\": " << (as.is3D ? "true" : "false")
+		   << ", \"maxDistance\": " << as.maxDistance << "}";
 	}
 	// ★追加: AudioListener
-	for(const auto& al : o.audioListeners) {
-		if(!first) ss<<",\n"; first = false;
-		ss<<"        {\"type\": \"AudioListener\", \"enabled\": "<<(al.enabled?"true":"false")<<"}";
+	for (const auto& al : o.audioListeners) {
+		if (!first)
+			ss << ",\n";
+		first = false;
+		ss << "        {\"type\": \"AudioListener\", \"enabled\": " << (al.enabled ? "true" : "false") << "}";
 	}
 	// ★追加: Hitbox
-	for(const auto& hb : o.hitboxes) {
-		if(!first) ss<<",\n"; first = false;
-		ss<<"        {\"type\": \"Hitbox\", \"enabled\": "<<(hb.enabled?"true":"false")<<", \"center\": ["<<hb.center.x<<","<<hb.center.y<<","<<hb.center.z<<"], \"size\": ["<<hb.size.x<<","<<hb.size.y<<","<<hb.size.z<<"], \"damage\": "<<hb.damage<<", \"isActive\": "<<(hb.isActive?"true":"false")<<", \"tag\": \""<<EscapeJson(hb.tag)<<"\"}";
+	for (const auto& hb : o.hitboxes) {
+		if (!first)
+			ss << ",\n";
+		first = false;
+		ss << "        {\"type\": \"Hitbox\", \"enabled\": " << (hb.enabled ? "true" : "false") << ", \"center\": [" << hb.center.x << "," << hb.center.y << "," << hb.center.z << "], \"size\": ["
+		   << hb.size.x << "," << hb.size.y << "," << hb.size.z << "], \"damage\": " << hb.damage << ", \"isActive\": " << (hb.isActive ? "true" : "false") << ", \"tag\": \"" << EscapeJson(hb.tag)
+		   << "\"}";
 	}
-	// ★追加: Hurtbox
-	for(const auto& hb : o.hurtboxes) {
-		if(!first) ss<<",\n"; first = false;
-		ss<<"        {\"type\": \"Hurtbox\", \"enabled\": "<<(hb.enabled?"true":"false")<<", \"center\": ["<<hb.center.x<<","<<hb.center.y<<","<<hb.center.z<<"], \"size\": ["<<hb.size.x<<","<<hb.size.y<<","<<hb.size.z<<"], \"tag\": \""<<EscapeJson(hb.tag)<<"\", \"damageMultiplier\": "<<hb.damageMultiplier<<"}";
+	// ★追加: Health
+	for (const auto& hc : o.healths) {
+		if (!first)
+			ss << ",\n";
+		first = false;
+		ss << "        {\"type\": \"Health\", \"enabled\": " << (hc.enabled ? "true" : "false") << ", \"hp\": " << hc.hp << ", \"maxHp\": " << hc.maxHp << ", \"stamina\": " << hc.stamina
+		   << ", \"maxStamina\": " << hc.maxStamina << ", \"invincibleTime\": " << hc.invincibleTime << ", \"isDead\": " << (hc.isDead ? "true" : "false") << "}";
 	}
-	ss<<"\n      ]\n";
-	ss<<"    }";
+	// ★追加: Script
+	for (const auto& sc : o.scripts) {
+		if (!first)
+			ss << ",\n";
+		first = false;
+		ss << "        {\"type\": \"Script\", \"enabled\": " << (sc.enabled ? "true" : "false") << ", \"scriptPath\": \"" << EscapeJson(sc.scriptPath) << "\"}";
+	}
+	ss << "\n      ]\n";
+	ss << "    }";
 	return ss.str();
 }
 
 void EditorUI::SaveScene(GameScene* scene, const std::string& path) {
-	if(!scene) return;
-	std::ofstream f(path); if(!f.is_open()){LogError("Save failed: "+path);return;}
-	f<<"{\n  \"objects\": [\n";
-	for(size_t i=0;i<scene->objects_.size();++i) {
-		if(i>0) f<<",\n";
-		f<<SerializeSceneObject(scene->objects_[i]);
+	if (!scene)
+		return;
+	std::ofstream f(path);
+	if (!f.is_open()) {
+		LogError("Save failed: " + path);
+		return;
 	}
-	f<<"\n  ]\n}\n"; f.close(); Log("Scene saved: "+path+" ("+std::to_string(scene->objects_.size())+" objects)");
+	f << "{\n  \"objects\": [\n";
+
+	// ★追加: Gitでの競合(コンフリクト)を防ぐため、オブジェクトを名前順にソートして保存する
+	std::vector<SceneObject> sortedObjects = scene->objects_;
+	std::stable_sort(sortedObjects.begin(), sortedObjects.end(), [](const SceneObject& a, const SceneObject& b) {
+		return a.name < b.name;
+	});
+
+	for (size_t i = 0; i < sortedObjects.size(); ++i) {
+		if (i > 0)
+			f << ",\n";
+		f << SerializeSceneObject(sortedObjects[i]);
+	}
+	f << "\n  ]\n}\n";
+	f.close();
+	Log("Scene saved: " + path + " (" + std::to_string(scene->objects_.size()) + " objects)");
 }
 
 // ====== JSON Load ======
@@ -202,7 +335,7 @@ static std::string UnescapeJson(const std::string& s) {
 	std::string o;
 	for (size_t i = 0; i < s.size(); ++i) {
 		if (s[i] == '\\' && i + 1 < s.size()) {
-			o += s[i+1];
+			o += s[i + 1];
 			i++;
 		} else {
 			o += s[i];
@@ -212,16 +345,24 @@ static std::string UnescapeJson(const std::string& s) {
 }
 
 static std::string ExtractString(const std::string& block, const std::string& key) {
-	auto pos=block.find("\""+key+"\""); if(pos==std::string::npos) return "";
-	auto q1=block.find("\"", block.find(":",pos)+1); if(q1==std::string::npos) return "";
+	auto pos = block.find("\"" + key + "\"");
+	if (pos == std::string::npos)
+		return "";
+	auto q1 = block.find("\"", block.find(":", pos) + 1);
+	if (q1 == std::string::npos)
+		return "";
 	size_t q2 = q1 + 1;
 	while (q2 < block.size()) {
-		if (block[q2] == '\\') q2 += 2;
-		else if (block[q2] == '"') break;
-		else q2++;
+		if (block[q2] == '\\')
+			q2 += 2;
+		else if (block[q2] == '"')
+			break;
+		else
+			q2++;
 	}
-	if(q2>=block.size()) return ""; 
-	return UnescapeJson(block.substr(q1+1,q2-q1-1));
+	if (q2 >= block.size())
+		return "";
+	return UnescapeJson(block.substr(q1 + 1, q2 - q1 - 1));
 }
 
 static size_t FindBlockEnd(const std::string& str, size_t startPos) {
@@ -231,320 +372,657 @@ static size_t FindBlockEnd(const std::string& str, size_t startPos) {
 
 	for (size_t i = startPos; i < str.size(); ++i) {
 		char c = str[i];
-		if (escape) { escape = false; continue; }
-		if (c == '\\') { escape = true; continue; }
-		if (c == '"') { inString = !inString; continue; }
+		if (escape) {
+			escape = false;
+			continue;
+		}
+		if (c == '\\') {
+			escape = true;
+			continue;
+		}
+		if (c == '"') {
+			inString = !inString;
+			continue;
+		}
 
 		if (!inString) {
-			if (c == '{' || c == '[') depth++;
+			if (c == '{' || c == '[')
+				depth++;
 			else if (c == '}' || c == ']') {
 				depth--;
-				if (depth <= 0) return i; 
+				if (depth <= 0)
+					return i;
 			}
 		}
 	}
 	return std::string::npos;
 }
 static std::vector<float> ExtractArray(const std::string& block, const std::string& key) {
-	std::vector<float> r; auto pos=block.find("\""+key+"\""); if(pos==std::string::npos) return r;
-	auto b=block.find("[",pos); auto e=block.find("]",b); if(b==std::string::npos||e==std::string::npos) return r;
-	std::istringstream ss(block.substr(b+1,e-b-1)); float v; while(ss>>v){r.push_back(v); char c; ss>>c;} return r;
+	std::vector<float> r;
+	auto pos = block.find("\"" + key + "\"");
+	if (pos == std::string::npos)
+		return r;
+	auto b = block.find("[", pos);
+	auto e = block.find("]", b);
+	if (b == std::string::npos || e == std::string::npos)
+		return r;
+	std::istringstream ss(block.substr(b + 1, e - b - 1));
+	float v;
+	while (ss >> v) {
+		r.push_back(v);
+		char c;
+		ss >> c;
+	}
+	return r;
+}
+
+static float ExtractFloat(const std::string& block, const std::string& key, float defaultVal) {
+	auto pos = block.find("\"" + key + "\"");
+	if (pos == std::string::npos)
+		return defaultVal;
+	auto colon = block.find(":", pos);
+	if (colon == std::string::npos)
+		return defaultVal;
+	size_t numStart = block.find_first_of("0123456789.-+", colon);
+	if (numStart == std::string::npos)
+		return defaultVal;
+	try {
+		return std::stof(block.substr(numStart));
+	} catch (...) {
+		return defaultVal;
+	}
 }
 
 static void ParseComponents(SceneObject& obj, const std::string& block, Engine::Renderer* renderer) {
 	auto compStart = block.find("\"components\"");
-	if(compStart == std::string::npos) return;
+	if (compStart == std::string::npos)
+		return;
 	auto arrStart = block.find("[", compStart);
-	if(arrStart == std::string::npos) return;
+	if (arrStart == std::string::npos)
+		return;
 	auto arrEnd = FindBlockEnd(block, arrStart);
-	if(arrEnd == std::string::npos) return;
-	
+	if (arrEnd == std::string::npos)
+		return;
+
 	size_t pos = arrStart + 1;
-	while(pos < arrEnd) {
+	while (pos < arrEnd) {
 		pos = block.find("{", pos);
-		if(pos == std::string::npos || pos > arrEnd) break;
+		if (pos == std::string::npos || pos > arrEnd)
+			break;
 		auto endPos = FindBlockEnd(block, pos);
-		if(endPos == std::string::npos || endPos > arrEnd) break;
+		if (endPos == std::string::npos || endPos > arrEnd)
+			break;
 		std::string cblock = block.substr(pos, endPos - pos + 1);
 		std::string type = ExtractString(cblock, "type");
 		bool enabled = true;
 		auto lkPos = cblock.find("\"enabled\"");
-		if(lkPos!=std::string::npos && cblock.find("false",lkPos)!=std::string::npos && cblock.find("false",lkPos)<lkPos+30) enabled=false;
+		if (lkPos != std::string::npos && cblock.find("false", lkPos) != std::string::npos && cblock.find("false", lkPos) < lkPos + 30)
+			enabled = false;
 
 		if (type == "MeshRenderer") {
-			MeshRendererComponent mr; mr.enabled = enabled;
+			MeshRendererComponent mr;
+			mr.enabled = enabled;
 			mr.modelPath = ExtractString(cblock, "modelPath");
-			if (!mr.modelPath.empty()) mr.modelHandle = renderer->LoadObjMesh(mr.modelPath);
+			if (!mr.modelPath.empty())
+				mr.modelHandle = renderer->LoadObjMesh(mr.modelPath);
 			mr.texturePath = ExtractString(cblock, "texturePath");
-			if (!mr.texturePath.empty()) mr.textureHandle = renderer->LoadTexture2D(mr.texturePath);
-			auto co = ExtractArray(cblock, "color"); if(co.size()>=4) mr.color={co[0],co[1],co[2],co[3]};
-			auto uvt = ExtractArray(cblock, "uvTiling"); if(uvt.size()>=2) mr.uvTiling={uvt[0],uvt[1]};
-			auto uvo = ExtractArray(cblock, "uvOffset"); if(uvo.size()>=2) mr.uvOffset={uvo[0],uvo[1]};
+			if (!mr.texturePath.empty())
+				mr.textureHandle = renderer->LoadTexture2D(mr.texturePath);
+			auto co = ExtractArray(cblock, "color");
+			if (co.size() >= 4)
+				mr.color = {co[0], co[1], co[2], co[3]};
+			auto uvt = ExtractArray(cblock, "uvTiling");
+			if (uvt.size() >= 2)
+				mr.uvTiling = {uvt[0], uvt[1]};
+			auto uvo = ExtractArray(cblock, "uvOffset");
+			if (uvo.size() >= 2)
+				mr.uvOffset = {uvo[0], uvo[1]};
 			mr.lightmapPath = ExtractString(cblock, "lightmapPath");
-			if (!mr.lightmapPath.empty()) mr.lightmapHandle = renderer->LoadTexture2D(mr.lightmapPath);
+			if (!mr.lightmapPath.empty())
+				mr.lightmapHandle = renderer->LoadTexture2D(mr.lightmapPath);
 			obj.meshRenderers.push_back(mr);
 		} else if (type == "BoxCollider") {
-			BoxColliderComponent bc; bc.enabled = enabled;
-			auto cen = ExtractArray(cblock, "center"); if(cen.size()>=3) bc.center={cen[0],cen[1],cen[2]};
-			auto sz = ExtractArray(cblock, "size"); if(sz.size()>=3) bc.size={sz[0],sz[1],sz[2]};
+			BoxColliderComponent bc;
+			bc.enabled = enabled;
+			auto cen = ExtractArray(cblock, "center");
+			if (cen.size() >= 3)
+				bc.center = {cen[0], cen[1], cen[2]};
+			auto sz = ExtractArray(cblock, "size");
+			if (sz.size() >= 3)
+				bc.size = {sz[0], sz[1], sz[2]};
 			obj.boxColliders.push_back(bc);
 		} else if (type == "Tag") {
-			TagComponent tg; tg.enabled = enabled;
+			TagComponent tg;
+			tg.enabled = enabled;
 			tg.tag = ExtractString(cblock, "tag");
 			obj.tags.push_back(tg);
 		} else if (type == "Animator") {
-			AnimatorComponent an; an.enabled = enabled;
+			AnimatorComponent an;
+			an.enabled = enabled;
 			an.currentAnimation = ExtractString(cblock, "currentAnimation");
-			auto iPos = cblock.find("\"isPlaying\""); if(iPos!=std::string::npos && cblock.find("true",iPos)!=std::string::npos && cblock.find("true",iPos)<iPos+30) an.isPlaying=true; else an.isPlaying=false;
-			auto lPos = cblock.find("\"loop\""); if(lPos!=std::string::npos && cblock.find("true",lPos)!=std::string::npos && cblock.find("true",lPos)<lPos+30) an.loop=true; else an.loop=false;
-			auto sp = ExtractArray(cblock, "speed"); if(sp.size()>=1) an.speed=sp[0];
-			auto tm = ExtractArray(cblock, "time"); if(tm.size()>=1) an.time=tm[0];
+			auto iPos = cblock.find("\"isPlaying\"");
+			if (iPos != std::string::npos && cblock.find("true", iPos) != std::string::npos && cblock.find("true", iPos) < iPos + 30)
+				an.isPlaying = true;
+			else
+				an.isPlaying = false;
+			auto lPos = cblock.find("\"loop\"");
+			if (lPos != std::string::npos && cblock.find("true", lPos) != std::string::npos && cblock.find("true", lPos) < lPos + 30)
+				an.loop = true;
+			else
+				an.loop = false;
+			auto sp = ExtractArray(cblock, "speed");
+			if (sp.size() >= 1)
+				an.speed = sp[0];
+			auto tm = ExtractArray(cblock, "time");
+			if (tm.size() >= 1)
+				an.time = tm[0];
 			obj.animators.push_back(an);
 		} else if (type == "Rigidbody") {
-			RigidbodyComponent rb; rb.enabled = enabled;
-			auto vl = ExtractArray(cblock, "velocity"); if(vl.size()>=3) rb.velocity={vl[0],vl[1],vl[2]};
-			auto gPos = cblock.find("\"useGravity\""); if(gPos!=std::string::npos && cblock.find("false",gPos)!=std::string::npos && cblock.find("false",gPos)<gPos+30) rb.useGravity=false; else rb.useGravity=true;
-			auto kPos = cblock.find("\"isKinematic\""); if(kPos!=std::string::npos && cblock.find("true",kPos)!=std::string::npos && cblock.find("true",kPos)<kPos+30) rb.isKinematic=true; else rb.isKinematic=false;
+			RigidbodyComponent rb;
+			rb.enabled = enabled;
+			auto vl = ExtractArray(cblock, "velocity");
+			if (vl.size() >= 3)
+				rb.velocity = {vl[0], vl[1], vl[2]};
+			auto gPos = cblock.find("\"useGravity\"");
+			if (gPos != std::string::npos && cblock.find("false", gPos) != std::string::npos && cblock.find("false", gPos) < gPos + 30)
+				rb.useGravity = false;
+			else
+				rb.useGravity = true;
+			auto kPos = cblock.find("\"isKinematic\"");
+			if (kPos != std::string::npos && cblock.find("true", kPos) != std::string::npos && cblock.find("true", kPos) < kPos + 30)
+				rb.isKinematic = true;
+			else
+				rb.isKinematic = false;
 			obj.rigidbodies.push_back(rb);
 		} else if (type == "ParticleEmitter") { // ★追加
-			ParticleEmitterComponent pe; pe.enabled = enabled;
+			ParticleEmitterComponent pe;
+			pe.enabled = enabled;
 			pe.emitter.Initialize(*Engine::Renderer::GetInstance(), "LoadedEmitter");
 
 			// assetPath があれば ParticleEmitter 自身にファイルから復元させる
 			pe.assetPath = ExtractString(cblock, "assetPath");
-			if(!pe.assetPath.empty()) {
+			if (!pe.assetPath.empty()) {
 				pe.emitter.LoadFromJson(pe.assetPath);
 			}
 
 			// JSON内にも上書きパラメーターがある場合のフォールバック（従来との互換性用）
 			auto& p = pe.emitter.params;
-			auto boolCheck = [&](const std::string& k, bool def) { auto pos = cblock.find("\""+k+"\""); if(pos==std::string::npos) return def; return cblock.find("true",pos)<pos+30; };
-			auto floatCheck = [&](const std::string& k, float def) { auto a = ExtractArray(cblock, k); return a.empty() ? def : a[0]; };
-			if (cblock.find("\"isPlaying\"") != std::string::npos) pe.emitter.isPlaying = boolCheck("isPlaying", true);
-			if (cblock.find("\"emitRate\"") != std::string::npos) p.emitRate = floatCheck("emitRate", 10.0f);
-			if (cblock.find("\"burstCount\"") != std::string::npos) p.burstCount = (int)floatCheck("burstCount", 0.0f);
-			if (cblock.find("\"lifeTime\"") != std::string::npos) p.lifeTime = floatCheck("lifeTime", 1.0f);
-			if (cblock.find("\"lifeTimeVariance\"") != std::string::npos) p.lifeTimeVariance = floatCheck("lifeTimeVariance", 0.2f);
-			auto vel = ExtractArray(cblock, "startVelocity"); if(vel.size()>=3) p.startVelocity = {vel[0],vel[1],vel[2]};
-			auto vRand = ExtractArray(cblock, "velocityVariance"); if(vRand.size()>=3) p.velocityVariance = {vRand[0],vRand[1],vRand[2]};
-			auto acc = ExtractArray(cblock, "acceleration"); if(acc.size()>=3) p.acceleration = {acc[0],acc[1],acc[2]};
-			auto ss = ExtractArray(cblock, "startSize"); if(ss.size()>=3) p.startSize = {ss[0],ss[1],ss[2]};
-			auto es = ExtractArray(cblock, "endSize"); if(es.size()>=3) p.endSize = {es[0],es[1],es[2]};
-			auto sc = ExtractArray(cblock, "startColor"); if(sc.size()>=4) p.startColor = {sc[0],sc[1],sc[2],sc[3]};
-			auto ec = ExtractArray(cblock, "endColor"); if(ec.size()>=4) p.endColor = {ec[0],ec[1],ec[2],ec[3]};
-			if (cblock.find("\"isAdditive\"") != std::string::npos) p.isAdditive = boolCheck("isAdditive", false);
+			auto boolCheck = [&](const std::string& k, bool def) {
+				auto pos = cblock.find("\"" + k + "\"");
+				if (pos == std::string::npos)
+					return def;
+				return cblock.find("true", pos) < pos + 30;
+			};
+			if (cblock.find("\"isPlaying\"") != std::string::npos)
+				pe.emitter.isPlaying = boolCheck("isPlaying", true);
+			if (cblock.find("\"emitRate\"") != std::string::npos)
+				p.emitRate = ExtractFloat(cblock, "emitRate", 10.0f);
+			if (cblock.find("\"burstCount\"") != std::string::npos)
+				p.burstCount = (int)ExtractFloat(cblock, "burstCount", 0.0f);
+			if (cblock.find("\"lifeTime\"") != std::string::npos)
+				p.lifeTime = ExtractFloat(cblock, "lifeTime", 1.0f);
+			if (cblock.find("\"lifeTimeVariance\"") != std::string::npos)
+				p.lifeTimeVariance = ExtractFloat(cblock, "lifeTimeVariance", 0.2f);
+			auto vel = ExtractArray(cblock, "startVelocity");
+			if (vel.size() >= 3)
+				p.startVelocity = {vel[0], vel[1], vel[2]};
+			auto vRand = ExtractArray(cblock, "velocityVariance");
+			if (vRand.size() >= 3)
+				p.velocityVariance = {vRand[0], vRand[1], vRand[2]};
+			auto acc = ExtractArray(cblock, "acceleration");
+			if (acc.size() >= 3)
+				p.acceleration = {acc[0], acc[1], acc[2]};
+			auto ss = ExtractArray(cblock, "startSize");
+			if (ss.size() >= 3)
+				p.startSize = {ss[0], ss[1], ss[2]};
+			auto es = ExtractArray(cblock, "endSize");
+			if (es.size() >= 3)
+				p.endSize = {es[0], es[1], es[2]};
+			auto sc = ExtractArray(cblock, "startColor");
+			if (sc.size() >= 4)
+				p.startColor = {sc[0], sc[1], sc[2], sc[3]};
+			auto ec = ExtractArray(cblock, "endColor");
+			if (ec.size() >= 4)
+				p.endColor = {ec[0], ec[1], ec[2], ec[3]};
+			if (cblock.find("\"isAdditive\"") != std::string::npos)
+				p.isAdditive = boolCheck("isAdditive", false);
 			obj.particleEmitters.push_back(pe);
 		} else if (type == "GpuMeshCollider") { // ★追加
-			GpuMeshColliderComponent gmc; gmc.enabled = enabled;
-			auto tPos = cblock.find("\"isTrigger\""); if(tPos!=std::string::npos && cblock.find("true",tPos)!=std::string::npos && cblock.find("true",tPos)<tPos+30) gmc.isTrigger=true; else gmc.isTrigger=false;
+			GpuMeshColliderComponent gmc;
+			gmc.enabled = enabled;
+			auto tPos = cblock.find("\"isTrigger\"");
+			if (tPos != std::string::npos && cblock.find("true", tPos) != std::string::npos && cblock.find("true", tPos) < tPos + 30)
+				gmc.isTrigger = true;
+			else
+				gmc.isTrigger = false;
 			gmc.meshPath = ExtractString(cblock, "meshPath");
-			if (!gmc.meshPath.empty()) gmc.meshHandle = renderer->LoadObjMesh(gmc.meshPath);
+			if (!gmc.meshPath.empty())
+				gmc.meshHandle = renderer->LoadObjMesh(gmc.meshPath);
 			obj.gpuMeshColliders.push_back(gmc);
 		} else if (type == "PlayerInput") { // ★追加
-			PlayerInputComponent pi; pi.enabled = enabled;
+			PlayerInputComponent pi;
+			pi.enabled = enabled;
 			obj.playerInputs.push_back(pi);
 		} else if (type == "CharacterMovement") { // ★追加
-			CharacterMovementComponent cm; cm.enabled = enabled;
-			auto floatCheck = [&](const std::string& k, float def) { auto a = ExtractArray(cblock, k); return a.empty() ? def : a[0]; };
-			if (cblock.find("\"speed\"") != std::string::npos) cm.speed = floatCheck("speed", 5.0f);
-			if (cblock.find("\"jumpPower\"") != std::string::npos) cm.jumpPower = floatCheck("jumpPower", 6.0f);
-			if (cblock.find("\"gravity\"") != std::string::npos) cm.gravity = floatCheck("gravity", -9.8f);
+			CharacterMovementComponent cm;
+			cm.enabled = enabled;
+			if (cblock.find("\"speed\"") != std::string::npos)
+				cm.speed = ExtractFloat(cblock, "speed", 5.0f);
+			if (cblock.find("\"jumpPower\"") != std::string::npos)
+				cm.jumpPower = ExtractFloat(cblock, "jumpPower", 6.0f);
+			if (cblock.find("\"gravity\"") != std::string::npos)
+				cm.gravity = ExtractFloat(cblock, "gravity", 9.8f);
 			obj.characterMovements.push_back(cm);
 		} else if (type == "CameraTarget") { // ★追加
-			CameraTargetComponent ct; ct.enabled = enabled;
-			auto floatCheck = [&](const std::string& k, float def) { auto a = ExtractArray(cblock, k); return a.empty() ? def : a[0]; };
-			if (cblock.find("\"distance\"") != std::string::npos) ct.distance = floatCheck("distance", 10.0f);
-			if (cblock.find("\"height\"") != std::string::npos) ct.height = floatCheck("height", 3.0f);
-			if (cblock.find("\"smoothSpeed\"") != std::string::npos) ct.smoothSpeed = floatCheck("smoothSpeed", 5.0f);
+			CameraTargetComponent ct;
+			ct.enabled = enabled;
+			if (cblock.find("\"distance\"") != std::string::npos)
+				ct.distance = ExtractFloat(cblock, "distance", 10.0f);
+			if (cblock.find("\"height\"") != std::string::npos)
+				ct.height = ExtractFloat(cblock, "height", 3.0f);
+			if (cblock.find("\"smoothSpeed\"") != std::string::npos)
+				ct.smoothSpeed = ExtractFloat(cblock, "smoothSpeed", 5.0f);
 			obj.cameraTargets.push_back(ct);
 		} else if (type == "DirectionalLight") { // ★追加
-			DirectionalLightComponent dl; dl.enabled = enabled;
-			auto floatCheck = [&](const std::string& k, float def) { auto a = ExtractArray(cblock, k); return a.empty() ? def : a[0]; };
-			auto col = ExtractArray(cblock, "color"); if (col.size() >= 3) dl.color = {col[0], col[1], col[2]};
-			if (cblock.find("\"intensity\"") != std::string::npos) dl.intensity = floatCheck("intensity", 1.0f);
+			DirectionalLightComponent dl;
+			dl.enabled = enabled;
+			auto col = ExtractArray(cblock, "color");
+			if (col.size() >= 3)
+				dl.color = {col[0], col[1], col[2]};
+			if (cblock.find("\"intensity\"") != std::string::npos)
+				dl.intensity = ExtractFloat(cblock, "intensity", 1.0f);
 			obj.directionalLights.push_back(dl);
 		} else if (type == "PointLight") { // ★追加
-			PointLightComponent pl; pl.enabled = enabled;
-			auto floatCheck = [&](const std::string& k, float def) { auto a = ExtractArray(cblock, k); return a.empty() ? def : a[0]; };
-			auto col = ExtractArray(cblock, "color"); if (col.size() >= 3) pl.color = {col[0], col[1], col[2]};
-			if (cblock.find("\"intensity\"") != std::string::npos) pl.intensity = floatCheck("intensity", 1.0f);
-			if (cblock.find("\"range\"") != std::string::npos) pl.range = floatCheck("range", 10.0f);
-			auto atten = ExtractArray(cblock, "atten"); if (atten.size() >= 3) pl.atten = {atten[0], atten[1], atten[2]};
+			PointLightComponent pl;
+			pl.enabled = enabled;
+			auto col = ExtractArray(cblock, "color");
+			if (col.size() >= 3)
+				pl.color = {col[0], col[1], col[2]};
+			if (cblock.find("\"intensity\"") != std::string::npos)
+				pl.intensity = ExtractFloat(cblock, "intensity", 1.0f);
+			if (cblock.find("\"range\"") != std::string::npos)
+				pl.range = ExtractFloat(cblock, "range", 10.0f);
+			auto atten = ExtractArray(cblock, "atten");
+			if (atten.size() >= 3)
+				pl.atten = {atten[0], atten[1], atten[2]};
 			obj.pointLights.push_back(pl);
 		} else if (type == "SpotLight") { // ★追加
-			SpotLightComponent sl; sl.enabled = enabled;
-			auto floatCheck = [&](const std::string& k, float def) { auto a = ExtractArray(cblock, k); return a.empty() ? def : a[0]; };
-			auto col = ExtractArray(cblock, "color"); if (col.size() >= 3) sl.color = {col[0], col[1], col[2]};
-			if (cblock.find("\"intensity\"") != std::string::npos) sl.intensity = floatCheck("intensity", 1.0f);
-			if (cblock.find("\"range\"") != std::string::npos) sl.range = floatCheck("range", 20.0f);
-			if (cblock.find("\"innerCos\"") != std::string::npos) sl.innerCos = floatCheck("innerCos", 0.98f);
-			if (cblock.find("\"outerCos\"") != std::string::npos) sl.outerCos = floatCheck("outerCos", 0.90f);
-			auto atten = ExtractArray(cblock, "atten"); if (atten.size() >= 3) sl.atten = {atten[0], atten[1], atten[2]};
+			SpotLightComponent sl;
+			sl.enabled = enabled;
+			auto col = ExtractArray(cblock, "color");
+			if (col.size() >= 3)
+				sl.color = {col[0], col[1], col[2]};
+			if (cblock.find("\"intensity\"") != std::string::npos)
+				sl.intensity = ExtractFloat(cblock, "intensity", 1.0f);
+			if (cblock.find("\"range\"") != std::string::npos)
+				sl.range = ExtractFloat(cblock, "range", 20.0f);
+			if (cblock.find("\"innerCos\"") != std::string::npos)
+				sl.innerCos = ExtractFloat(cblock, "innerCos", 0.98f);
+			if (cblock.find("\"outerCos\"") != std::string::npos)
+				sl.outerCos = ExtractFloat(cblock, "outerCos", 0.90f);
+			auto atten = ExtractArray(cblock, "atten");
+			if (atten.size() >= 3)
+				sl.atten = {atten[0], atten[1], atten[2]};
 			obj.spotLights.push_back(sl);
 		} else if (type == "AudioSource") { // ★追加
-			AudioSourceComponent as; as.enabled = enabled;
+			AudioSourceComponent as;
+			as.enabled = enabled;
 			as.soundPath = ExtractString(cblock, "soundPath");
-			auto floatCheck = [&](const std::string& k, float def) { auto a = ExtractArray(cblock, k); return a.empty() ? def : a[0]; };
-			auto boolCheck = [&](const std::string& k, bool def) { auto pos = cblock.find("\""+k+"\""); if(pos==std::string::npos) return def; return cblock.find("true",pos)<pos+30; };
-			if (cblock.find("\"volume\"") != std::string::npos) as.volume = floatCheck("volume", 1.0f);
-			if (cblock.find("\"loop\"") != std::string::npos) as.loop = boolCheck("loop", false);
-			if (cblock.find("\"playOnStart\"") != std::string::npos) as.playOnStart = boolCheck("playOnStart", false);
-			if (cblock.find("\"is3D\"") != std::string::npos) as.is3D = boolCheck("is3D", true);
-			if (cblock.find("\"maxDistance\"") != std::string::npos) as.maxDistance = floatCheck("maxDistance", 50.0f);
+			auto boolCheck = [&](const std::string& k, bool def) {
+				auto pos = cblock.find("\"" + k + "\"");
+				if (pos == std::string::npos)
+					return def;
+				return cblock.find("true", pos) < pos + 30;
+			};
+			if (cblock.find("\"volume\"") != std::string::npos)
+				as.volume = ExtractFloat(cblock, "volume", 1.0f);
+			if (cblock.find("\"loop\"") != std::string::npos)
+				as.loop = boolCheck("loop", false);
+			if (cblock.find("\"playOnStart\"") != std::string::npos)
+				as.playOnStart = boolCheck("playOnStart", false);
+			if (cblock.find("\"is3D\"") != std::string::npos)
+				as.is3D = boolCheck("is3D", true);
+			if (cblock.find("\"maxDistance\"") != std::string::npos)
+				as.maxDistance = ExtractFloat(cblock, "maxDistance", 50.0f);
 			// 音声ファイルをロード
 			if (!as.soundPath.empty()) {
 				auto* audio = Engine::Audio::GetInstance();
-				if (audio) as.soundHandle = audio->Load(as.soundPath);
+				if (audio)
+					as.soundHandle = audio->Load(as.soundPath);
 			}
 			obj.audioSources.push_back(as);
 		} else if (type == "AudioListener") { // ★追加
-			AudioListenerComponent al; al.enabled = enabled;
+			AudioListenerComponent al;
+			al.enabled = enabled;
 			obj.audioListeners.push_back(al);
 		} else if (type == "Hitbox") { // ★追加
-			HitboxComponent hb; hb.enabled = enabled;
-			auto cen = ExtractArray(cblock, "center"); if(cen.size()>=3) hb.center={cen[0],cen[1],cen[2]};
-			auto sz = ExtractArray(cblock, "size"); if(sz.size()>=3) hb.size={sz[0],sz[1],sz[2]};
-			auto floatCheck = [&](const std::string& k, float def) { auto a = ExtractArray(cblock, k); return a.empty() ? def : a[0]; };
-			if (cblock.find("\"damage\"") != std::string::npos) hb.damage = floatCheck("damage", 10.0f);
-			auto aPos = cblock.find("\"isActive\""); if(aPos!=std::string::npos && cblock.find("true",aPos)!=std::string::npos && cblock.find("true",aPos)<aPos+30) hb.isActive=true; else hb.isActive=false;
-			hb.tag = ExtractString(cblock, "tag"); if(hb.tag.empty()) hb.tag = "Default";
+			HitboxComponent hb;
+			hb.enabled = enabled;
+			auto cen = ExtractArray(cblock, "center");
+			if (cen.size() >= 3)
+				hb.center = {cen[0], cen[1], cen[2]};
+			auto sz = ExtractArray(cblock, "size");
+			if (sz.size() >= 3)
+				hb.size = {sz[0], sz[1], sz[2]};
+			if (cblock.find("\"damage\"") != std::string::npos)
+				hb.damage = ExtractFloat(cblock, "damage", 10.0f);
+			auto aPos = cblock.find("\"isActive\"");
+			if (aPos != std::string::npos && cblock.find("true", aPos) != std::string::npos && cblock.find("true", aPos) < aPos + 30)
+				hb.isActive = true;
+			else
+				hb.isActive = false;
+			hb.tag = ExtractString(cblock, "tag");
+			if (hb.tag.empty())
+				hb.tag = "Default";
 			obj.hitboxes.push_back(hb);
 		} else if (type == "Hurtbox") { // ★追加
-			HurtboxComponent hb; hb.enabled = enabled;
-			auto cen = ExtractArray(cblock, "center"); if(cen.size()>=3) hb.center={cen[0],cen[1],cen[2]};
-			auto sz = ExtractArray(cblock, "size"); if(sz.size()>=3) hb.size={sz[0],sz[1],sz[2]};
-			auto floatCheck = [&](const std::string& k, float def) { auto a = ExtractArray(cblock, k); return a.empty() ? def : a[0]; };
-			hb.tag = ExtractString(cblock, "tag"); if(hb.tag.empty()) hb.tag = "Body";
-			if (cblock.find("\"damageMultiplier\"") != std::string::npos) hb.damageMultiplier = floatCheck("damageMultiplier", 1.0f);
+			HurtboxComponent hb;
+			hb.enabled = enabled;
+			auto cen = ExtractArray(cblock, "center");
+			if (cen.size() >= 3)
+				hb.center = {cen[0], cen[1], cen[2]};
+			auto sz = ExtractArray(cblock, "size");
+			if (sz.size() >= 3)
+				hb.size = {sz[0], sz[1], sz[2]};
+			hb.tag = ExtractString(cblock, "tag");
+			if (hb.tag.empty())
+				hb.tag = "Body";
+			if (cblock.find("\"damageMultiplier\"") != std::string::npos)
+				hb.damageMultiplier = ExtractFloat(cblock, "damageMultiplier", 1.0f);
 			obj.hurtboxes.push_back(hb);
 		} else if (type == "Health") { // ★追加
-			HealthComponent hc; hc.enabled = enabled;
-			auto floatCheck = [&](const std::string& k, float def) { auto a = ExtractArray(cblock, k); return a.empty() ? def : a[0]; };
-			if (cblock.find("\"hp\"") != std::string::npos) hc.hp = floatCheck("hp", 100.0f);
-			if (cblock.find("\"maxHp\"") != std::string::npos) hc.maxHp = floatCheck("maxHp", 100.0f);
-			if (cblock.find("\"stamina\"") != std::string::npos) hc.stamina = floatCheck("stamina", 100.0f);
-			if (cblock.find("\"maxStamina\"") != std::string::npos) hc.maxStamina = floatCheck("maxStamina", 100.0f);
-			if (cblock.find("\"invincibleTime\"") != std::string::npos) hc.invincibleTime = floatCheck("invincibleTime", 0.0f);
-			auto aPos = cblock.find("\"isDead\""); if(aPos!=std::string::npos && cblock.find("true",aPos)!=std::string::npos && cblock.find("true",aPos)<aPos+30) hc.isDead=true; else hc.isDead=false;
+			HealthComponent hc;
+			hc.enabled = enabled;
+			if (cblock.find("\"hp\"") != std::string::npos)
+				hc.hp = ExtractFloat(cblock, "hp", 100.0f);
+			if (cblock.find("\"maxHp\"") != std::string::npos)
+				hc.maxHp = ExtractFloat(cblock, "maxHp", 100.0f);
+			if (cblock.find("\"stamina\"") != std::string::npos)
+				hc.stamina = ExtractFloat(cblock, "stamina", 100.0f);
+			if (cblock.find("\"maxStamina\"") != std::string::npos)
+				hc.maxStamina = ExtractFloat(cblock, "maxStamina", 100.0f);
+			if (cblock.find("\"invincibleTime\"") != std::string::npos)
+				hc.invincibleTime = ExtractFloat(cblock, "invincibleTime", 0.0f);
+			auto aPos = cblock.find("\"isDead\"");
+			if (aPos != std::string::npos && cblock.find("true", aPos) != std::string::npos && cblock.find("true", aPos) < aPos + 30)
+				hc.isDead = true;
+			else
+				hc.isDead = false;
 			obj.healths.push_back(hc);
+		} else if (type == "Script") { // ★追加
+			ScriptComponent sc;
+			sc.enabled = enabled;
+			sc.scriptPath = ExtractString(cblock, "scriptPath");
+			obj.scripts.push_back(sc);
 		}
 		pos = endPos + 1;
 	}
 }
 void EditorUI::LoadScene(GameScene* scene, const std::string& path) {
-	if(!scene) return; std::ifstream f(path); if(!f.is_open()){LogError("Load failed: "+path);return;}
-	std::string content((std::istreambuf_iterator<char>(f)),std::istreambuf_iterator<char>()); f.close();
-	scene->objects_.clear(); scene->selectedIndices_.clear(); scene->selectedObjectIndex_=-1;
-	auto* renderer=Engine::Renderer::GetInstance();
-	auto arrStart=content.find("[",content.find("\"objects\"")); if(arrStart==std::string::npos){LogError("Invalid scene file");return;}
-	auto arrEnd=content.rfind("]"); if(arrEnd==std::string::npos) arrEnd=content.size();
-	size_t objStart=arrStart;
-	while(objStart < arrEnd){
-		objStart=content.find("{",objStart); if(objStart==std::string::npos || objStart>arrEnd) break;
-		// 最初の "{" の位置から探すため、FindBlockEndはobjStartから開始（FindBlockEnd内で"{"をカウントする）
-		auto objEnd=FindBlockEnd(content, objStart); if(objEnd==std::string::npos || objEnd>arrEnd) break;
-		std::string block=content.substr(objStart,objEnd-objStart+1);
-		SceneObject obj; obj.name=ExtractString(block,"name"); obj.modelPath=ExtractString(block,"modelPath"); obj.texturePath=ExtractString(block,"texturePath");
-		{auto lkPos=block.find("\"locked\""); if(lkPos!=std::string::npos && block.find("true",lkPos)!=std::string::npos && block.find("true",lkPos)<lkPos+30) obj.locked=true;}
-		auto tr=ExtractArray(block,"translate"); if(tr.size()>=3){obj.translate={tr[0],tr[1],tr[2]};}
-		auto ro=ExtractArray(block,"rotate"); if(ro.size()>=3){obj.rotate={ro[0],ro[1],ro[2]};}
-		auto sc=ExtractArray(block,"scale"); if(sc.size()>=3){obj.scale={sc[0],sc[1],sc[2]};}
-		auto co=ExtractArray(block,"color"); if(co.size()>=4){obj.color={co[0],co[1],co[2],co[3]};} else if(co.size()>=3){obj.color={co[0],co[1],co[2],1};}
-		if(!obj.modelPath.empty()) obj.modelHandle=renderer->LoadObjMesh(obj.modelPath);
-		if(!obj.texturePath.empty()) obj.textureHandle=renderer->LoadTexture2D(obj.texturePath);
-		ParseComponents(obj, block, renderer);
-		scene->objects_.push_back(obj); objStart=objEnd;
+	if (!scene)
+		return;
+	std::ifstream f(path);
+	if (!f.is_open()) {
+		LogError("Load failed: " + path);
+		return;
 	}
-	Log("Scene loaded: "+path+" ("+std::to_string(scene->objects_.size())+" objects)");
+	std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+	f.close();
+	scene->objects_.clear();
+	scene->selectedIndices_.clear();
+	scene->selectedObjectIndex_ = -1;
+	auto* renderer = Engine::Renderer::GetInstance();
+	auto arrStart = content.find("[", content.find("\"objects\""));
+	if (arrStart == std::string::npos) {
+		LogError("Invalid scene file");
+		return;
+	}
+	auto arrEnd = content.rfind("]");
+	if (arrEnd == std::string::npos)
+		arrEnd = content.size();
+	size_t objStart = arrStart;
+	while (objStart < arrEnd) {
+		objStart = content.find("{", objStart);
+		if (objStart == std::string::npos || objStart > arrEnd)
+			break;
+		// 最初の "{" の位置から探すため、FindBlockEndはobjStartから開始（FindBlockEnd内で"{"をカウントする）
+		auto objEnd = FindBlockEnd(content, objStart);
+		if (objEnd == std::string::npos || objEnd > arrEnd)
+			break;
+		std::string block = content.substr(objStart, objEnd - objStart + 1);
+		SceneObject obj;
+		obj.name = ExtractString(block, "name");
+		obj.modelPath = ExtractString(block, "modelPath");
+		obj.texturePath = ExtractString(block, "texturePath");
+		{
+			auto lkPos = block.find("\"locked\"");
+			if (lkPos != std::string::npos && block.find("true", lkPos) != std::string::npos && block.find("true", lkPos) < lkPos + 30)
+				obj.locked = true;
+		}
+		auto tr = ExtractArray(block, "translate");
+		if (tr.size() >= 3) {
+			obj.translate = {tr[0], tr[1], tr[2]};
+		}
+		auto ro = ExtractArray(block, "rotate");
+		if (ro.size() >= 3) {
+			obj.rotate = {ro[0], ro[1], ro[2]};
+		}
+		auto sc = ExtractArray(block, "scale");
+		if (sc.size() >= 3) {
+			obj.scale = {sc[0], sc[1], sc[2]};
+		}
+		auto co = ExtractArray(block, "color");
+		if (co.size() >= 4) {
+			obj.color = {co[0], co[1], co[2], co[3]};
+		} else if (co.size() >= 3) {
+			obj.color = {co[0], co[1], co[2], 1};
+		}
+		if (!obj.modelPath.empty())
+			obj.modelHandle = renderer->LoadObjMesh(obj.modelPath);
+		if (!obj.texturePath.empty())
+			obj.textureHandle = renderer->LoadTexture2D(obj.texturePath);
+		ParseComponents(obj, block, renderer);
+		scene->objects_.push_back(obj);
+		objStart = objEnd;
+	}
+	Log("Scene loaded: " + path + " (" + std::to_string(scene->objects_.size()) + " objects)");
+}
+
+void EditorUI::AddScene(GameScene* scene, const std::string& path) {
+	if (!scene)
+		return;
+	std::ifstream f(path);
+	if (!f.is_open()) {
+		LogError("AddScene failed: " + path);
+		return;
+	}
+	std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+	f.close();
+
+	auto* renderer = Engine::Renderer::GetInstance();
+	auto arrStart = content.find("[", content.find("\"objects\""));
+	if (arrStart == std::string::npos) {
+		LogError("Invalid scene file (Add)");
+		return;
+	}
+	auto arrEnd = content.rfind("]");
+	if (arrEnd == std::string::npos)
+		arrEnd = content.size();
+	size_t objStart = arrStart;
+	while (objStart < arrEnd) {
+		objStart = content.find("{", objStart);
+		if (objStart == std::string::npos || objStart > arrEnd)
+			break;
+		auto objEnd = FindBlockEnd(content, objStart);
+		if (objEnd == std::string::npos || objEnd > arrEnd)
+			break;
+		std::string block = content.substr(objStart, objEnd - objStart + 1);
+		SceneObject obj;
+		obj.name = ExtractString(block, "name");
+		// 同じ名前がある場合はコピー名を生成（任意：上書きの方がいい場合もあるが安全のため）
+		obj.name = GenerateCopyName(obj.name, scene->objects_);
+
+		obj.modelPath = ExtractString(block, "modelPath");
+		obj.texturePath = ExtractString(block, "texturePath");
+		{
+			auto lkPos = block.find("\"locked\"");
+			if (lkPos != std::string::npos && block.find("true", lkPos) != std::string::npos && block.find("true", lkPos) < lkPos + 30)
+				obj.locked = true;
+		}
+		auto tr = ExtractArray(block, "translate");
+		if (tr.size() >= 3) {
+			obj.translate = {tr[0], tr[1], tr[2]};
+		}
+		auto ro = ExtractArray(block, "rotate");
+		if (ro.size() >= 3) {
+			obj.rotate = {ro[0], ro[1], ro[2]};
+		}
+		auto sc = ExtractArray(block, "scale");
+		if (sc.size() >= 3) {
+			obj.scale = {sc[0], sc[1], sc[2]};
+		}
+		auto co = ExtractArray(block, "color");
+		if (co.size() >= 4) {
+			obj.color = {co[0], co[1], co[2], co[3]};
+		} else if (co.size() >= 3) {
+			obj.color = {co[0], co[1], co[2], 1};
+		}
+		if (!obj.modelPath.empty())
+			obj.modelHandle = renderer->LoadObjMesh(obj.modelPath);
+		if (!obj.texturePath.empty())
+			obj.textureHandle = renderer->LoadTexture2D(obj.texturePath);
+		ParseComponents(obj, block, renderer);
+		scene->objects_.push_back(obj);
+		objStart = objEnd;
+	}
+	Log("Scene added: " + path + " (Total: " + std::to_string(scene->objects_.size()) + " objects)");
 }
 
 void EditorUI::LoadPrefab(GameScene* scene, const std::string& path) {
-	if(!scene) return; std::ifstream f(path); if(!f.is_open()){LogError("Prefab load failed: "+path);return;}
-	std::string content((std::istreambuf_iterator<char>(f)),std::istreambuf_iterator<char>()); f.close();
-	
+	if (!scene)
+		return;
+	std::ifstream f(path);
+	if (!f.is_open()) {
+		LogError("Prefab load failed: " + path);
+		return;
+	}
+	std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+	f.close();
+
 	size_t objStart = content.find("{");
-	if (objStart == std::string::npos) return;
+	if (objStart == std::string::npos)
+		return;
 	size_t objEnd = FindBlockEnd(content, objStart);
-	if (objEnd == std::string::npos) return;
+	if (objEnd == std::string::npos)
+		return;
 	std::string block = content.substr(objStart, objEnd - objStart + 1);
-	SceneObject obj; obj.name = GenerateCopyName(ExtractString(block,"name"), scene->objects_);
-	obj.modelPath = ExtractString(block,"modelPath"); obj.texturePath = ExtractString(block,"texturePath");
-	auto tr=ExtractArray(block,"translate"); if(tr.size()>=3){obj.translate={tr[0],tr[1],tr[2]};}
-	auto ro=ExtractArray(block,"rotate"); if(ro.size()>=3){obj.rotate={ro[0],ro[1],ro[2]};}
-	auto sc=ExtractArray(block,"scale"); if(sc.size()>=3){obj.scale={sc[0],sc[1],sc[2]};}
-	auto co=ExtractArray(block,"color"); if(co.size()>=4){obj.color={co[0],co[1],co[2],co[3]};} else if(co.size()>=3){obj.color={co[0],co[1],co[2],1};}
+	SceneObject obj;
+	obj.name = GenerateCopyName(ExtractString(block, "name"), scene->objects_);
+	obj.modelPath = ExtractString(block, "modelPath");
+	obj.texturePath = ExtractString(block, "texturePath");
+	auto tr = ExtractArray(block, "translate");
+	if (tr.size() >= 3) {
+		obj.translate = {tr[0], tr[1], tr[2]};
+	}
+	auto ro = ExtractArray(block, "rotate");
+	if (ro.size() >= 3) {
+		obj.rotate = {ro[0], ro[1], ro[2]};
+	}
+	auto sc = ExtractArray(block, "scale");
+	if (sc.size() >= 3) {
+		obj.scale = {sc[0], sc[1], sc[2]};
+	}
+	auto co = ExtractArray(block, "color");
+	if (co.size() >= 4) {
+		obj.color = {co[0], co[1], co[2], co[3]};
+	} else if (co.size() >= 3) {
+		obj.color = {co[0], co[1], co[2], 1};
+	}
 	auto* r = Engine::Renderer::GetInstance();
-	if(!obj.modelPath.empty()) obj.modelHandle = r->LoadObjMesh(obj.modelPath);
-	if(!obj.texturePath.empty()) obj.textureHandle = r->LoadTexture2D(obj.texturePath);
-	
+	if (!obj.modelPath.empty())
+		obj.modelHandle = r->LoadObjMesh(obj.modelPath);
+	if (!obj.texturePath.empty())
+		obj.textureHandle = r->LoadTexture2D(obj.texturePath);
+
 	ParseComponents(obj, block, r);
 
 	// 後方互換性：コンポーネントが無く、モデルがあればデフォルトを付与
 	if (obj.meshRenderers.empty() && !obj.modelPath.empty()) {
-		MeshRendererComponent mr; mr.modelHandle = obj.modelHandle; mr.textureHandle = obj.textureHandle;
-		mr.modelPath = obj.modelPath; mr.texturePath = obj.texturePath; mr.color = obj.color;
+		MeshRendererComponent mr;
+		mr.modelHandle = obj.modelHandle;
+		mr.textureHandle = obj.textureHandle;
+		mr.modelPath = obj.modelPath;
+		mr.texturePath = obj.texturePath;
+		mr.color = obj.color;
 		obj.meshRenderers.push_back(mr);
 	}
-	
+
 	scene->objects_.push_back(obj);
-	Log("Prefab loaded and instantiated: "+path);
+	Log("Prefab loaded and instantiated: " + path);
 }
 
 // ====== ★ Ray-AABB 交差判定 ======
-static bool RayIntersectsAABB(DirectX::XMVECTOR rayOrig, DirectX::XMVECTOR rayDir,
-	const DirectX::XMFLOAT3& bmin, const DirectX::XMFLOAT3& bmax, float& tOut)
-{
+static bool RayIntersectsAABB(DirectX::XMVECTOR rayOrig, DirectX::XMVECTOR rayDir, const DirectX::XMFLOAT3& bmin, const DirectX::XMFLOAT3& bmax, float& tOut) {
 	using namespace DirectX;
-	XMFLOAT3 orig; XMStoreFloat3(&orig, rayOrig);
-	XMFLOAT3 dir;  XMStoreFloat3(&dir, rayDir);
+	XMFLOAT3 orig;
+	XMStoreFloat3(&orig, rayOrig);
+	XMFLOAT3 dir;
+	XMStoreFloat3(&dir, rayDir);
 	float tmin = -FLT_MAX, tmax = FLT_MAX;
 	float mn[3] = {bmin.x, bmin.y, bmin.z};
 	float mx[3] = {bmax.x, bmax.y, bmax.z};
-	float o[3]  = {orig.x, orig.y, orig.z};
-	float d[3]  = {dir.x, dir.y, dir.z};
+	float o[3] = {orig.x, orig.y, orig.z};
+	float d[3] = {dir.x, dir.y, dir.z};
 	for (int i = 0; i < 3; ++i) {
-		if (std::fabs(d[i]) < 1e-8f) { if (o[i] < mn[i] || o[i] > mx[i]) return false; }
-		else {
-			float t1 = (mn[i] - o[i]) / d[i]; float t2 = (mx[i] - o[i]) / d[i];
-			if (t1 > t2) { float tmp = t1; t1 = t2; t2 = tmp; }
-			if (t1 > tmin) tmin = t1; if (t2 < tmax) tmax = t2;
-			if (tmin > tmax) return false;
+		if (std::fabs(d[i]) < 1e-8f) {
+			if (o[i] < mn[i] || o[i] > mx[i])
+				return false;
+		} else {
+			float t1 = (mn[i] - o[i]) / d[i];
+			float t2 = (mx[i] - o[i]) / d[i];
+			if (t1 > t2) {
+				float tmp = t1;
+				t1 = t2;
+				t2 = tmp;
+			}
+			if (t1 > tmin)
+				tmin = t1;
+			if (t2 < tmax)
+				tmax = t2;
+			if (tmin > tmax)
+				return false;
 		}
 	}
-	if (tmax < 0) return false;
+	if (tmax < 0)
+		return false;
 	tOut = tmin > 0 ? tmin : tmax;
 	return true;
 }
 
 // ★ スクリーン座標からワールドRayを構築
-static void ScreenToWorldRay(float screenX, float screenY, float imageW, float imageH,
-	DirectX::XMMATRIX view, DirectX::XMMATRIX proj,
-	DirectX::XMVECTOR& outOrig, DirectX::XMVECTOR& outDir)
-{
+static void ScreenToWorldRay(float screenX, float screenY, float imageW, float imageH, DirectX::XMMATRIX view, DirectX::XMMATRIX proj, DirectX::XMVECTOR& outOrig, DirectX::XMVECTOR& outDir) {
 	using namespace DirectX;
 	// NDC座標に変換 [-1, 1]
 	float ndcX = (screenX / imageW) * 2.0f - 1.0f;
 	float ndcY = 1.0f - (screenY / imageH) * 2.0f; // Y反転
-	
+
 	XMMATRIX invProj = XMMatrixInverse(nullptr, proj);
 	XMMATRIX invView = XMMatrixInverse(nullptr, view);
 
 	// Near plane と Far plane のポイント
 	XMVECTOR nearPoint = XMVector3TransformCoord(XMVectorSet(ndcX, ndcY, 0.0f, 1.0f), invProj);
-	XMVECTOR farPoint  = XMVector3TransformCoord(XMVectorSet(ndcX, ndcY, 1.0f, 1.0f), invProj);
+	XMVECTOR farPoint = XMVector3TransformCoord(XMVectorSet(ndcX, ndcY, 1.0f, 1.0f), invProj);
 
 	// ビュー空間→ワールド空間
 	nearPoint = XMVector3TransformCoord(nearPoint, invView);
-	farPoint  = XMVector3TransformCoord(farPoint, invView);
+	farPoint = XMVector3TransformCoord(farPoint, invView);
 
 	outOrig = nearPoint;
-	outDir  = XMVector3Normalize(XMVectorSubtract(farPoint, nearPoint));
+	outDir = XMVector3Normalize(XMVectorSubtract(farPoint, nearPoint));
 }
 
 // ★ ギズモ軸のRayヒット判定（ローカル空間に変換して判定）
-static int HitTestGizmoAxis(DirectX::XMVECTOR rayOrig, DirectX::XMVECTOR rayDir,
-	const Engine::Transform& objTransform, float axisLen, GizmoMode mode)
-{
+static int HitTestGizmoAxis(DirectX::XMVECTOR rayOrig, DirectX::XMVECTOR rayDir, const Engine::Transform& objTransform, float axisLen, GizmoMode mode) {
 	Engine::Matrix4x4 mat = objTransform.ToMatrix();
 	DirectX::XMMATRIX worldMat = DirectX::XMLoadFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&mat));
 	DirectX::XMVECTOR det;
@@ -561,8 +1039,10 @@ static int HitTestGizmoAxis(DirectX::XMVECTOR rayOrig, DirectX::XMVECTOR rayDir,
 		float bestDistSq = FLT_MAX;
 
 		using namespace DirectX;
-		XMFLOAT3 orig; XMStoreFloat3(&orig, localOrig);
-		XMFLOAT3 dir;  XMStoreFloat3(&dir, localDir);
+		XMFLOAT3 orig;
+		XMStoreFloat3(&orig, localOrig);
+		XMFLOAT3 dir;
+		XMStoreFloat3(&dir, localDir);
 
 		for (int a = 0; a < 3; ++a) {
 			float N[3] = {0, 0, 0};
@@ -574,7 +1054,7 @@ static int HitTestGizmoAxis(DirectX::XMVECTOR rayOrig, DirectX::XMVECTOR rayDir,
 					float px = orig.x + t * dir.x;
 					float py = orig.y + t * dir.y;
 					float pz = orig.z + t * dir.z;
-					float dist = std::sqrt(px*px + py*py + pz*pz);
+					float dist = std::sqrt(px * px + py * py + pz * pz);
 					if (std::fabs(dist - radius) < thickness) {
 						if (t < bestDistSq) {
 							bestDistSq = t;
@@ -588,16 +1068,19 @@ static int HitTestGizmoAxis(DirectX::XMVECTOR rayOrig, DirectX::XMVECTOR rayDir,
 	} else {
 		float thickness = 0.15f;
 		DirectX::XMFLOAT3 axes[3][2] = {
-			{{-thickness, -thickness, -thickness}, {axisLen, thickness, thickness}},
-			{{-thickness, -thickness, -thickness}, {thickness, axisLen, thickness}},
-			{{-thickness, -thickness, -thickness}, {thickness, thickness, axisLen}},
+		    {{-thickness, -thickness, -thickness}, {axisLen, thickness, thickness}},
+		    {{-thickness, -thickness, -thickness}, {thickness, axisLen, thickness}},
+		    {{-thickness, -thickness, -thickness}, {thickness, thickness, axisLen}},
 		};
 		float bestT = FLT_MAX;
 		int bestAxis = -1;
 		for (int a = 0; a < 3; ++a) {
 			float t;
 			if (RayIntersectsAABB(localOrig, localDir, axes[a][0], axes[a][1], t)) {
-				if (t < bestT) { bestT = t; bestAxis = a; }
+				if (t < bestT) {
+					bestT = t;
+					bestAxis = a;
+				}
 			}
 		}
 		return bestAxis;
@@ -611,7 +1094,8 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 
 	ImGuiWindowFlags wf = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
 	const ImGuiViewport* vp = ImGui::GetMainViewport();
-	ImGui::SetNextWindowPos(vp->Pos); ImGui::SetNextWindowSize(vp->Size);
+	ImGui::SetNextWindowPos(vp->Pos);
+	ImGui::SetNextWindowSize(vp->Size);
 	ImGui::SetNextWindowViewport(vp->ID);
 	wf |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
 	wf |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
@@ -629,39 +1113,158 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	// ★追加: アニメーションウィンドウの呼び出し
 	ShowAnimationWindow(renderer, gameScene);
 
+	// ★追加: Play Mode Monitor
+	ShowPlayModeMonitor(gameScene);
+	ShowPlayModeMonitor(gameScene); // ★追加: Play Mode Monitor
 
 	// ====== Menu Bar ======
 	if (ImGui::BeginMenuBar()) {
 		if (ImGui::BeginMenu("File")) {
-			if(ImGui::MenuItem("Save Scene","Ctrl+S")) SaveScene(gameScene,"Resources/scene.json");
-			if(ImGui::MenuItem("Load Scene")) LoadScene(gameScene,"Resources/scene.json");
+			// ★追加: 現在のシーン名を入力/表示するバッファ
+			static char currentSceneName[128] = "scene.json";
+			ImGui::InputText("Current Scene", currentSceneName, sizeof(currentSceneName));
+
+			if (ImGui::MenuItem("Save Scene", "Ctrl+S")) {
+				SaveScene(gameScene, std::string("Resources/") + currentSceneName);
+			}
+
+			if (ImGui::BeginMenu("Load Scene...")) {
+				// Resourcesフォルダ内のjsonファイルを列挙
+				try {
+					for (const auto& entry : std::filesystem::directory_iterator("Resources")) {
+						if (entry.path().extension() == ".json") {
+							std::string filename = entry.path().filename().string();
+							if (ImGui::MenuItem(filename.c_str())) {
+								strcpy_s(currentSceneName, filename.c_str());
+								LoadScene(gameScene, entry.path().string());
+							}
+						}
+					}
+				} catch (...) {
+				}
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::BeginMenu("Add Scene... (Additive)")) {
+				try {
+					for (const auto& entry : std::filesystem::directory_iterator("Resources")) {
+						if (entry.path().extension() == ".json") {
+							std::string filename = entry.path().filename().string();
+							if (ImGui::MenuItem(filename.c_str())) {
+								AddScene(gameScene, entry.path().string());
+							}
+						}
+					}
+				} catch (...) {
+				}
+				ImGui::EndMenu();
+			}
 			ImGui::Separator();
-			if(ImGui::MenuItem("Undo","Ctrl+Z")) Undo(); if(ImGui::MenuItem("Redo","Ctrl+Y")) Redo();
-			ImGui::Separator(); if(ImGui::MenuItem("Exit")){} ImGui::EndMenu();
+			if (ImGui::MenuItem("Undo", "Ctrl+Z"))
+				Undo();
+			if (ImGui::MenuItem("Redo", "Ctrl+Y"))
+				Redo();
+			ImGui::Separator();
+			if (ImGui::MenuItem("Exit")) {
+			}
+			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Edit")) {
-			if(ImGui::MenuItem("Copy","Ctrl+C")) { if(gameScene) { clipboardObjects.clear(); for(int i:gameScene->selectedIndices_) if(i<(int)gameScene->objects_.size()) clipboardObjects.push_back(gameScene->objects_[i]); Log("Copied "+std::to_string(clipboardObjects.size())+" object(s)"); }}
-			if(ImGui::MenuItem("Paste","Ctrl+V")) { if(gameScene && !clipboardObjects.empty()) { for(auto obj:clipboardObjects){obj.name=GenerateCopyName(obj.name,gameScene->objects_); obj.locked=false; obj.translate.x+=1.0f; gameScene->objects_.push_back(obj);} Log("Pasted "+std::to_string(clipboardObjects.size())+" object(s)"); }}
-			if(ImGui::MenuItem("Duplicate","Ctrl+D")) { if(gameScene) { std::vector<SceneObject> dups; for(int i:gameScene->selectedIndices_) if(i<(int)gameScene->objects_.size()){auto o=gameScene->objects_[i]; o.name=GenerateCopyName(o.name,gameScene->objects_); o.locked=false; o.translate.x+=1.0f; dups.push_back(o);} for(auto&d:dups) gameScene->objects_.push_back(d); Log("Duplicated "+std::to_string(dups.size())+" object(s)"); }}
-			if(ImGui::MenuItem("Delete","Del")) { if(gameScene && !gameScene->selectedIndices_.empty()) { for(auto it=gameScene->selectedIndices_.rbegin();it!=gameScene->selectedIndices_.rend();++it) if(*it<(int)gameScene->objects_.size() && !gameScene->objects_[*it].locked) gameScene->objects_.erase(gameScene->objects_.begin()+*it); gameScene->selectedIndices_.clear(); gameScene->selectedObjectIndex_=-1; }}
-			if(ImGui::MenuItem("Select All","Ctrl+A")) { if(gameScene) { for(int i=0;i<(int)gameScene->objects_.size();++i) gameScene->selectedIndices_.insert(i); if(!gameScene->objects_.empty()) gameScene->selectedObjectIndex_=0; }}
+			if (ImGui::MenuItem("Copy", "Ctrl+C")) {
+				if (gameScene) {
+					clipboardObjects.clear();
+					for (int i : gameScene->selectedIndices_)
+						if (i < (int)gameScene->objects_.size())
+							clipboardObjects.push_back(gameScene->objects_[i]);
+					Log("Copied " + std::to_string(clipboardObjects.size()) + " object(s)");
+				}
+			}
+			if (ImGui::MenuItem("Paste", "Ctrl+V")) {
+				if (gameScene && !clipboardObjects.empty()) {
+					for (auto obj : clipboardObjects) {
+						obj.name = GenerateCopyName(obj.name, gameScene->objects_);
+						obj.locked = false;
+						obj.translate.x += 1.0f;
+						gameScene->objects_.push_back(obj);
+					}
+					Log("Pasted " + std::to_string(clipboardObjects.size()) + " object(s)");
+				}
+			}
+			if (ImGui::MenuItem("Duplicate", "Ctrl+D")) {
+				if (gameScene) {
+					std::vector<SceneObject> dups;
+					for (int i : gameScene->selectedIndices_)
+						if (i < (int)gameScene->objects_.size()) {
+							auto o = gameScene->objects_[i];
+							o.name = GenerateCopyName(o.name, gameScene->objects_);
+							o.locked = false;
+							o.translate.x += 1.0f;
+							dups.push_back(o);
+						}
+					for (auto& d : dups)
+						gameScene->objects_.push_back(d);
+					Log("Duplicated " + std::to_string(dups.size()) + " object(s)");
+				}
+			}
+			if (ImGui::MenuItem("Delete", "Del")) {
+				if (gameScene && !gameScene->selectedIndices_.empty()) {
+					for (auto it = gameScene->selectedIndices_.rbegin(); it != gameScene->selectedIndices_.rend(); ++it)
+						if (*it < (int)gameScene->objects_.size() && !gameScene->objects_[*it].locked)
+							gameScene->objects_.erase(gameScene->objects_.begin() + *it);
+					gameScene->selectedIndices_.clear();
+					gameScene->selectedObjectIndex_ = -1;
+				}
+			}
+			if (ImGui::MenuItem("Select All", "Ctrl+A")) {
+				if (gameScene) {
+					for (int i = 0; i < (int)gameScene->objects_.size(); ++i)
+						gameScene->selectedIndices_.insert(i);
+					if (!gameScene->objects_.empty())
+						gameScene->selectedObjectIndex_ = 0;
+				}
+			}
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Scene")) {
-			if(ImGui::MenuItem("Title")) Engine::SceneManager::GetInstance()->Change("Title");
-			if(ImGui::MenuItem("Game")) Engine::SceneManager::GetInstance()->Change("Game");
+			if (ImGui::MenuItem("Title"))
+				Engine::SceneManager::GetInstance()->Change("Title");
+			if (ImGui::MenuItem("Game"))
+				Engine::SceneManager::GetInstance()->Change("Game");
 			ImGui::EndMenu();
 		}
-		ImGui::Spacing(); ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical); ImGui::Spacing();
-		ImGui::SetCursorPosY(ImGui::GetCursorPosY()+2); ImGui::Text("Aspect:"); ImGui::SameLine();
-		ImGui::SetCursorPosY(ImGui::GetCursorPosY()-2); ImGui::PushItemWidth(110); ImGui::Combo("##Asp",&aspectMode,aspectNames,IM_ARRAYSIZE(aspectNames)); ImGui::PopItemWidth();
+		ImGui::Spacing();
+		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+		ImGui::Spacing();
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 2);
+		ImGui::Text("Aspect:");
+		ImGui::SameLine();
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 2);
+		ImGui::PushItemWidth(110);
+		ImGui::Combo("##Asp", &aspectMode, aspectNames, IM_ARRAYSIZE(aspectNames));
+		ImGui::PopItemWidth();
 
-		ImGui::Spacing(); ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical); ImGui::Spacing();
-		ImGui::SetCursorPosY(ImGui::GetCursorPosY()+2);
-		auto gBtn=[](const char* l,GizmoMode m){bool a=(currentGizmoMode==m); if(a) ImGui::PushStyleColor(ImGuiCol_Button,ImVec4(.3f,.5f,.9f,1)); if(ImGui::SmallButton(l)) currentGizmoMode=m; if(a) ImGui::PopStyleColor();};
-		gBtn("T##M",GizmoMode::Translate); ImGui::SameLine(); gBtn("R##R",GizmoMode::Rotate); ImGui::SameLine(); gBtn("S##S",GizmoMode::Scale);
+		ImGui::Spacing();
+		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+		ImGui::Spacing();
+		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 2);
+		auto gBtn = [](const char* l, GizmoMode m) {
+			bool a = (currentGizmoMode == m);
+			if (a)
+				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(.3f, .5f, .9f, 1));
+			if (ImGui::SmallButton(l))
+				currentGizmoMode = m;
+			if (a)
+				ImGui::PopStyleColor();
+		};
+		gBtn("T##M", GizmoMode::Translate);
+		ImGui::SameLine();
+		gBtn("R##R", GizmoMode::Rotate);
+		ImGui::SameLine();
+		gBtn("S##S", GizmoMode::Scale);
 
-		ImGui::Spacing(); ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical); ImGui::Spacing();
+		ImGui::Spacing();
+		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+		ImGui::Spacing();
 		if (gameScene) {
 			if (gameScene->isPlaying_) {
 				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(.8f, .2f, .2f, 1));
@@ -669,7 +1272,8 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 					gameScene->isPlaying_ = false;
 					LoadScene(gameScene, "Resources/.temp_play.json");
 					auto* audio = Engine::Audio::GetInstance();
-					if (audio) audio->StopAll();
+					if (audio)
+						audio->StopAll();
 					Log("Play mode stopped. Scene restored.");
 				}
 				ImGui::PopStyleColor();
@@ -687,17 +1291,53 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	}
 
 	// ====== Shortcuts ======
-	if(io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Z,false)) Undo();
-	if(io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y,false)) Redo();
-	if(io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S,false)) SaveScene(gameScene,"Resources/scene.json");
-	if(io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_C,false) && gameScene) { clipboardObjects.clear(); for(int i:gameScene->selectedIndices_) if(i<(int)gameScene->objects_.size()) clipboardObjects.push_back(gameScene->objects_[i]); if(!clipboardObjects.empty()) Log("Copied "+std::to_string(clipboardObjects.size())); }
-	if(io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V,false) && gameScene && !clipboardObjects.empty()) { for(auto obj:clipboardObjects){obj.name=GenerateCopyName(obj.name,gameScene->objects_); obj.locked=false; obj.translate.x+=1; gameScene->objects_.push_back(obj);} Log("Pasted "+std::to_string(clipboardObjects.size())); }
-	if(io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_D,false) && gameScene) { std::vector<SceneObject> dups; for(int i:gameScene->selectedIndices_) if(i<(int)gameScene->objects_.size()){auto o=gameScene->objects_[i]; o.name=GenerateCopyName(o.name,gameScene->objects_); o.locked=false; o.translate.x+=1; dups.push_back(o);} for(auto&d:dups) gameScene->objects_.push_back(d); }
-	if(io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A,false) && gameScene) { for(int i=0;i<(int)gameScene->objects_.size();++i) gameScene->selectedIndices_.insert(i); }
-	if(!io.WantTextInput && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-		if(ImGui::IsKeyPressed(ImGuiKey_T,false)) currentGizmoMode=GizmoMode::Translate;
-		if(ImGui::IsKeyPressed(ImGuiKey_R,false)) currentGizmoMode=GizmoMode::Rotate;
-		if(ImGui::IsKeyPressed(ImGuiKey_S,false)&&!io.KeyCtrl) currentGizmoMode=GizmoMode::Scale;
+	if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Z, false))
+		Undo();
+	if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y, false))
+		Redo();
+	if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false))
+		SaveScene(gameScene, "Resources/scene.json");
+	if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_C, false) && gameScene) {
+		clipboardObjects.clear();
+		for (int i : gameScene->selectedIndices_)
+			if (i < (int)gameScene->objects_.size())
+				clipboardObjects.push_back(gameScene->objects_[i]);
+		if (!clipboardObjects.empty())
+			Log("Copied " + std::to_string(clipboardObjects.size()));
+	}
+	if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V, false) && gameScene && !clipboardObjects.empty()) {
+		for (auto obj : clipboardObjects) {
+			obj.name = GenerateCopyName(obj.name, gameScene->objects_);
+			obj.locked = false;
+			obj.translate.x += 1;
+			gameScene->objects_.push_back(obj);
+		}
+		Log("Pasted " + std::to_string(clipboardObjects.size()));
+	}
+	if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_D, false) && gameScene) {
+		std::vector<SceneObject> dups;
+		for (int i : gameScene->selectedIndices_)
+			if (i < (int)gameScene->objects_.size()) {
+				auto o = gameScene->objects_[i];
+				o.name = GenerateCopyName(o.name, gameScene->objects_);
+				o.locked = false;
+				o.translate.x += 1;
+				dups.push_back(o);
+			}
+		for (auto& d : dups)
+			gameScene->objects_.push_back(d);
+	}
+	if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A, false) && gameScene) {
+		for (int i = 0; i < (int)gameScene->objects_.size(); ++i)
+			gameScene->selectedIndices_.insert(i);
+	}
+	if (!io.WantTextInput && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+		if (ImGui::IsKeyPressed(ImGuiKey_T, false))
+			currentGizmoMode = GizmoMode::Translate;
+		if (ImGui::IsKeyPressed(ImGuiKey_R, false))
+			currentGizmoMode = GizmoMode::Rotate;
+		if (ImGui::IsKeyPressed(ImGuiKey_S, false) && !io.KeyCtrl)
+			currentGizmoMode = GizmoMode::Scale;
 	}
 
 	ShowHierarchy(gameScene);
@@ -711,24 +1351,41 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	ImGui::Begin("Game");
 	ImVec2 cp = ImGui::GetCursorPos(), av = ImGui::GetContentRegionAvail();
 	float tW = av.x, tH = av.y;
-	if(aspectMode==1){float r=16.f/9.f; if(tW/tH>r) tW=tH*r; else tH=tW/r;}
-	else if(aspectMode==2){float r=4.f/3.f; if(tW/tH>r) tW=tH*r; else tH=tW/r;}
-	float offX=(av.x-tW)*.5f, offY=(av.y-tH)*.5f;
-	ImGui::SetCursorPos(ImVec2(cp.x+offX, cp.y+offY));
+	if (aspectMode == 1) {
+		float r = 16.f / 9.f;
+		if (tW / tH > r)
+			tW = tH * r;
+		else
+			tH = tW / r;
+	} else if (aspectMode == 2) {
+		float r = 4.f / 3.f;
+		if (tW / tH > r)
+			tW = tH * r;
+		else
+			tH = tW / r;
+	}
+	float offX = (av.x - tW) * .5f, offY = (av.y - tH) * .5f;
+	ImGui::SetCursorPos(ImVec2(cp.x + offX, cp.y + offY));
 
 	// ★ 画像の絶対スクリーン座標を記録 (ピッキング用)
 	ImVec2 windowPos = ImGui::GetWindowPos();
 	ImVec2 curScreen = ImGui::GetCursorScreenPos();
 	ImGui::Image((ImTextureID)renderer->GetGameFinalSRV().ptr, ImVec2(tW, tH));
 	// ★追加: プレハブやモデルのドラッグ＆ドロップ受け入れ先
-	if(ImGui::BeginDragDropTarget()){
-		if(const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")){
+	if (ImGui::BeginDragDropTarget()) {
+		if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
 			std::string path((const char*)pl->Data, pl->DataSize - 1);
 			if (path.find(".prefab") != std::string::npos) {
 				LoadPrefab(gameScene, path);
 			} else if (path.find(".obj") != std::string::npos || path.find(".gltf") != std::string::npos || path.find(".fbx") != std::string::npos) {
-				SceneObject o; o.name = "Model"; o.modelPath = path; o.modelHandle = renderer->LoadObjMesh(path);
-				MeshRendererComponent mr; mr.modelHandle = o.modelHandle; mr.modelPath = o.modelPath; o.meshRenderers.push_back(mr);
+				SceneObject o;
+				o.name = "Model";
+				o.modelPath = path;
+				o.modelHandle = renderer->LoadObjMesh(path);
+				MeshRendererComponent mr;
+				mr.modelHandle = o.modelHandle;
+				mr.modelPath = o.modelPath;
+				o.meshRenderers.push_back(mr);
 				gameScene->objects_.push_back(o);
 			}
 		}
@@ -740,7 +1397,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	bool gameHovered = ImGui::IsWindowHovered();
 
 	// ====== ★ ビューポートクリック選択 + ギズモドラッグ ======
-	if (gameScene && gameHovered && tW > 0 && tH > 0) {
+	if (gameScene && gameHovered && tW > 0 && tH > 0 && !gameScene->IsPlaying()) {
 		ImVec2 mousePos = ImGui::GetMousePos();
 		float localX = mousePos.x - gameImageMin.x;
 		float localY = mousePos.y - gameImageMin.y;
@@ -757,8 +1414,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 
 				// 1. ギズモ軸ヒットテスト
 				bool hitGizmo = false;
-				if (gameScene->selectedObjectIndex_ >= 0 && gameScene->selectedObjectIndex_ < (int)gameScene->objects_.size()
-					&& !gameScene->objects_[gameScene->selectedObjectIndex_].locked) {
+				if (gameScene->selectedObjectIndex_ >= 0 && gameScene->selectedObjectIndex_ < (int)gameScene->objects_.size() && !gameScene->objects_[gameScene->selectedObjectIndex_].locked) {
 					auto& selObj = gameScene->objects_[gameScene->selectedObjectIndex_];
 					int axis = HitTestGizmoAxis(rayOrig, rayDir, selObj.GetTransform(), 2.0f, currentGizmoMode);
 					if (axis >= 0) {
@@ -781,8 +1437,9 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 					int bestIdx = -1;
 					for (int i = 0; i < (int)gameScene->objects_.size(); ++i) {
 						const auto& obj = gameScene->objects_[i];
-						if (obj.locked) continue; // ★ ロック済みオブジェクトは選択不可
-						
+						if (obj.locked)
+							continue; // ★ ロック済みオブジェクトは選択不可
+
 						// ★ OBB判定: Rayをオブジェクトのローカル空間に変換
 						Engine::Matrix4x4 mat = obj.GetTransform().ToMatrix();
 						DirectX::XMMATRIX worldMat = DirectX::XMLoadFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&mat));
@@ -794,23 +1451,34 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 						DirectX::XMVECTOR localDir = DirectX::XMVectorSubtract(localTarget, localOrig);
 
 						// 最小サイズ保証
-						float hx = 1.0f; if (std::fabs(obj.scale.x) < 0.6f && std::fabs(obj.scale.x) > 0.001f) hx = 0.3f / std::fabs(obj.scale.x);
-						float hy = 1.0f; if (std::fabs(obj.scale.y) < 0.6f && std::fabs(obj.scale.y) > 0.001f) hy = 0.3f / std::fabs(obj.scale.y);
-						float hz = 1.0f; if (std::fabs(obj.scale.z) < 0.6f && std::fabs(obj.scale.z) > 0.001f) hz = 0.3f / std::fabs(obj.scale.z);
+						float hx = 1.0f;
+						if (std::fabs(obj.scale.x) < 0.6f && std::fabs(obj.scale.x) > 0.001f)
+							hx = 0.3f / std::fabs(obj.scale.x);
+						float hy = 1.0f;
+						if (std::fabs(obj.scale.y) < 0.6f && std::fabs(obj.scale.y) > 0.001f)
+							hy = 0.3f / std::fabs(obj.scale.y);
+						float hz = 1.0f;
+						if (std::fabs(obj.scale.z) < 0.6f && std::fabs(obj.scale.z) > 0.001f)
+							hz = 0.3f / std::fabs(obj.scale.z);
 						DirectX::XMFLOAT3 bmin = {-hx, -hy, -hz};
-						DirectX::XMFLOAT3 bmax = { hx,  hy,  hz};
+						DirectX::XMFLOAT3 bmax = {hx, hy, hz};
 
 						float tLocal;
 						if (RayIntersectsAABB(localOrig, localDir, bmin, bmax, tLocal)) {
 							// tLocal は worldDir (正規化済) の長さ(1)に対する係数と一致
-							if (tLocal < bestT) { bestT = tLocal; bestIdx = i; }
+							if (tLocal < bestT) {
+								bestT = tLocal;
+								bestIdx = i;
+							}
 						}
 					}
 					if (bestIdx >= 0) {
 						if (io.KeyCtrl) {
 							// Ctrl+クリック: トグル追加
-							if (gameScene->selectedIndices_.count(bestIdx)) gameScene->selectedIndices_.erase(bestIdx);
-							else gameScene->selectedIndices_.insert(bestIdx);
+							if (gameScene->selectedIndices_.count(bestIdx))
+								gameScene->selectedIndices_.erase(bestIdx);
+							else
+								gameScene->selectedIndices_.insert(bestIdx);
 						} else if (io.KeyShift) {
 							// Shift+クリック: 追加選択
 							gameScene->selectedIndices_.insert(bestIdx);
@@ -845,26 +1513,40 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 						auto initT = dragStartTransforms[idx];
 						if (currentGizmoMode == GizmoMode::Translate) {
 							float s = 0.02f;
-							float dx = (gizmoDragAxis == 0) ? delta.x*s : 0;
-							float dy = (gizmoDragAxis == 1) ? -delta.y*s : 0;
-							float dz = (gizmoDragAxis == 2) ? delta.x*s : 0;
+							float dx = (gizmoDragAxis == 0) ? delta.x * s : 0;
+							float dy = (gizmoDragAxis == 1) ? -delta.y * s : 0;
+							float dz = (gizmoDragAxis == 2) ? delta.x * s : 0;
 							// ローカル軸に沿って移動する
 							auto rotMat = DirectX::XMMatrixRotationRollPitchYaw(initT.rotate.x, initT.rotate.y, initT.rotate.z);
 							DirectX::XMVECTOR moveV = DirectX::XMVector3TransformNormal(DirectX::XMVectorSet(dx, dy, dz, 0), rotMat);
-							DirectX::XMFLOAT3 moveF; DirectX::XMStoreFloat3(&moveF, moveV);
+							DirectX::XMFLOAT3 moveF;
+							DirectX::XMStoreFloat3(&moveF, moveV);
 							obj.translate = DirectX::XMFLOAT3(initT.translate.x + moveF.x, initT.translate.y + moveF.y, initT.translate.z + moveF.z);
 						} else if (currentGizmoMode == GizmoMode::Rotate) {
 							float s = 0.01f;
 							auto nr = initT.rotate;
-							if(gizmoDragAxis==0) nr.x += delta.y*s; 
-							else if(gizmoDragAxis==1) nr.y += delta.x*s; 
-							else nr.z += delta.x*s;
+							if (gizmoDragAxis == 0)
+								nr.x += delta.y * s;
+							else if (gizmoDragAxis == 1)
+								nr.y += delta.x * s;
+							else
+								nr.z += delta.x * s;
 							obj.rotate = DirectX::XMFLOAT3(nr.x, nr.y, nr.z);
 						} else {
-							float s = 0.01f; 
+							float s = 0.01f;
 							auto ns = initT.scale;
-							if(gizmoDragAxis==0) ns.x+=delta.x*s; else if(gizmoDragAxis==1) ns.y-=delta.y*s; else ns.z+=delta.x*s;
-							if(ns.x<0.01f)ns.x=0.01f; if(ns.y<0.01f)ns.y=0.01f; if(ns.z<0.01f)ns.z=0.01f;
+							if (gizmoDragAxis == 0)
+								ns.x += delta.x * s;
+							else if (gizmoDragAxis == 1)
+								ns.y -= delta.y * s;
+							else
+								ns.z += delta.x * s;
+							if (ns.x < 0.01f)
+								ns.x = 0.01f;
+							if (ns.y < 0.01f)
+								ns.y = 0.01f;
+							if (ns.z < 0.01f)
+								ns.z = 0.01f;
 							obj.scale = DirectX::XMFLOAT3(ns.x, ns.y, ns.z);
 						}
 					}
@@ -877,26 +1559,19 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				if (std::fabs(delta.x) > 2.0f || std::fabs(delta.y) > 2.0f) { // デッドゾーン
 					auto camR2 = gameScene->camera_.Rotation();
 					auto rotMat = DirectX::XMMatrixRotationRollPitchYaw(camR2.x, camR2.y, camR2.z);
-					DirectX::XMFLOAT3 right = {1,0,0}, up = {0,1,0};
+					DirectX::XMFLOAT3 right = {1, 0, 0}, up = {0, 1, 0};
 					DirectX::XMVECTOR rightV = DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(&right), rotMat);
 					DirectX::XMVECTOR upV = DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(&up), rotMat);
 
 					float sensitivity = 0.015f;
-					DirectX::XMVECTOR moveV = DirectX::XMVectorAdd(
-						DirectX::XMVectorScale(rightV, delta.x * sensitivity),
-						DirectX::XMVectorScale(upV, -delta.y * sensitivity)
-					);
+					DirectX::XMVECTOR moveV = DirectX::XMVectorAdd(DirectX::XMVectorScale(rightV, delta.x * sensitivity), DirectX::XMVectorScale(upV, -delta.y * sensitivity));
 					DirectX::XMFLOAT3 moveF;
 					DirectX::XMStoreFloat3(&moveF, moveV);
 
 					for (int idx : gameScene->selectedIndices_) {
 						if (idx >= 0 && idx < (int)gameScene->objects_.size() && dragStartTransforms.count(idx)) {
 							auto initT = dragStartTransforms[idx];
-							gameScene->objects_[idx].translate = DirectX::XMFLOAT3(
-								initT.translate.x + moveF.x,
-								initT.translate.y + moveF.y,
-								initT.translate.z + moveF.z
-							);
+							gameScene->objects_[idx].translate = DirectX::XMFLOAT3(initT.translate.x + moveF.x, initT.translate.y + moveF.y, initT.translate.z + moveF.z);
 						}
 					}
 				}
@@ -916,30 +1591,31 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 					}
 				}
 				if (!targetIndices.empty()) {
-					PushUndo({"Transform",
-						[gameScene, targetIndices, oldTransforms](){
-							for(size_t i=0; i<targetIndices.size(); ++i){
-								int idx = targetIndices[i];
-								if(idx < (int)gameScene->objects_.size()){
-									gameScene->objects_[idx].translate = DirectX::XMFLOAT3(oldTransforms[i].translate.x, oldTransforms[i].translate.y, oldTransforms[i].translate.z);
-									gameScene->objects_[idx].rotate = DirectX::XMFLOAT3(oldTransforms[i].rotate.x, oldTransforms[i].rotate.y, oldTransforms[i].rotate.z);
-									gameScene->objects_[idx].scale = DirectX::XMFLOAT3(oldTransforms[i].scale.x, oldTransforms[i].scale.y, oldTransforms[i].scale.z);
-								}
-							}
-						},
-						[gameScene, targetIndices, newTransforms](){
-							for(size_t i=0; i<targetIndices.size(); ++i){
-								int idx = targetIndices[i];
-								if(idx < (int)gameScene->objects_.size()){
-									gameScene->objects_[idx].translate = DirectX::XMFLOAT3(newTransforms[i].translate.x, newTransforms[i].translate.y, newTransforms[i].translate.z);
-									gameScene->objects_[idx].rotate = DirectX::XMFLOAT3(newTransforms[i].rotate.x, newTransforms[i].rotate.y, newTransforms[i].rotate.z);
-									gameScene->objects_[idx].scale = DirectX::XMFLOAT3(newTransforms[i].scale.x, newTransforms[i].scale.y, newTransforms[i].scale.z);
-								}
-							}
-						}
-					});
+					PushUndo(
+					    {"Transform",
+					     [gameScene, targetIndices, oldTransforms]() {
+						     for (size_t i = 0; i < targetIndices.size(); ++i) {
+							     int idx = targetIndices[i];
+							     if (idx < (int)gameScene->objects_.size()) {
+								     gameScene->objects_[idx].translate = DirectX::XMFLOAT3(oldTransforms[i].translate.x, oldTransforms[i].translate.y, oldTransforms[i].translate.z);
+								     gameScene->objects_[idx].rotate = DirectX::XMFLOAT3(oldTransforms[i].rotate.x, oldTransforms[i].rotate.y, oldTransforms[i].rotate.z);
+								     gameScene->objects_[idx].scale = DirectX::XMFLOAT3(oldTransforms[i].scale.x, oldTransforms[i].scale.y, oldTransforms[i].scale.z);
+							     }
+						     }
+					     },
+					     [gameScene, targetIndices, newTransforms]() {
+						     for (size_t i = 0; i < targetIndices.size(); ++i) {
+							     int idx = targetIndices[i];
+							     if (idx < (int)gameScene->objects_.size()) {
+								     gameScene->objects_[idx].translate = DirectX::XMFLOAT3(newTransforms[i].translate.x, newTransforms[i].translate.y, newTransforms[i].translate.z);
+								     gameScene->objects_[idx].rotate = DirectX::XMFLOAT3(newTransforms[i].rotate.x, newTransforms[i].rotate.y, newTransforms[i].rotate.z);
+								     gameScene->objects_[idx].scale = DirectX::XMFLOAT3(newTransforms[i].scale.x, newTransforms[i].scale.y, newTransforms[i].scale.z);
+							     }
+						     }
+					     }});
 				}
-				gizmoDragging = false; gizmoDragAxis = -1;
+				gizmoDragging = false;
+				gizmoDragAxis = -1;
 				objectDragging = false;
 				dragStartTransforms.clear();
 			}
@@ -951,34 +1627,54 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 		if (ImGui::IsMouseDragging(ImGuiMouseButton_Right, 1.0f)) {
 			ImVec2 d = ImGui::GetMouseDragDelta(ImGuiMouseButton_Right, 1.0f);
 			ImGui::ResetMouseDragDelta(ImGuiMouseButton_Right);
-			camR.y += d.x * 0.003f; camR.x += d.y * 0.003f;
+			camR.y += d.x * 0.003f;
+			camR.x += d.y * 0.003f;
 			float lim = DirectX::XMConvertToRadians(89.0f);
-			if (camR.x > lim) camR.x = lim; if (camR.x < -lim) camR.x = -lim;
+			if (camR.x > lim)
+				camR.x = lim;
+			if (camR.x < -lim)
+				camR.x = -lim;
 			gameScene->camera_.SetRotation(camR);
 		}
 		if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
 			float sp = io.KeyShift ? 0.45f : 0.15f;
-			DirectX::XMFLOAT3 mv = {0,0,0};
-			if(ImGui::IsKeyDown(ImGuiKey_W))mv.z+=sp; if(ImGui::IsKeyDown(ImGuiKey_S))mv.z-=sp;
-			if(ImGui::IsKeyDown(ImGuiKey_A))mv.x-=sp; if(ImGui::IsKeyDown(ImGuiKey_D))mv.x+=sp;
-			if(ImGui::IsKeyDown(ImGuiKey_Q))mv.y-=sp; if(ImGui::IsKeyDown(ImGuiKey_E))mv.y+=sp;
-			auto r=DirectX::XMMatrixRotationRollPitchYaw(camR.x,camR.y,camR.z);
-			DirectX::XMStoreFloat3(&camP, DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&camP), DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(&mv),r)));
+			DirectX::XMFLOAT3 mv = {0, 0, 0};
+			if (ImGui::IsKeyDown(ImGuiKey_W))
+				mv.z += sp;
+			if (ImGui::IsKeyDown(ImGuiKey_S))
+				mv.z -= sp;
+			if (ImGui::IsKeyDown(ImGuiKey_A))
+				mv.x -= sp;
+			if (ImGui::IsKeyDown(ImGuiKey_D))
+				mv.x += sp;
+			if (ImGui::IsKeyDown(ImGuiKey_Q))
+				mv.y -= sp;
+			if (ImGui::IsKeyDown(ImGuiKey_E))
+				mv.y += sp;
+			auto r = DirectX::XMMatrixRotationRollPitchYaw(camR.x, camR.y, camR.z);
+			DirectX::XMStoreFloat3(&camP, DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&camP), DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(&mv), r)));
 			gameScene->camera_.SetPosition(camP);
 		}
 		float wh = io.MouseWheel;
 		if (std::fabs(wh) > 0.01f) {
-			float zs=io.KeyShift?3.f:1.f; auto r=DirectX::XMMatrixRotationRollPitchYaw(camR.x,camR.y,camR.z);
-			DirectX::XMFLOAT3 fw={0,0,1};
-			DirectX::XMStoreFloat3(&camP, DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&camP), DirectX::XMVectorScale(DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(&fw),r),wh*zs)));
+			float zs = io.KeyShift ? 3.f : 1.f;
+			auto r = DirectX::XMMatrixRotationRollPitchYaw(camR.x, camR.y, camR.z);
+			DirectX::XMFLOAT3 fw = {0, 0, 1};
+			DirectX::XMStoreFloat3(&camP, DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&camP), DirectX::XMVectorScale(DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(&fw), r), wh * zs)));
 			gameScene->camera_.SetPosition(camP);
 		}
 	}
 	// ドラッグがウィンドウ外に行った場合のリセット
-	if ((gizmoDragging || objectDragging) && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) { gizmoDragging = false; gizmoDragAxis = -1; objectDragging = false; }
+	if ((gizmoDragging || objectDragging) && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+		gizmoDragging = false;
+		gizmoDragAxis = -1;
+		objectDragging = false;
+	}
 
-	if (gameScene && tH > 0.0f) gameScene->camera_.SetProjection(DirectX::XMConvertToRadians(45.0f), tW/tH, 0.1f, 1000.0f);
-	ImGui::End(); ImGui::PopStyleVar();
+	if (gameScene && tH > 0.0f)
+		gameScene->camera_.SetProjection(DirectX::XMConvertToRadians(45.0f), tW / tH, 0.1f, 1000.0f);
+	ImGui::End();
+	ImGui::PopStyleVar();
 
 	// ★ DrawSelectionGizmo削除: GameScene::Draw()内で描画するように移動済み
 	ImGui::End(); // DockSpace
@@ -990,89 +1686,187 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 	ImGuiIO& io = ImGui::GetIO();
 	if (scene) {
 		if (ImGui::BeginPopupContextWindow("HierarchyCtx")) {
-			auto addObj=[&](const char* label,const std::string& mp,const std::string& tp){
-				if(ImGui::MenuItem(label)){auto* r=Engine::Renderer::GetInstance(); SceneObject obj; obj.name=label;
-					if(!mp.empty()){obj.modelHandle=r->LoadObjMesh(mp); obj.modelPath=mp;}
-					if(!tp.empty()){obj.textureHandle=r->LoadTexture2D(tp); obj.texturePath=tp;}
-					else{obj.textureHandle=r->LoadTexture2D("Resources/white1x1.png"); obj.texturePath="Resources/white1x1.png";}
-					scene->objects_.push_back(obj); int idx=(int)scene->objects_.size()-1;
-					scene->selectedIndices_={idx}; scene->selectedObjectIndex_=idx;
-					PushUndo({std::string("Create ")+label,
-						[scene,idx](){if(idx<(int)scene->objects_.size()){scene->objects_.erase(scene->objects_.begin()+idx);scene->selectedIndices_.clear();scene->selectedObjectIndex_=-1;}},
-						[scene,obj,idx](){scene->objects_.insert(scene->objects_.begin()+idx,obj);scene->selectedIndices_={idx};scene->selectedObjectIndex_=idx;}
-					}); Log(std::string("Created: ")+label);}
+			auto addObj = [&](const char* label, const std::string& mp, const std::string& tp) {
+				if (ImGui::MenuItem(label)) {
+					auto* r = Engine::Renderer::GetInstance();
+					SceneObject obj;
+					obj.name = label;
+					if (!mp.empty()) {
+						obj.modelHandle = r->LoadObjMesh(mp);
+						obj.modelPath = mp;
+					}
+					if (!tp.empty()) {
+						obj.textureHandle = r->LoadTexture2D(tp);
+						obj.texturePath = tp;
+					} else {
+						obj.textureHandle = r->LoadTexture2D("Resources/white1x1.png");
+						obj.texturePath = "Resources/white1x1.png";
+					}
+					scene->objects_.push_back(obj);
+					int idx = (int)scene->objects_.size() - 1;
+					scene->selectedIndices_ = {idx};
+					scene->selectedObjectIndex_ = idx;
+					PushUndo(
+					    {std::string("Create ") + label,
+					     [scene, idx]() {
+						     if (idx < (int)scene->objects_.size()) {
+							     scene->objects_.erase(scene->objects_.begin() + idx);
+							     scene->selectedIndices_.clear();
+							     scene->selectedObjectIndex_ = -1;
+						     }
+					     },
+					     [scene, obj, idx]() {
+						     scene->objects_.insert(scene->objects_.begin() + idx, obj);
+						     scene->selectedIndices_ = {idx};
+						     scene->selectedObjectIndex_ = idx;
+					     }});
+					Log(std::string("Created: ") + label);
+				}
 			};
-			addObj("Empty","",""); addObj("Cube","Resources/cube/cube.obj","Resources/white1x1.png"); addObj("Plane","Resources/plane.obj","Resources/white1x1.png");
+			addObj("Empty", "", "");
+			addObj("Cube", "Resources/cube/cube.obj", "Resources/white1x1.png");
+			addObj("Plane", "Resources/plane.obj", "Resources/white1x1.png");
 			ImGui::Separator();
-			if(!scene->selectedIndices_.empty() && ImGui::MenuItem("Delete Selected")){
-				std::vector<std::pair<int,SceneObject>> del;
-				for(auto it=scene->selectedIndices_.rbegin();it!=scene->selectedIndices_.rend();++it){int i=*it; if(i<(int)scene->objects_.size() && !scene->objects_[i].locked){del.push_back({i,scene->objects_[i]});scene->objects_.erase(scene->objects_.begin()+i);}}
-				scene->selectedIndices_.clear();scene->selectedObjectIndex_=-1;
-				if(!del.empty()) PushUndo({"Delete",[scene,del](){for(auto it=del.rbegin();it!=del.rend();++it)if(it->first<=(int)scene->objects_.size())scene->objects_.insert(scene->objects_.begin()+it->first,it->second);},
-					[scene,del](){for(auto&p:del)if(p.first<(int)scene->objects_.size())scene->objects_.erase(scene->objects_.begin()+p.first);scene->selectedIndices_.clear();scene->selectedObjectIndex_=-1;}});
+			if (!scene->selectedIndices_.empty() && ImGui::MenuItem("Delete Selected")) {
+				std::vector<std::pair<int, SceneObject>> del;
+				for (auto it = scene->selectedIndices_.rbegin(); it != scene->selectedIndices_.rend(); ++it) {
+					int i = *it;
+					if (i < (int)scene->objects_.size() && !scene->objects_[i].locked) {
+						del.push_back({i, scene->objects_[i]});
+						scene->objects_.erase(scene->objects_.begin() + i);
+					}
+				}
+				scene->selectedIndices_.clear();
+				scene->selectedObjectIndex_ = -1;
+				if (!del.empty())
+					PushUndo(
+					    {"Delete",
+					     [scene, del]() {
+						     for (auto it = del.rbegin(); it != del.rend(); ++it)
+							     if (it->first <= (int)scene->objects_.size())
+								     scene->objects_.insert(scene->objects_.begin() + it->first, it->second);
+					     },
+					     [scene, del]() {
+						     for (auto& p : del)
+							     if (p.first < (int)scene->objects_.size())
+								     scene->objects_.erase(scene->objects_.begin() + p.first);
+						     scene->selectedIndices_.clear();
+						     scene->selectedObjectIndex_ = -1;
+					     }});
 			}
 			ImGui::Separator();
 			// ★ 一括ロック/解除
-			if(ImGui::MenuItem("Lock All")) { for(auto& o : scene->objects_) o.locked = true; Log("All objects locked"); }
-			if(ImGui::MenuItem("Unlock All")) { for(auto& o : scene->objects_) o.locked = false; Log("All objects unlocked"); }
-			if(!scene->selectedIndices_.empty()) {
-				if(ImGui::MenuItem("Lock Selected")) { for(int i:scene->selectedIndices_) if(i<(int)scene->objects_.size()) scene->objects_[i].locked=true; }
-				if(ImGui::MenuItem("Unlock Selected")) { for(int i:scene->selectedIndices_) if(i<(int)scene->objects_.size()) scene->objects_[i].locked=false; }
+			if (ImGui::MenuItem("Lock All")) {
+				for (auto& o : scene->objects_)
+					o.locked = true;
+				Log("All objects locked");
+			}
+			if (ImGui::MenuItem("Unlock All")) {
+				for (auto& o : scene->objects_)
+					o.locked = false;
+				Log("All objects unlocked");
+			}
+			if (!scene->selectedIndices_.empty()) {
+				if (ImGui::MenuItem("Lock Selected")) {
+					for (int i : scene->selectedIndices_)
+						if (i < (int)scene->objects_.size())
+							scene->objects_[i].locked = true;
+				}
+				if (ImGui::MenuItem("Unlock Selected")) {
+					for (int i : scene->selectedIndices_)
+						if (i < (int)scene->objects_.size())
+							scene->objects_[i].locked = false;
+				}
 			}
 			ImGui::EndPopup();
 		}
-		for(int i=0;i<(int)scene->objects_.size();++i){
-			bool sel=scene->selectedIndices_.count(i)>0;
-			bool locked=scene->objects_[i].locked;
+		for (int i = 0; i < (int)scene->objects_.size(); ++i) {
+			bool sel = scene->selectedIndices_.count(i) > 0;
+			bool locked = scene->objects_[i].locked;
 			// ★ ロックトグルボタン
 			ImGui::PushID(i);
-			if(locked) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
-			if(ImGui::SmallButton(locked ? "L##lk" : "U##lk")) { scene->objects_[i].locked = !locked; }
-			if(locked) ImGui::PopStyleColor();
+			if (locked)
+				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
+			if (ImGui::SmallButton(locked ? "L##lk" : "U##lk")) {
+				scene->objects_[i].locked = !locked;
+			}
+			if (locked)
+				ImGui::PopStyleColor();
 			ImGui::SameLine();
 			ImGui::PopID();
-			std::string lb=scene->objects_[i].name; if(lb.empty()) lb="Object "+std::to_string(i);
-			if(locked) lb = "[L] " + lb;
-			lb+="##"+std::to_string(i);
+			std::string lb = scene->objects_[i].name;
+			if (lb.empty())
+				lb = "Object " + std::to_string(i);
+			if (locked)
+				lb = "[L] " + lb;
+			lb += "##" + std::to_string(i);
 			// ★ ロック済みオブジェクトは選択不可
-			if(locked) {
+			if (locked) {
 				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
 				ImGui::Selectable(lb.c_str(), sel, ImGuiSelectableFlags_Disabled);
 				ImGui::PopStyleColor();
 			} else {
-				if(ImGui::Selectable(lb.c_str(), sel)){
-					if(io.KeyCtrl){if(sel)scene->selectedIndices_.erase(i); else scene->selectedIndices_.insert(i);}
-					else if(io.KeyShift&&scene->selectedObjectIndex_>=0){int lo=(std::min)(scene->selectedObjectIndex_,i),hi=(std::max)(scene->selectedObjectIndex_,i); for(int j=lo;j<=hi;++j) if(!scene->objects_[j].locked) scene->selectedIndices_.insert(j);}
-					else{scene->selectedIndices_={i};}
-					scene->selectedObjectIndex_=i;
+				if (ImGui::Selectable(lb.c_str(), sel)) {
+					if (io.KeyCtrl) {
+						if (sel)
+							scene->selectedIndices_.erase(i);
+						else
+							scene->selectedIndices_.insert(i);
+					} else if (io.KeyShift && scene->selectedObjectIndex_ >= 0) {
+						int lo = (std::min)(scene->selectedObjectIndex_, i), hi = (std::max)(scene->selectedObjectIndex_, i);
+						for (int j = lo; j <= hi; ++j)
+							if (!scene->objects_[j].locked)
+								scene->selectedIndices_.insert(j);
+					} else {
+						scene->selectedIndices_ = {i};
+					}
+					scene->selectedObjectIndex_ = i;
 				}
 			}
 		}
-		if(!io.WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Delete,false)&&!scene->selectedIndices_.empty()){
-			for(auto it=scene->selectedIndices_.rbegin();it!=scene->selectedIndices_.rend();++it)if(*it<(int)scene->objects_.size() && !scene->objects_[*it].locked)scene->objects_.erase(scene->objects_.begin()+*it);
-			scene->selectedIndices_.clear();scene->selectedObjectIndex_=-1;
+		if (!io.WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Delete, false) && !scene->selectedIndices_.empty()) {
+			for (auto it = scene->selectedIndices_.rbegin(); it != scene->selectedIndices_.rend(); ++it)
+				if (*it < (int)scene->objects_.size() && !scene->objects_[*it].locked)
+					scene->objects_.erase(scene->objects_.begin() + *it);
+			scene->selectedIndices_.clear();
+			scene->selectedObjectIndex_ = -1;
 		}
-	} else ImGui::Text("No Active Scene");
+	} else
+		ImGui::Text("No Active Scene");
 	ImGui::End();
 }
 
 // ====== Inspector ======
 void EditorUI::ShowInspector(GameScene* scene) {
 	ImGui::Begin("Inspector");
-	if(scene&&scene->selectedObjectIndex_>=0&&scene->selectedObjectIndex_<(int)scene->objects_.size()){
-		auto& obj=scene->objects_[scene->selectedObjectIndex_];
-		char buf[256]; strcpy_s(buf,obj.name.c_str());
-		if(ImGui::InputText("Name",buf,sizeof(buf))){std::string oN=obj.name,nN=buf;obj.name=nN;int i=scene->selectedObjectIndex_;
-			PushUndo({"Rename",[scene,i,oN](){if(i<(int)scene->objects_.size())scene->objects_[i].name=oN;},[scene,i,nN](){if(i<(int)scene->objects_.size())scene->objects_[i].name=nN;}});}
+	if (scene && scene->selectedObjectIndex_ >= 0 && scene->selectedObjectIndex_ < (int)scene->objects_.size()) {
+		auto& obj = scene->objects_[scene->selectedObjectIndex_];
+		char buf[256];
+		strcpy_s(buf, obj.name.c_str());
+		if (ImGui::InputText("Name", buf, sizeof(buf))) {
+			std::string oN = obj.name, nN = buf;
+			obj.name = nN;
+			int i = scene->selectedObjectIndex_;
+			PushUndo(
+			    {"Rename",
+			     [scene, i, oN]() {
+				     if (i < (int)scene->objects_.size())
+					     scene->objects_[i].name = oN;
+			     },
+			     [scene, i, nN]() {
+				     if (i < (int)scene->objects_.size())
+					     scene->objects_[i].name = nN;
+			     }});
+		}
 		// ★ ロックチェックボックス
 		ImGui::SameLine();
 		ImGui::Checkbox("Lock", &obj.locked);
 		// ★追加: Prefab保存ボタン
 		ImGui::SameLine();
-		if(ImGui::Button("Save Prefab")){
+		if (ImGui::Button("Save Prefab")) {
 			std::string ppath = "Resources/" + obj.name + ".prefab";
 			std::ofstream pf(ppath);
-			if(pf.is_open()){
+			if (pf.is_open()) {
 				// SerializeSceneObjectは4スペースインデントのコンテキストで囲んでいるため、それをそのまま使用する
 				pf << "{\n  \"prefab\":\n" << SerializeSceneObject(obj) << "\n}\n";
 				pf.close();
@@ -1081,64 +1875,216 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				LogError("Failed to save prefab: " + ppath);
 			}
 		}
-		if(obj.locked) {
+		if (obj.locked) {
 			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
 			ImGui::Text("** LOCKED - Transform editing disabled **");
 			ImGui::PopStyleColor();
 		}
-		// ★ ロック中はTransformとコンポーネント編集を無効化
-		if(obj.locked) ImGui::BeginDisabled();
-		ImGui::Separator(); ImGui::Text("Transform");
-		{auto old=obj.translate;ImGui::DragFloat3("Position",&obj.translate.x,0.1f);
-			if(ImGui::IsItemDeactivatedAfterEdit()){auto nv=obj.translate;int i=scene->selectedObjectIndex_;PushUndo({"Move",[scene,i,old](){if(i<(int)scene->objects_.size())scene->objects_[i].translate=old;},[scene,i,nv](){if(i<(int)scene->objects_.size())scene->objects_[i].translate=nv;}});}}
-		{auto old=obj.rotate;ImGui::DragFloat3("Rotation",&obj.rotate.x,0.01f);
-			if(ImGui::IsItemDeactivatedAfterEdit()){auto nv=obj.rotate;int i=scene->selectedObjectIndex_;PushUndo({"Rotate",[scene,i,old](){if(i<(int)scene->objects_.size())scene->objects_[i].rotate=old;},[scene,i,nv](){if(i<(int)scene->objects_.size())scene->objects_[i].rotate=nv;}});}}
-		{auto old=obj.scale;ImGui::DragFloat3("Scale",&obj.scale.x,0.1f);
-			if(ImGui::IsItemDeactivatedAfterEdit()){auto nv=obj.scale;int i=scene->selectedObjectIndex_;PushUndo({"Scale",[scene,i,old](){if(i<(int)scene->objects_.size())scene->objects_[i].scale=old;},[scene,i,nv](){if(i<(int)scene->objects_.size())scene->objects_[i].scale=nv;}});}}
-
-		ImGui::Separator(); ImGui::ColorEdit4("Color",&obj.color.x);
-		ImGui::Separator(); ImGui::Text("Model: %s",obj.modelPath.empty()?"(none)":obj.modelPath.c_str());
-		ImGui::Text("Texture: %s",obj.texturePath.empty()?"(none)":obj.texturePath.c_str());
-		if(ImGui::BeginDragDropTarget()){if(const ImGuiPayload*pl=ImGui::AcceptDragDropPayload("RESOURCE_PATH")){
-			std::string path((const char*)pl->Data,pl->DataSize-1); auto*r=Engine::Renderer::GetInstance();
-			if(path.find(".png")!=std::string::npos||path.find(".jpg")!=std::string::npos){obj.textureHandle=r->LoadTexture2D(path);obj.texturePath=path;Log("Texture: "+path);}
-			else if(path.find(".obj")!=std::string::npos||path.find(".gltf")!=std::string::npos){obj.modelHandle=r->LoadObjMesh(path);obj.modelPath=path;Log("Model: "+path);}
-		}ImGui::EndDragDropTarget();}
+		// ★ ロック中、またはプレイ中はTransformとコンポーネント編集を無効化
+		if (obj.locked || scene->IsPlaying())
+			ImGui::BeginDisabled();
+		ImGui::Separator();
+		ImGui::Text("Transform");
+		{
+			auto old = obj.translate;
+			ImGui::DragFloat3("Position", &obj.translate.x, 0.1f);
+			if (ImGui::IsItemDeactivatedAfterEdit()) {
+				auto nv = obj.translate;
+				int i = scene->selectedObjectIndex_;
+				PushUndo(
+				    {"Move",
+				     [scene, i, old]() {
+					     if (i < (int)scene->objects_.size())
+						     scene->objects_[i].translate = old;
+				     },
+				     [scene, i, nv]() {
+					     if (i < (int)scene->objects_.size())
+						     scene->objects_[i].translate = nv;
+				     }});
+			}
+		}
+		{
+			auto old = obj.rotate;
+			ImGui::DragFloat3("Rotation", &obj.rotate.x, 0.01f);
+			if (ImGui::IsItemDeactivatedAfterEdit()) {
+				auto nv = obj.rotate;
+				int i = scene->selectedObjectIndex_;
+				PushUndo(
+				    {"Rotate",
+				     [scene, i, old]() {
+					     if (i < (int)scene->objects_.size())
+						     scene->objects_[i].rotate = old;
+				     },
+				     [scene, i, nv]() {
+					     if (i < (int)scene->objects_.size())
+						     scene->objects_[i].rotate = nv;
+				     }});
+			}
+		}
+		{
+			auto old = obj.scale;
+			ImGui::DragFloat3("Scale", &obj.scale.x, 0.1f);
+			if (ImGui::IsItemDeactivatedAfterEdit()) {
+				auto nv = obj.scale;
+				int i = scene->selectedObjectIndex_;
+				PushUndo(
+				    {"Scale",
+				     [scene, i, old]() {
+					     if (i < (int)scene->objects_.size())
+						     scene->objects_[i].scale = old;
+				     },
+				     [scene, i, nv]() {
+					     if (i < (int)scene->objects_.size())
+						     scene->objects_[i].scale = nv;
+				     }});
+			}
+		}
 
 		ImGui::Separator();
-		if(ImGui::CollapsingHeader("Components",ImGuiTreeNodeFlags_DefaultOpen)){
-			for(size_t ci=0;ci<obj.meshRenderers.size();++ci){auto&mr=obj.meshRenderers[ci];ImGui::PushID((int)ci);
-				if(ImGui::TreeNode("MeshRenderer")){ImGui::Checkbox("Enabled",&mr.enabled);ImGui::ColorEdit4("Color##MR",&mr.color.x);
-					ImGui::DragFloat2("UV Tiling",&mr.uvTiling.x,0.01f);
-					ImGui::DragFloat2("UV Offset",&mr.uvOffset.x,0.01f);
-					ImGui::Text("Lightmap: %s",mr.lightmapPath.empty()?"(none)":mr.lightmapPath.c_str());
-					if(ImGui::BeginDragDropTarget()){if(const ImGuiPayload*pl=ImGui::AcceptDragDropPayload("RESOURCE_PATH")){
-						std::string path((const char*)pl->Data,pl->DataSize-1);
-						if(path.find(".png")!=std::string::npos||path.find(".jpg")!=std::string::npos){mr.lightmapHandle=Engine::Renderer::GetInstance()->LoadTexture2D(path);mr.lightmapPath=path;}
-					}ImGui::EndDragDropTarget();}
-					if(ImGui::Button("Remove##MR")){obj.meshRenderers.erase(obj.meshRenderers.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
-			for(size_t ci=0;ci<obj.boxColliders.size();++ci){auto&bc=obj.boxColliders[ci];ImGui::PushID(1000+(int)ci);
-				if(ImGui::TreeNode("BoxCollider")){ImGui::Checkbox("Enabled",&bc.enabled);ImGui::DragFloat3("Center",&bc.center.x,0.1f);ImGui::DragFloat3("Size",&bc.size.x,0.1f);
-					if(ImGui::Button("Remove##BC")){obj.boxColliders.erase(obj.boxColliders.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
-			for(size_t ci=0;ci<obj.tags.size();++ci){auto&tg=obj.tags[ci];ImGui::PushID(2000+(int)ci);
-				if(ImGui::TreeNode("Tag")){char tb[128];strcpy_s(tb,tg.tag.c_str());if(ImGui::InputText("Tag",tb,sizeof(tb)))tg.tag=tb;
-					if(ImGui::Button("Remove##Tag")){obj.tags.erase(obj.tags.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
-			for(size_t ci=0;ci<obj.animators.size();++ci){auto&an=obj.animators[ci];ImGui::PushID(3000+(int)ci);
-				if(ImGui::TreeNode("Animator")){ImGui::Checkbox("Enabled",&an.enabled);
-					char tb[128];strcpy_s(tb,an.currentAnimation.c_str());if(ImGui::InputText("Animation",tb,sizeof(tb)))an.currentAnimation=tb;
-					ImGui::Checkbox("Is Playing",&an.isPlaying); ImGui::SameLine(); ImGui::Checkbox("Loop",&an.loop);
-					ImGui::DragFloat("Speed",&an.speed,0.01f); ImGui::DragFloat("Time",&an.time,0.01f);
-					if(ImGui::Button("Remove##Anim")){obj.animators.erase(obj.animators.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
-			for(size_t ci=0;ci<obj.rigidbodies.size();++ci){auto&rb=obj.rigidbodies[ci];ImGui::PushID(4000+(int)ci);
-				if(ImGui::TreeNode("Rigidbody")){ImGui::Checkbox("Enabled",&rb.enabled);
-					ImGui::DragFloat3("Velocity",&rb.velocity.x,0.1f);
-					ImGui::Checkbox("Use Gravity",&rb.useGravity); ImGui::Checkbox("Is Kinematic",&rb.isKinematic);
-					if(ImGui::Button("Remove##RB")){obj.rigidbodies.erase(obj.rigidbodies.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+		ImGui::ColorEdit4("Color", &obj.color.x);
+		ImGui::Separator();
+		ImGui::Text("Model: %s", obj.modelPath.empty() ? "(none)" : obj.modelPath.c_str());
+		ImGui::Text("Texture: %s", obj.texturePath.empty() ? "(none)" : obj.texturePath.c_str());
+		if (ImGui::BeginDragDropTarget()) {
+			if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
+				std::string path((const char*)pl->Data, pl->DataSize - 1);
+				auto* r = Engine::Renderer::GetInstance();
+				if (path.find(".png") != std::string::npos || path.find(".jpg") != std::string::npos) {
+					obj.textureHandle = r->LoadTexture2D(path);
+					obj.texturePath = path;
+					if (!obj.meshRenderers.empty()) {
+						obj.meshRenderers[0].textureHandle = obj.textureHandle;
+						obj.meshRenderers[0].texturePath = path;
+					}
+					Log("Texture: " + path);
+				} else if (path.find(".obj") != std::string::npos || path.find(".gltf") != std::string::npos) {
+					obj.modelHandle = r->LoadObjMesh(path);
+					obj.modelPath = path;
+					if (!obj.meshRenderers.empty()) {
+						obj.meshRenderers[0].modelHandle = obj.modelHandle;
+						obj.meshRenderers[0].modelPath = path;
+					}
+					Log("Model: " + path);
+				}
+			}
+			ImGui::EndDragDropTarget();
+		}
+
+		ImGui::Separator();
+		if (ImGui::CollapsingHeader("Components", ImGuiTreeNodeFlags_DefaultOpen)) {
+			for (size_t ci = 0; ci < obj.meshRenderers.size(); ++ci) {
+				auto& mr = obj.meshRenderers[ci];
+				ImGui::PushID((int)ci);
+				if (ImGui::TreeNode("MeshRenderer")) {
+					ImGui::Checkbox("Enabled", &mr.enabled);
+					ImGui::ColorEdit4("Color##MR", &mr.color.x);
+					ImGui::DragFloat2("UV Tiling", &mr.uvTiling.x, 0.01f);
+					ImGui::DragFloat2("UV Offset", &mr.uvOffset.x, 0.01f);
+					ImGui::Text("Lightmap: %s", mr.lightmapPath.empty() ? "(none)" : mr.lightmapPath.c_str());
+					if (ImGui::BeginDragDropTarget()) {
+						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
+							std::string path((const char*)pl->Data, pl->DataSize - 1);
+							if (path.find(".png") != std::string::npos || path.find(".jpg") != std::string::npos) {
+								mr.lightmapHandle = Engine::Renderer::GetInstance()->LoadTexture2D(path);
+								mr.lightmapPath = path;
+							}
+						}
+						ImGui::EndDragDropTarget();
+					}
+					if (ImGui::Button("Remove##MR")) {
+						obj.meshRenderers.erase(obj.meshRenderers.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			for (size_t ci = 0; ci < obj.boxColliders.size(); ++ci) {
+				auto& bc = obj.boxColliders[ci];
+				ImGui::PushID(1000 + (int)ci);
+				if (ImGui::TreeNode("BoxCollider")) {
+					ImGui::Checkbox("Enabled", &bc.enabled);
+					ImGui::DragFloat3("Center", &bc.center.x, 0.1f);
+					ImGui::DragFloat3("Size", &bc.size.x, 0.1f);
+					if (ImGui::Button("Remove##BC")) {
+						obj.boxColliders.erase(obj.boxColliders.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			for (size_t ci = 0; ci < obj.tags.size(); ++ci) {
+				auto& tg = obj.tags[ci];
+				ImGui::PushID(2000 + (int)ci);
+				if (ImGui::TreeNode("Tag")) {
+					char tb[128];
+					strcpy_s(tb, tg.tag.c_str());
+					if (ImGui::InputText("Tag", tb, sizeof(tb)))
+						tg.tag = tb;
+					if (ImGui::Button("Remove##Tag")) {
+						obj.tags.erase(obj.tags.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			for (size_t ci = 0; ci < obj.animators.size(); ++ci) {
+				auto& an = obj.animators[ci];
+				ImGui::PushID(3000 + (int)ci);
+				if (ImGui::TreeNode("Animator")) {
+					ImGui::Checkbox("Enabled", &an.enabled);
+					char tb[128];
+					strcpy_s(tb, an.currentAnimation.c_str());
+					if (ImGui::InputText("Animation", tb, sizeof(tb)))
+						an.currentAnimation = tb;
+					ImGui::Checkbox("Is Playing", &an.isPlaying);
+					ImGui::SameLine();
+					ImGui::Checkbox("Loop", &an.loop);
+					ImGui::DragFloat("Speed", &an.speed, 0.01f);
+					ImGui::DragFloat("Time", &an.time, 0.01f);
+					if (ImGui::Button("Remove##Anim")) {
+						obj.animators.erase(obj.animators.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			for (size_t ci = 0; ci < obj.rigidbodies.size(); ++ci) {
+				auto& rb = obj.rigidbodies[ci];
+				ImGui::PushID(4000 + (int)ci);
+				if (ImGui::TreeNode("Rigidbody")) {
+					ImGui::Checkbox("Enabled", &rb.enabled);
+					ImGui::DragFloat3("Velocity", &rb.velocity.x, 0.1f);
+					ImGui::Checkbox("Use Gravity", &rb.useGravity);
+					ImGui::Checkbox("Is Kinematic", &rb.isKinematic);
+					if (ImGui::Button("Remove##RB")) {
+						obj.rigidbodies.erase(obj.rigidbodies.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
 			// ★追加: ParticleEmitter コンポーネント
-			for(size_t ci=0;ci<obj.particleEmitters.size();++ci){auto&pe=obj.particleEmitters[ci];ImGui::PushID(5000+(int)ci);
-				if(ImGui::TreeNode("Particle Emitter")){
-					ImGui::Checkbox("Enabled##PE",&pe.enabled);
-					
+			for (size_t ci = 0; ci < obj.particleEmitters.size(); ++ci) {
+				auto& pe = obj.particleEmitters[ci];
+				ImGui::PushID(5000 + (int)ci);
+				if (ImGui::TreeNode("Particle Emitter")) {
+					ImGui::Checkbox("Enabled##PE", &pe.enabled);
+
 					// ★追加: アセットパスとD&D
 					ImGui::Text("Asset: %s", pe.assetPath.empty() ? "(none)" : pe.assetPath.c_str());
 					if (ImGui::BeginDragDropTarget()) {
@@ -1169,7 +2115,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 								pe.emitter.LoadFromJson(pe.assetPath);
 							}
 						}
-						
+
 						if (ImGui::BeginDragDropTarget()) {
 							if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
 								std::string path((const char*)payload->Data, payload->DataSize - 1);
@@ -1205,7 +2151,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 
 						// --- プレビュー/基本設定 ---
 						ImGui::Checkbox("Is Playing##PE", &pe.emitter.isPlaying);
-						
+
 						if (ImGui::CollapsingHeader("Emission##PE", ImGuiTreeNodeFlags_DefaultOpen)) {
 							ImGui::DragFloat("Emit Rate##PE", &p.emitRate, 1.0f, 0.0f, 1000.0f);
 							ImGui::DragInt("Burst Count##PE", &p.burstCount, 1, 0, 1000);
@@ -1217,10 +2163,13 @@ void EditorUI::ShowInspector(GameScene* scene) {
 						// 形状
 						if (ImGui::CollapsingHeader("Shape##PEHeader", ImGuiTreeNodeFlags_DefaultOpen)) {
 							int shapeType = static_cast<int>(p.shape);
-							const char* shapeNames[] = { "Point", "Sphere", "Cone" };
-							if (ImGui::Combo("Shape##PECombo", &shapeType, shapeNames, IM_ARRAYSIZE(shapeNames))) p.shape = static_cast<Engine::EmissionShape>(shapeType);
-							if (p.shape != Engine::EmissionShape::Point) ImGui::DragFloat("Shape Radius##PE", &p.shapeRadius, 0.01f, 0.0f, 100.0f);
-							if (p.shape == Engine::EmissionShape::Cone) ImGui::DragFloat("Cone Angle##PE", &p.shapeAngle, 0.01f, 0.0f, 3.1415f);
+							const char* shapeNames[] = {"Point", "Sphere", "Cone"};
+							if (ImGui::Combo("Shape##PECombo", &shapeType, shapeNames, IM_ARRAYSIZE(shapeNames)))
+								p.shape = static_cast<Engine::EmissionShape>(shapeType);
+							if (p.shape != Engine::EmissionShape::Point)
+								ImGui::DragFloat("Shape Radius##PE", &p.shapeRadius, 0.01f, 0.0f, 100.0f);
+							if (p.shape == Engine::EmissionShape::Cone)
+								ImGui::DragFloat("Cone Angle##PE", &p.shapeAngle, 0.01f, 0.0f, 3.1415f);
 						}
 
 						if (ImGui::CollapsingHeader("Life Time & Physics##PE", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -1242,11 +2191,13 @@ void EditorUI::ShowInspector(GameScene* scene) {
 						if (ImGui::CollapsingHeader("Rendering & UV##PE", ImGuiTreeNodeFlags_DefaultOpen)) {
 							char texBuf[256];
 							strcpy_s(texBuf, p.texturePath.c_str());
-							if (ImGui::InputText("Texture##PE", texBuf, sizeof(texBuf))) p.texturePath = texBuf;
+							if (ImGui::InputText("Texture##PE", texBuf, sizeof(texBuf)))
+								p.texturePath = texBuf;
 
 							char shaderBuf[256];
 							strcpy_s(shaderBuf, p.shaderName.c_str());
-							if (ImGui::InputText("Shader##PE", shaderBuf, sizeof(shaderBuf))) p.shaderName = shaderBuf;
+							if (ImGui::InputText("Shader##PE", shaderBuf, sizeof(shaderBuf)))
+								p.shaderName = shaderBuf;
 
 							ImGui::Checkbox("Additive Blend##PE", &p.isAdditive);
 							ImGui::Checkbox("Use Billboard##PE", &p.useBillboard);
@@ -1261,228 +2212,460 @@ void EditorUI::ShowInspector(GameScene* scene) {
 							}
 						}
 					}
-					if(ImGui::Button("Remove##PE")){obj.particleEmitters.erase(obj.particleEmitters.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}
-					ImGui::TreePop();
-				}ImGui::PopID();}
-			// ★追加: GpuMeshCollider コンポーネント
-			for(size_t ci=0;ci<obj.gpuMeshColliders.size();++ci){auto&gmc=obj.gpuMeshColliders[ci];ImGui::PushID(6000+(int)ci);
-				if(ImGui::TreeNode("GpuMeshCollider")){
-					ImGui::Checkbox("Enabled##GMC",&gmc.enabled);
-					ImGui::Checkbox("Is Trigger##GMC",&gmc.isTrigger);
-					ImGui::Text("Mesh: %s", gmc.meshPath.empty()?"(none)":gmc.meshPath.c_str());
-					if(ImGui::BeginDragDropTarget()){
-						if(const ImGuiPayload*pl=ImGui::AcceptDragDropPayload("RESOURCE_PATH")){
-							std::string path((const char*)pl->Data,pl->DataSize-1);
-							if(path.find(".obj")!=std::string::npos||path.find(".gltf")!=std::string::npos){
-								gmc.meshHandle=Engine::Renderer::GetInstance()->LoadObjMesh(path);gmc.meshPath=path;Log("GpuMeshCollider Mesh: "+path);
-							}
-						}ImGui::EndDragDropTarget();
+					if (ImGui::Button("Remove##PE")) {
+						obj.particleEmitters.erase(obj.particleEmitters.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
 					}
-					if(gmc.isIntersecting) ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "[Intersection Detected!]");
-					else ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "No Intersection");
-					if(ImGui::Button("Remove##GMC")){obj.gpuMeshColliders.erase(obj.gpuMeshColliders.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
-			
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			// ★追加: GpuMeshCollider コンポーネント
+			for (size_t ci = 0; ci < obj.gpuMeshColliders.size(); ++ci) {
+				auto& gmc = obj.gpuMeshColliders[ci];
+				ImGui::PushID(6000 + (int)ci);
+				if (ImGui::TreeNode("GpuMeshCollider")) {
+					ImGui::Checkbox("Enabled##GMC", &gmc.enabled);
+					ImGui::Checkbox("Is Trigger##GMC", &gmc.isTrigger);
+					ImGui::Text("Mesh: %s", gmc.meshPath.empty() ? "(none)" : gmc.meshPath.c_str());
+					if (ImGui::BeginDragDropTarget()) {
+						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
+							std::string path((const char*)pl->Data, pl->DataSize - 1);
+							if (path.find(".obj") != std::string::npos || path.find(".gltf") != std::string::npos) {
+								gmc.meshHandle = Engine::Renderer::GetInstance()->LoadObjMesh(path);
+								gmc.meshPath = path;
+								Log("GpuMeshCollider Mesh: " + path);
+							}
+						}
+						ImGui::EndDragDropTarget();
+					}
+					if (gmc.isIntersecting)
+						ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "[Intersection Detected!]");
+					else
+						ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "No Intersection");
+					if (ImGui::Button("Remove##GMC")) {
+						obj.gpuMeshColliders.erase(obj.gpuMeshColliders.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+
 			// ★追加: PlayerInput コンポーネント
-			for(size_t ci=0;ci<obj.playerInputs.size();++ci){auto&pi=obj.playerInputs[ci];ImGui::PushID(7000+(int)ci);
-				if(ImGui::TreeNode("PlayerInput")){
-					ImGui::Checkbox("Enabled##PI",&pi.enabled);
+			for (size_t ci = 0; ci < obj.playerInputs.size(); ++ci) {
+				auto& pi = obj.playerInputs[ci];
+				ImGui::PushID(7000 + (int)ci);
+				if (ImGui::TreeNode("PlayerInput")) {
+					ImGui::Checkbox("Enabled##PI", &pi.enabled);
 					ImGui::Text("MoveDir: (%.2f, %.2f)", pi.moveDir.x, pi.moveDir.y);
 					ImGui::Text("JumpRequested: %s", pi.jumpRequested ? "true" : "false");
 					ImGui::Text("AttackRequested: %s", pi.attackRequested ? "true" : "false");
-					if(ImGui::Button("Remove##PI")){obj.playerInputs.erase(obj.playerInputs.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+					if (ImGui::Button("Remove##PI")) {
+						obj.playerInputs.erase(obj.playerInputs.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
 
 			// ★追加: CharacterMovement コンポーネント
-			for(size_t ci=0;ci<obj.characterMovements.size();++ci){auto&cm=obj.characterMovements[ci];ImGui::PushID(8000+(int)ci);
-				if(ImGui::TreeNode("CharacterMovement")){
-					ImGui::Checkbox("Enabled##CM",&cm.enabled);
-					ImGui::DragFloat("Speed##CM",&cm.speed,0.1f);
-					ImGui::DragFloat("JumpPower##CM",&cm.jumpPower,0.1f);
-					ImGui::DragFloat("Gravity##CM",&cm.gravity,0.1f);
+			for (size_t ci = 0; ci < obj.characterMovements.size(); ++ci) {
+				auto& cm = obj.characterMovements[ci];
+				ImGui::PushID(8000 + (int)ci);
+				if (ImGui::TreeNode("CharacterMovement")) {
+					ImGui::Checkbox("Enabled##CM", &cm.enabled);
+					ImGui::DragFloat("Speed##CM", &cm.speed, 0.1f);
+					ImGui::DragFloat("JumpPower##CM", &cm.jumpPower, 0.1f);
+					ImGui::DragFloat("Gravity##CM", &cm.gravity, 0.1f);
 					ImGui::Text("VelocityY: %.2f", cm.velocityY);
 					ImGui::Text("IsGrounded: %s", cm.isGrounded ? "true" : "false");
-					if(ImGui::Button("Remove##CM")){obj.characterMovements.erase(obj.characterMovements.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+					if (ImGui::Button("Remove##CM")) {
+						obj.characterMovements.erase(obj.characterMovements.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
 
 			// ★追加: CameraTarget コンポーネント
-			for(size_t ci=0;ci<obj.cameraTargets.size();++ci){auto&ct=obj.cameraTargets[ci];ImGui::PushID(9000+(int)ci);
-				if(ImGui::TreeNode("CameraTarget")){
-					ImGui::Checkbox("Enabled##CT",&ct.enabled);
-					ImGui::DragFloat("Distance##CT",&ct.distance,0.1f);
-					ImGui::DragFloat("Height##CT",&ct.height,0.1f);
-					ImGui::DragFloat("SmoothSpeed##CT",&ct.smoothSpeed,0.1f);
-					if(ImGui::Button("Remove##CT")){obj.cameraTargets.erase(obj.cameraTargets.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+			for (size_t ci = 0; ci < obj.cameraTargets.size(); ++ci) {
+				auto& ct = obj.cameraTargets[ci];
+				ImGui::PushID(9000 + (int)ci);
+				if (ImGui::TreeNode("CameraTarget")) {
+					ImGui::Checkbox("Enabled##CT", &ct.enabled);
+					ImGui::DragFloat("Distance##CT", &ct.distance, 0.1f);
+					ImGui::DragFloat("Height##CT", &ct.height, 0.1f);
+					ImGui::DragFloat("SmoothSpeed##CT", &ct.smoothSpeed, 0.1f);
+					if (ImGui::Button("Remove##CT")) {
+						obj.cameraTargets.erase(obj.cameraTargets.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
 
 			// ★追加: DirectionalLight コンポーネント
-			for(size_t ci=0;ci<obj.directionalLights.size();++ci){auto&dl=obj.directionalLights[ci];ImGui::PushID(10000+(int)ci);
-				if(ImGui::TreeNode("DirectionalLight")){
-					ImGui::Checkbox("Enabled##DL",&dl.enabled);
-					ImGui::ColorEdit3("Color##DL",&dl.color.x);
-					ImGui::DragFloat("Intensity##DL",&dl.intensity,0.01f, 0.0f, 100.0f);
-					if(ImGui::Button("Remove##DL")){obj.directionalLights.erase(obj.directionalLights.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+			for (size_t ci = 0; ci < obj.directionalLights.size(); ++ci) {
+				auto& dl = obj.directionalLights[ci];
+				ImGui::PushID(10000 + (int)ci);
+				if (ImGui::TreeNode("DirectionalLight")) {
+					ImGui::Checkbox("Enabled##DL", &dl.enabled);
+					ImGui::ColorEdit3("Color##DL", &dl.color.x);
+					ImGui::DragFloat("Intensity##DL", &dl.intensity, 0.01f, 0.0f, 100.0f);
+					if (ImGui::Button("Remove##DL")) {
+						obj.directionalLights.erase(obj.directionalLights.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
 
 			// ★追加: PointLight コンポーネント
-			for(size_t ci=0;ci<obj.pointLights.size();++ci){auto&pl=obj.pointLights[ci];ImGui::PushID(11000+(int)ci);
-				if(ImGui::TreeNode("PointLight")){
-					ImGui::Checkbox("Enabled##PL",&pl.enabled);
-					ImGui::ColorEdit3("Color##PL",&pl.color.x);
-					ImGui::DragFloat("Intensity##PL",&pl.intensity,0.01f, 0.0f, 100.0f);
-					ImGui::DragFloat("Range##PL",&pl.range,0.1f, 0.0f, 1000.0f);
-					ImGui::DragFloat3("Attenuation##PL",&pl.atten.x,0.001f, 0.0f, 1.0f);
-					if(ImGui::Button("Remove##PL")){obj.pointLights.erase(obj.pointLights.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+			for (size_t ci = 0; ci < obj.pointLights.size(); ++ci) {
+				auto& pl = obj.pointLights[ci];
+				ImGui::PushID(11000 + (int)ci);
+				if (ImGui::TreeNode("PointLight")) {
+					ImGui::Checkbox("Enabled##PL", &pl.enabled);
+					ImGui::ColorEdit3("Color##PL", &pl.color.x);
+					ImGui::DragFloat("Intensity##PL", &pl.intensity, 0.01f, 0.0f, 100.0f);
+					ImGui::DragFloat("Range##PL", &pl.range, 0.1f, 0.0f, 1000.0f);
+					ImGui::DragFloat3("Attenuation##PL", &pl.atten.x, 0.001f, 0.0f, 1.0f);
+					if (ImGui::Button("Remove##PL")) {
+						obj.pointLights.erase(obj.pointLights.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
 
 			// ★追加: SpotLight コンポーネント
-			for(size_t ci=0;ci<obj.spotLights.size();++ci){auto&sl=obj.spotLights[ci];ImGui::PushID(12000+(int)ci);
-				if(ImGui::TreeNode("SpotLight")){
-					ImGui::Checkbox("Enabled##SL",&sl.enabled);
-					ImGui::ColorEdit3("Color##SL",&sl.color.x);
-					ImGui::DragFloat("Intensity##SL",&sl.intensity,0.01f, 0.0f, 100.0f);
-					ImGui::DragFloat("Range##SL",&sl.range,0.1f, 0.0f, 1000.0f);
-					ImGui::DragFloat("Inner Cos##SL",&sl.innerCos,0.01f, -1.0f, 1.0f);
-					ImGui::DragFloat("Outer Cos##SL",&sl.outerCos,0.01f, -1.0f, 1.0f);
-					ImGui::DragFloat3("Attenuation##SL",&sl.atten.x,0.001f, 0.0f, 1.0f);
-				if(ImGui::Button("Remove##SL")){obj.spotLights.erase(obj.spotLights.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
-
-		// ★追加: AudioSource コンポーネント
-		for(size_t ci=0;ci<obj.audioSources.size();++ci){auto&as=obj.audioSources[ci];ImGui::PushID(13000+(int)ci);
-			if(ImGui::TreeNode("AudioSource")){
-				ImGui::Checkbox("Enabled##AS",&as.enabled);
-				// サウンドファイルパス
-				char pathBuf[256]; strcpy_s(pathBuf, as.soundPath.c_str());
-				if(ImGui::InputText("Sound Path##AS", pathBuf, sizeof(pathBuf))) {
-					as.soundPath = pathBuf;
-					// パス変更時に再ロード
-					if(!as.soundPath.empty()) {
-						auto* audio = Engine::Audio::GetInstance();
-						if(audio) as.soundHandle = audio->Load(as.soundPath);
+			for (size_t ci = 0; ci < obj.spotLights.size(); ++ci) {
+				auto& sl = obj.spotLights[ci];
+				ImGui::PushID(12000 + (int)ci);
+				if (ImGui::TreeNode("SpotLight")) {
+					ImGui::Checkbox("Enabled##SL", &sl.enabled);
+					ImGui::ColorEdit3("Color##SL", &sl.color.x);
+					ImGui::DragFloat("Intensity##SL", &sl.intensity, 0.01f, 0.0f, 100.0f);
+					ImGui::DragFloat("Range##SL", &sl.range, 0.1f, 0.0f, 1000.0f);
+					ImGui::DragFloat("Inner Cos##SL", &sl.innerCos, 0.01f, -1.0f, 1.0f);
+					ImGui::DragFloat("Outer Cos##SL", &sl.outerCos, 0.01f, -1.0f, 1.0f);
+					ImGui::DragFloat3("Attenuation##SL", &sl.atten.x, 0.001f, 0.0f, 1.0f);
+					if (ImGui::Button("Remove##SL")) {
+						obj.spotLights.erase(obj.spotLights.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
 					}
+					ImGui::TreePop();
 				}
-				if(ImGui::BeginDragDropTarget()){
-					if(const ImGuiPayload*pl=ImGui::AcceptDragDropPayload("RESOURCE_PATH")){
-						std::string path((const char*)pl->Data,pl->DataSize-1);
-						if(path.find(".mp3")!=std::string::npos||path.find(".wav")!=std::string::npos){
-							as.soundPath = path;
+				ImGui::PopID();
+			}
+
+			// ★追加: AudioSource コンポーネント
+			for (size_t ci = 0; ci < obj.audioSources.size(); ++ci) {
+				auto& as = obj.audioSources[ci];
+				ImGui::PushID(13000 + (int)ci);
+				if (ImGui::TreeNode("AudioSource")) {
+					ImGui::Checkbox("Enabled##AS", &as.enabled);
+					// サウンドファイルパス
+					char pathBuf[256];
+					strcpy_s(pathBuf, as.soundPath.c_str());
+					if (ImGui::InputText("Sound Path##AS", pathBuf, sizeof(pathBuf))) {
+						as.soundPath = pathBuf;
+						// パス変更時に再ロード
+						if (!as.soundPath.empty()) {
 							auto* audio = Engine::Audio::GetInstance();
-							if(audio) as.soundHandle = audio->Load(path);
-							EditorUI::Log("AudioSource: " + path);
-						}
-					}ImGui::EndDragDropTarget();
-				}
-				if (ImGui::DragFloat("Volume##AS",&as.volume,0.01f,0.0f,1.0f)) {
-					if (as.isPlaying && as.voiceHandle) {
-						auto* audio = Engine::Audio::GetInstance();
-						if (audio) audio->SetVolume(as.voiceHandle, as.volume);
-					}
-				}
-				ImGui::Checkbox("Loop##AS",&as.loop);
-				ImGui::Checkbox("Play On Start##AS",&as.playOnStart);
-				ImGui::Checkbox("3D Sound##AS",&as.is3D);
-				if(as.is3D) ImGui::DragFloat("Max Distance##AS",&as.maxDistance,0.5f,0.0f,500.0f);
-				// Play/Stop ボタン
-				if(as.isPlaying) {
-					if(ImGui::Button("Stop##AS")){
-						auto* audio = Engine::Audio::GetInstance();
-						if(audio && as.voiceHandle) { audio->Stop(as.voiceHandle); as.voiceHandle = 0; }
-						as.isPlaying = false;
-					}
-					ImGui::SameLine(); ImGui::TextColored(ImVec4(0.3f,1.0f,0.3f,1.0f),"Playing...");
-				} else {
-					if(ImGui::Button("Play##AS")){
-						auto* audio = Engine::Audio::GetInstance();
-						if(audio && as.soundHandle != 0xFFFFFFFF) {
-							as.voiceHandle = audio->Play(as.soundHandle, as.loop, as.volume);
-							as.isPlaying = true;
+							if (audio)
+								as.soundHandle = audio->Load(as.soundPath);
 						}
 					}
+					if (ImGui::BeginDragDropTarget()) {
+						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
+							std::string path((const char*)pl->Data, pl->DataSize - 1);
+							if (path.find(".mp3") != std::string::npos || path.find(".wav") != std::string::npos) {
+								as.soundPath = path;
+								auto* audio = Engine::Audio::GetInstance();
+								if (audio)
+									as.soundHandle = audio->Load(path);
+								EditorUI::Log("AudioSource: " + path);
+							}
+						}
+						ImGui::EndDragDropTarget();
+					}
+					if (ImGui::DragFloat("Volume##AS", &as.volume, 0.01f, 0.0f, 1.0f)) {
+						if (as.isPlaying && as.voiceHandle) {
+							auto* audio = Engine::Audio::GetInstance();
+							if (audio)
+								audio->SetVolume(as.voiceHandle, as.volume);
+						}
+					}
+					ImGui::Checkbox("Loop##AS", &as.loop);
+					ImGui::Checkbox("Play On Start##AS", &as.playOnStart);
+					ImGui::Checkbox("3D Sound##AS", &as.is3D);
+					if (as.is3D)
+						ImGui::DragFloat("Max Distance##AS", &as.maxDistance, 0.5f, 0.0f, 500.0f);
+					// Play/Stop ボタン
+					if (as.isPlaying) {
+						if (ImGui::Button("Stop##AS")) {
+							auto* audio = Engine::Audio::GetInstance();
+							if (audio && as.voiceHandle) {
+								audio->Stop(as.voiceHandle);
+								as.voiceHandle = 0;
+							}
+							as.isPlaying = false;
+						}
+						ImGui::SameLine();
+						ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), "Playing...");
+					} else {
+						if (ImGui::Button("Play##AS")) {
+							auto* audio = Engine::Audio::GetInstance();
+							if (audio && as.soundHandle != 0xFFFFFFFF) {
+								as.voiceHandle = audio->Play(as.soundHandle, as.loop, as.volume);
+								as.isPlaying = true;
+							}
+						}
+					}
+					if (ImGui::Button("Remove##AS")) {
+						obj.audioSources.erase(obj.audioSources.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
 				}
-				if(ImGui::Button("Remove##AS")){obj.audioSources.erase(obj.audioSources.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+				ImGui::PopID();
+			}
 
-		// ★追加: AudioListener コンポーネント
-		for(size_t ci=0;ci<obj.audioListeners.size();++ci){auto&al=obj.audioListeners[ci];ImGui::PushID(14000+(int)ci);
-			if(ImGui::TreeNode("AudioListener")){
-				ImGui::Checkbox("Enabled##AL",&al.enabled);
-				ImGui::TextColored(ImVec4(0.6f,0.8f,1.0f,1.0f),"This object receives audio.");
-				if(ImGui::Button("Remove##AL")){obj.audioListeners.erase(obj.audioListeners.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+			// ★追加: AudioListener コンポーネント
+			for (size_t ci = 0; ci < obj.audioListeners.size(); ++ci) {
+				auto& al = obj.audioListeners[ci];
+				ImGui::PushID(14000 + (int)ci);
+				if (ImGui::TreeNode("AudioListener")) {
+					ImGui::Checkbox("Enabled##AL", &al.enabled);
+					ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "This object receives audio.");
+					if (ImGui::Button("Remove##AL")) {
+						obj.audioListeners.erase(obj.audioListeners.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
 
-		// ★追加: Hitbox コンポーネント (攻撃判定)
-		for(size_t ci=0;ci<obj.hitboxes.size();++ci){auto&hb=obj.hitboxes[ci];ImGui::PushID(15000+(int)ci);
-			if(ImGui::TreeNode("Hitbox (Attack)")){
-				ImGui::Checkbox("Enabled##HB",&hb.enabled);
-				ImGui::Checkbox("Active##HB",&hb.isActive);
-				if(hb.isActive) ImGui::TextColored(ImVec4(1.0f,0.3f,0.3f,1.0f),"[ACTIVE]");
-				else ImGui::TextColored(ImVec4(0.5f,0.5f,0.5f,1.0f),"[Inactive]");
-				ImGui::DragFloat3("Center##HB",&hb.center.x,0.1f);
-				ImGui::DragFloat3("Size##HB",&hb.size.x,0.1f,0.01f,100.0f);
-				ImGui::DragFloat("Damage##HB",&hb.damage,0.1f,0.0f,9999.0f);
-				char tagBuf[128]; strcpy_s(tagBuf, hb.tag.c_str());
-				if(ImGui::InputText("Tag##HB", tagBuf, sizeof(tagBuf))) hb.tag = tagBuf;
-				if(ImGui::Button("Remove##HB")){obj.hitboxes.erase(obj.hitboxes.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+			// ★追加: Hitbox コンポーネント (攻撃判定)
+			for (size_t ci = 0; ci < obj.hitboxes.size(); ++ci) {
+				auto& hb = obj.hitboxes[ci];
+				ImGui::PushID(15000 + (int)ci);
+				if (ImGui::TreeNode("Hitbox (Attack)")) {
+					ImGui::Checkbox("Enabled##HB", &hb.enabled);
+					ImGui::Checkbox("Active##HB", &hb.isActive);
+					if (hb.isActive)
+						ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "[ACTIVE]");
+					else
+						ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "[Inactive]");
+					ImGui::DragFloat3("Center##HB", &hb.center.x, 0.1f);
+					ImGui::DragFloat3("Size##HB", &hb.size.x, 0.1f, 0.01f, 100.0f);
+					ImGui::DragFloat("Damage##HB", &hb.damage, 0.1f, 0.0f, 9999.0f);
+					char tagBuf[128];
+					strcpy_s(tagBuf, hb.tag.c_str());
+					if (ImGui::InputText("Tag##HB", tagBuf, sizeof(tagBuf)))
+						hb.tag = tagBuf;
+					if (ImGui::Button("Remove##HB")) {
+						obj.hitboxes.erase(obj.hitboxes.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
 
-		// ★追加: Hurtbox コンポーネント (食らい判定)
-		for(size_t ci=0;ci<obj.hurtboxes.size();++ci){auto&hb=obj.hurtboxes[ci];ImGui::PushID(16000+(int)ci);
-			if(ImGui::TreeNode("Hurtbox (Damage)")){
-				ImGui::Checkbox("Enabled##HU",&hb.enabled);
-				ImGui::DragFloat3("Center##HU",&hb.center.x,0.1f);
-				ImGui::DragFloat3("Size##HU",&hb.size.x,0.1f,0.01f,100.0f);
-				char tagBuf[128]; strcpy_s(tagBuf, hb.tag.c_str());
-				if(ImGui::InputText("Tag##HU", tagBuf, sizeof(tagBuf))) hb.tag = tagBuf;
-				ImGui::DragFloat("Damage Multiplier##HU",&hb.damageMultiplier,0.01f,0.0f,10.0f);
-				if(ImGui::Button("Remove##HU")){obj.hurtboxes.erase(obj.hurtboxes.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+			// ★追加: Hurtbox コンポーネント (食らい判定)
+			for (size_t ci = 0; ci < obj.hurtboxes.size(); ++ci) {
+				auto& hb = obj.hurtboxes[ci];
+				ImGui::PushID(16000 + (int)ci);
+				if (ImGui::TreeNode("Hurtbox (Damage)")) {
+					ImGui::Checkbox("Enabled##HU", &hb.enabled);
+					ImGui::DragFloat3("Center##HU", &hb.center.x, 0.1f);
+					ImGui::DragFloat3("Size##HU", &hb.size.x, 0.1f, 0.01f, 100.0f);
+					char tagBuf[128];
+					strcpy_s(tagBuf, hb.tag.c_str());
+					if (ImGui::InputText("Tag##HU", tagBuf, sizeof(tagBuf)))
+						hb.tag = tagBuf;
+					ImGui::DragFloat("Damage Multiplier##HU", &hb.damageMultiplier, 0.01f, 0.0f, 10.0f);
+					if (ImGui::Button("Remove##HU")) {
+						obj.hurtboxes.erase(obj.hurtboxes.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
 
-		// ★追加: Health コンポーネント (ステータス管理)
-		for(size_t ci=0;ci<obj.healths.size();++ci){auto&hc=obj.healths[ci];ImGui::PushID(17000+(int)ci);
-			if(ImGui::TreeNode("Health (Status)")){
-				ImGui::Checkbox("Enabled##HC",&hc.enabled);
-				ImGui::DragFloat("HP##HC",&hc.hp, 1.0f, 0.0f, hc.maxHp);
-				ImGui::DragFloat("Max HP##HC",&hc.maxHp, 1.0f, 1.0f, 9999.0f);
-				ImGui::DragFloat("Stamina##HC",&hc.stamina, 1.0f, 0.0f, hc.maxStamina);
-				ImGui::DragFloat("Max Stamina##HC",&hc.maxStamina, 1.0f, 1.0f, 9999.0f);
-				ImGui::DragFloat("Invincible Time##HC",&hc.invincibleTime, 0.1f, 0.0f, 10.0f);
-				ImGui::Checkbox("Is Dead##HC",&hc.isDead);
-				if(ImGui::Button("Remove##HC")){obj.healths.erase(obj.healths.begin()+ci);ImGui::TreePop();ImGui::PopID();goto end_comp;}ImGui::TreePop();}ImGui::PopID();}
+			// ★追加: Health コンポーネント (ステータス管理)
+			for (size_t ci = 0; ci < obj.healths.size(); ++ci) {
+				auto& hc = obj.healths[ci];
+				ImGui::PushID(17000 + (int)ci);
+				if (ImGui::TreeNode("Health (Status)")) {
+					ImGui::Checkbox("Enabled##HC", &hc.enabled);
+					ImGui::DragFloat("HP##HC", &hc.hp, 1.0f, 0.0f, hc.maxHp);
+					ImGui::DragFloat("Max HP##HC", &hc.maxHp, 1.0f, 1.0f, 9999.0f);
+					ImGui::DragFloat("Stamina##HC", &hc.stamina, 1.0f, 0.0f, hc.maxStamina);
+					ImGui::DragFloat("Max Stamina##HC", &hc.maxStamina, 1.0f, 1.0f, 9999.0f);
+					ImGui::DragFloat("Invincible Time##HC", &hc.invincibleTime, 0.1f, 0.0f, 10.0f);
+					ImGui::Checkbox("Is Dead##HC", &hc.isDead);
+					if (ImGui::Button("Remove##HC")) {
+						obj.healths.erase(obj.healths.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
 
+			// ★追加: Script コンポーネント (テキストスクリプト)
+			for (size_t ci = 0; ci < obj.scripts.size(); ++ci) {
+				auto& sc = obj.scripts[ci];
+				ImGui::PushID(18000 + (int)ci);
+				if (ImGui::TreeNode("Script")) {
+					ImGui::Checkbox("Enabled##SC", &sc.enabled);
+					char pathBuf[256];
+					strcpy_s(pathBuf, sc.scriptPath.c_str());
+					if (ImGui::InputText("Class Name##SC", pathBuf, sizeof(pathBuf)))
+						sc.scriptPath = pathBuf;
+					ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "(e.g., PlayerScript)");
+
+					// ==========================================
+					// ★追加: VS Codeを開くボタン
+					// ==========================================
+					if (ImGui::Button("Open in VS Code")) {
+						// code コマンドでワークスペースと対象ファイルを開く
+						std::string cmd = "code . " + sc.scriptPath + ".cpp " + sc.scriptPath + ".h";
+						system(cmd.c_str());
+					}
+
+					if (ImGui::Button("Remove##SC")) {
+						obj.scripts.erase(obj.scripts.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
 
 		end_comp:
-			if(ImGui::Button("Add Component"))ImGui::OpenPopup("AddComp");
-			if(ImGui::BeginPopup("AddComp")){
-				if(ImGui::MenuItem("MeshRenderer")){MeshRendererComponent mr;obj.meshRenderers.push_back(mr);} 
-				if(ImGui::MenuItem("BoxCollider")){obj.boxColliders.push_back({});} 
-				if(ImGui::MenuItem("Tag")){obj.tags.push_back({});} 
-				if(ImGui::MenuItem("Animator")){obj.animators.push_back({});} 
-				if(ImGui::MenuItem("Rigidbody")){obj.rigidbodies.push_back({});} 
-				if(ImGui::MenuItem("ParticleEmitter")){ // ★追加
+			if (ImGui::Button("Add Component"))
+				ImGui::OpenPopup("AddComp");
+			if (ImGui::BeginPopup("AddComp")) {
+				if (ImGui::MenuItem("MeshRenderer")) {
+					MeshRendererComponent mr;
+					obj.meshRenderers.push_back(mr);
+				}
+				if (ImGui::MenuItem("BoxCollider")) {
+					obj.boxColliders.push_back({});
+				}
+				if (ImGui::MenuItem("Tag")) {
+					obj.tags.push_back({});
+				}
+				if (ImGui::MenuItem("Animator")) {
+					obj.animators.push_back({});
+				}
+				if (ImGui::MenuItem("Rigidbody")) {
+					obj.rigidbodies.push_back({});
+				}
+				if (ImGui::MenuItem("ParticleEmitter")) { // ★追加
 					ParticleEmitterComponent pe;
 					pe.emitter.Initialize(*Engine::Renderer::GetInstance(), "NewEmitter");
 					obj.particleEmitters.push_back(pe);
 				}
-				if(ImGui::MenuItem("GpuMeshCollider")){ // ★追加
+				if (ImGui::MenuItem("GpuMeshCollider")) { // ★追加
 					GpuMeshColliderComponent gmc;
 					gmc.meshHandle = obj.modelHandle; // デフォルトでオブジェクトのメッシュを使用
 					gmc.meshPath = obj.modelPath;
 					obj.gpuMeshColliders.push_back(gmc);
 				}
-				if(ImGui::MenuItem("PlayerInput")){ obj.playerInputs.push_back({}); } // ★追加
-				if(ImGui::MenuItem("CharacterMovement")){ obj.characterMovements.push_back({}); } // ★追加
-				if(ImGui::MenuItem("CameraTarget")){ obj.cameraTargets.push_back({}); } // ★追加
+				if (ImGui::MenuItem("PlayerInput")) {
+					obj.playerInputs.push_back({});
+				} // ★追加
+				if (ImGui::MenuItem("CharacterMovement")) {
+					obj.characterMovements.push_back({});
+				} // ★追加
+				if (ImGui::MenuItem("CameraTarget")) {
+					obj.cameraTargets.push_back({});
+				} // ★追加
 				ImGui::Separator();
-				if(ImGui::MenuItem("DirectionalLight")){ obj.directionalLights.push_back({}); } // ★追加
-				if(ImGui::MenuItem("PointLight")){ obj.pointLights.push_back({}); } // ★追加
-				if(ImGui::MenuItem("SpotLight")){ obj.spotLights.push_back({}); } // ★追加
+				if (ImGui::MenuItem("DirectionalLight")) {
+					obj.directionalLights.push_back({});
+				} // ★追加
+				if (ImGui::MenuItem("PointLight")) {
+					obj.pointLights.push_back({});
+				} // ★追加
+				if (ImGui::MenuItem("SpotLight")) {
+					obj.spotLights.push_back({});
+				} // ★追加
 				ImGui::Separator();
-				if(ImGui::MenuItem("AudioSource")){ obj.audioSources.push_back({}); } // ★追加
-				if(ImGui::MenuItem("AudioListener")){ obj.audioListeners.push_back({}); } // ★追加
+				if (ImGui::MenuItem("AudioSource")) {
+					obj.audioSources.push_back({});
+				} // ★追加
+				if (ImGui::MenuItem("AudioListener")) {
+					obj.audioListeners.push_back({});
+				} // ★追加
 				ImGui::Separator();
-				if(ImGui::MenuItem("Hitbox")){ obj.hitboxes.push_back({}); } // ★追加
-				if(ImGui::MenuItem("Hurtbox")){ obj.hurtboxes.push_back({}); } // ★追加
+				if (ImGui::MenuItem("Hitbox")) {
+					obj.hitboxes.push_back({});
+				} // ★追加
+				if (ImGui::MenuItem("Hurtbox")) {
+					obj.hurtboxes.push_back({});
+				} // ★追加
 				ImGui::Separator();
-				if(ImGui::MenuItem("Health")){ obj.healths.push_back({}); } // ★追加
+				if (ImGui::MenuItem("Health")) {
+					obj.healths.push_back({});
+				} // ★追加
+				ImGui::Separator();
+				if (ImGui::MenuItem("Script")) {
+					obj.scripts.push_back({});
+				} // ★追加
 				ImGui::EndPopup();
 			}
 		}
-		if(obj.locked) ImGui::EndDisabled();
+		if (obj.locked || scene->IsPlaying())
+			ImGui::EndDisabled();
 		ImGui::Separator();
-		const char* mn[]={"Translate (T)","Rotate (R)","Scale (S)"};
-		ImGui::Text("Gizmo: %s",mn[(int)currentGizmoMode]);
-		if(scene->selectedIndices_.size()>1)ImGui::Text("(%d selected)",(int)scene->selectedIndices_.size());
-	} else ImGui::Text("No Object Selected");
+		const char* mn[] = {"Translate (T)", "Rotate (R)", "Scale (S)"};
+		ImGui::Text("Gizmo: %s", mn[(int)currentGizmoMode]);
+		if (scene->selectedIndices_.size() > 1)
+			ImGui::Text("(%d selected)", (int)scene->selectedIndices_.size());
+	} else
+		ImGui::Text("No Object Selected");
 	ImGui::End();
 }
 
@@ -1501,15 +2684,20 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 
 	// ★ ファイル操作用の状態変数
 	static bool renaming = false;
-	static std::string renamingPath;          // 名前変更対象のフルパス
+	static std::string renamingPath; // 名前変更対象のフルパス
 	static char renameBuffer[256] = {};
 	static bool showDeleteConfirm = false;
-	static std::string deletingPath;          // 削除対象のフルパス
-	static std::string deletingName;          // 削除対象の表示名
+	static std::string deletingPath; // 削除対象のフルパス
+	static std::string deletingName; // 削除対象の表示名
 	static bool creatingFolder = false;
 	static char newFolderNameBuf[256] = {};
 
-	if (!fs::exists(currentDir)) currentDir = "Resources";
+	// ★ 追加: スクリプト作成用の状態変数
+	static bool creatingScript = false;
+	static char newScriptNameBuf[256] = "NewScript";
+
+	if (!fs::exists(currentDir))
+		currentDir = "Resources";
 
 	// --- パンくずリスト ---
 	{
@@ -1524,7 +2712,8 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 			std::istringstream iss2(token);
 			std::string t2;
 			while (std::getline(iss2, t2, '/')) {
-				if (t2.empty()) continue;
+				if (t2.empty())
+					continue;
 				if (!first) {
 					accumulated += "/";
 					ImGui::SameLine(0, 2);
@@ -1547,13 +2736,18 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 		memset(newFolderNameBuf, 0, sizeof(newFolderNameBuf));
 		strncpy_s(newFolderNameBuf, "NewFolder", sizeof(newFolderNameBuf) - 1);
 	}
-	if (ImGui::IsItemHovered()) { ImGui::BeginTooltip(); ImGui::Text("Create Folder"); ImGui::EndTooltip(); }
+	if (ImGui::IsItemHovered()) {
+		ImGui::BeginTooltip();
+		ImGui::Text("Create Folder");
+		ImGui::EndTooltip();
+	}
 
 	ImGui::SameLine(ImGui::GetWindowWidth() - 160);
 	ImGui::PushItemWidth(100);
 	ImGui::SliderFloat("##iconSz", &iconSize, 48.0f, 128.0f, "%.0f");
 	ImGui::PopItemWidth();
-	ImGui::SameLine(); ImGui::Text("Size");
+	ImGui::SameLine();
+	ImGui::Text("Size");
 
 	ImGui::Separator();
 
@@ -1564,8 +2758,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 		ImGui::Text("Folder Name:");
 		ImGui::SameLine();
 		ImGui::PushItemWidth(200);
-		bool enterPressed = ImGui::InputText("##newFolderName", newFolderNameBuf, sizeof(newFolderNameBuf),
-			ImGuiInputTextFlags_EnterReturnsTrue);
+		bool enterPressed = ImGui::InputText("##newFolderName", newFolderNameBuf, sizeof(newFolderNameBuf), ImGuiInputTextFlags_EnterReturnsTrue);
 		ImGui::PopItemWidth();
 		ImGui::SameLine();
 		if (ImGui::SmallButton("OK") || enterPressed) {
@@ -1586,6 +2779,73 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 		ImGui::PopStyleColor();
 	}
 
+	// --- ★ C++スクリプト作成ダイアログ ---
+	if (creatingScript) {
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.20f, 0.12f, 0.25f, 1.0f));
+		ImGui::BeginChild("##createScriptPanel", ImVec2(0, 32), true);
+		ImGui::Text("Script Name:");
+		ImGui::SameLine();
+		ImGui::PushItemWidth(200);
+		bool enterPressedS = ImGui::InputText("##newScriptName", newScriptNameBuf, sizeof(newScriptNameBuf), ImGuiInputTextFlags_EnterReturnsTrue);
+		ImGui::PopItemWidth();
+		ImGui::SameLine();
+		if (ImGui::SmallButton("Create##scr") || enterPressedS) {
+			std::string className(newScriptNameBuf);
+			if (!className.empty()) {
+				// Game/ フォルダにヘッダーとソースを生成
+				std::string hPath = "Game/" + className + ".h";
+				std::string cppPath = "Game/" + className + ".cpp";
+				if (!fs::exists(hPath) && !fs::exists(cppPath)) {
+					// ヘッダーファイル
+					{
+						std::ofstream f(hPath);
+						f << "#pragma once\n";
+						f << "#include \"IScript.h\"\n\n";
+						f << "namespace Game {\n\n";
+						f << "class " << className << " : public IScript {\n";
+						f << "public:\n";
+						f << "\tvoid Start(SceneObject& obj, GameScene* scene) override {\n";
+						f << "\t\t// 初期化処理（シーン開始時に1回呼ばれる）\n";
+						f << "\t}\n\n";
+						f << "\tvoid Update(SceneObject& obj, GameScene* scene, float dt) override {\n";
+						f << "\t\t// 毎フレーム処理\n";
+						f << "\t}\n\n";
+						f << "\tvoid OnDestroy(SceneObject& obj, GameScene* scene) override {\n";
+						f << "\t\t// オブジェクト破棄時の処理\n";
+						f << "\t}\n";
+						f << "};\n\n";
+						f << "} // namespace Game\n";
+						f.close();
+					}
+					// ソースファイル
+					{
+						std::ofstream f(cppPath);
+						f << "#include \"" << className << ".h\"\n";
+						f << "#include \"ObjectTypes.h\"\n";
+						f << "#include \"Scenes/GameScene.h\"\n";
+						f << "#include \"ScriptEngine.h\"\n\n";
+						f << "// ★ スクリプト自動登録\n";
+						f << "REGISTER_SCRIPT(Game::" << className << ");\n";
+						f.close();
+					}
+					Log("Script created: " + hPath + " / " + cppPath);
+					// VS Codeで開く
+					std::string cmd = "code . " + hPath + " " + cppPath;
+					system(cmd.c_str());
+				} else {
+					LogWarning("Script already exists: " + className);
+				}
+			}
+			creatingScript = false;
+		}
+		ImGui::SameLine();
+		if (ImGui::SmallButton("Cancel##scr")) {
+			creatingScript = false;
+		}
+		ImGui::EndChild();
+		ImGui::PopStyleColor();
+	}
+
 	// --- ★ 名前変更インラインUI ---
 	if (renaming) {
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.15f, 0.2f, 0.15f, 1.0f));
@@ -1593,8 +2853,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 		ImGui::Text("Rename:");
 		ImGui::SameLine();
 		ImGui::PushItemWidth(250);
-		bool enterPressed = ImGui::InputText("##renameInput", renameBuffer, sizeof(renameBuffer),
-			ImGuiInputTextFlags_EnterReturnsTrue);
+		bool enterPressed = ImGui::InputText("##renameInput", renameBuffer, sizeof(renameBuffer), ImGuiInputTextFlags_EnterReturnsTrue);
 		ImGui::PopItemWidth();
 		ImGui::SameLine();
 		if (ImGui::SmallButton("OK##ren") || enterPressed) {
@@ -1662,10 +2921,10 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 
 	// --- ファイル一覧を収集 ---
 	struct ProjectEntry {
-		std::string path;     // フルパス
-		std::string name;     // ファイル名のみ
+		std::string path; // フルパス
+		std::string name; // ファイル名のみ
 		bool isDir;
-		std::string ext;      // 小文字拡張子
+		std::string ext; // 小文字拡張子
 	};
 	std::vector<ProjectEntry> entries;
 
@@ -1679,7 +2938,8 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 			if (!pe.isDir) {
 				pe.ext = e.path().extension().string();
 				// 小文字化
-				for (auto& c : pe.ext) c = (char)std::tolower((unsigned char)c);
+				for (auto& c : pe.ext)
+					c = (char)std::tolower((unsigned char)c);
 			}
 			entries.push_back(pe);
 		}
@@ -1687,14 +2947,16 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 
 	// ソート: フォルダ先、ファイル後
 	std::sort(entries.begin(), entries.end(), [](const ProjectEntry& a, const ProjectEntry& b) {
-		if (a.isDir != b.isDir) return a.isDir > b.isDir;
+		if (a.isDir != b.isDir)
+			return a.isDir > b.isDir;
 		return a.name < b.name;
 	});
 
 	// --- 「..」上位フォルダボタン ---
 	if (currentDir != "Resources") {
 		auto parent = fs::path(currentDir).parent_path().string();
-		if (parent.empty()) parent = "Resources";
+		if (parent.empty())
+			parent = "Resources";
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.25f, 0.3f, 1.0f));
 		if (ImGui::Button(".. (Up)", ImVec2(iconSize, 30))) {
 			currentDir = parent;
@@ -1707,7 +2969,8 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 	float panelWidth = ImGui::GetContentRegionAvail().x;
 	float cellWidth = iconSize + 12.0f;
 	int columns = (int)(panelWidth / cellWidth);
-	if (columns < 1) columns = 1;
+	if (columns < 1)
+		columns = 1;
 	int col = (currentDir != "Resources") ? 1 : 0; // 「..」ボタンの分
 
 	for (size_t ei = 0; ei < entries.size(); ++ei) {
@@ -1718,10 +2981,13 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 		bool isModel = (pe.ext == ".obj" || pe.ext == ".gltf" || pe.ext == ".fbx");
 		bool isAudio = (pe.ext == ".mp3" || pe.ext == ".wav" || pe.ext == ".ogg");
 		bool isPrefab = (pe.ext == ".prefab");
+		bool isScript = (pe.ext == ".cpp" || pe.ext == ".h"); // ★追加
 
 		// グリッドレイアウト
-		if (col > 0 && col < columns) ImGui::SameLine();
-		else if (col >= columns) col = 0;
+		if (col > 0 && col < columns)
+			ImGui::SameLine();
+		else if (col >= columns)
+			col = 0;
 
 		ImGui::BeginGroup();
 
@@ -1833,7 +3099,8 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 						playingAudioPath.clear();
 					} else {
 						// 前の再生を停止
-						if (playingVoiceHandle != 0) audio->Stop(playingVoiceHandle);
+						if (playingVoiceHandle != 0)
+							audio->Stop(playingVoiceHandle);
 						uint32_t sh = audio->Load(pe.path);
 						if (sh != 0xFFFFFFFF) {
 							playingVoiceHandle = audio->Play(sh, false, 0.5f);
@@ -1861,6 +3128,17 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 			float cx = (bmin.x + bmax.x) * 0.5f;
 			float cy = (bmin.y + bmax.y) * 0.5f;
 			ImGui::GetWindowDrawList()->AddText(ImVec2(cx - 16, cy - 10), IM_COL32(150, 255, 200, 255), "PFB");
+		} else if (isScript) {
+			// ★ C++スクリプト: 紫アイコン
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.15f, 0.35f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.35f, 0.25f, 0.45f, 1.0f));
+			ImGui::Button("##script", ImVec2(iconSize, iconSize));
+			ImGui::PopStyleColor(2);
+			ImVec2 bmin = ImGui::GetItemRectMin();
+			ImVec2 bmax = ImGui::GetItemRectMax();
+			float cx = (bmin.x + bmax.x) * 0.5f;
+			float cy = (bmin.y + bmax.y) * 0.5f;
+			ImGui::GetWindowDrawList()->AddText(ImVec2(cx - 12, cy - 10), IM_COL32(200, 150, 255, 255), "C++");
 		} else {
 			// ★ その他ファイル: グレーアイコン
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
@@ -1871,6 +3149,14 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 			float cx = (bmin.x + bmax.x) * 0.5f;
 			float cy = (bmin.y + bmax.y) * 0.5f;
 			ImGui::GetWindowDrawList()->AddText(ImVec2(cx - 6, cy - 10), IM_COL32(180, 180, 180, 255), "F");
+		}
+
+		// ★追加: スクリプトやテキストファイルをダブルクリックでVS Codeで開く
+		if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+			if (isScript || pe.ext == ".json" || pe.ext == ".txt") {
+				std::string cmd = "code \"" + pe.path + "\"";
+				system(cmd.c_str());
+			}
 		}
 
 		// ★ ドラッグ＆ドロップソース (ファイルのみ — フォルダは上で別途処理)
@@ -1936,25 +3222,42 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 			strncpy_s(newFolderNameBuf, "NewFolder", sizeof(newFolderNameBuf) - 1);
 		}
 		if (ImGui::BeginMenu("Create File")) {
+			// ★追加: C++スクリプト作成ボタン
+			if (ImGui::MenuItem("C++ Script")) {
+				creatingScript = true;
+				memset(newScriptNameBuf, 0, sizeof(newScriptNameBuf));
+				strncpy_s(newScriptNameBuf, "NewScript", sizeof(newScriptNameBuf) - 1);
+			}
 			if (ImGui::MenuItem(".prefab")) {
 				std::string path = currentDir + "/New.prefab";
 				int num = 1;
-				while (fs::exists(path)) { path = currentDir + "/New_" + std::to_string(num++) + ".prefab"; }
-				std::ofstream f(path); f << "{\n  \"name\": \"NewObject\",\n  \"translate\": [0, 0, 0],\n  \"rotate\": [0, 0, 0],\n  \"scale\": [1, 1, 1],\n  \"color\": [1, 1, 1, 1],\n  \"components\": []\n}\n"; f.close();
+				while (fs::exists(path)) {
+					path = currentDir + "/New_" + std::to_string(num++) + ".prefab";
+				}
+				std::ofstream f(path);
+				f << "{\n  \"name\": \"NewObject\",\n  \"translate\": [0, 0, 0],\n  \"rotate\": [0, 0, 0],\n  \"scale\": [1, 1, 1],\n  \"color\": [1, 1, 1, 1],\n  \"components\": []\n}\n";
+				f.close();
 				Log("Created: " + path);
 			}
 			if (ImGui::MenuItem(".json (empty)")) {
 				std::string path = currentDir + "/NewFile.json";
 				int num = 1;
-				while (fs::exists(path)) { path = currentDir + "/NewFile_" + std::to_string(num++) + ".json"; }
-				std::ofstream f(path); f << "{\n}\n"; f.close();
+				while (fs::exists(path)) {
+					path = currentDir + "/NewFile_" + std::to_string(num++) + ".json";
+				}
+				std::ofstream f(path);
+				f << "{\n}\n";
+				f.close();
 				Log("Created: " + path);
 			}
 			if (ImGui::MenuItem(".txt (empty)")) {
 				std::string path = currentDir + "/NewFile.txt";
 				int num = 1;
-				while (fs::exists(path)) { path = currentDir + "/NewFile_" + std::to_string(num++) + ".txt"; }
-				std::ofstream f(path); f.close();
+				while (fs::exists(path)) {
+					path = currentDir + "/NewFile_" + std::to_string(num++) + ".txt";
+				}
+				std::ofstream f(path);
+				f.close();
 				Log("Created: " + path);
 			}
 			ImGui::EndMenu();
@@ -1978,31 +3281,67 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 
 void EditorUI::ShowSceneSettings(Engine::Renderer* renderer) {
 	ImGui::Begin("Scene Settings");
-	if(ImGui::CollapsingHeader("Post Processing",ImGuiTreeNodeFlags_DefaultOpen)){
-		auto pp=renderer->GetPostProcessParams();bool ch=false;bool en=renderer->GetPostProcessEnabled();
-		if(ImGui::Checkbox("Enable",&en))renderer->SetPostProcessEnabled(en);
-		if(en){ch|=ImGui::DragFloat("Vignette",&pp.vignette,0.01f,0,5);ch|=ImGui::DragFloat("Distortion",&pp.distortion,0.001f,0,1);
-			ch|=ImGui::DragFloat("Noise",&pp.noiseStrength,0.01f,0,1);ch|=ImGui::DragFloat("Chromatic",&pp.chromaShift,0.001f,0,0.1f);ch|=ImGui::DragFloat("Scanline",&pp.scanline,0.01f,0,1);}
-		if(ch)renderer->SetPostProcessParams(pp);}
+	if (ImGui::CollapsingHeader("Post Processing", ImGuiTreeNodeFlags_DefaultOpen)) {
+		auto pp = renderer->GetPostProcessParams();
+		bool ch = false;
+		bool en = renderer->GetPostProcessEnabled();
+		if (ImGui::Checkbox("Enable", &en))
+			renderer->SetPostProcessEnabled(en);
+		if (en) {
+			ch |= ImGui::DragFloat("Vignette", &pp.vignette, 0.01f, 0, 5);
+			ch |= ImGui::DragFloat("Distortion", &pp.distortion, 0.001f, 0, 1);
+			ch |= ImGui::DragFloat("Noise", &pp.noiseStrength, 0.01f, 0, 1);
+			ch |= ImGui::DragFloat("Chromatic", &pp.chromaShift, 0.001f, 0, 0.1f);
+			ch |= ImGui::DragFloat("Scanline", &pp.scanline, 0.01f, 0, 1);
+		}
+		if (ch)
+			renderer->SetPostProcessParams(pp);
+	}
 	ImGui::End();
 }
 
 void EditorUI::ShowConsole() {
 	ImGui::Begin("Console");
-	if(ImGui::SmallButton("Clear"))consoleLog.clear(); ImGui::SameLine();ImGui::Text("(%d)",(int)consoleLog.size());ImGui::Separator();
-	ImGui::BeginChild("CS",ImVec2(0,0),false,ImGuiWindowFlags_HorizontalScrollbar);
-	for(const auto&e:consoleLog){ImVec4 c;const char*p;
-		switch(e.level){case LogLevel::Info:c={.8f,.8f,.8f,1};p="[INFO] ";break;case LogLevel::Warning:c={1,.9f,.3f,1};p="[WARN] ";break;default:c={1,.3f,.3f,1};p="[ERR]  ";break;}
-		ImGui::PushStyleColor(ImGuiCol_Text,c);ImGui::TextUnformatted((std::string(p)+e.message).c_str());ImGui::PopStyleColor();}
-	if(ImGui::GetScrollY()>=ImGui::GetScrollMaxY()-10)ImGui::SetScrollHereY(1);
-	ImGui::EndChild();ImGui::End();
+	if (ImGui::SmallButton("Clear"))
+		consoleLog.clear();
+	ImGui::SameLine();
+	ImGui::Text("(%d)", (int)consoleLog.size());
+	ImGui::Separator();
+	ImGui::BeginChild("CS", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
+	for (const auto& e : consoleLog) {
+		ImVec4 c;
+		const char* p;
+		switch (e.level) {
+		case LogLevel::Info:
+			c = {.8f, .8f, .8f, 1};
+			p = "[INFO] ";
+			break;
+		case LogLevel::Warning:
+			c = {1, .9f, .3f, 1};
+			p = "[WARN] ";
+			break;
+		default:
+			c = {1, .3f, .3f, 1};
+			p = "[ERR]  ";
+			break;
+		}
+		ImGui::PushStyleColor(ImGuiCol_Text, c);
+		ImGui::TextUnformatted((std::string(p) + e.message).c_str());
+		ImGui::PopStyleColor();
+	}
+	if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 10)
+		ImGui::SetScrollHereY(1);
+	ImGui::EndChild();
+	ImGui::End();
 }
 
 // ====== ★ 選択ギズモ + ハイライト描画 ======
 void EditorUI::DrawSelectionGizmo(Engine::Renderer* renderer, GameScene* scene) {
-	if (!scene) return;
+	if (!scene)
+		return;
 	for (int idx : scene->selectedIndices_) {
-		if (idx < 0 || idx >= (int)scene->objects_.size()) continue;
+		if (idx < 0 || idx >= (int)scene->objects_.size())
+			continue;
 		auto& obj = scene->objects_[idx];
 		Engine::Vector3 pos = {obj.translate.x, obj.translate.y, obj.translate.z};
 		const float al = 2.0f, ar = 0.3f;
@@ -2011,10 +3350,14 @@ void EditorUI::DrawSelectionGizmo(Engine::Renderer* renderer, GameScene* scene) 
 		auto axisColor = [](int axis, int dragAxis) -> Engine::Vector4 {
 			bool active = (dragAxis == axis);
 			switch (axis) {
-				case 0: return active ? Engine::Vector4{1.0f, 0.5f, 0.5f, 1.0f} : Engine::Vector4{1.0f, 0.2f, 0.2f, 1.0f}; // X=赤
-				case 1: return active ? Engine::Vector4{0.5f, 1.0f, 0.5f, 1.0f} : Engine::Vector4{0.2f, 1.0f, 0.2f, 1.0f}; // Y=緑
-				case 2: return active ? Engine::Vector4{0.5f, 0.5f, 1.0f, 1.0f} : Engine::Vector4{0.2f, 0.2f, 1.0f, 1.0f}; // Z=青
-				default: return {1,1,1,1};
+			case 0:
+				return active ? Engine::Vector4{1.0f, 0.5f, 0.5f, 1.0f} : Engine::Vector4{1.0f, 0.2f, 0.2f, 1.0f}; // X=赤
+			case 1:
+				return active ? Engine::Vector4{0.5f, 1.0f, 0.5f, 1.0f} : Engine::Vector4{0.2f, 1.0f, 0.2f, 1.0f}; // Y=緑
+			case 2:
+				return active ? Engine::Vector4{0.5f, 0.5f, 1.0f, 1.0f} : Engine::Vector4{0.2f, 0.2f, 1.0f, 1.0f}; // Z=青
+			default:
+				return {1, 1, 1, 1};
 			}
 		};
 
@@ -2023,65 +3366,90 @@ void EditorUI::DrawSelectionGizmo(Engine::Renderer* renderer, GameScene* scene) 
 
 		if (currentGizmoMode == GizmoMode::Translate) {
 			// X軸 →
-			renderer->DrawLine3D(pos, {pos.x+al, pos.y, pos.z}, cX);
-			renderer->DrawLine3D({pos.x+al, pos.y, pos.z}, {pos.x+al-ar, pos.y+ar*.4f, pos.z}, cX);
-			renderer->DrawLine3D({pos.x+al, pos.y, pos.z}, {pos.x+al-ar, pos.y-ar*.4f, pos.z}, cX);
+			renderer->DrawLine3D(pos, {pos.x + al, pos.y, pos.z}, cX);
+			renderer->DrawLine3D({pos.x + al, pos.y, pos.z}, {pos.x + al - ar, pos.y + ar * .4f, pos.z}, cX);
+			renderer->DrawLine3D({pos.x + al, pos.y, pos.z}, {pos.x + al - ar, pos.y - ar * .4f, pos.z}, cX);
 			// Y軸 ↑
-			renderer->DrawLine3D(pos, {pos.x, pos.y+al, pos.z}, cY);
-			renderer->DrawLine3D({pos.x, pos.y+al, pos.z}, {pos.x+ar*.4f, pos.y+al-ar, pos.z}, cY);
-			renderer->DrawLine3D({pos.x, pos.y+al, pos.z}, {pos.x-ar*.4f, pos.y+al-ar, pos.z}, cY);
+			renderer->DrawLine3D(pos, {pos.x, pos.y + al, pos.z}, cY);
+			renderer->DrawLine3D({pos.x, pos.y + al, pos.z}, {pos.x + ar * .4f, pos.y + al - ar, pos.z}, cY);
+			renderer->DrawLine3D({pos.x, pos.y + al, pos.z}, {pos.x - ar * .4f, pos.y + al - ar, pos.z}, cY);
 			// Z軸
-			renderer->DrawLine3D(pos, {pos.x, pos.y, pos.z+al}, cZ);
-			renderer->DrawLine3D({pos.x, pos.y, pos.z+al}, {pos.x, pos.y+ar*.4f, pos.z+al-ar}, cZ);
-			renderer->DrawLine3D({pos.x, pos.y, pos.z+al}, {pos.x, pos.y-ar*.4f, pos.z+al-ar}, cZ);
+			renderer->DrawLine3D(pos, {pos.x, pos.y, pos.z + al}, cZ);
+			renderer->DrawLine3D({pos.x, pos.y, pos.z + al}, {pos.x, pos.y + ar * .4f, pos.z + al - ar}, cZ);
+			renderer->DrawLine3D({pos.x, pos.y, pos.z + al}, {pos.x, pos.y - ar * .4f, pos.z + al - ar}, cZ);
 		} else if (currentGizmoMode == GizmoMode::Rotate) {
-			const int seg = 32; const float rad = 1.5f;
+			const int seg = 32;
+			const float rad = 1.5f;
 			for (int i = 0; i < seg; ++i) {
 				float a0 = (float)i / seg * DirectX::XM_2PI, a1 = (float)(i + 1) / seg * DirectX::XM_2PI;
-				renderer->DrawLine3D({pos.x, pos.y + cosf(a0)*rad, pos.z + sinf(a0)*rad}, {pos.x, pos.y + cosf(a1)*rad, pos.z + sinf(a1)*rad}, cX);
-				renderer->DrawLine3D({pos.x + cosf(a0)*rad, pos.y, pos.z + sinf(a0)*rad}, {pos.x + cosf(a1)*rad, pos.y, pos.z + sinf(a1)*rad}, cY);
-				renderer->DrawLine3D({pos.x + cosf(a0)*rad, pos.y + sinf(a0)*rad, pos.z}, {pos.x + cosf(a1)*rad, pos.y + sinf(a1)*rad, pos.z}, cZ);
+				renderer->DrawLine3D({pos.x, pos.y + cosf(a0) * rad, pos.z + sinf(a0) * rad}, {pos.x, pos.y + cosf(a1) * rad, pos.z + sinf(a1) * rad}, cX);
+				renderer->DrawLine3D({pos.x + cosf(a0) * rad, pos.y, pos.z + sinf(a0) * rad}, {pos.x + cosf(a1) * rad, pos.y, pos.z + sinf(a1) * rad}, cY);
+				renderer->DrawLine3D({pos.x + cosf(a0) * rad, pos.y + sinf(a0) * rad, pos.z}, {pos.x + cosf(a1) * rad, pos.y + sinf(a1) * rad, pos.z}, cZ);
 			}
 		} else {
 			float e = 0.15f;
-			renderer->DrawLine3D(pos, {pos.x+al, pos.y, pos.z}, cX);
-			renderer->DrawLine3D({pos.x+al-e, pos.y-e, pos.z}, {pos.x+al+e, pos.y+e, pos.z}, cX);
-			renderer->DrawLine3D({pos.x+al+e, pos.y-e, pos.z}, {pos.x+al-e, pos.y+e, pos.z}, cX);
-			renderer->DrawLine3D(pos, {pos.x, pos.y+al, pos.z}, cY);
-			renderer->DrawLine3D({pos.x-e, pos.y+al-e, pos.z}, {pos.x+e, pos.y+al+e, pos.z}, cY);
-			renderer->DrawLine3D({pos.x+e, pos.y+al-e, pos.z}, {pos.x-e, pos.y+al+e, pos.z}, cY);
-			renderer->DrawLine3D(pos, {pos.x, pos.y, pos.z+al}, cZ);
-			renderer->DrawLine3D({pos.x, pos.y-e, pos.z+al-e}, {pos.x, pos.y+e, pos.z+al+e}, cZ);
-			renderer->DrawLine3D({pos.x, pos.y+e, pos.z+al-e}, {pos.x, pos.y-e, pos.z+al+e}, cZ);
+			renderer->DrawLine3D(pos, {pos.x + al, pos.y, pos.z}, cX);
+			renderer->DrawLine3D({pos.x + al - e, pos.y - e, pos.z}, {pos.x + al + e, pos.y + e, pos.z}, cX);
+			renderer->DrawLine3D({pos.x + al + e, pos.y - e, pos.z}, {pos.x + al - e, pos.y + e, pos.z}, cX);
+			renderer->DrawLine3D(pos, {pos.x, pos.y + al, pos.z}, cY);
+			renderer->DrawLine3D({pos.x - e, pos.y + al - e, pos.z}, {pos.x + e, pos.y + al + e, pos.z}, cY);
+			renderer->DrawLine3D({pos.x + e, pos.y + al - e, pos.z}, {pos.x - e, pos.y + al + e, pos.z}, cY);
+			renderer->DrawLine3D(pos, {pos.x, pos.y, pos.z + al}, cZ);
+			renderer->DrawLine3D({pos.x, pos.y - e, pos.z + al - e}, {pos.x, pos.y + e, pos.z + al + e}, cZ);
+			renderer->DrawLine3D({pos.x, pos.y + e, pos.z + al - e}, {pos.x, pos.y - e, pos.z + al + e}, cZ);
 		}
 
 		// ★ 選択ハイライト: バウンディングボックス (黄色のワイヤーフレーム)
 		float sx = obj.scale.x * 0.5f, sy = obj.scale.y * 0.5f, sz = obj.scale.z * 0.5f;
 		Engine::Vector4 hlColor = {1.0f, 0.85f, 0.0f, 0.9f}; // 明るい黄色
 		Engine::Vector3 v[8] = {
-			{pos.x-sx,pos.y-sy,pos.z-sz},{pos.x+sx,pos.y-sy,pos.z-sz},{pos.x+sx,pos.y+sy,pos.z-sz},{pos.x-sx,pos.y+sy,pos.z-sz},
-			{pos.x-sx,pos.y-sy,pos.z+sz},{pos.x+sx,pos.y-sy,pos.z+sz},{pos.x+sx,pos.y+sy,pos.z+sz},{pos.x-sx,pos.y+sy,pos.z+sz},
+		    {pos.x - sx, pos.y - sy, pos.z - sz},
+            {pos.x + sx, pos.y - sy, pos.z - sz},
+            {pos.x + sx, pos.y + sy, pos.z - sz},
+            {pos.x - sx, pos.y + sy, pos.z - sz},
+		    {pos.x - sx, pos.y - sy, pos.z + sz},
+            {pos.x + sx, pos.y - sy, pos.z + sz},
+            {pos.x + sx, pos.y + sy, pos.z + sz},
+            {pos.x - sx, pos.y + sy, pos.z + sz},
 		};
-		int edges[][2] = {{0,1},{1,2},{2,3},{3,0},{4,5},{5,6},{6,7},{7,4},{0,4},{1,5},{2,6},{3,7}};
-		for (auto& eg : edges) renderer->DrawLine3D(v[eg[0]], v[eg[1]], hlColor);
+		int edges[][2] = {
+		    {0, 1},
+            {1, 2},
+            {2, 3},
+            {3, 0},
+            {4, 5},
+            {5, 6},
+            {6, 7},
+            {7, 4},
+            {0, 4},
+            {1, 5},
+            {2, 6},
+            {3, 7}
+        };
+		for (auto& eg : edges)
+			renderer->DrawLine3D(v[eg[0]], v[eg[1]], hlColor);
 
 		// ★追加: コライダー可視化 (緑色のワイヤーフレーム)
 		for (const auto& bc : obj.boxColliders) {
-			if (!bc.enabled) continue;
+			if (!bc.enabled)
+				continue;
 			float csx = bc.size.x * 0.5f * obj.scale.x;
 			float csy = bc.size.y * 0.5f * obj.scale.y;
 			float csz = bc.size.z * 0.5f * obj.scale.z;
-			Engine::Vector3 cp = {
-				pos.x + bc.center.x * obj.scale.x,
-				pos.y + bc.center.y * obj.scale.y,
-				pos.z + bc.center.z * obj.scale.z
-			};
+			Engine::Vector3 cp = {pos.x + bc.center.x * obj.scale.x, pos.y + bc.center.y * obj.scale.y, pos.z + bc.center.z * obj.scale.z};
 			Engine::Vector4 colColor = {0.2f, 1.0f, 0.2f, 0.8f}; // 緑色
 			Engine::Vector3 cv[8] = {
-				{cp.x-csx,cp.y-csy,cp.z-csz},{cp.x+csx,cp.y-csy,cp.z-csz},{cp.x+csx,cp.y+csy,cp.z-csz},{cp.x-csx,cp.y+csy,cp.z-csz},
-				{cp.x-csx,cp.y-csy,cp.z+csz},{cp.x+csx,cp.y-csy,cp.z+csz},{cp.x+csx,cp.y+csy,cp.z+csz},{cp.x-csx,cp.y+csy,cp.z+csz},
+			    {cp.x - csx, cp.y - csy, cp.z - csz},
+                {cp.x + csx, cp.y - csy, cp.z - csz},
+                {cp.x + csx, cp.y + csy, cp.z - csz},
+                {cp.x - csx, cp.y + csy, cp.z - csz},
+			    {cp.x - csx, cp.y - csy, cp.z + csz},
+                {cp.x + csx, cp.y - csy, cp.z + csz},
+                {cp.x + csx, cp.y + csy, cp.z + csz},
+                {cp.x - csx, cp.y + csy, cp.z + csz},
 			};
-			for (auto& eg : edges) renderer->DrawLine3D(cv[eg[0]], cv[eg[1]], colColor);
+			for (auto& eg : edges)
+				renderer->DrawLine3D(cv[eg[0]], cv[eg[1]], colColor);
 		}
 	}
 }
@@ -2095,7 +3463,7 @@ void EditorUI::ShowAnimationWindow(Engine::Renderer* renderer, GameScene* scene)
 			auto& anim = obj.animators[0]; // 最初のAnimatorを表示
 			ImGui::Text("Selected: %s (Animator)", obj.name.c_str());
 			ImGui::Separator();
-			
+
 			// アニメーションリスト（モデルが持っているアニメーションを取得）
 			auto* r = Engine::Renderer::GetInstance();
 			auto* m = r->GetModel(obj.modelHandle);
@@ -2109,11 +3477,12 @@ void EditorUI::ShowAnimationWindow(Engine::Renderer* renderer, GameScene* scene)
 								anim.currentAnimation = a.name;
 								anim.time = 0.0f;
 							}
-							if (selected) ImGui::SetItemDefaultFocus();
+							if (selected)
+								ImGui::SetItemDefaultFocus();
 						}
 						ImGui::EndCombo();
 					}
-					
+
 					// 現在のアニメーションを探す
 					const Engine::Animation* currentAnimPtr = nullptr;
 					for (const auto& a : data.animations) {
@@ -2122,12 +3491,12 @@ void EditorUI::ShowAnimationWindow(Engine::Renderer* renderer, GameScene* scene)
 							break;
 						}
 					}
-					
+
 					if (currentAnimPtr) {
 						ImGui::Text("Duration: %.2f ticks (%.1f fps)", currentAnimPtr->duration, currentAnimPtr->ticksPerSecond);
 						// シークバー (タイムライン)
 						ImGui::SliderFloat("Time", &anim.time, 0.0f, currentAnimPtr->duration, "%.2f");
-						
+
 						// 再生コントロール
 						if (ImGui::Button(anim.isPlaying ? "Stop" : "Play")) {
 							anim.isPlaying = !anim.isPlaying;
@@ -2151,6 +3520,64 @@ void EditorUI::ShowAnimationWindow(Engine::Renderer* renderer, GameScene* scene)
 		}
 	} else {
 		ImGui::Text("No Object Selected.");
+	}
+	ImGui::End();
+}
+
+// ====== Play Mode Monitor ======
+void EditorUI::ShowPlayModeMonitor(GameScene* scene) {
+	if (!scene || !scene->IsPlaying())
+		return;
+
+	ImGui::Begin("Play Mode Monitor");
+	static std::map<size_t, std::vector<float>> hpHistories;
+
+	if (ImGui::BeginTable("MonitorTable", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable)) {
+		ImGui::TableSetupColumn("Name");
+		ImGui::TableSetupColumn("Pos (X,Y,Z)");
+		ImGui::TableSetupColumn("HP Status");
+		ImGui::TableSetupColumn("HP Graph (Recent 100 frames)");
+		ImGui::TableHeadersRow();
+
+		const auto& objs = scene->GetObjects();
+		for (size_t i = 0; i < objs.size(); ++i) {
+			const auto& obj = objs[i];
+			ImGui::TableNextRow();
+
+			// Name
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text("%s", obj.name.c_str());
+
+			// Position
+			ImGui::TableSetColumnIndex(1);
+			ImGui::Text("%.2f, %.2f, %.2f", obj.translate.x, obj.translate.y, obj.translate.z);
+
+			// HP
+			ImGui::TableSetColumnIndex(2);
+			float currentHp = 0.0f;
+			float maxHp = 0.0f;
+			if (!obj.healths.empty()) {
+				currentHp = obj.healths[0].hp;
+				maxHp = obj.healths[0].maxHp;
+				ImGui::Text("%.1f / %.1f", currentHp, maxHp);
+			} else {
+				ImGui::Text("-");
+			}
+
+			// Graph
+			ImGui::TableSetColumnIndex(3);
+			if (!obj.healths.empty()) {
+				auto& history = hpHistories[i];
+				history.push_back(currentHp);
+				if (history.size() > 100)
+					history.erase(history.begin());
+
+				ImGui::PlotLines("##hplot", history.data(), (int)history.size(), 0, nullptr, 0.0f, maxHp, ImVec2(0, 40));
+			} else {
+				ImGui::Text("No Health Component");
+			}
+		}
+		ImGui::EndTable();
 	}
 	ImGui::End();
 }

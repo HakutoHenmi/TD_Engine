@@ -7,14 +7,23 @@
 int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int cmdShow) {
 	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
-	// ★追加: 実行ファイルのディレクトリにCWDを設定
-	// （ビルド後のコピー先に Resources/ があるため、相対パスが正しく解決される）
+	// ★変更: 開発用ディレクトリ (TD_Engine) を優先する
 	{
 		wchar_t exePath[MAX_PATH];
 		GetModuleFileNameW(nullptr, exePath, MAX_PATH);
 		wchar_t* lastSlash = wcsrchr(exePath, L'\\');
 		if (lastSlash) *lastSlash = L'\0';
-		SetCurrentDirectoryW(exePath);
+
+		wchar_t devPath[MAX_PATH];
+		wcscpy_s(devPath, exePath);
+		wcscat_s(devPath, L"\\..\\..\\..\\TD_Engine");
+
+		DWORD attr = GetFileAttributesW(devPath);
+		if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY)) {
+			SetCurrentDirectoryW(devPath);
+		} else {
+			SetCurrentDirectoryW(exePath);
+		}
 	}
 
 	Engine::App app;

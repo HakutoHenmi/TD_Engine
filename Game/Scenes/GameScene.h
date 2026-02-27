@@ -6,10 +6,12 @@
 #include "Transform.h"
 #include "WindowDX.h"
 #include "../ObjectTypes.h"
+#include "../Systems/ISystem.h"
 #include <vector>
 #include <set>
+#include <memory>
 #include "../../Engine/ParticleEmitter.h"
-#include "../../Engine/ParticleEditor.h" // ★追加
+#include "../../Engine/ParticleEditor.h"
 
 namespace Game {
 
@@ -21,12 +23,16 @@ public:
     void DrawEditor() override;
 
     void DrawEditorGizmos();
-    // ★追加: 選択オブジェクトのハイライトとギズモを描画
     void DrawSelectionHighlight();
-    // ★追加: ライト用ギズモの描画
     void DrawLightGizmos();
 
-    // The original public `isPlaying_` is removed as per the instruction's implied move to private.
+	// ★ 汎用スポーン（スクリプトから呼べる）
+	void SpawnObject(const SceneObject& obj);
+
+    const std::vector<SceneObject>& GetObjects() const { return objects_; }
+    void SetObjects(const std::vector<SceneObject>& o) { objects_ = o; }
+    bool IsPlaying() const { return isPlaying_; }
+    Engine::Renderer* GetRenderer() const { return renderer_; } // ★追加
 
 private:
     Engine::WindowDX* dx_ = nullptr;
@@ -36,12 +42,14 @@ private:
     std::set<int> selectedIndices_;
     int selectedObjectIndex_ = -1;
 
-    const std::vector<SceneObject>& GetObjects() const { return objects_; }
-    void SetObjects(const std::vector<SceneObject>& o) { objects_ = o; }
+    bool isPlaying_ = false;
+    std::vector<SceneObject> pendingSpawns_;
 
-    bool isPlaying_ = false; // ★追加: エディタからのPlayモード管理
+    // ★ ECS風Systemリスト
+    std::vector<std::unique_ptr<ISystem>> systems_;
+    GameContext ctx_;
 
-    // ★追加: 個別のパーティクルエディター
+    // パーティクルエディター
     Engine::ParticleEditor particleEditor_;
 
     friend class EditorUI;

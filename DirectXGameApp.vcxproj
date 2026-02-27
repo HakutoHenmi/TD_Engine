@@ -165,8 +165,8 @@ exit /b 0
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>assimp-vc143-mtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)externals\assimp\lib\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <LinkTimeCodeGeneration />
     </Link>
     <FxCompile>
@@ -184,6 +184,10 @@ exit /b 0
     <ClCompile Include="Game\Editor\EditorUI.cpp" />
     <ClCompile Include="Game\Scenes\GameScene.cpp" />
     <ClCompile Include="Game\Scenes\TitleScene.cpp" />
+    <ClCompile Include="Game\ScriptEngine.cpp" /> <!-- ★追加 -->
+    <ClCompile Include="Game\PlayerScript.cpp" />
+    <ClCompile Include="Game\EnemyAIScript.cpp" />
+    <ClCompile Include="Game\BulletScript.cpp" />
     <ClCompile Include="main.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">MaxSpeed</Optimization>
       <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</WholeProgramOptimization>
@@ -194,6 +198,21 @@ exit /b 0
     <ClInclude Include="Game\Scenes\GameScene.h" />
     <ClInclude Include="Game\Scenes\TitleScene.h" />
     <ClInclude Include="Game\ObjectTypes.h" />
+    <ClInclude Include="Game\ScriptEngine.h" /> <!-- ★追加 -->
+    <ClInclude Include="Game\IScript.h" />
+    <ClInclude Include="Game\PlayerScript.h" />
+    <ClInclude Include="Game\EnemyAIScript.h" />
+    <ClInclude Include="Game\BulletScript.h" />
+    <ClInclude Include="Game\Systems\ISystem.h" />
+    <ClInclude Include="Game\Systems\PlayerInputSystem.h" />
+    <ClInclude Include="Game\Systems\CharacterMovementSystem.h" />
+    <ClInclude Include="Game\Systems\CameraFollowSystem.h" />
+    <ClInclude Include="Game\Systems\PhysicsSystem.h" />
+    <ClInclude Include="Game\Systems\CombatSystem.h" />
+    <ClInclude Include="Game\Systems\HealthSystem.h" />
+    <ClInclude Include="Game\Systems\AudioSystem.h" />
+    <ClInclude Include="Game\Systems\ScriptSystem.h" />
+    <ClInclude Include="Game\Systems\CleanupSystem.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="DirectXGameEngine.vcxproj">
