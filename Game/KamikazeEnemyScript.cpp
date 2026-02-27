@@ -21,13 +21,25 @@ void KamikazeEnemyScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 
 	// プレイヤー検索
 	DirectX::XMFLOAT3 targetPos = {0, 0, 0};
+	// キャッシュが有効か確認
 	bool found = false;
-
-	for (const auto& otherObj : scene->GetObjects()) {
-		if (otherObj.name == "Player") {
-			targetPos = otherObj.translate;
+	if (playerIndexCache_ != static_cast<size_t>(-1) && playerIndexCache_ < scene->GetObjects().size()) {
+		if (scene->GetObjects()[playerIndexCache_].name == "Player") {
+			targetPos = scene->GetObjects()[playerIndexCache_].translate;
 			found = true;
-			break;
+		}
+	}
+
+	// キャッシュが無効なら検索
+	if (!found) {
+		const auto& objects = scene->GetObjects();
+		for (size_t i = 0; i < objects.size(); ++i) {
+			if (objects[i].name == "Player") {
+				targetPos = objects[i].translate;
+				playerIndexCache_ = i;
+				found = true;
+				break;
+			}
 		}
 	}
 

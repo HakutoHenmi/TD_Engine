@@ -156,8 +156,8 @@ void ParticleSystem::Draw(const Camera& cam, const std::string& shaderName, bool
 			uvScaleOffset.w = rowIdx * uvScaleOffset.y; // Offset V
 		}
 
-		// ★変更: DrawParticleを使用
-		renderer_->DrawParticle(mesh_, tex_, tf, p.color, uvScaleOffset, shaderName);
+		// ★GPUインスタンシングを使用して描画予約
+		renderer_->DrawParticleInstanced(mesh_, tex_, tf, p.color, uvScaleOffset, shaderName);
 	}
 }
 

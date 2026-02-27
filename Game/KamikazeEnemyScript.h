@@ -18,6 +18,7 @@ private:
 	float explosionRadius_ = 6.0f; // 爆発ダメージ半径
 	float damage_ = 50.0f;         // 爆発ダメージ
 	bool isExploded_ = false;
+	size_t playerIndexCache_ = static_cast<size_t>(-1);
 };
 
 } // namespace Game
