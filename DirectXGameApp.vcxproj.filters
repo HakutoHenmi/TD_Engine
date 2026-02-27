@@ -11,6 +11,11 @@
     <ClCompile Include="Game\Editor\EditorUI.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
+    <ClCompile Include="Game\ScriptEngine.cpp" />
+    <ClCompile Include="Game\PlayerScript.cpp" />
+    <ClCompile Include="Game\EnemyAIScript.cpp" />
+    <ClCompile Include="Game\BulletScript.cpp" />
+    <ClCompile Include="TowerScript.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
@@ -25,6 +30,22 @@
     <ClInclude Include="Game\ObjectTypes.h">
       <Filter>Game</Filter>
     </ClInclude>
+    <ClInclude Include="Game\ScriptEngine.h" />
+    <ClInclude Include="Game\IScript.h" />
+    <ClInclude Include="Game\PlayerScript.h" />
+    <ClInclude Include="Game\EnemyAIScript.h" />
+    <ClInclude Include="Game\BulletScript.h" />
+    <ClInclude Include="Game\Systems\ISystem.h" />
+    <ClInclude Include="Game\Systems\PlayerInputSystem.h" />
+    <ClInclude Include="Game\Systems\CharacterMovementSystem.h" />
+    <ClInclude Include="Game\Systems\CameraFollowSystem.h" />
+    <ClInclude Include="Game\Systems\PhysicsSystem.h" />
+    <ClInclude Include="Game\Systems\CombatSystem.h" />
+    <ClInclude Include="Game\Systems\HealthSystem.h" />
+    <ClInclude Include="Game\Systems\AudioSystem.h" />
+    <ClInclude Include="Game\Systems\ScriptSystem.h" />
+    <ClInclude Include="Game\Systems\CleanupSystem.h" />
+    <ClInclude Include="TowerScript.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">
