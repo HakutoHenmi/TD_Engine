@@ -5,8 +5,12 @@
 #include <vector>
 #include <string>
 #include "../Engine/ParticleEmitter.h"
+#include <map>
+#include <memory> // ★追加
 
 namespace Game {
+
+class IScript; // ★追加: C++スクリプトの基底クラス前方宣言
 
 enum class ObjectType : uint32_t {
 	Cube = 0,
@@ -26,7 +30,8 @@ enum class ComponentType {
 	MeshRenderer, BoxCollider, Tag, Animator, Rigidbody, ParticleEmitter, 
 	GpuMeshCollider, PlayerInput, CharacterMovement, CameraTarget,
 	DirectionalLight, PointLight, SpotLight,
-	AudioSource, AudioListener, Hitbox, Hurtbox, Health // ★追加: 音響 & 戦闘判定 & ステータス
+	AudioSource, AudioListener, Hitbox, Hurtbox, Health, // ★追加: 音響 & 戦闘判定 & ステータス
+	Script // ★追加: スクリプトコンポーネント
 };
 struct Component { ComponentType type; bool enabled = true; };
 
@@ -91,7 +96,7 @@ struct PlayerInputComponent : public Component {
 struct CharacterMovementComponent : public Component {
 	float speed = 5.0f;
 	float jumpPower = 6.0f;
-	float gravity = -9.8f;
+	float gravity = 9.8f;
 	float velocityY = 0.0f;
 	bool isGrounded = false;
 	CharacterMovementComponent() { type = ComponentType::CharacterMovement; }
@@ -195,6 +200,13 @@ struct HealthComponent : public Component {
 	HealthComponent() { type = ComponentType::Health; }
 };
 
+// ★変更: Script コンポーネント (ロジックの外部化)
+struct ScriptComponent : public Component {
+	std::string scriptPath = ""; // スクリプトのクラス名 (例: "PlayerScript")
+	std::shared_ptr<IScript> instance = nullptr; // C++スクリプトのインスタンス
+	ScriptComponent() { type = ComponentType::Script; }
+};
+
 // ★ エディター用オブジェクト構造体
 struct SceneObject {
 	std::string name = "Object";
@@ -236,6 +248,9 @@ struct SceneObject {
 
 	// ★追加: ステータス管理コンポーネント
 	std::vector<HealthComponent> healths;
+
+	// ★追加: スクリプトコンポーネント
+	std::vector<ScriptComponent> scripts;
 
 	Engine::Transform GetTransform() const {
 		Engine::Transform t;

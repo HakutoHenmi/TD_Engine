@@ -50,6 +50,7 @@ public:
 	// ★ シーン保存/読み込み
 	static void SaveScene(GameScene* scene, const std::string& path);
 	static void LoadScene(GameScene* scene, const std::string& path);
+	static void AddScene(GameScene* scene, const std::string& path); // ★追加
 	static void LoadPrefab(GameScene* scene, const std::string& path);
 
 private:
@@ -59,6 +60,7 @@ private:
 	static void ShowSceneSettings(Engine::Renderer* renderer);
 	static void ShowAnimationWindow(Engine::Renderer* renderer, GameScene* scene);
 	static void ShowConsole();
+	static void ShowPlayModeMonitor(GameScene* scene); // ★追加
 	static void DrawSelectionGizmo(Engine::Renderer* renderer, GameScene* scene);
 };
 

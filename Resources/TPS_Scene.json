@@ -1,0 +1,357 @@
+{
+  "objects": [
+    {
+      "name": "Sun",
+      "locked": false,
+      "translate": [
+        0,
+        10,
+        0
+      ],
+      "rotate": [
+        0.785398,
+        0.523599,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "color": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "modelPath": "",
+      "texturePath": "",
+      "components": [
+        {
+          "type": "DirectionalLight",
+          "enabled": true,
+          "color": [
+            1,
+            1,
+            1
+          ],
+          "intensity": 1
+        }
+      ]
+    },
+    {
+      "name": "Ground",
+      "locked": false,
+      "translate": [
+        0,
+        0,
+        0
+      ],
+      "rotate": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        20,
+        1,
+        20
+      ],
+      "color": [
+        0.8,
+        0.8,
+        0.8,
+        1
+      ],
+      "modelPath": "Resources/plane.obj",
+      "texturePath": "Resources/white1x1.png",
+      "components": [
+        {
+          "type": "MeshRenderer",
+          "enabled": true,
+          "modelPath": "Resources/plane.obj",
+          "texturePath": "Resources/white1x1.png"
+        },
+        {
+          "type": "BoxCollider",
+          "enabled": true,
+          "center": [
+            0,
+            -0.5,
+            0
+          ],
+          "size": [
+            20,
+            1,
+            20
+          ],
+          "isTrigger": false
+        }
+      ]
+    },
+    {
+      "name": "Player",
+      "locked": false,
+      "translate": [
+        0,
+        1,
+        -5
+      ],
+      "rotate": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        2,
+        1
+      ],
+      "color": [
+        0.2,
+        0.8,
+        0.2,
+        1
+      ],
+      "modelPath": "Resources/cube/cube.obj",
+      "texturePath": "Resources/white1x1.png",
+      "components": [
+        {
+          "type": "MeshRenderer",
+          "enabled": true,
+          "modelPath": "Resources/cube/cube.obj",
+          "texturePath": "Resources/white1x1.png"
+        },
+        {
+          "type": "BoxCollider",
+          "enabled": true,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "size": [
+            1,
+            2,
+            1
+          ],
+          "isTrigger": false
+        },
+        {
+          "type": "PlayerInput",
+          "enabled": true
+        },
+        {
+          "type": "CharacterMovement",
+          "enabled": true,
+          "speed": 10,
+          "jumpForce": 5,
+          "gravity": 9.8
+        },
+        {
+          "type": "CameraTarget",
+          "enabled": true,
+          "offset": [
+            0,
+            3,
+            -5
+          ],
+          "pitch": 0.2,
+          "yaw": 0
+        },
+        {
+          "type": "Tag",
+          "enabled": true,
+          "tag": "Player"
+        },
+        {
+          "type": "Health",
+          "enabled": true,
+          "hp": 100,
+          "maxHp": 100,
+          "stamina": 100,
+          "maxStamina": 100,
+          "invincibleTime": 0,
+          "isDead": false
+        },
+        {
+          "type": "Script",
+          "enabled": true,
+          "scriptPath": "PlayerScript"
+        }
+      ]
+    },
+    {
+      "name": "Enemy_A",
+      "locked": false,
+      "translate": [
+        5,
+        1,
+        10
+      ],
+      "rotate": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        2,
+        1
+      ],
+      "color": [
+        0.9,
+        0.2,
+        0.2,
+        1
+      ],
+      "modelPath": "Resources/cube/cube.obj",
+      "texturePath": "Resources/white1x1.png",
+      "components": [
+        {
+          "type": "MeshRenderer",
+          "enabled": true,
+          "modelPath": "Resources/cube/cube.obj",
+          "texturePath": "Resources/white1x1.png"
+        },
+        {
+          "type": "BoxCollider",
+          "enabled": true,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "size": [
+            1,
+            2,
+            1
+          ],
+          "isTrigger": false
+        },
+        {
+          "type": "Tag",
+          "enabled": true,
+          "tag": "Enemy"
+        },
+        {
+          "type": "Hurtbox",
+          "enabled": true,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "size": [
+            1,
+            2,
+            1
+          ],
+          "tag": "Body",
+          "damageMultiplier": 1
+        },
+        {
+          "type": "Health",
+          "enabled": true,
+          "hp": 30,
+          "maxHp": 30,
+          "stamina": 100,
+          "maxStamina": 100,
+          "invincibleTime": 0,
+          "isDead": false
+        },
+        {
+          "type": "Script",
+          "enabled": true,
+          "scriptPath": "EnemyAIScript"
+        }
+      ]
+    },
+    {
+      "name": "Enemy_B",
+      "locked": false,
+      "translate": [
+        -5,
+        1,
+        12
+      ],
+      "rotate": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        2,
+        1
+      ],
+      "color": [
+        0.9,
+        0.2,
+        0.2,
+        1
+      ],
+      "modelPath": "Resources/cube/cube.obj",
+      "texturePath": "Resources/white1x1.png",
+      "components": [
+        {
+          "type": "MeshRenderer",
+          "enabled": true,
+          "modelPath": "Resources/cube/cube.obj",
+          "texturePath": "Resources/white1x1.png"
+        },
+        {
+          "type": "BoxCollider",
+          "enabled": true,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "size": [
+            1,
+            2,
+            1
+          ],
+          "isTrigger": false
+        },
+        {
+          "type": "Tag",
+          "enabled": true,
+          "tag": "Enemy"
+        },
+        {
+          "type": "Hurtbox",
+          "enabled": true,
+          "center": [
+            0,
+            0,
+            0
+          ],
+          "size": [
+            1,
+            2,
+            1
+          ],
+          "tag": "Body",
+          "damageMultiplier": 1
+        },
+        {
+          "type": "Health",
+          "enabled": true,
+          "hp": 30,
+          "maxHp": 30,
+          "stamina": 100,
+          "maxStamina": 100,
+          "invincibleTime": 0,
+          "isDead": false
+        },
+        {
+          "type": "Script",
+          "enabled": true,
+          "scriptPath": "EnemyAIScript"
+        }
+      ]
+    }
+  ]
+}
