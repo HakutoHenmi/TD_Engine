@@ -1,5 +1,6 @@
 #include "App.h"
 #include <Windows.h>
+#include "JobSystem.h"
 
 
 namespace Engine {
@@ -9,6 +10,9 @@ bool App::Initialize(HINSTANCE hInst, int cmdShow) {
 	if (!dx_.Initialize(hInst, cmdShow, hwnd_))
 		return false;
 
+	// Job Systemの初期化
+	JobSystem::Initialize();
+
 
 	if (!renderer_.Initialize(&dx_))
 		return false;
@@ -17,11 +21,11 @@ bool App::Initialize(HINSTANCE hInst, int cmdShow) {
 	camera_.Initialize();
 	audio_.Initialize();
 
-	// ImGui初期化
-	// ImGui
+#ifdef USE_IMGUI
 	if (!imgui_.Initialize(hwnd_, dx_, dx_.SRV(), dx_.SRV_CPU(0), dx_.SRV_GPU(0), 18.0f, "Resources/fonts/Huninn/Huninn-Regular.ttf")) {
 		return false;
 	}
+#endif
 
 	if (registrar_) {
 		registrar_(sceneManager_, dx_);
@@ -62,26 +66,32 @@ void App::Run() {
 		const float clearColor[] = {0.1f, 0.25f, 0.5f, 1.0f};
 		renderer_.BeginFrame(clearColor);
 
+#ifdef USE_IMGUI
 		imgui_.NewFrame(dx_);
+#endif
 
 		sceneManager_.Update();
 		sceneManager_.Draw();
 
 		renderer_.EndFrame();
 
-		// 3. エディター表示
+#ifdef USE_IMGUI
  		Engine::IScene* currentScene = sceneManager_.Current();
  		if (currentScene) {
  			currentScene->DrawEditor();
  		}
 
 		imgui_.Render(dx_);
+#endif
 		dx_.EndFrame();
 	}
 }
 
 void App::Shutdown() {
+	JobSystem::Shutdown();
+#ifdef USE_IMGUI
 	imgui_.Shutdown();
+#endif
 	audio_.Shutdown();
 	input_.Shutdown();
 	dx_.WaitIdle();

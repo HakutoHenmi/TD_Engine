@@ -128,6 +128,10 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Engine\EntityManager.cpp" />
+    <ClCompile Include="Engine\RenderSystem.cpp" />
+    <ClCompile Include="Engine\CollisionSystem.cpp" />
+    <ClCompile Include="Engine\JobSystem.cpp" />
     <ClCompile Include="Engine\App.cpp" />
     <ClCompile Include="Engine\Audio.cpp" />
     <ClCompile Include="Engine\Camera.cpp" />
@@ -151,6 +155,18 @@
     <ClCompile Include="externals\imgui\imgui_widgets.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Engine\Components.h" />
+    <ClInclude Include="Engine\ECS.h" />
+    <ClInclude Include="Engine\RenderSystem.h" />
+    <ClInclude Include="Engine\CollisionSystem.h" />
+    <ClInclude Include="Engine\ComponentArray.h" />
+    <ClInclude Include="Engine\ComponentManager.h" />
+    <ClInclude Include="Engine\System.h" />
+    <ClInclude Include="Engine\SystemManager.h" />
+    <ClInclude Include="Engine\Coordinator.h" />
+    <ClInclude Include="Engine\SpatialPartition.h" />
+    <ClInclude Include="Engine\EntityManager.h" />
+    <ClInclude Include="Engine\JobSystem.h" />
     <ClInclude Include="Engine\App.h" />
     <ClInclude Include="Engine\Audio.h" />
     <ClInclude Include="Engine\Camera.h" />

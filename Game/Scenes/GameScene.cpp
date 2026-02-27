@@ -1,17 +1,21 @@
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include "GameScene.h"
 #include "../Editor/EditorUI.h"
 #include "../ScriptEngine.h"
-#include "../Systems/PlayerInputSystem.h"
-#include "../Systems/CharacterMovementSystem.h"
+#include "../Systems/AudioSystem.h"
 #include "../Systems/CameraFollowSystem.h"
-#include "../Systems/PhysicsSystem.h"
+#include "../Systems/CharacterMovementSystem.h"
+#include "../Systems/CleanupSystem.h"
 #include "../Systems/CombatSystem.h"
 #include "../Systems/HealthSystem.h"
-#include "../Systems/AudioSystem.h"
+#include "../Systems/PhysicsSystem.h"
+#include "../Systems/PlayerInputSystem.h"
 #include "../Systems/ScriptSystem.h"
-#include "../Systems/CleanupSystem.h"
 #include "Audio.h"
 #include "imgui.h"
+#include <Windows.h> // OutputDebugStringA
 #include <algorithm>
 #include <cmath>
 
@@ -21,12 +25,25 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 	dx_ = dx;
 	renderer_ = Engine::Renderer::GetInstance();
 	camera_.Initialize();
+	// ★追加: 明示的にプロジェクションを設定 (1920x1080のアスペクト比)
+	camera_.SetProjection(0.7854f, (float)Engine::WindowDX::kW / (float)Engine::WindowDX::kH, 0.1f, 1000.0f);
 	camera_.SetPosition(0, 2, -5);
 	camera_.SetRotation(0.2f, 0, 0);
 	renderer_->SetAmbientColor({0.4f, 0.4f, 0.45f});
 
-	// 既にオブジェクトが存在する場合（リスタート時）は重複追加を防止
-	if (objects_.empty()) {
+	bool loaded = false;
+	// ★ リリース構成等での自動ロード
+	if (std::filesystem::exists("Resources/TPS_Scene.json")) {
+		OutputDebugStringA("[GameScene] Resources/TPS_Scene.json found. Loading...\n");
+		EditorUI::LoadScene(this, "Resources/TPS_Scene.json");
+		isPlaying_ = true; // ロード直後からプレイ状態にする
+		loaded = true;
+	} else {
+		OutputDebugStringA("[GameScene] Resources/TPS_Scene.json NOT found.\n");
+	}
+
+	// 既にオブジェクトが存在する場合（リスタート時）やロード失敗時は最低限の内容を作成
+	if (objects_.empty() || !loaded) {
 		SceneObject sun;
 		sun.name = "Sun";
 		sun.translate = {0, 10, 0};
@@ -68,11 +85,13 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 
 	// 前回プレイで動的に生成されたオブジェクトの削除
 	objects_.erase(
-	    std::remove_if(objects_.begin(), objects_.end(),
+	    std::remove_if(
+	        objects_.begin(), objects_.end(),
 	        [](const SceneObject& o) {
 		        bool isBullet = false;
 		        for (const auto& t : o.tags) {
-			        if (t.tag == "Bullet") isBullet = true;
+			        if (t.tag == "Bullet")
+				        isBullet = true;
 		        }
 		        return isBullet || o.name == "Bullet";
 	        }),
@@ -88,7 +107,13 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 // ★ Update: 各Systemに処理を委譲
 // =====================================================
 void GameScene::Update() {
-	float dt = ImGui::GetIO().DeltaTime;
+	static auto last = std::chrono::steady_clock::now();
+	auto now = std::chrono::steady_clock::now();
+	float dt = std::chrono::duration<float>(now - last).count();
+	last = now;
+
+	if (dt > 1.0f / 10.0f)
+		dt = 1.0f / 60.0f; // 極端なラグ対策
 
 	// コンテキストを更新
 	ctx_.dt = dt;
@@ -150,8 +175,10 @@ void GameScene::Update() {
 				uint32_t meshA = objA.gpuMeshColliders[0].meshHandle;
 				uint32_t meshB = objB.gpuMeshColliders[0].meshHandle;
 
-				if (meshA == 0) meshA = objA.modelHandle;
-				if (meshB == 0) meshB = objB.modelHandle;
+				if (meshA == 0)
+					meshA = objA.modelHandle;
+				if (meshB == 0)
+					meshB = objB.modelHandle;
 
 				if (meshA != 0 && meshB != 0) {
 					renderer_->DispatchCollision(meshA, objA.GetTransform(), meshB, objB.GetTransform(), pairIndex);
@@ -254,7 +281,8 @@ void GameScene::Update() {
 	// パーティクルエミッターコンポーネント
 	for (auto& obj : objects_) {
 		for (auto& emitterComp : obj.particleEmitters) {
-			if (!emitterComp.enabled) continue;
+			if (!emitterComp.enabled)
+				continue;
 
 			if (!emitterComp.isInitialized) {
 				emitterComp.emitter.Initialize(*renderer_, obj.name + "_Emitter");
@@ -271,9 +299,7 @@ void GameScene::Update() {
 }
 
 // ★ 汎用スポーン
-void GameScene::SpawnObject(const SceneObject& obj) {
-	pendingSpawns_.push_back(obj);
-}
+void GameScene::SpawnObject(const SceneObject& obj) { pendingSpawns_.push_back(obj); }
 
 void GameScene::Draw() {
 	renderer_->SetCamera(camera_);
@@ -401,21 +427,37 @@ void GameScene::DrawSelectionHighlight() {
 			DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&v[i]), p);
 		}
 		int edges[][2] = {
-		    {0, 1}, {1, 2}, {2, 3}, {3, 0},
-            {4, 5}, {5, 6}, {6, 7}, {7, 4},
-            {0, 4}, {1, 5}, {2, 6}, {3, 7}
+		    {0, 1},
+            {1, 2},
+            {2, 3},
+            {3, 0},
+            {4, 5},
+            {5, 6},
+            {6, 7},
+            {7, 4},
+            {0, 4},
+            {1, 5},
+            {2, 6},
+            {3, 7}
         };
 		for (auto& eg : edges)
 			renderer_->DrawLine3D(v[eg[0]], v[eg[1]], hlColor, true);
 
 		for (const auto& bc : obj.boxColliders) {
-			if (!bc.enabled) continue;
+			if (!bc.enabled)
+				continue;
 			float hx = bc.size.x * 0.5f, hy = bc.size.y * 0.5f, hz = bc.size.z * 0.5f;
 			Engine::Vector3 cp = {bc.center.x, bc.center.y, bc.center.z};
 			Engine::Vector4 colColor = {0.2f, 1.0f, 0.2f, 0.8f};
 			Engine::Vector3 cv[8] = {
-			    {cp.x-hx,cp.y-hy,cp.z-hz},{cp.x+hx,cp.y-hy,cp.z-hz},{cp.x+hx,cp.y+hy,cp.z-hz},{cp.x-hx,cp.y+hy,cp.z-hz},
-			    {cp.x-hx,cp.y-hy,cp.z+hz},{cp.x+hx,cp.y-hy,cp.z+hz},{cp.x+hx,cp.y+hy,cp.z+hz},{cp.x-hx,cp.y+hy,cp.z+hz},
+			    {cp.x - hx, cp.y - hy, cp.z - hz},
+                {cp.x + hx, cp.y - hy, cp.z - hz},
+                {cp.x + hx, cp.y + hy, cp.z - hz},
+                {cp.x - hx, cp.y + hy, cp.z - hz},
+			    {cp.x - hx, cp.y - hy, cp.z + hz},
+                {cp.x + hx, cp.y - hy, cp.z + hz},
+                {cp.x + hx, cp.y + hy, cp.z + hz},
+                {cp.x - hx, cp.y + hy, cp.z + hz},
 			};
 			for (int i = 0; i < 8; ++i) {
 				DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(cv[i].x, cv[i].y, cv[i].z, 1.0f), worldMat);
@@ -426,10 +468,20 @@ void GameScene::DrawSelectionHighlight() {
 		}
 
 		for (const auto& gmc : obj.gpuMeshColliders) {
-			if (!gmc.enabled) continue;
+			if (!gmc.enabled)
+				continue;
 			Engine::Vector4 gColor = gmc.isIntersecting ? Engine::Vector4{1.0f, 0.2f, 0.2f, 0.8f} : Engine::Vector4{0.2f, 0.2f, 1.0f, 0.8f};
 			float hs = 1.0f;
-			Engine::Vector3 cv[8] = {{-hs,-hs,-hs},{hs,-hs,-hs},{hs,hs,-hs},{-hs,hs,-hs},{-hs,-hs,hs},{hs,-hs,hs},{hs,hs,hs},{-hs,hs,hs}};
+			Engine::Vector3 cv[8] = {
+			    {-hs, -hs, -hs},
+                {hs,  -hs, -hs},
+                {hs,  hs,  -hs},
+                {-hs, hs,  -hs},
+                {-hs, -hs, hs },
+                {hs,  -hs, hs },
+                {hs,  hs,  hs },
+                {-hs, hs,  hs }
+            };
 			for (int i = 0; i < 8; ++i) {
 				DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(cv[i].x, cv[i].y, cv[i].z, 1.0f), worldMat);
 				DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&cv[i]), p);
@@ -439,13 +491,20 @@ void GameScene::DrawSelectionHighlight() {
 		}
 
 		for (const auto& hb : obj.hitboxes) {
-			if (!hb.enabled) continue;
-			float hx = hb.size.x*0.5f, hy = hb.size.y*0.5f, hz = hb.size.z*0.5f;
+			if (!hb.enabled)
+				continue;
+			float hx = hb.size.x * 0.5f, hy = hb.size.y * 0.5f, hz = hb.size.z * 0.5f;
 			Engine::Vector3 cp = {hb.center.x, hb.center.y, hb.center.z};
-			Engine::Vector4 hbColor = hb.isActive ? Engine::Vector4{1.0f,0.2f,0.2f,1.0f} : Engine::Vector4{1.0f,0.2f,0.2f,0.3f};
+			Engine::Vector4 hbColor = hb.isActive ? Engine::Vector4{1.0f, 0.2f, 0.2f, 1.0f} : Engine::Vector4{1.0f, 0.2f, 0.2f, 0.3f};
 			Engine::Vector3 hv[8] = {
-			    {cp.x-hx,cp.y-hy,cp.z-hz},{cp.x+hx,cp.y-hy,cp.z-hz},{cp.x+hx,cp.y+hy,cp.z-hz},{cp.x-hx,cp.y+hy,cp.z-hz},
-			    {cp.x-hx,cp.y-hy,cp.z+hz},{cp.x+hx,cp.y-hy,cp.z+hz},{cp.x+hx,cp.y+hy,cp.z+hz},{cp.x-hx,cp.y+hy,cp.z+hz},
+			    {cp.x - hx, cp.y - hy, cp.z - hz},
+                {cp.x + hx, cp.y - hy, cp.z - hz},
+                {cp.x + hx, cp.y + hy, cp.z - hz},
+                {cp.x - hx, cp.y + hy, cp.z - hz},
+			    {cp.x - hx, cp.y - hy, cp.z + hz},
+                {cp.x + hx, cp.y - hy, cp.z + hz},
+                {cp.x + hx, cp.y + hy, cp.z + hz},
+                {cp.x - hx, cp.y + hy, cp.z + hz},
 			};
 			for (int i = 0; i < 8; ++i) {
 				DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(hv[i].x, hv[i].y, hv[i].z, 1.0f), worldMat);
@@ -456,13 +515,20 @@ void GameScene::DrawSelectionHighlight() {
 		}
 
 		for (const auto& hb : obj.hurtboxes) {
-			if (!hb.enabled) continue;
-			float hx = hb.size.x*0.5f, hy = hb.size.y*0.5f, hz = hb.size.z*0.5f;
+			if (!hb.enabled)
+				continue;
+			float hx = hb.size.x * 0.5f, hy = hb.size.y * 0.5f, hz = hb.size.z * 0.5f;
 			Engine::Vector3 cp = {hb.center.x, hb.center.y, hb.center.z};
 			Engine::Vector4 hbColor = {0.2f, 1.0f, 0.5f, 0.6f};
 			Engine::Vector3 hv[8] = {
-			    {cp.x-hx,cp.y-hy,cp.z-hz},{cp.x+hx,cp.y-hy,cp.z-hz},{cp.x+hx,cp.y+hy,cp.z-hz},{cp.x-hx,cp.y+hy,cp.z-hz},
-			    {cp.x-hx,cp.y-hy,cp.z+hz},{cp.x+hx,cp.y-hy,cp.z+hz},{cp.x+hx,cp.y+hy,cp.z+hz},{cp.x-hx,cp.y+hy,cp.z+hz},
+			    {cp.x - hx, cp.y - hy, cp.z - hz},
+                {cp.x + hx, cp.y - hy, cp.z - hz},
+                {cp.x + hx, cp.y + hy, cp.z - hz},
+                {cp.x - hx, cp.y + hy, cp.z - hz},
+			    {cp.x - hx, cp.y - hy, cp.z + hz},
+                {cp.x + hx, cp.y - hy, cp.z + hz},
+                {cp.x + hx, cp.y + hy, cp.z + hz},
+                {cp.x - hx, cp.y + hy, cp.z + hz},
 			};
 			for (int i = 0; i < 8; ++i) {
 				DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(hv[i].x, hv[i].y, hv[i].z, 1.0f), worldMat);
@@ -487,40 +553,59 @@ void GameScene::DrawSelectionHighlight() {
 		auto axCol = [](int axis, int drag) -> Engine::Vector4 {
 			bool a = (drag == axis);
 			switch (axis) {
-			case 0: return a ? Engine::Vector4{1,.6f,.6f,1} : Engine::Vector4{1,.2f,.2f,1};
-			case 1: return a ? Engine::Vector4{.6f,1,.6f,1} : Engine::Vector4{.2f,1,.2f,1};
-			case 2: return a ? Engine::Vector4{.6f,.6f,1,1} : Engine::Vector4{.2f,.2f,1,1};
-			default: return {1,1,1,1};
+			case 0:
+				return a ? Engine::Vector4{1, .6f, .6f, 1} : Engine::Vector4{1, .2f, .2f, 1};
+			case 1:
+				return a ? Engine::Vector4{.6f, 1, .6f, 1} : Engine::Vector4{.2f, 1, .2f, 1};
+			case 2:
+				return a ? Engine::Vector4{.6f, .6f, 1, 1} : Engine::Vector4{.2f, .2f, 1, 1};
+			default:
+				return {1, 1, 1, 1};
 			}
 		};
 		auto cX = axCol(0, dAxis), cY = axCol(1, dAxis), cZ = axCol(2, dAxis);
 
 		if (currentGizmoMode == GizmoMode::Translate) {
-			drawLocalLine({0,0,0}, {al,0,0}, cX); drawLocalLine({al,0,0}, {al-ar,ar*.4f,0}, cX); drawLocalLine({al,0,0}, {al-ar,-ar*.4f,0}, cX);
-			drawLocalLine({0,0,0}, {0,al,0}, cY); drawLocalLine({0,al,0}, {ar*.4f,al-ar,0}, cY); drawLocalLine({0,al,0}, {-ar*.4f,al-ar,0}, cY);
-			drawLocalLine({0,0,0}, {0,0,al}, cZ); drawLocalLine({0,0,al}, {0,ar*.4f,al-ar}, cZ); drawLocalLine({0,0,al}, {0,-ar*.4f,al-ar}, cZ);
+			drawLocalLine({0, 0, 0}, {al, 0, 0}, cX);
+			drawLocalLine({al, 0, 0}, {al - ar, ar * .4f, 0}, cX);
+			drawLocalLine({al, 0, 0}, {al - ar, -ar * .4f, 0}, cX);
+			drawLocalLine({0, 0, 0}, {0, al, 0}, cY);
+			drawLocalLine({0, al, 0}, {ar * .4f, al - ar, 0}, cY);
+			drawLocalLine({0, al, 0}, {-ar * .4f, al - ar, 0}, cY);
+			drawLocalLine({0, 0, 0}, {0, 0, al}, cZ);
+			drawLocalLine({0, 0, al}, {0, ar * .4f, al - ar}, cZ);
+			drawLocalLine({0, 0, al}, {0, -ar * .4f, al - ar}, cZ);
 		} else if (currentGizmoMode == GizmoMode::Rotate) {
-			const int seg = 32; const float rad = 1.5f;
+			const int seg = 32;
+			const float rad = 1.5f;
 			for (int i = 0; i < seg; ++i) {
 				float a0 = (float)i / seg * DirectX::XM_2PI, a1 = (float)(i + 1) / seg * DirectX::XM_2PI;
-				drawLocalLine({0,cosf(a0)*rad,sinf(a0)*rad}, {0,cosf(a1)*rad,sinf(a1)*rad}, cX);
-				drawLocalLine({cosf(a0)*rad,0,sinf(a0)*rad}, {cosf(a1)*rad,0,sinf(a1)*rad}, cY);
-				drawLocalLine({cosf(a0)*rad,sinf(a0)*rad,0}, {cosf(a1)*rad,sinf(a1)*rad,0}, cZ);
+				drawLocalLine({0, cosf(a0) * rad, sinf(a0) * rad}, {0, cosf(a1) * rad, sinf(a1) * rad}, cX);
+				drawLocalLine({cosf(a0) * rad, 0, sinf(a0) * rad}, {cosf(a1) * rad, 0, sinf(a1) * rad}, cY);
+				drawLocalLine({cosf(a0) * rad, sinf(a0) * rad, 0}, {cosf(a1) * rad, sinf(a1) * rad, 0}, cZ);
 			}
 		} else {
 			float e = 0.15f;
-			drawLocalLine({0,0,0}, {al,0,0}, cX); drawLocalLine({al-e,-e,0}, {al+e,e,0}, cX); drawLocalLine({al+e,-e,0}, {al-e,e,0}, cX);
-			drawLocalLine({0,0,0}, {0,al,0}, cY); drawLocalLine({-e,al-e,0}, {e,al+e,0}, cY); drawLocalLine({e,al-e,0}, {-e,al+e,0}, cY);
-			drawLocalLine({0,0,0}, {0,0,al}, cZ); drawLocalLine({0,-e,al-e}, {0,e,al+e}, cZ); drawLocalLine({0,e,al-e}, {0,-e,al+e}, cZ);
+			drawLocalLine({0, 0, 0}, {al, 0, 0}, cX);
+			drawLocalLine({al - e, -e, 0}, {al + e, e, 0}, cX);
+			drawLocalLine({al + e, -e, 0}, {al - e, e, 0}, cX);
+			drawLocalLine({0, 0, 0}, {0, al, 0}, cY);
+			drawLocalLine({-e, al - e, 0}, {e, al + e, 0}, cY);
+			drawLocalLine({e, al - e, 0}, {-e, al + e, 0}, cY);
+			drawLocalLine({0, 0, 0}, {0, 0, al}, cZ);
+			drawLocalLine({0, -e, al - e}, {0, e, al + e}, cZ);
+			drawLocalLine({0, e, al - e}, {0, -e, al + e}, cZ);
 		}
 	}
 }
 
 void GameScene::DrawEditorGizmos() {
-	if (!renderer_) return;
+	if (!renderer_)
+		return;
 	const float gridSize = 100.0f, step = 1.0f;
 	for (float i = -gridSize; i <= gridSize; i += step) {
-		if (std::fabs(i) < 0.01f) continue;
+		if (std::fabs(i) < 0.01f)
+			continue;
 		bool isMajor = std::fmod(std::fabs(i), 10.0f) < 0.01f;
 		float alpha = isMajor ? 0.35f : 0.15f;
 		Engine::Vector4 gc = {0.6f, 0.6f, 0.6f, alpha};
@@ -542,7 +627,8 @@ void GameScene::DrawEditor() {
 }
 
 void GameScene::DrawLightGizmos() {
-	if (!renderer_) return;
+	if (!renderer_)
+		return;
 	for (size_t i = 0; i < objects_.size(); ++i) {
 		auto& obj = objects_[i];
 		Engine::Vector3 pos = {obj.translate.x, obj.translate.y, obj.translate.z};
@@ -552,7 +638,8 @@ void GameScene::DrawLightGizmos() {
 		float alpha = isSelected ? 1.0f : 0.4f;
 
 		for (const auto& dl : obj.directionalLights) {
-			if (!dl.enabled) continue;
+			if (!dl.enabled)
+				continue;
 			Engine::Vector4 col = {1.0f, 0.9f, 0.2f, alpha};
 			renderer_->DrawLine3D(pos, {pos.x + fwd.x * 5.0f, pos.y + fwd.y * 5.0f, pos.z + fwd.z * 5.0f}, col, true);
 			float s = 0.5f;
@@ -560,7 +647,8 @@ void GameScene::DrawLightGizmos() {
 			renderer_->DrawLine3D({pos.x, pos.y - s, pos.z}, {pos.x, pos.y + s, pos.z}, col, true);
 		}
 		for (const auto& pl : obj.pointLights) {
-			if (!pl.enabled) continue;
+			if (!pl.enabled)
+				continue;
 			Engine::Vector4 col = {0.2f, 0.9f, 0.2f, alpha};
 			float s = 0.5f;
 			renderer_->DrawLine3D({pos.x - s, pos.y, pos.z}, {pos.x + s, pos.y, pos.z}, col, true);
@@ -568,7 +656,8 @@ void GameScene::DrawLightGizmos() {
 			renderer_->DrawLine3D({pos.x, pos.y, pos.z - s}, {pos.x, pos.y, pos.z + s}, col, true);
 		}
 		for (const auto& sl : obj.spotLights) {
-			if (!sl.enabled) continue;
+			if (!sl.enabled)
+				continue;
 			Engine::Vector4 col = {0.2f, 0.8f, 1.0f, alpha};
 			renderer_->DrawLine3D(pos, {pos.x + fwd.x * 5.0f, pos.y + fwd.y * 5.0f, pos.z + fwd.z * 5.0f}, col, true);
 			float s = 0.5f;

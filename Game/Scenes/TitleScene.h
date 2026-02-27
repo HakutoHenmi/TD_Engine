@@ -15,6 +15,7 @@ public:
 private:
 	Engine::WindowDX* dx_ = nullptr;
 	Engine::Renderer* renderer_ = nullptr;
+	Engine::Camera camera_;
 };
 
 } // namespace Game

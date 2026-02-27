@@ -332,6 +332,13 @@ void Model::Draw(ID3D12GraphicsCommandList* cmd, UINT /*root*/) {
 	cmd->DrawIndexedInstanced(indexCount_, 1, 0, 0, 0);
 }
 
+void Model::DrawInstanced(ID3D12GraphicsCommandList* cmd, UINT instanceCount, UINT /*root*/) {
+	cmd->IASetVertexBuffers(0, 1, &vbv_);
+	cmd->IASetIndexBuffer(&ibv_);
+	cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	cmd->DrawIndexedInstanced(indexCount_, instanceCount, 0, 0, 0);
+}
+
 void Model::UpdateSkeleton(const Node& node, const Matrix4x4& parentTransform, const Animation& animation, float time, std::vector<Matrix4x4>& outPalette) {
 	Matrix4x4 localTransform = node.transform;
 	auto it = animation.nodeAnimations.find(node.name);

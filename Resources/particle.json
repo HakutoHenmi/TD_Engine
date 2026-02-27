@@ -38,14 +38,14 @@
     "lifeTimeVariance": 0.20000000298023224,
     "name": "PreviewEmitter",
     "position": [
-        -8.975589752197266,
-        8.553629875183105,
-        -6.142519950866699
+        -7.855403423309326,
+        5.220095634460449,
+        -1.2554311752319336
     ],
     "shaderName": "",
-    "shape": 0,
+    "shape": 1,
     "shapeAngle": 0.5,
-    "shapeRadius": 1.0,
+    "shapeRadius": 5.0,
     "startColor": [
         1.0,
         1.0,

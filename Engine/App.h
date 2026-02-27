@@ -1,7 +1,9 @@
 #pragma once
 #include "Audio.h"
 #include "Camera.h"
+#ifdef USE_IMGUI
 #include "ImGuiLayer.h"
+#endif
 #include "Input.h"
 #include "Matrix4x4.h"
 #include "Renderer.h"
@@ -46,7 +48,9 @@ private:
 	Camera camera_;
 	Audio audio_;
 	Renderer renderer_;
+#ifdef USE_IMGUI
 	ImGuiLayer imgui_;
+#endif
 
 	std::chrono::steady_clock::time_point prev_{};
 
