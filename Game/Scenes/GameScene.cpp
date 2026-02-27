@@ -343,7 +343,8 @@ void GameScene::Draw() {
 				if (hasAnim) {
 					renderer_->DrawSkinnedMesh(mr.modelHandle, mr.textureHandle, obj.GetTransform(), bonePalette, {mr.color.x, mr.color.y, mr.color.z, mr.color.w});
 				} else {
-					renderer_->DrawMesh(mr.modelHandle, mr.textureHandle, obj.GetTransform(), {mr.color.x, mr.color.y, mr.color.z, mr.color.w});
+					// ★変更: インスタンス描画を使用
+					renderer_->DrawMeshInstanced(mr.modelHandle, mr.textureHandle, obj.GetTransform(), {mr.color.x, mr.color.y, mr.color.z, mr.color.w}, mr.shaderName);
 				}
 			}
 		}
@@ -378,7 +379,8 @@ void GameScene::Draw() {
 			if (hasAnim) {
 				renderer_->DrawSkinnedMesh(obj.modelHandle, obj.textureHandle, obj.GetTransform(), bonePalette, {obj.color.x, obj.color.y, obj.color.z, obj.color.w});
 			} else {
-				renderer_->DrawMesh(obj.modelHandle, obj.textureHandle, obj.GetTransform(), {obj.color.x, obj.color.y, obj.color.z, obj.color.w});
+				// ★変更: インスタンス描画を使用
+				renderer_->DrawMeshInstanced(obj.modelHandle, obj.textureHandle, obj.GetTransform(), {obj.color.x, obj.color.y, obj.color.z, obj.color.w}, obj.shaderName);
 			}
 		}
 	}

@@ -47,6 +47,7 @@ struct MeshRendererComponent : public Component {
 	DirectX::XMFLOAT2 uvOffset = {0, 0};
 	uint32_t lightmapHandle = 0;
 	std::string lightmapPath;
+	std::string shaderName = "Default"; // ★追加
 	MeshRendererComponent() { type = ComponentType::MeshRenderer; }
 };
 
@@ -255,6 +256,7 @@ struct SceneObject {
 	uint32_t textureHandle = 0;
 	std::string modelPath;   // ★追加: 保存/復元用パス
 	std::string texturePath;  // ★追加: 保存/復元用パス
+	std::string shaderName = "Default"; // ★追加
 
 	// コンポーネント
 	std::vector<MeshRendererComponent> meshRenderers;

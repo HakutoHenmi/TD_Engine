@@ -279,6 +279,7 @@ void Renderer::BeginFrame(const float clearColorRGBA[4]) {
 
 	drawCalls_.clear(); // ★追加: ドローコールをクリア
 	instancedDrawCalls_.clear(); // ★追加
+	instancedParticleDrawCalls_.clear(); // ★追加: パーティクル用
 	spriteDrawCalls_.clear(); // ★スプライトもクリア
 
 	cbFrameAddr_ = 0;
@@ -358,7 +359,7 @@ void Renderer::ResetGameViewport() {
 }
 
 void Renderer::FlushDrawCalls() {
-	if (drawCalls_.empty() && instancedDrawCalls_.empty()) {
+	if (drawCalls_.empty() && instancedDrawCalls_.empty() && instancedParticleDrawCalls_.empty()) {
 		FlushLines();
 		return;
 	}
@@ -449,20 +450,29 @@ void Renderer::FlushDrawCalls() {
 		model->Draw(list_, 3);
 	}
 
-	// ====== インスタンス描画の実行 ======
-	if (!instancedDrawCalls_.empty()) {
-		ID3D12PipelineState* psoInst = pipelines_["Instanced"].Get();
-		list_->SetPipelineState(psoInst);
+	// ====== インスタンス描画の共通処理関数 (ラムダ) ======
+	auto flushInstanced = [&](std::vector<InstancedDrawCall>& calls, const std::string& defaultShaderName) {
+		if (calls.empty()) return;
 
-		for (auto& idc : instancedDrawCalls_) {
+		for (auto& idc : calls) {
 			auto* model = GetModel(idc.mesh);
 			if (!model || idc.instances.empty()) continue;
 
-			// シェーダー切り替え（もし指定があれば）
-			if (idc.shaderName != "Default" && pipelines_.count(idc.shaderName + "Instanced")) {
-				list_->SetPipelineState(pipelines_[idc.shaderName + "Instanced"].Get());
+			// シェーダー設定
+			std::string sName = idc.shaderName;
+			if (sName == "Default") sName = defaultShaderName;
+			// "Particle" -> "ParticleInstanced", "ParticleAdditive" -> "ParticleAdditiveInstanced" への自動マッピング
+			if (defaultShaderName == "ParticleInstanced") {
+				if (sName == "Particle") sName = "ParticleInstanced";
+				else if (sName == "ParticleAdditive") sName = "ParticleAdditiveInstanced";
+			}
+
+			if (pipelines_.count(sName)) {
+				list_->SetPipelineState(pipelines_[sName].Get());
+			} else if (pipelines_.count(defaultShaderName)) {
+				list_->SetPipelineState(pipelines_[defaultShaderName].Get());
 			} else {
-				list_->SetPipelineState(psoInst);
+				continue; // 有効なPSOがない場合はスキップ
 			}
 
 			// テクスチャ設定
@@ -472,30 +482,27 @@ void Renderer::FlushDrawCalls() {
 				list_->SetGraphicsRootDescriptorTable(3, textures_[0].srvGpu);
 			}
 
-			// インスタンスデータの転送 (StructuredBufferとして)
+			// インスタンスデータの転送
 			uint32_t dataSize = static_cast<uint32_t>(sizeof(InstanceData) * idc.instances.size());
 			uint32_t offset = upload_[fi].Allocate(dataSize, 256);
 			if (offset != UINT32_MAX) {
 				std::memcpy(upload_[fi].mapped + offset, idc.instances.data(), dataSize);
-				D3D12_GPU_VIRTUAL_ADDRESS gpuAddr = upload_[fi].buffer->GetGPUVirtualAddress() + offset;
-				
-				// Root Parameter 6 にインスタンスデータを渡す（DescriptorTable経由ではなく直接CBV/SRVとして渡す場合はInitを修正する必要があるが、現状はTable）
-				// この実装ではDescriptorTable(t2)を想定しているので、本来はSRVヒープに書き込む必要がある。
-				// しかし簡易化のため、ここでは RootParameter 6 を SRV(t2) として直接設定できるように InitPipelines で InitAsShaderResourceView に変更するか、
-				// あるいは動的記述子ヒープを使用する。
-				// 
-				// 修正：InitPipelinesで params[6].InitAsShaderResourceView(2) に変更するのが一番簡単。
-				list_->SetGraphicsRootShaderResourceView(6, gpuAddr);
+				list_->SetGraphicsRootShaderResourceView(6, upload_[fi].buffer->GetGPUVirtualAddress() + offset);
 			}
 
-			// 描画発行
 			model->DrawInstanced(list_, static_cast<uint32_t>(idc.instances.size()));
 		}
-	}
+		calls.clear();
+	};
+
+	// 通常オブジェクトのインスタンス描画
+	flushInstanced(instancedDrawCalls_, "Instanced");
+	
+	// パーティクルのインスタンス描画
+	flushInstanced(instancedParticleDrawCalls_, "ParticleInstanced");
 
 	FlushLines();
 	drawCalls_.clear();
-	instancedDrawCalls_.clear();
 }
 
 void Renderer::EndFrame() {
@@ -1170,9 +1177,22 @@ VSOut main(VSIn v) {
 	if (!CreatePSO("Default", vs3d.Get(), ps3d.Get()))
 		return false;
 
-	auto vsInst = CompileShader(kVSInstanced, "main", "vs_5_0");
-	if (vsInst && !CreatePSO("Instanced", vsInst.Get(), ps3d.Get()))
+	// 通常オブジェクト インスタンス描画
+	auto vsInst = CompileShaderFromFile(L"Resources/shaders/InstancedObjVS.hlsl", "main", "vs_5_0");
+	auto psInst = CompileShaderFromFile(L"Resources/shaders/InstancedObjPS.hlsl", "main", "ps_5_0");
+	if (!vsInst || !psInst || !CreatePSO("Instanced", vsInst.Get(), psInst.Get()))
 		return false;
+
+	// パーティクル インスタンス描画 (PixelShaderは既存のParticlePSを使用)
+	auto vsPartInst = CompileShaderFromFile(L"Resources/shaders/InstancedParticleVS.hlsl", "main", "vs_5_0");
+	auto psPart = CompileShaderFromFile(L"Resources/shaders/ParticlePS.hlsl", "main", "ps_5_0");
+	if (!vsPartInst || !psPart || !CreatePSO("ParticleInstanced", vsPartInst.Get(), psPart.Get()))
+		return false;
+
+	// パーティクル 加算 インスタンス描画
+	if (vsPartInst && psPart) {
+		CreatePSO_Transparent("ParticleAdditiveInstanced", vsPartInst.Get(), psPart.Get(), true);
+	}
 
 	// Skinning用レイアウト
 	D3D12_INPUT_ELEMENT_DESC skinLayout[] = {
@@ -1485,6 +1505,28 @@ void Renderer::DrawMeshInstanced(MeshHandle mesh, TextureHandle texture, const T
 	InstanceData data;
 	data.world = transform.ToMatrix();
 	data.color = mulColor;
+	data.uvScaleOffset = {1, 1, 0, 0}; // デフォルト
+	it->instances.push_back(data);
+}
+
+void Renderer::DrawParticleInstanced(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, const Vector4& uvScaleOffset, const std::string& shaderName) {
+	auto it = std::find_if(instancedParticleDrawCalls_.begin(), instancedParticleDrawCalls_.end(), [&](const InstancedDrawCall& idc) {
+		return idc.mesh == mesh && idc.tex == texture && idc.shaderName == shaderName;
+	});
+
+	if (it == instancedParticleDrawCalls_.end()) {
+		InstancedDrawCall newIdc;
+		newIdc.mesh = mesh;
+		newIdc.tex = texture;
+		newIdc.shaderName = shaderName;
+		instancedParticleDrawCalls_.push_back(newIdc);
+		it = instancedParticleDrawCalls_.end() - 1;
+	}
+
+	InstanceData data;
+	data.world = transform.ToMatrix();
+	data.color = mulColor;
+	data.uvScaleOffset = uvScaleOffset;
 	it->instances.push_back(data);
 }
 
