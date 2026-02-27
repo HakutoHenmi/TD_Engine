@@ -8,6 +8,10 @@ namespace Game {
 void TitleScene::Initialize(Engine::WindowDX* dx) {
 	dx_ = dx;
 	renderer_ = Engine::Renderer::GetInstance();
+
+	camera_.Initialize();
+	// ★追加: 明示的にプロジェクションを設定 (1920x1080のアスペクト比)
+	camera_.SetProjection(0.7854f, (float)Engine::WindowDX::kW / (float)Engine::WindowDX::kH, 0.1f, 1000.0f);
 }
 
 #include "../Engine/Input.h"

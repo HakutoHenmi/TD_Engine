@@ -196,6 +196,9 @@ public:
 	// 通常メッシュ描画
 	void DrawMesh(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, const std::string& shaderName = "Default");
 
+	// インスタンス描画の予約
+	void DrawMeshInstanced(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, const std::string& shaderName = "Default");
+
 	// ★追加: パーティクル描画 (UVスケール・オフセット付き)
 	void DrawParticle(MeshHandle mesh, TextureHandle texture, const Transform& transform, 
 					  const Vector4& mulColor, const Vector4& uvScaleOffset, 
@@ -250,6 +253,18 @@ private:
 		std::vector<Matrix4x4> bones;
 		bool isParticle = false;
 		Vector4 uvScaleOffset;
+	};
+
+	struct InstanceData {
+		Matrix4x4 world;
+		Vector4 color;
+	};
+
+	struct InstancedDrawCall {
+		MeshHandle mesh;
+		TextureHandle tex;
+		std::string shaderName;
+		std::vector<InstanceData> instances;
 	};
 
 private:
@@ -389,6 +404,7 @@ private:
 	bool backBufferBarrierState_ = false;
 
 	std::vector<DrawCall> drawCalls_; // ★追加: ドローコールバッファ
+	std::vector<InstancedDrawCall> instancedDrawCalls_; // ★追加: インスタンスドローコール
 
 	// ★変更: Mesh構造体ではなくModelクラスへのスマートポインタで管理
 	std::vector<std::shared_ptr<Model>> models_;

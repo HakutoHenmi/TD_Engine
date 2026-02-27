@@ -15,6 +15,8 @@ void Camera::Initialize() {
 	shakeAmpPos_ = shakeAmpRot_ = 0.0f;
 	shakeOfs_ = {0, 0, 0};
 	shakeRot_ = {0, 0, 0};
+	// ★追加: デフォルトのプロジェクション設定 (FOV 45度, 16:9, 近面0.1, 遠面1000)
+	SetProjection(0.7854f, 16.0f / 9.0f, 0.1f, 1000.0f);
 	UpdateView();
 }
 

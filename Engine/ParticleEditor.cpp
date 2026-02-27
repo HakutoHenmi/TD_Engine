@@ -22,6 +22,13 @@ void ParticleEditor::Update(float dt) {
 		previewEmitter_.Update(dt);
 	}
 
+	// ★変更: ImGui コンテキストがない場合は以降の入力をスキップ
+	if (!ImGui::GetCurrentContext()) {
+		previewCamera_.SetPosition(0, 2, -10);
+		previewCamera_.LookAt(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+		return;
+	}
+
 	// ★追加: カメラ操作 (ImGuiウィンドウ上でドラッグ可能にする)
 	if (ImGui::IsMouseDragging(ImGuiMouseButton_Right)) {
 		ImVec2 delta = ImGui::GetIO().MouseDelta;

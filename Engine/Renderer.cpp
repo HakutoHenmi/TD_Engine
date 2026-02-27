@@ -22,6 +22,11 @@ namespace Engine {
 
 Renderer* Renderer::instance_ = nullptr;
 
+// クリア値の定数定義
+static const float kPPSceneClearColor[] = { 0.1f, 0.25f, 0.5f, 1.0f };
+static const float kFinalSceneClearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+static const float kCustomTargetClearColor[] = { 0.1f, 0.1f, 0.12f, 1.0f };
+
 static uint32_t AlignUp(uint32_t v, uint32_t a) { return (v + (a - 1)) & ~(a - 1); }
 
 uint32_t Renderer::UploadRing::Allocate(uint32_t bytes, uint32_t alignment) {
@@ -273,6 +278,7 @@ void Renderer::BeginFrame(const float clearColorRGBA[4]) {
 	upload_[fi].Reset();
 
 	drawCalls_.clear(); // ★追加: ドローコールをクリア
+	instancedDrawCalls_.clear(); // ★追加
 
 	cbFrameAddr_ = 0;
 	backBufferBarrierState_ = false;
@@ -351,7 +357,7 @@ void Renderer::ResetGameViewport() {
 }
 
 void Renderer::FlushDrawCalls() {
-	if (drawCalls_.empty()) {
+	if (drawCalls_.empty() && instancedDrawCalls_.empty()) {
 		FlushLines();
 		return;
 	}
@@ -442,8 +448,53 @@ void Renderer::FlushDrawCalls() {
 		model->Draw(list_, 3);
 	}
 
+	// ====== インスタンス描画の実行 ======
+	if (!instancedDrawCalls_.empty()) {
+		ID3D12PipelineState* psoInst = pipelines_["Instanced"].Get();
+		list_->SetPipelineState(psoInst);
+
+		for (auto& idc : instancedDrawCalls_) {
+			auto* model = GetModel(idc.mesh);
+			if (!model || idc.instances.empty()) continue;
+
+			// シェーダー切り替え（もし指定があれば）
+			if (idc.shaderName != "Default" && pipelines_.count(idc.shaderName + "Instanced")) {
+				list_->SetPipelineState(pipelines_[idc.shaderName + "Instanced"].Get());
+			} else {
+				list_->SetPipelineState(psoInst);
+			}
+
+			// テクスチャ設定
+			if (idc.tex != 0 && idc.tex < textures_.size()) {
+				list_->SetGraphicsRootDescriptorTable(3, textures_[idc.tex].srvGpu);
+			} else {
+				list_->SetGraphicsRootDescriptorTable(3, textures_[0].srvGpu);
+			}
+
+			// インスタンスデータの転送 (StructuredBufferとして)
+			uint32_t dataSize = static_cast<uint32_t>(sizeof(InstanceData) * idc.instances.size());
+			uint32_t offset = upload_[fi].Allocate(dataSize, 256);
+			if (offset != UINT32_MAX) {
+				std::memcpy(upload_[fi].mapped + offset, idc.instances.data(), dataSize);
+				D3D12_GPU_VIRTUAL_ADDRESS gpuAddr = upload_[fi].buffer->GetGPUVirtualAddress() + offset;
+				
+				// Root Parameter 6 にインスタンスデータを渡す（DescriptorTable経由ではなく直接CBV/SRVとして渡す場合はInitを修正する必要があるが、現状はTable）
+				// この実装ではDescriptorTable(t2)を想定しているので、本来はSRVヒープに書き込む必要がある。
+				// しかし簡易化のため、ここでは RootParameter 6 を SRV(t2) として直接設定できるように InitPipelines で InitAsShaderResourceView に変更するか、
+				// あるいは動的記述子ヒープを使用する。
+				// 
+				// 修正：InitPipelinesで params[6].InitAsShaderResourceView(2) に変更するのが一番簡単。
+				list_->SetGraphicsRootShaderResourceView(6, gpuAddr);
+			}
+
+			// 描画発行
+			model->DrawInstanced(list_, static_cast<uint32_t>(idc.instances.size()));
+		}
+	}
+
 	FlushLines();
 	drawCalls_.clear();
+	instancedDrawCalls_.clear();
 }
 
 void Renderer::EndFrame() {
@@ -554,8 +605,7 @@ void Renderer::EndFrame() {
 	auto rtvFinal = finalRtv_;
 	list_->OMSetRenderTargets(1, &rtvFinal, FALSE, nullptr);
 	
-	const float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f }; // 余白等があれば黒で埋める
-	list_->ClearRenderTargetView(rtvFinal, clearColor, 0, nullptr);
+	list_->ClearRenderTargetView(rtvFinal, kFinalSceneClearColor, 0, nullptr);
 
 	if (framePPEnabled_) {
 		list_->SetPipelineState(psoPP_.Get());
@@ -886,13 +936,17 @@ bool Renderer::InitPipelines() {
 		CD3DX12_DESCRIPTOR_RANGE rangeShadowSRV;
 		rangeShadowSRV.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1); // t1
 
-		CD3DX12_ROOT_PARAMETER params[6]{};
+		CD3DX12_DESCRIPTOR_RANGE rangeInstanceSRV;
+		rangeInstanceSRV.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2); // t2 (Instance Data)
+
+		CD3DX12_ROOT_PARAMETER params[7]{};
 		params[0].InitAsConstantBufferView(0);                                        // b0: CBFrame
 		params[1].InitAsConstantBufferView(1);                                        // b1: CBObj
 		params[2].InitAsConstantBufferView(2);                                        // b2: CBLight
 		params[3].InitAsDescriptorTable(1, &rangeSRV, D3D12_SHADER_VISIBILITY_PIXEL); // t0: Texture
 		params[4].InitAsConstantBufferView(3);                                        // b3: CBBone (スキニング用)
 		params[5].InitAsDescriptorTable(1, &rangeShadowSRV, D3D12_SHADER_VISIBILITY_PIXEL); // t1: ShadowMap
+		params[6].InitAsShaderResourceView(2, 0, D3D12_SHADER_VISIBILITY_VERTEX);       // t2: InstanceData (SRV)
 
 		// s0: 通常のテクスチャサンプラー, s1: 影比較用サンプラー
 		CD3DX12_STATIC_SAMPLER_DESC samp[2]{};
@@ -956,6 +1010,28 @@ VSOut main(VSIn v) {
     o.svpos = mul(vp, gProj); 
     o.uv = v.uv; 
     return o; 
+}
+)";
+
+	static const char* kVSInstanced = R"(
+struct InstanceData { row_major float4x4 world; float4 color; };
+StructuredBuffer<InstanceData> gInstanceData : register(t2);
+
+cbuffer CBFrame : register(b0) { row_major float4x4 gView; row_major float4x4 gProj; row_major float4x4 gViewProj; float3 gCamPos; float gTime; };
+
+struct VSIn { float4 pos : POSITION; float2 uv : TEXCOORD0; float3 nrm : NORMAL; };
+struct VSOut { float4 svpos : SV_POSITION; float3 worldPos: TEXCOORD0; float3 normal : TEXCOORD1; float2 uv : TEXCOORD2; float4 color : COLOR0; };
+
+VSOut main(VSIn v, uint instanceID : SV_InstanceID) {
+    VSOut o;
+    InstanceData data = gInstanceData[instanceID];
+    float4 wp = mul(v.pos, data.world);
+    o.worldPos = wp.xyz;
+    o.normal = normalize(mul(float4(v.nrm, 0), data.world).xyz);
+    o.svpos = mul(mul(wp, gView), gProj);
+    o.uv = v.uv;
+    o.color = data.color;
+    return o;
 }
 )";
 
@@ -1088,6 +1164,10 @@ VSOut main(VSIn v) {
 		return false;
 
 	if (!CreatePSO("Default", vs3d.Get(), ps3d.Get()))
+		return false;
+
+	auto vsInst = CompileShader(kVSInstanced, "main", "vs_5_0");
+	if (vsInst && !CreatePSO("Instanced", vsInst.Get(), ps3d.Get()))
 		return false;
 
 	// Skinning用レイアウト
@@ -1383,15 +1463,35 @@ Renderer::TextureHandle Renderer::LoadTexture2D(const std::string& filePath, boo
 	return handle;
 }
 
+void Renderer::DrawMeshInstanced(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, const std::string& shaderName) {
+	// 既存のInstancedDrawCallを探す
+	auto it = std::find_if(instancedDrawCalls_.begin(), instancedDrawCalls_.end(), [&](const InstancedDrawCall& idc) {
+		return idc.mesh == mesh && idc.tex == texture && idc.shaderName == shaderName;
+	});
+
+	if (it == instancedDrawCalls_.end()) {
+		InstancedDrawCall newIdc;
+		newIdc.mesh = mesh;
+		newIdc.tex = texture;
+		newIdc.shaderName = shaderName;
+		instancedDrawCalls_.push_back(newIdc);
+		it = instancedDrawCalls_.end() - 1;
+	}
+
+	InstanceData data;
+	data.world = transform.ToMatrix();
+	data.color = mulColor;
+	it->instances.push_back(data);
+}
+
 Renderer::MeshHandle Renderer::LoadObjMesh(const std::string& objFilePath) {
 	if (objFilePath.empty())
 		return 0;
 	auto it = meshCache_.find(objFilePath);
 	if (it != meshCache_.end())
-		return it->second;
+		return (MeshHandle)it->second;
 
 	// ★修正: 一時的なコマンドリストを作成して使用する
-	// メインのlist_はInitialize後に閉じられているため、それを使うとD3D12エラーになる
 	ComPtr<ID3D12CommandAllocator> alloc;
 	ComPtr<ID3D12GraphicsCommandList> cmd;
 	if (FAILED(dev_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&alloc)))) {
@@ -1423,7 +1523,7 @@ Renderer::MeshHandle Renderer::LoadObjMesh(const std::string& objFilePath) {
 
 	MeshHandle handle = (MeshHandle)models_.size();
 	models_.push_back(model);
-	meshCache_[objFilePath] = handle;
+	meshCache_[objFilePath] = (int)handle;
 	return handle;
 }
 
@@ -1637,10 +1737,7 @@ bool Renderer::InitPostProcess_() {
 		rd.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 		D3D12_CLEAR_VALUE cv{};
 		cv.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		cv.Color[0] = 0.1f;
-		cv.Color[1] = 0.25f;
-		cv.Color[2] = 0.5f;
-		cv.Color[3] = 1.0f;
+		std::memcpy(cv.Color, kPPSceneClearColor, sizeof(float) * 4);
 
 		CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_DEFAULT);
 		dev_->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &cv, IID_PPV_ARGS(&ppSceneColor_));
@@ -1748,10 +1845,7 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 		rd.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 		D3D12_CLEAR_VALUE cv{};
 		cv.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		cv.Color[0] = 0.0f;
-		cv.Color[1] = 0.0f;
-		cv.Color[2] = 0.0f;
-		cv.Color[3] = 1.0f;
+		std::memcpy(cv.Color, kFinalSceneClearColor, sizeof(float) * 4);
 
 		CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_DEFAULT);
 		dev_->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &cv, IID_PPV_ARGS(&finalSceneColor_));
@@ -1812,7 +1906,7 @@ Renderer::CustomRenderTarget Renderer::CreateRenderTarget(uint32_t width, uint32
 
 	D3D12_CLEAR_VALUE cv{};
 	cv.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	cv.Color[0] = 0.0f; cv.Color[1] = 0.0f; cv.Color[2] = 0.0f; cv.Color[3] = 0.0f;
+	std::memcpy(cv.Color, kCustomTargetClearColor, sizeof(float) * 4);
 
 	CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_DEFAULT);
 	dev_->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &cv, IID_PPV_ARGS(&target.texture));
@@ -1865,8 +1959,7 @@ void Renderer::BeginCustomRenderTarget(const CustomRenderTarget& target) {
 		D3D12_RESOURCE_STATE_RENDER_TARGET);
 	list_->ResourceBarrier(1, &barrier);
 
-	const float clearColor[] = { 0.1f, 0.1f, 0.12f, 1.0f }; // エディタ用の暗めの背景色
-	list_->ClearRenderTargetView(target.rtv, clearColor, 0, nullptr);
+	list_->ClearRenderTargetView(target.rtv, kCustomTargetClearColor, 0, nullptr);
 	list_->ClearDepthStencilView(target.dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 	list_->OMSetRenderTargets(1, &target.rtv, FALSE, &target.dsv);

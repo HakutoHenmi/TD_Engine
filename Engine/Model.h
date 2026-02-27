@@ -90,6 +90,7 @@ public:
 
 	// 描画 (Rendererの実装に合わせてデフォルト引数を調整: t0がindex 3の場合)
 	void Draw(ID3D12GraphicsCommandList* cmd, UINT rootSrvParamIndex = 3);
+	void DrawInstanced(ID3D12GraphicsCommandList* cmd, UINT instanceCount, UINT rootSrvParamIndex = 3);
 
 	// ゲッター
 	const ModelData& GetData() const { return data_; }
