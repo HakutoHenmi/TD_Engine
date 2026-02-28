@@ -101,7 +101,7 @@ void BaseScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	hb.isActive = true;
 	hb.damage = damage_;
 	hb.tag = "Bullet"; // まずは Player と同じにしとく（当たるか確認）
-	hb.size = {1.0f, 1.0f, 1.0f};
+	hb.size = {1.0f, 1.0f, 1.0f};　
 	bullet.hitboxes.push_back(hb);
 
 	HealthComponent hc;
