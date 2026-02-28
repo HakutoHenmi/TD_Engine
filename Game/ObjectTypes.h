@@ -34,7 +34,12 @@ enum class ComponentType {
 	Script, // ★追加: スクリプトコンポーネント
 	RectTransform, UIImage, UIText, UIButton // ★追加: UIコンポーネント
 };
-struct Component { ComponentType type; bool enabled = true; };
+struct Component { 
+	ComponentType type = ComponentType::MeshRenderer; 
+	bool enabled = true; 
+	Component() = default;
+	Component(ComponentType t) : type(t), enabled(true) {}
+};
 
 struct MeshRendererComponent : public Component {
 	uint32_t modelHandle = 0;

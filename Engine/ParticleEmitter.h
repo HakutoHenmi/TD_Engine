@@ -2,7 +2,14 @@
 
 #include "Particle.h"
 #include <string>
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 26819)
+#endif
 #include "ThirdParty/nlohmann/json.hpp"
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 namespace Engine {
 

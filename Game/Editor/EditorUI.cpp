@@ -159,7 +159,7 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 		first = false;
 		ss << "        {\"type\": \"MeshRenderer\", \"enabled\": " << (mr.enabled ? "true" : "false") << ", \"modelPath\": \"" << EscapeJson(mr.modelPath) << "\", \"texturePath\": \""
 		   << EscapeJson(mr.texturePath) << "\", \"color\": [" << mr.color.x << "," << mr.color.y << "," << mr.color.z << "," << mr.color.w << "], \"uvTiling\": [" << mr.uvTiling.x << ","
-		   << mr.uvTiling.y << "], \"uvOffset\": [" << mr.uvOffset.x << "," << mr.uvOffset.y << "], \"lightmapPath\": \"" << EscapeJson(mr.lightmapPath) << "\"}";
+		   << mr.uvTiling.y << "], \"uvOffset\": [" << mr.uvOffset.x << "," << mr.uvOffset.y << "], \"lightmapPath\": \"" << EscapeJson(mr.lightmapPath) << "\", \"shaderName\": \"" << EscapeJson(mr.shaderName) << "\"}";
 	}
 	for (const auto& bc : o.boxColliders) {
 		if (!first)
@@ -306,6 +306,23 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 			ss << ",\n";
 		first = false;
 		ss << "        {\"type\": \"Script\", \"enabled\": " << (sc.enabled ? "true" : "false") << ", \"scriptPath\": \"" << EscapeJson(sc.scriptPath) << "\"}";
+	}
+	// ★追加: UI Components
+	for (const auto& rt : o.rectTransforms) {
+		if (!first) ss << ",\n"; first = false;
+		ss << "        {\"type\": \"RectTransform\", \"enabled\": " << (rt.enabled ? "true" : "false") << ", \"pos\": [" << rt.pos.x << "," << rt.pos.y << "], \"size\": [" << rt.size.x << "," << rt.size.y << "], \"anchor\": [" << rt.anchor.x << "," << rt.anchor.y << "], \"pivot\": [" << rt.pivot.x << "," << rt.pivot.y << "], \"rotation\": " << rt.rotation << "}";
+	}
+	for (const auto& img : o.images) {
+		if (!first) ss << ",\n"; first = false;
+		ss << "        {\"type\": \"UIImage\", \"enabled\": " << (img.enabled ? "true" : "false") << ", \"texturePath\": \"" << EscapeJson(img.texturePath) << "\", \"color\": [" << img.color.x << "," << img.color.y << "," << img.color.z << "," << img.color.w << "]}";
+	}
+	for (const auto& txt : o.texts) {
+		if (!first) ss << ",\n"; first = false;
+		ss << "        {\"type\": \"UIText\", \"enabled\": " << (txt.enabled ? "true" : "false") << ", \"text\": \"" << EscapeJson(txt.text) << "\", \"fontSize\": " << txt.fontSize << ", \"color\": [" << txt.color.x << "," << txt.color.y << "," << txt.color.z << "," << txt.color.w << "]}";
+	}
+	for (const auto& btn : o.buttons) {
+		if (!first) ss << ",\n"; first = false;
+		ss << "        {\"type\": \"UIButton\", \"enabled\": " << (btn.enabled ? "true" : "false") << ", \"normalColor\": [" << btn.normalColor.x << "," << btn.normalColor.y << "," << btn.normalColor.z << "," << btn.normalColor.w << "], \"hoverColor\": [" << btn.hoverColor.x << "," << btn.hoverColor.y << "," << btn.hoverColor.z << "," << btn.hoverColor.w << "], \"pressedColor\": [" << btn.pressedColor.x << "," << btn.pressedColor.y << "," << btn.pressedColor.z << "," << btn.pressedColor.w << "]}";
 	}
 	ss << "\n      ]\n";
 	ss << "    }";
@@ -507,6 +524,8 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 			mr.lightmapPath = ExtractString(cblock, "lightmapPath");
 			if (!mr.lightmapPath.empty())
 				mr.lightmapHandle = renderer->LoadTexture2D(mr.lightmapPath);
+			mr.shaderName = ExtractString(cblock, "shaderName");
+			if (mr.shaderName.empty()) mr.shaderName = "Default";
 			obj.meshRenderers.push_back(mr);
 		} else if (type == "BoxCollider") {
 			BoxColliderComponent bc;
@@ -782,6 +801,36 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 			sc.enabled = enabled;
 			sc.scriptPath = ExtractString(cblock, "scriptPath");
 			obj.scripts.push_back(sc);
+		} else if (type == "RectTransform") {
+			RectTransformComponent rt;
+			rt.enabled = enabled;
+			auto p = ExtractArray(cblock, "pos"); if (p.size() >= 2) rt.pos = {p[0], p[1]};
+			auto s = ExtractArray(cblock, "size"); if (s.size() >= 2) rt.size = {s[0], s[1]};
+			auto a = ExtractArray(cblock, "anchor"); if (a.size() >= 2) rt.anchor = {a[0], a[1]};
+			auto pv = ExtractArray(cblock, "pivot"); if (pv.size() >= 2) rt.pivot = {pv[0], pv[1]};
+			rt.rotation = ExtractFloat(cblock, "rotation", 0.0f);
+			obj.rectTransforms.push_back(rt);
+		} else if (type == "UIImage") {
+			UIImageComponent img;
+			img.enabled = enabled;
+			img.texturePath = ExtractString(cblock, "texturePath");
+			if (renderer && !img.texturePath.empty()) img.textureHandle = renderer->LoadTexture2D(img.texturePath);
+			auto c = ExtractArray(cblock, "color"); if (c.size() >= 4) img.color = {c[0], c[1], c[2], c[3]};
+			obj.images.push_back(img);
+		} else if (type == "UIText") {
+			UITextComponent txt;
+			txt.enabled = enabled;
+			txt.text = UnescapeJson(ExtractString(cblock, "text"));
+			txt.fontSize = ExtractFloat(cblock, "fontSize", 24.0f);
+			auto c = ExtractArray(cblock, "color"); if (c.size() >= 4) txt.color = {c[0], c[1], c[2], c[3]};
+			obj.texts.push_back(txt);
+		} else if (type == "UIButton") {
+			UIButtonComponent btn;
+			btn.enabled = enabled;
+			auto nc = ExtractArray(cblock, "normalColor"); if (nc.size() >= 4) btn.normalColor = {nc[0], nc[1], nc[2], nc[3]};
+			auto hc = ExtractArray(cblock, "hoverColor"); if (hc.size() >= 4) btn.hoverColor = {hc[0], hc[1], hc[2], hc[3]};
+			auto pc = ExtractArray(cblock, "pressedColor"); if (pc.size() >= 4) btn.pressedColor = {pc[0], pc[1], pc[2], pc[3]};
+			obj.buttons.push_back(btn);
 		}
 		pos = endPos + 1;
 	}
