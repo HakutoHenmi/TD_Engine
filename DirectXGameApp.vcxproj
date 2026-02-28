@@ -181,6 +181,7 @@ exit /b 0
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="BaseScript.cpp" />
     <ClCompile Include="Game\Editor\EditorUI.cpp" />
     <ClCompile Include="Game\Scenes\GameScene.cpp" />
     <ClCompile Include="Game\Scenes\TitleScene.cpp" />
@@ -196,6 +197,7 @@ exit /b 0
     <ClCompile Include="TowerScript.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BaseScript.h" />
     <ClInclude Include="Game\Editor\EditorUI.h" />
     <ClInclude Include="Game\Scenes\GameScene.h" />
     <ClInclude Include="Game\Scenes\TitleScene.h" />
