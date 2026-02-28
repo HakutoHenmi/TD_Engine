@@ -7,8 +7,8 @@
 namespace Game {
 
 static bool HasTag(const SceneObject& obj, const char* tagName) {
-	for (int i = 0; i < (int)obj.tags.size(); ++i) {//タグ配列を最初から最後までループして、指定されたタグがあるか確認
-		if (obj.tags[i].tag == tagName) { //タグが見つかったらtrueを返す
+	for (int i = 0; i < (int)obj.tags.size(); ++i) { // タグ配列を最初から最後までループして、指定されたタグがあるか確認
+		if (obj.tags[i].tag == tagName) {            // タグが見つかったらtrueを返す
 			return true;
 		}
 	}
@@ -27,22 +27,22 @@ void BaseScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 		attackTimer_ -= dt;
 	}
 
-	// 1) 一番近いEnemyを探す（範囲内）
-	const SceneObject* target = nullptr;
-	float bestDistSq = attackRange_ * attackRange_;
+	//  一番近いEnemyを探す（範囲内）
+	const SceneObject* target = nullptr; //最初はターゲットなし
+	float bestDist = attackRange_;
 
-	for (const auto& other : scene->GetObjects()) {
+	for (const auto& other : scene->GetObjects()) { // シーン内の全オブジェクトをループして見ます
 
-		if (!HasTag(other, "Enemy")) {
+		if (!HasTag(other, "Enemy")) { // もし敵のタグがなければ無視
 			continue;
 		}
 
 		float dx = other.translate.x - obj.translate.x;
 		float dz = other.translate.z - obj.translate.z;
-		float distSq = dx * dx + dz * dz;
+		float dist = std::sqrt(dx * dx + dz * dz);
 
-		if (distSq < bestDistSq) {
-			bestDistSq = distSq;
+		if (dist < bestDist) {
+			bestDist = dist;
 			target = &other;
 		}
 	}
@@ -81,7 +81,6 @@ void BaseScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 
 	bullet.rotate = obj.rotate;
 	bullet.scale = {0.2f, 0.2f, 0.2f};
-
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
 		bullet.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
