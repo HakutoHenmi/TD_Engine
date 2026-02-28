@@ -34,13 +34,13 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 
 	bool loaded = false;
 	// ★ リリース構成等での自動ロード
-	if (std::filesystem::exists("Resources/TPS_Scene.json")) {
-		OutputDebugStringA("[GameScene] Resources/TPS_Scene.json found. Loading...\n");
-		EditorUI::LoadScene(this, "Resources/TPS_Scene.json");
+	if (std::filesystem::exists("Resources/scene.json")) {
+		OutputDebugStringA("[GameScene] Resources/scene.json found. Loading...\n");
+		EditorUI::LoadScene(this, "Resources/scene.json");
 		isPlaying_ = true; // ロード直後からプレイ状態にする
 		loaded = true;
 	} else {
-		OutputDebugStringA("[GameScene] Resources/TPS_Scene.json NOT found.\n");
+		OutputDebugStringA("[GameScene] Resources/scene.json NOT found.\n");
 	}
 
 	// 既にオブジェクトが存在する場合（リスタート時）やロード失敗時は最低限の内容を作成
@@ -58,7 +58,7 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 		plane.textureHandle = renderer_->LoadTexture2D("Resources/white1x1.png");
 		plane.modelPath = "Resources/plane.obj";
 		plane.texturePath = "Resources/white1x1.png";
-		plane.scale = {5, 1, 5};
+		plane.scale = {20, 1, 20};
 		objects_.push_back(plane);
 	}
 
@@ -109,6 +109,7 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 // ★ Update: 各Systemに処理を委譲
 // =====================================================
 void GameScene::Update() {
+	if (!renderer_) return;
 	static auto last = std::chrono::steady_clock::now();
 	auto now = std::chrono::steady_clock::now();
 	float dt = std::chrono::duration<float>(now - last).count();
@@ -286,7 +287,7 @@ void GameScene::Update() {
 			if (!emitterComp.enabled)
 				continue;
 
-			if (!emitterComp.isInitialized) {
+			if (!emitterComp.isInitialized && renderer_) {
 				emitterComp.emitter.Initialize(*renderer_, obj.name + "_Emitter");
 				if (!emitterComp.assetPath.empty()) {
 					emitterComp.emitter.LoadFromJson(emitterComp.assetPath);
@@ -304,8 +305,9 @@ void GameScene::Update() {
 void GameScene::SpawnObject(const SceneObject& obj) { pendingSpawns_.push_back(obj); }
 
 void GameScene::Draw() {
+	if (!renderer_) return;
 	renderer_->SetCamera(camera_);
-#ifdef _DEBUG
+#ifdef USE_IMGUI
 	DrawEditorGizmos();
 #endif
 
@@ -341,10 +343,12 @@ void GameScene::Draw() {
 				}
 
 				if (hasAnim) {
-					renderer_->DrawSkinnedMesh(mr.modelHandle, mr.textureHandle, obj.GetTransform(), bonePalette, {mr.color.x, mr.color.y, mr.color.z, mr.color.w});
+					renderer_->DrawSkinnedMesh(mr.modelHandle, mr.textureHandle, obj.GetTransform(), bonePalette, 
+						{obj.color.x * mr.color.x, obj.color.y * mr.color.y, obj.color.z * mr.color.z, obj.color.w * mr.color.w});
 				} else {
-					// ★変更: インスタンス描画を使用
-					renderer_->DrawMeshInstanced(mr.modelHandle, mr.textureHandle, obj.GetTransform(), {mr.color.x, mr.color.y, mr.color.z, mr.color.w}, mr.shaderName);
+					// ★変更: インスタンス描画を使用。オブジェクトカラーとコンポーネントカラーを乗算する
+					renderer_->DrawMeshInstanced(mr.modelHandle, mr.textureHandle, obj.GetTransform(), 
+						{obj.color.x * mr.color.x, obj.color.y * mr.color.y, obj.color.z * mr.color.z, obj.color.w * mr.color.w}, mr.shaderName);
 				}
 			}
 		}
@@ -384,7 +388,7 @@ void GameScene::Draw() {
 			}
 		}
 	}
-#ifdef _DEBUG
+#ifdef USE_IMGUI
 	DrawSelectionHighlight();
 	DrawLightGizmos();
 #endif
@@ -629,7 +633,7 @@ void GameScene::DrawEditorGizmos() {
 }
 
 void GameScene::DrawEditor() {
-#ifdef _DEBUG
+#ifdef USE_IMGUI
 	EditorUI::Show(renderer_, this);
 	particleEditor_.DrawUI();
 #endif

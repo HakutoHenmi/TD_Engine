@@ -30,6 +30,7 @@ public:
 		objects.erase(
 			std::remove_if(objects.begin(), objects.end(),
 				[](const SceneObject& o) {
+					if (o.name == "Player" || o.name == "PlayerSword") return false;
 					return !o.healths.empty() && o.healths[0].isDead && o.healths[0].enabled;
 				}),
 			objects.end());

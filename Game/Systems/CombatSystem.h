@@ -11,38 +11,58 @@ public:
 
 		for (size_t ai = 0; ai < objects.size(); ++ai) {
 			auto& attacker = objects[ai];
-			for (auto& hitbox : attacker.hitboxes) {
-				if (!hitbox.enabled || !hitbox.isActive) continue;
+				for (auto& hitbox : attacker.hitboxes) {
+					if (!hitbox.enabled || !hitbox.isActive) continue;
 
-				DirectX::XMFLOAT3 hAPos = {
-					attacker.translate.x + hitbox.center.x,
-					attacker.translate.y + hitbox.center.y,
-					attacker.translate.z + hitbox.center.z
-				};
+					// スケールを考慮したHitbox位置とサイズ
+					DirectX::XMFLOAT3 hAPos = {
+						attacker.translate.x + hitbox.center.x * std::abs(attacker.scale.x),
+						attacker.translate.y + hitbox.center.y * std::abs(attacker.scale.y),
+						attacker.translate.z + hitbox.center.z * std::abs(attacker.scale.z)
+					};
+					DirectX::XMFLOAT3 hASize = {
+						hitbox.size.x * std::abs(attacker.scale.x),
+						hitbox.size.y * std::abs(attacker.scale.y),
+						hitbox.size.z * std::abs(attacker.scale.z)
+					};
 
-				for (size_t di = 0; di < objects.size(); ++di) {
-					if (ai == di) continue;
-					auto& defender = objects[di];
+					for (size_t di = 0; di < objects.size(); ++di) {
+						if (ai == di) continue;
+						auto& defender = objects[di];
 
-					// Hurtbox判定
-					bool hit = false;
-					for (auto& hurtbox : defender.hurtboxes) {
-						if (!hurtbox.enabled) continue;
-						DirectX::XMFLOAT3 hBPos = {
-							defender.translate.x + hurtbox.center.x,
-							defender.translate.y + hurtbox.center.y,
-							defender.translate.z + hurtbox.center.z
-						};
-						if (CheckAABBOverlap(hAPos, hitbox.size, hBPos, hurtbox.size)) {
-							hit = true;
-							if (!defender.healths.empty() && defender.healths[0].invincibleTime <= 0.0f) {
-								defender.healths[0].hp -= hitbox.damage * hurtbox.damageMultiplier;
-								defender.healths[0].invincibleTime = 0.5f;
-								ApplyKnockback(attacker, defender);
-							}
-							break;
+						// プレイヤーと自身の剣の間での当たり判定をスキップ（自爆防止）
+						if ((attacker.name == "Player" && defender.name == "PlayerSword") ||
+							(attacker.name == "PlayerSword" && defender.name == "Player")) {
+							continue;
 						}
-					}
+
+						// Hurtbox判定
+						bool hit = false;
+						for (auto& hurtbox : defender.hurtboxes) {
+							if (!hurtbox.enabled) continue;
+							
+							// スケールを考慮したHurtbox位置とサイズ
+							DirectX::XMFLOAT3 hBPos = {
+								defender.translate.x + hurtbox.center.x * std::abs(defender.scale.x),
+								defender.translate.y + hurtbox.center.y * std::abs(defender.scale.y),
+								defender.translate.z + hurtbox.center.z * std::abs(defender.scale.z)
+							};
+							DirectX::XMFLOAT3 hBSize = {
+								hurtbox.size.x * std::abs(defender.scale.x),
+								hurtbox.size.y * std::abs(defender.scale.y),
+								hurtbox.size.z * std::abs(defender.scale.z)
+							};
+
+							if (CheckAABBOverlap(hAPos, hASize, hBPos, hBSize)) {
+								hit = true;
+								if (!defender.healths.empty() && defender.healths[0].invincibleTime <= 0.0f) {
+									defender.healths[0].hp -= hitbox.damage * hurtbox.damageMultiplier;
+									defender.healths[0].invincibleTime = 0.5f;
+									ApplyKnockback(attacker, defender);
+								}
+								break;
+							}
+						}
 
 					// BoxColliderフォールバック（Hurtboxがない場合）
 					if (!hit && defender.hurtboxes.empty() && !defender.boxColliders.empty()) {
@@ -87,9 +107,9 @@ public:
 private:
 	static bool CheckAABBOverlap(const DirectX::XMFLOAT3& posA, const DirectX::XMFLOAT3& sizeA,
 		const DirectX::XMFLOAT3& posB, const DirectX::XMFLOAT3& sizeB) {
-		return std::abs(posA.x - posB.x) < (sizeA.x + sizeB.x) * 0.5f &&
-		       std::abs(posA.y - posB.y) < (sizeA.y + sizeB.y) * 0.5f &&
-		       std::abs(posA.z - posB.z) < (sizeA.z + sizeB.z) * 0.5f;
+		return std::abs(posA.x - posB.x) < (sizeA.x + sizeB.x) &&
+		       std::abs(posA.y - posB.y) < (sizeA.y + sizeB.y) &&
+		       std::abs(posA.z - posB.z) < (sizeA.z + sizeB.z);
 	}
 
 	static void ApplyKnockback(const SceneObject& attacker, SceneObject& defender) {
