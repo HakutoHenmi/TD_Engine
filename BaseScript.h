@@ -11,11 +11,11 @@ public:
 	void OnDestroy(SceneObject& obj, GameScene* scene) override;
 
 private:
-	float rotationSpeed_ = 1.0f;
-	float attackInterval_ = 1.0f;
-	float attackTimer_ = 0.0f;
-	float damage_ = 10.0f;
-	float attackRange_ = 30.0f;
+	float rotationSpeed_ = 1.0f;  // タワーの回転速度
+	float attackInterval_ = 3.0f; // 攻撃のクールダウン時間
+	float attackTimer_ = 0.0f;    // 攻撃のクールダウンタイマー
+	float damage_ = 10.0f;        // 攻撃のダメージ量
+	float attackRange_ = 30.0f;   // 攻撃の射程距離
 };
 
 } // namespace Game

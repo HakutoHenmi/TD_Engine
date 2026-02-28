@@ -7,17 +7,17 @@
 namespace Game {
 
 static bool HasTag(const SceneObject& obj, const char* tagName) {
-	for (int i = 0; i < (int)obj.tags.size(); ++i) {
-		if (obj.tags[i].tag == tagName) {
+	for (int i = 0; i < (int)obj.tags.size(); ++i) {//タグ配列を最初から最後までループして、指定されたタグがあるか確認
+		if (obj.tags[i].tag == tagName) { //タグが見つかったらtrueを返す
 			return true;
 		}
 	}
-	return false;
+	return false; // タグが見つからなかったらfalseを返す
 }
 
 void BaseScript::Start(SceneObject& obj, GameScene* /*scene*/) {
 	(void)obj;
-	attackTimer_ = 0.0f;
+	attackTimer_ = 0.0f; // クールダウン初期化
 }
 
 void BaseScript::Update(SceneObject& obj, GameScene* scene, float dt) {
@@ -34,10 +34,6 @@ void BaseScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	for (const auto& other : scene->GetObjects()) {
 
 		if (!HasTag(other, "Enemy")) {
-			continue;
-		}
-		// 追加：死んでる敵は無視
-		if (!other.healths.empty() && other.healths[0].hp <= 0.0f) {
 			continue;
 		}
 
@@ -101,7 +97,7 @@ void BaseScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	hb.isActive = true;
 	hb.damage = damage_;
 	hb.tag = "Bullet"; // まずは Player と同じにしとく（当たるか確認）
-	hb.size = {1.0f, 1.0f, 1.0f};　
+	hb.size = {1.0f, 1.0f, 1.0f};
 	bullet.hitboxes.push_back(hb);
 
 	HealthComponent hc;
