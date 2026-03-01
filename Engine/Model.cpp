@@ -1,4 +1,4 @@
-// Engine/Model.cpp
+#define NOMINMAX
 #include "Model.h"
 
 #include <algorithm>
@@ -263,6 +263,20 @@ bool Model::Load(ID3D12Device* device, ID3D12GraphicsCommandList* cmd, const std
 			}
 		}
 		vertexOffset += mesh->mNumVertices;
+	}
+
+	// Calculate AABB
+	if (!data_.vertices.empty()) {
+		data_.min = {FLT_MAX, FLT_MAX, FLT_MAX};
+		data_.max = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+		for (const auto& v : data_.vertices) {
+			data_.min.x = (std::min)(data_.min.x, v.position.x);
+			data_.min.y = (std::min)(data_.min.y, v.position.y);
+			data_.min.z = (std::min)(data_.min.z, v.position.z);
+			data_.max.x = (std::max)(data_.max.x, v.position.x);
+			data_.max.y = (std::max)(data_.max.y, v.position.y);
+			data_.max.z = (std::max)(data_.max.z, v.position.z);
+		}
 	}
 
 	// ★★★ 修正箇所: テクスチャ読み込み部分 ★★★

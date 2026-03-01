@@ -46,14 +46,7 @@ public:
 
 				obj.translate.y += cm.velocityY * ctx.dt;
 
-				float floorHeight = 1.0f;
-				if (obj.translate.y <= floorHeight) {
-					obj.translate.y = floorHeight;
-					cm.velocityY = 0.0f;
-					cm.isGrounded = true;
-				} else {
-					cm.isGrounded = false;
-				}
+				// 床判定(1.0f)は削除（PhysicsSystemでコライダー同士が処理する）
 			}
 		}
 	}
