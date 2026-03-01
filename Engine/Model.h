@@ -78,6 +78,10 @@ struct ModelData {
 
 	// アニメーション情報
 	std::vector<Animation> animations;
+
+	// AABB (Local Space)
+	Vector3 min{0, 0, 0};
+	Vector3 max{0, 0, 0};
 };
 
 class Model {
