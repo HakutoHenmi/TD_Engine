@@ -22,36 +22,59 @@ void BaseScript::Start(SceneObject& obj, GameScene* /*scene*/) {
 
 void BaseScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 
+
+	// タワーを回転させる
+	obj.rotate.y += rotationSpeed_ * dt;
+
+
 	// 発射クールダウン
 	if (attackTimer_ > 0.0f) {
 		attackTimer_ -= dt;
 	}
 
 	//  一番近いEnemyを探す（範囲内）
-	const SceneObject* target = nullptr; //最初はターゲットなし
-	float bestDist = attackRange_;
+	const SceneObject* target = nullptr; // 最初はターゲットなし
 
 	for (const auto& other : scene->GetObjects()) { // シーン内の全オブジェクトをループして見ます
 
+		// この場合、otherが敵かどうかをタグで判断します
 		if (!HasTag(other, "Enemy")) { // もし敵のタグがなければ無視
-			continue;
+			continue;                  // Enemyではなかったらその回のforのループをスキップして次のオブジェクトをチェックします
 		}
+		// これハッシュタグを増やせば他の種類の敵も判定できるようになり
 
+		//  ここからは Enemy のときだけ実行される
+		// other(エネミー)とobj(タワー)の距離を計算します（Yは無視してXZ平面で）
+		// これはXZ平面の距離を計算するためのコードそしてYは無視されるので円柱型の当たり判定になります。
 		float dx = other.translate.x - obj.translate.x;
 		float dz = other.translate.z - obj.translate.z;
 		float dist = std::sqrt(dx * dx + dz * dz);
 
-		if (dist < bestDist) {
-			bestDist = dist;
+		// 距離が攻撃範囲内ならother(エネミー)をターゲットに設定する。
+		if (dist < attackRange_) {
 			target = &other;
 		}
 	}
 
+	//  ターゲットがいなければ何もしない
 	if (target == nullptr) {
 		return;
 	}
 
-	// 2) ターゲット方向へ向ける（Y回転だけ）
+	// クールダウン終わってたら撃つ
+	if (attackTimer_ > 0.0f) {
+		return;
+	}
+
+
+	// 弾を生成して撃つ
+	SceneObject bullet;
+	bullet.name = "Bullet";//このオブジェクトは弾です？
+
+	bullet.translate = obj.translate;
+	bullet.translate.y += 2.0f;
+
+	// 敵方向（XZ）
 	float toX = target->translate.x - obj.translate.x;
 	float toZ = target->translate.z - obj.translate.z;
 
@@ -59,28 +82,18 @@ void BaseScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 		return;
 	}
 
-	// +Zが前の前提：PlayerScriptの sin/cos と合わせるため atan2(x, z)
 	float desiredYaw = std::atan2(toX, toZ);
 
-	// すぐ向ける（まずはこれでOK）
-	obj.rotate.y = desiredYaw;
+	// ここを desiredYaw にする
+	bullet.translate.x += std::sin(desiredYaw) * 1.5f;
+	bullet.translate.z += std::cos(desiredYaw) * 1.5f;
 
-	// 3) クールダウン終わってたら撃つ
-	if (attackTimer_ > 0.0f) {
-		return;
-	}
-
-	SceneObject bullet;
-	bullet.name = "Bullet";
-
-	bullet.translate = obj.translate;
-	bullet.translate.y += 2.0f;
-
-	bullet.translate.x += std::sin(obj.rotate.y) * 1.5f;
-	bullet.translate.z += std::cos(obj.rotate.y) * 1.5f;
-
+	// 回転はVector3でセット
 	bullet.rotate = obj.rotate;
+	bullet.rotate.y = desiredYaw;
+
 	bullet.scale = {0.2f, 0.2f, 0.2f};
+
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
 		bullet.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
