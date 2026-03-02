@@ -1,7 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
     <ClCompile Include="Game\Scenes\TitleScene.cpp">
       <Filter>Scenes</Filter>
     </ClCompile>
@@ -14,11 +13,28 @@
     <ClCompile Include="Game\Systems\UISystem.cpp">
       <Filter>Systems</Filter>
     </ClCompile>
-    <ClCompile Include="Game\ScriptEngine.cpp" />
-    <ClCompile Include="Game\PlayerScript.cpp" />
-    <ClCompile Include="Game\EnemyAIScript.cpp" />
-    <ClCompile Include="Game\BulletScript.cpp" />
-    <ClCompile Include="Game\KamikazeEnemyScript.cpp" />
+    <ClCompile Include="Game\Scripts\BaseScript.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Scripts\BulletScript.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Scripts\EnemyAIScript.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Scripts\KamikazeEnemyScript.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Scripts\PlayerScript.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Scripts\ScriptEngine.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Scripts\TowerScript.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
@@ -36,22 +52,60 @@
     <ClInclude Include="Game\Systems\UISystem.h">
       <Filter>Systems</Filter>
     </ClInclude>
-    <ClInclude Include="Game\ScriptEngine.h" />
-    <ClInclude Include="Game\IScript.h" />
-    <ClInclude Include="Game\PlayerScript.h" />
-    <ClInclude Include="Game\EnemyAIScript.h" />
-    <ClInclude Include="Game\BulletScript.h" />
-    <ClInclude Include="Game\Systems\ISystem.h" />
-    <ClInclude Include="Game\Systems\PlayerInputSystem.h" />
-    <ClInclude Include="Game\Systems\CharacterMovementSystem.h" />
-    <ClInclude Include="Game\Systems\CameraFollowSystem.h" />
-    <ClInclude Include="Game\Systems\PhysicsSystem.h" />
-    <ClInclude Include="Game\Systems\CombatSystem.h" />
-    <ClInclude Include="Game\Systems\HealthSystem.h" />
-    <ClInclude Include="Game\Systems\AudioSystem.h" />
-    <ClInclude Include="Game\Systems\ScriptSystem.h" />
-    <ClInclude Include="Game\Systems\CleanupSystem.h" />
-    <ClInclude Include="Game\KamikazeEnemyScript.h" />
+    <ClInclude Include="Game\Scripts\BaseScript.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Scripts\BulletScript.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Scripts\EnemyAIScript.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Scripts\IScript.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Scripts\KamikazeEnemyScript.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Scripts\PlayerScript.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Scripts\ScriptEngine.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Scripts\TowerScript.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Systems\AudioSystem.h">
+      <Filter>Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Systems\CameraFollowSystem.h">
+      <Filter>Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Systems\CharacterMovementSystem.h">
+      <Filter>Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Systems\CleanupSystem.h">
+      <Filter>Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Systems\CombatSystem.h">
+      <Filter>Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Systems\HealthSystem.h">
+      <Filter>Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Systems\ISystem.h">
+      <Filter>Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Systems\PhysicsSystem.h">
+      <Filter>Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Systems\PlayerInputSystem.h">
+      <Filter>Systems</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Systems\ScriptSystem.h">
+      <Filter>Systems</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">
@@ -65,6 +119,9 @@
     </Filter>
     <Filter Include="Systems">
       <UniqueIdentifier>{f2a3b4c5-d6e7-48a9-b0c1-d2e3f4a5b6c7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Scripts">
+      <UniqueIdentifier>{2183f610-6b59-423a-95bc-4fff8159e64c}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

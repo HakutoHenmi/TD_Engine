@@ -1,8 +1,8 @@
+#include "App.h"
+#include "GameScene.h"
+#include "TitleScene.h"
 #include <Windows.h>
 #include <memory>
-#include "App.h"
-#include "Game/Scenes/GameScene.h"
-#include "Game/Scenes/TitleScene.h"
 
 int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int cmdShow) {
 	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
@@ -12,7 +12,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int cmdShow) {
 		wchar_t exePath[MAX_PATH];
 		GetModuleFileNameW(nullptr, exePath, MAX_PATH);
 		wchar_t* lastSlash = wcsrchr(exePath, L'\\');
-		if (lastSlash) *lastSlash = L'\0';
+		if (lastSlash)
+			*lastSlash = L'\0';
 
 		wchar_t devPath[MAX_PATH];
 		wcscpy_s(devPath, exePath);
