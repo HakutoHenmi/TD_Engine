@@ -181,37 +181,35 @@ exit /b 0
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="BaseScript.cpp" />
     <ClCompile Include="Game\Editor\EditorUI.cpp" />
-    <ClCompile Include="Game\KamikazeEnemyScript.cpp" />
+    <ClCompile Include="Game\main.cpp" />
     <ClCompile Include="Game\Scenes\GameScene.cpp" />
     <ClCompile Include="Game\Scenes\TitleScene.cpp" />
-    <ClCompile Include="Game\ScriptEngine.cpp" />
+    <ClCompile Include="Game\Scripts\BaseScript.cpp" />
+    <ClCompile Include="Game\Scripts\BulletScript.cpp" />
+    <ClCompile Include="Game\Scripts\EnemyAIScript.cpp" />
+    <ClCompile Include="Game\Scripts\KamikazeEnemyScript.cpp" />
+    <ClCompile Include="Game\Scripts\PlayerScript.cpp" />
+    <ClCompile Include="Game\Scripts\ScriptEngine.cpp" />
+    <ClCompile Include="Game\Scripts\TowerScript.cpp" />
     <!-- ★追加 -->
     <ClCompile Include="Game\Systems\UISystem.cpp" />
-    <ClCompile Include="Game\PlayerScript.cpp" />
-    <ClCompile Include="Game\EnemyAIScript.cpp" />
-    <ClCompile Include="Game\BulletScript.cpp" />
-    <ClCompile Include="main.cpp">
-      <Optimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">MaxSpeed</Optimization>
-      <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</WholeProgramOptimization>
-    </ClCompile>
-    <ClCompile Include="TowerScript.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="BaseScript.h" />
     <ClInclude Include="Game\Editor\EditorUI.h" />
-    <ClInclude Include="Game\KamikazeEnemyScript.h" />
     <ClInclude Include="Game\Scenes\GameScene.h" />
     <ClInclude Include="Game\Scenes\TitleScene.h" />
     <ClInclude Include="Game\ObjectTypes.h" />
-    <ClInclude Include="Game\ScriptEngine.h" />
+    <ClInclude Include="Game\Scripts\BaseScript.h" />
+    <ClInclude Include="Game\Scripts\BulletScript.h" />
+    <ClInclude Include="Game\Scripts\EnemyAIScript.h" />
+    <ClInclude Include="Game\Scripts\IScript.h" />
+    <ClInclude Include="Game\Scripts\KamikazeEnemyScript.h" />
+    <ClInclude Include="Game\Scripts\PlayerScript.h" />
+    <ClInclude Include="Game\Scripts\ScriptEngine.h" />
+    <ClInclude Include="Game\Scripts\TowerScript.h" />
     <!-- ★追加 -->
     <ClInclude Include="Game\Systems\UISystem.h" />
-    <ClInclude Include="Game\IScript.h" />
-    <ClInclude Include="Game\PlayerScript.h" />
-    <ClInclude Include="Game\EnemyAIScript.h" />
-    <ClInclude Include="Game\BulletScript.h" />
     <ClInclude Include="Game\Systems\ISystem.h" />
     <ClInclude Include="Game\Systems\PlayerInputSystem.h" />
     <ClInclude Include="Game\Systems\CharacterMovementSystem.h" />
@@ -222,7 +220,6 @@ exit /b 0
     <ClInclude Include="Game\Systems\AudioSystem.h" />
     <ClInclude Include="Game\Systems\ScriptSystem.h" />
     <ClInclude Include="Game\Systems\CleanupSystem.h" />
-    <ClInclude Include="TowerScript.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="DirectXGameEngine.vcxproj">

@@ -3,7 +3,7 @@
 #endif
 #include "GameScene.h"
 #include "../Editor/EditorUI.h"
-#include "../ScriptEngine.h"
+#include "../Scripts/ScriptEngine.h"
 #include "../Systems/AudioSystem.h"
 #include "../Systems/CameraFollowSystem.h"
 #include "../Systems/CharacterMovementSystem.h"
@@ -109,7 +109,8 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 // ★ Update: 各Systemに処理を委譲
 // =====================================================
 void GameScene::Update() {
-	if (!renderer_) return;
+	if (!renderer_)
+		return;
 	static auto last = std::chrono::steady_clock::now();
 	auto now = std::chrono::steady_clock::now();
 	float dt = std::chrono::duration<float>(now - last).count();
@@ -305,7 +306,8 @@ void GameScene::Update() {
 void GameScene::SpawnObject(const SceneObject& obj) { pendingSpawns_.push_back(obj); }
 
 void GameScene::Draw() {
-	if (!renderer_) return;
+	if (!renderer_)
+		return;
 	renderer_->SetCamera(camera_);
 #ifdef USE_IMGUI
 	DrawEditorGizmos();
@@ -314,7 +316,7 @@ void GameScene::Draw() {
 	// ★追加: プレイヤーの位置を Renderer に同期（草のインタラクション用）
 	for (const auto& obj : objects_) {
 		if (obj.name == "Player") {
-			renderer_->SetPlayerPos(Engine::Vector3{ obj.translate.x, obj.translate.y, obj.translate.z });
+			renderer_->SetPlayerPos(Engine::Vector3{obj.translate.x, obj.translate.y, obj.translate.z});
 			break;
 		}
 	}
@@ -351,11 +353,12 @@ void GameScene::Draw() {
 				}
 
 				if (hasAnim) {
-					renderer_->DrawSkinnedMesh(mr.modelHandle, mr.textureHandle, obj.GetTransform(), bonePalette, 
-						{obj.color.x * mr.color.x, obj.color.y * mr.color.y, obj.color.z * mr.color.z, obj.color.w * mr.color.w});
+					renderer_->DrawSkinnedMesh(
+					    mr.modelHandle, mr.textureHandle, obj.GetTransform(), bonePalette, {obj.color.x * mr.color.x, obj.color.y * mr.color.y, obj.color.z * mr.color.z, obj.color.w * mr.color.w});
 				} else {
-					renderer_->DrawMeshInstanced(mr.modelHandle, mr.textureHandle, obj.GetTransform(), 
-						{obj.color.x * mr.color.x, obj.color.y * mr.color.y, obj.color.z * mr.color.z, obj.color.w * mr.color.w}, mr.shaderName, mr.extraTextureHandles);
+					renderer_->DrawMeshInstanced(
+					    mr.modelHandle, mr.textureHandle, obj.GetTransform(), {obj.color.x * mr.color.x, obj.color.y * mr.color.y, obj.color.z * mr.color.z, obj.color.w * mr.color.w}, mr.shaderName,
+					    mr.extraTextureHandles);
 				}
 			}
 		}
@@ -392,7 +395,8 @@ void GameScene::Draw() {
 			} else {
 				// ★変更: インスタンス描画を使用
 				std::vector<uint32_t> extraHandles;
-				for (const auto& p : obj.extraTexturePaths) extraHandles.push_back(renderer_->LoadTexture2D(p));
+				for (const auto& p : obj.extraTexturePaths)
+					extraHandles.push_back(renderer_->LoadTexture2D(p));
 				renderer_->DrawMeshInstanced(obj.modelHandle, obj.textureHandle, obj.GetTransform(), {obj.color.x, obj.color.y, obj.color.z, obj.color.w}, obj.shaderName, extraHandles);
 			}
 		}

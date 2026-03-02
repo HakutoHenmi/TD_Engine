@@ -1,6 +1,6 @@
 #pragma once
+#include "../Scripts/ScriptEngine.h"
 #include "ISystem.h"
-#include "../ScriptEngine.h"
 
 namespace Game {
 
@@ -11,7 +11,8 @@ public:
 	void SetScene(GameScene* scene) { scene_ = scene; }
 
 	void Update(std::vector<SceneObject>& objects, GameContext& ctx) override {
-		if (!ctx.isPlaying) return;
+		if (!ctx.isPlaying)
+			return;
 
 		auto* scriptEngine = ScriptEngine::GetInstance();
 		for (auto& obj : objects) {
