@@ -52,6 +52,8 @@ struct MeshRendererComponent : public Component {
 	DirectX::XMFLOAT2 uvOffset = {0, 0};
 	uint32_t lightmapHandle = 0;
 	std::string lightmapPath;
+	std::vector<uint32_t> extraTextureHandles; // ★追加
+	std::vector<std::string> extraTexturePaths; // ★追加
 	std::string shaderName = "Default"; // ★追加
 	MeshRendererComponent() { type = ComponentType::MeshRenderer; }
 };
@@ -63,10 +65,16 @@ struct BoxColliderComponent : public Component {
 	BoxColliderComponent() { type = ComponentType::BoxCollider; }
 };
 
+enum class MeshCollisionType {
+	Mesh,   // 全ポリゴン
+	Convex, // 凸包近似（簡易化）
+};
+
 // ★追加: GPUメッシュコライダーコンポーネント
 struct GpuMeshColliderComponent : public Component {
 	uint32_t meshHandle = 0;
 	std::string meshPath = "";
+	MeshCollisionType collisionType = MeshCollisionType::Mesh; // 追加
 	bool isTrigger = false;
 	bool isIntersecting = false; // 衝突結果格納用
 	GpuMeshColliderComponent() { type = ComponentType::GpuMeshCollider; }
@@ -261,6 +269,7 @@ struct SceneObject {
 	uint32_t textureHandle = 0;
 	std::string modelPath;   // ★追加: 保存/復元用パス
 	std::string texturePath;  // ★追加: 保存/復元用パス
+	std::vector<std::string> extraTexturePaths; // ★追加
 	std::string shaderName = "Default"; // ★追加
 
 	// コンポーネント

@@ -311,6 +311,14 @@ void GameScene::Draw() {
 	DrawEditorGizmos();
 #endif
 
+	// ★追加: プレイヤーの位置を Renderer に同期（草のインタラクション用）
+	for (const auto& obj : objects_) {
+		if (obj.name == "Player") {
+			renderer_->SetPlayerPos(Engine::Vector3{ obj.translate.x, obj.translate.y, obj.translate.z });
+			break;
+		}
+	}
+
 	for (const auto& obj : objects_) {
 		bool hasMeshRenderer = false;
 		for (const auto& mr : obj.meshRenderers) {
@@ -346,9 +354,8 @@ void GameScene::Draw() {
 					renderer_->DrawSkinnedMesh(mr.modelHandle, mr.textureHandle, obj.GetTransform(), bonePalette, 
 						{obj.color.x * mr.color.x, obj.color.y * mr.color.y, obj.color.z * mr.color.z, obj.color.w * mr.color.w});
 				} else {
-					// ★変更: インスタンス描画を使用。オブジェクトカラーとコンポーネントカラーを乗算する
 					renderer_->DrawMeshInstanced(mr.modelHandle, mr.textureHandle, obj.GetTransform(), 
-						{obj.color.x * mr.color.x, obj.color.y * mr.color.y, obj.color.z * mr.color.z, obj.color.w * mr.color.w}, mr.shaderName);
+						{obj.color.x * mr.color.x, obj.color.y * mr.color.y, obj.color.z * mr.color.z, obj.color.w * mr.color.w}, mr.shaderName, mr.extraTextureHandles);
 				}
 			}
 		}
@@ -384,7 +391,9 @@ void GameScene::Draw() {
 				renderer_->DrawSkinnedMesh(obj.modelHandle, obj.textureHandle, obj.GetTransform(), bonePalette, {obj.color.x, obj.color.y, obj.color.z, obj.color.w});
 			} else {
 				// ★変更: インスタンス描画を使用
-				renderer_->DrawMeshInstanced(obj.modelHandle, obj.textureHandle, obj.GetTransform(), {obj.color.x, obj.color.y, obj.color.z, obj.color.w}, obj.shaderName);
+				std::vector<uint32_t> extraHandles;
+				for (const auto& p : obj.extraTexturePaths) extraHandles.push_back(renderer_->LoadTexture2D(p));
+				renderer_->DrawMeshInstanced(obj.modelHandle, obj.textureHandle, obj.GetTransform(), {obj.color.x, obj.color.y, obj.color.z, obj.color.w}, obj.shaderName, extraHandles);
 			}
 		}
 	}

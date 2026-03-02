@@ -63,6 +63,8 @@ bool Renderer::Initialize(WindowDX* window) {
 	if (!dev_ || !list_ || !queue_ || !srvHeap_)
 		return false;
 
+	srvDynamicCursor_ = kSrvStaticMax;
+
 	viewport_.TopLeftX = 0.0f;
 	viewport_.TopLeftY = 0.0f;
 	viewport_.Width = (float)Engine::WindowDX::kW;
@@ -278,8 +280,13 @@ void Renderer::BeginFrame(const float clearColorRGBA[4]) {
 	upload_[fi].Reset();
 
 	drawCalls_.clear(); // ★追加: ドローコールをクリア
-	instancedDrawCalls_.clear(); // ★追加
-	instancedParticleDrawCalls_.clear(); // ★追加: パーティクル用
+	
+	cbFrame_.time += 0.016f; // 固定値だが、本来はDeltaTimeを使うべき
+
+	// インスタンス描画用のキューをクリア
+	instancedDrawCalls_.clear();
+	instancedParticleDrawCalls_.clear();
+	srvDynamicCursor_ = kSrvStaticMax; // 動的SRVカーソルをリセット
 	spriteDrawCalls_.clear(); // ★スプライトもクリア
 
 	cbFrameAddr_ = 0;
@@ -379,6 +386,8 @@ void Renderer::FlushDrawCalls() {
 		list_->SetGraphicsRootDescriptorTable(5, shadowSrv_);
 	}
 
+	D3D12_GPU_DESCRIPTOR_HANDLE defaultSrv = textures_[0].srvGpu;
+
 	for (const auto& dc : drawCalls_) {
 		auto* model = GetModel(dc.mesh);
 		if (!model) continue;
@@ -395,37 +404,66 @@ void Renderer::FlushDrawCalls() {
 			list_->SetGraphicsRootDescriptorTable(5, shadowSrv_);
 		}
 
-		if (dc.isParticle) {
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable : 4324)
-#endif
-			struct alignas(256) CBParticle { Matrix4x4 world; float color[4]; float uvScaleOffset[4]; };
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
-			CBParticle pcb{}; pcb.world = dc.tr.ToMatrix(); 
-			pcb.color[0]=dc.color.x; pcb.color[1]=dc.color.y; pcb.color[2]=dc.color.z; pcb.color[3]=dc.color.w;
-			pcb.uvScaleOffset[0]=dc.uvScaleOffset.x; pcb.uvScaleOffset[1]=dc.uvScaleOffset.y; pcb.uvScaleOffset[2]=dc.uvScaleOffset.z; pcb.uvScaleOffset[3]=dc.uvScaleOffset.w;
-			uint32_t oOff = upload_[fi].Allocate(sizeof(CBParticle), 256);
-			std::memcpy(upload_[fi].mapped + oOff, &pcb, sizeof(CBParticle));
-			list_->SetGraphicsRootConstantBufferView(1, upload_[fi].buffer->GetGPUVirtualAddress() + oOff);
-			list_->SetGraphicsRootConstantBufferView(4, upload_[fi].buffer->GetGPUVirtualAddress() + oOff);
+		if (dc.shaderName == "EnhancedTerrain") {
+			list_->SetGraphicsRootSignature(rootSigTerrain_.Get());
+			list_->SetGraphicsRootConstantBufferView(0, cbFrameAddr_);
+			list_->SetGraphicsRootConstantBufferView(2, cbLightAddr_);
+			
+			// t0-t5: Descriptor Table
+			uint32_t sIdx = AllocateDynamicSrvIndex(6);
+			if (sIdx != UINT32_MAX) {
+				D3D12_CPU_DESCRIPTOR_HANDLE dest = window_->SRV_CPU((int)sIdx);
+				D3D12_GPU_DESCRIPTOR_HANDLE destGpu = window_->SRV_GPU((int)sIdx);
+				for (int i = 0; i < 6; ++i) {
+					D3D12_CPU_DESCRIPTOR_HANDLE src;
+					if (i == 0 && dc.tex < textures_.size()) src = textures_[dc.tex].srvCpu;
+					else if (i > 0 && (i - 1) < (int)dc.extraTex.size() && dc.extraTex[i - 1] < textures_.size())
+						src = textures_[dc.extraTex[i - 1]].srvCpu;
+					else src = textures_[0].srvCpu;
+					dev_->CopyDescriptorsSimple(1, dest, src, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+					dest.ptr += srvInc_;
+				}
+				list_->SetGraphicsRootDescriptorTable(3, destGpu);
+			}
+			if (shadowSrv_.ptr != 0) list_->SetGraphicsRootDescriptorTable(4, shadowSrv_);
 		} else {
+			list_->SetGraphicsRootSignature(rootSig3D_.Get());
+			list_->SetGraphicsRootConstantBufferView(0, cbFrameAddr_);
+			list_->SetGraphicsRootConstantBufferView(2, cbLightAddr_);
+			if (shadowSrv_.ptr != 0) list_->SetGraphicsRootDescriptorTable(5, shadowSrv_);
+			
+			if (dc.tex != 0 && dc.tex < textures_.size()) {
+				list_->SetGraphicsRootDescriptorTable(3, textures_[dc.tex].srvGpu);
+			} else if (model->GetSrvGpu().ptr != 0) {
+				list_->SetGraphicsRootDescriptorTable(3, model->GetSrvGpu());
+			} else {
+				list_->SetGraphicsRootDescriptorTable(3, textures_[0].srvGpu);
+			}
+		}
+
 #ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable : 4324)
 #endif
-			struct alignas(256) CBObj { Matrix4x4 world; float color[4]; };
+		struct alignas(256) CBObj { Matrix4x4 world; float color[4]; };
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
-			CBObj ocb{}; ocb.world = dc.tr.ToMatrix(); 
-			ocb.color[0]=dc.color.x; ocb.color[1]=dc.color.y; ocb.color[2]=dc.color.z; ocb.color[3]=dc.color.w;
-			uint32_t oOff = upload_[fi].Allocate(sizeof(CBObj), 256);
+		CBObj ocb{}; ocb.world = dc.tr.ToMatrix(); 
+		ocb.color[0]=dc.color.x; ocb.color[1]=dc.color.y; ocb.color[2]=dc.color.z; ocb.color[3]=dc.color.w;
+		uint32_t oOff = upload_[fi].Allocate(sizeof(CBObj), 256);
+		if (oOff != UINT32_MAX) {
 			std::memcpy(upload_[fi].mapped + oOff, &ocb, sizeof(CBObj));
-			list_->SetGraphicsRootConstantBufferView(1, upload_[fi].buffer->GetGPUVirtualAddress() + oOff);
-
+			auto gpuAddr = upload_[fi].buffer->GetGPUVirtualAddress() + oOff;
+			list_->SetGraphicsRootConstantBufferView(1, gpuAddr);
+			
+			// ★重要: EnhancedTerrain の場合は StructuredBuffer<InstanceData> (Slot 5) にもバインド
+			if (dc.shaderName == "EnhancedTerrain") {
+				list_->SetGraphicsRootShaderResourceView(5, gpuAddr);
+			}
+		}
+		
+		if (dc.shaderName != "EnhancedTerrain") {
 			if (dc.isSkinned) {
 				struct CBBone { Matrix4x4 bones[128]; };
 				CBBone boneData{};
@@ -439,15 +477,7 @@ void Renderer::FlushDrawCalls() {
 			}
 		}
 
-		if (dc.tex != 0 && dc.tex < textures_.size()) {
-			list_->SetGraphicsRootDescriptorTable(3, textures_[dc.tex].srvGpu);
-		} else if (model->GetSrvGpu().ptr != 0) {
-			list_->SetGraphicsRootDescriptorTable(3, model->GetSrvGpu());
-		} else {
-			list_->SetGraphicsRootDescriptorTable(3, textures_[0].srvGpu);
-		}
-
-		model->Draw(list_, 3);
+		model->Draw(list_);
 	}
 
 	// ====== インスタンス描画の共通処理関数 (ラムダ) ======
@@ -476,18 +506,52 @@ void Renderer::FlushDrawCalls() {
 			}
 
 			// テクスチャ設定
-			if (idc.tex != 0 && idc.tex < textures_.size()) {
-				list_->SetGraphicsRootDescriptorTable(3, textures_[idc.tex].srvGpu);
-			} else {
-				list_->SetGraphicsRootDescriptorTable(3, textures_[0].srvGpu);
-			}
-
 			// インスタンスデータの転送
 			uint32_t dataSize = static_cast<uint32_t>(sizeof(InstanceData) * idc.instances.size());
 			uint32_t offset = upload_[fi].Allocate(dataSize, 256);
 			if (offset != UINT32_MAX) {
 				std::memcpy(upload_[fi].mapped + offset, idc.instances.data(), dataSize);
-				list_->SetGraphicsRootShaderResourceView(6, upload_[fi].buffer->GetGPUVirtualAddress() + offset);
+				
+				// ★修正: EnhancedTerrainの場合のセットアップ (RootSignatureを先に設定してからバインドする)
+				if (sName == "EnhancedTerrain") {
+					list_->SetGraphicsRootSignature(rootSigTerrain_.Get());
+					list_->SetGraphicsRootConstantBufferView(0, cbFrameAddr_);
+					list_->SetGraphicsRootConstantBufferView(2, cbLightAddr_);
+					if (shadowSrv_.ptr != 0) list_->SetGraphicsRootDescriptorTable(4, shadowSrv_);
+
+					// テクスチャバインド
+					uint32_t sIdx = AllocateDynamicSrvIndex(6);
+					if (sIdx != UINT32_MAX) {
+						D3D12_CPU_DESCRIPTOR_HANDLE dest = window_->SRV_CPU((int)sIdx);
+						D3D12_GPU_DESCRIPTOR_HANDLE destGpu = window_->SRV_GPU((int)sIdx);
+						for (int i = 0; i < 6; ++i) {
+							D3D12_CPU_DESCRIPTOR_HANDLE src;
+							if (i == 0 && idc.tex < textures_.size()) src = textures_[idc.tex].srvCpu;
+							else if (i > 0 && (i - 1) < (int)idc.extraTex.size() && idc.extraTex[i - 1] < textures_.size())
+								src = textures_[idc.extraTex[i - 1]].srvCpu;
+							else src = textures_[0].srvCpu;
+							dev_->CopyDescriptorsSimple(1, dest, src, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+							dest.ptr += srvInc_;
+						}
+						list_->SetGraphicsRootDescriptorTable(3, destGpu);
+					}
+					// インスタンスデータバインド (Slot 5)
+					list_->SetGraphicsRootShaderResourceView(5, upload_[fi].buffer->GetGPUVirtualAddress() + offset);
+				} else {
+					list_->SetGraphicsRootSignature(rootSig3D_.Get());
+					list_->SetGraphicsRootConstantBufferView(0, cbFrameAddr_);
+					list_->SetGraphicsRootConstantBufferView(2, cbLightAddr_);
+					if (shadowSrv_.ptr != 0) list_->SetGraphicsRootDescriptorTable(5, shadowSrv_);
+					
+					// テクスチャ
+					if (idc.tex != 0 && idc.tex < textures_.size()) {
+						list_->SetGraphicsRootDescriptorTable(3, textures_[idc.tex].srvGpu);
+					} else {
+						list_->SetGraphicsRootDescriptorTable(3, textures_[0].srvGpu);
+					}
+					// インスタンスデータバインド (Slot 6)
+					list_->SetGraphicsRootShaderResourceView(6, upload_[fi].buffer->GetGPUVirtualAddress() + offset);
+				}
 			}
 
 			model->DrawInstanced(list_, static_cast<uint32_t>(idc.instances.size()));
@@ -758,7 +822,20 @@ void Renderer::SetAreaLight(int index, const Vector3& pos, const Vector3& color,
 	lightCB_.areaLights[index].enabled = enabled ? 1 : 0;
 }
 
-uint32_t Renderer::AllocateSrvIndex() { return srvCursor_++; }
+uint32_t Renderer::AllocateSrvIndex(uint32_t count) {
+	uint32_t idx = srvCursor_;
+	srvCursor_ += count;
+	return idx;
+}
+
+uint32_t Renderer::AllocateDynamicSrvIndex(uint32_t count) {
+	if (srvDynamicCursor_ + count > kSrvHeapTotal) {
+		return UINT32_MAX; // 溢れた
+	}
+	uint32_t idx = srvDynamicCursor_;
+	srvDynamicCursor_ += count;
+	return idx;
+}
 
 ComPtr<ID3DBlob> Renderer::CompileShader(const char* src, const char* entry, const char* target) {
 	UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
@@ -974,6 +1051,37 @@ bool Renderer::InitPipelines() {
 			return false;
 		if (FAILED(dev_->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(), IID_PPV_ARGS(&rootSig3D_))))
 			return false;
+	}
+
+	// ★追加: 地形用 RootSignature (複数テクスチャ対応)
+	{
+		CD3DX12_DESCRIPTOR_RANGE rangeSRVs;
+		rangeSRVs.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 6, 0); // t0-t5: SplatMap, Layer0-3, Detail
+
+		CD3DX12_DESCRIPTOR_RANGE rangeShadowSRV;
+		rangeShadowSRV.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 6); // t6: ShadowMap
+
+		CD3DX12_ROOT_PARAMETER params[6]{};
+		params[0].InitAsConstantBufferView(0);                                        // b0: CBFrame
+		params[1].InitAsConstantBufferView(1);                                        // b1: CBObj
+		params[2].InitAsConstantBufferView(2);                                        // b2: CBLight
+		params[3].InitAsDescriptorTable(1, &rangeSRVs, D3D12_SHADER_VISIBILITY_PIXEL); // t0-t5
+		params[4].InitAsDescriptorTable(1, &rangeShadowSRV, D3D12_SHADER_VISIBILITY_PIXEL); // t6: ShadowMap
+		params[5].InitAsShaderResourceView(2, 0, D3D12_SHADER_VISIBILITY_VERTEX);       // t2: InstanceData (SRV)
+
+		CD3DX12_STATIC_SAMPLER_DESC samp[2]{};
+		samp[0].Init(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+		samp[1].Init(1, D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER, D3D12_TEXTURE_ADDRESS_MODE_BORDER);
+		samp[1].ComparisonFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+		samp[1].BorderColor = D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE;
+
+		CD3DX12_ROOT_SIGNATURE_DESC rsDesc;
+		rsDesc.Init(_countof(params), params, 2, samp, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+		ComPtr<ID3DBlob> sig, err;
+		if (SUCCEEDED(D3D12SerializeRootSignature(&rsDesc, D3D_ROOT_SIGNATURE_VERSION_1, &sig, &err))) {
+			dev_->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(), IID_PPV_ARGS(&rootSigTerrain_));
+		}
 	}
 
 	// ★追加: コンピュート RootSignature
@@ -1392,9 +1500,62 @@ float4 main(PSIn i) : SV_TARGET { return i.color; }
 		dev_->CreateComputePipelineState(&computePsoDesc, IID_PPV_ARGS(&psoCollision_)); // 失敗しても続行
 	}
 
-	// ★追加: Particle用シェーダーのコンパイルと登録 (RootSignature作成後に行う必要がある)
-	CreateShaderPipelineTransparent("Particle", L"Resources/shaders/ParticleVS.hlsl", L"Resources/shaders/ParticlePS.hlsl", false);
-	CreateShaderPipelineTransparent("ParticleAdditive", L"Resources/shaders/ParticleVS.hlsl", L"Resources/shaders/ParticlePS.hlsl", true);
+	// ★追加: 高品位地形シェーダーの登録
+	{
+		auto vs = CompileShaderFromFile(L"Resources/shaders/EnhancedTerrainVS.hlsl", "main", "vs_5_0");
+		auto ps = CompileShaderFromFile(L"Resources/shaders/EnhancedTerrainPS.hlsl", "main", "ps_5_0");
+		if (vs && ps) {
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
+			psoDesc.pRootSignature = rootSigTerrain_.Get();
+			psoDesc.VS = { vs->GetBufferPointer(), vs->GetBufferSize() };
+			psoDesc.PS = { ps->GetBufferPointer(), ps->GetBufferSize() };
+			psoDesc.SampleMask = UINT_MAX;
+			psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+			psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+			psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+			psoDesc.InputLayout = { skinLayout, _countof(skinLayout) }; // VertexData に合わせる
+			psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			psoDesc.NumRenderTargets = 1;
+			psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+			psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+			psoDesc.SampleDesc.Count = 1;
+
+			Microsoft::WRL::ComPtr<ID3D12PipelineState> pso;
+			if (SUCCEEDED(dev_->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pso)))) {
+				pipelines_["EnhancedTerrain"] = pso;
+				shaderNames_.push_back("EnhancedTerrain");
+			}
+		}
+	}
+
+	// ★追加: 鳴潮風スタイライズド草シェーダーの登録
+	{
+		auto vs = CompileShaderFromFile(L"Resources/shaders/StylizedGrassVS.hlsl", "main", "vs_5_0");
+		auto ps = CompileShaderFromFile(L"Resources/shaders/StylizedGrassPS.hlsl", "main", "ps_5_0");
+		if (vs && ps) {
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
+			psoDesc.pRootSignature = rootSig3D_.Get();
+			psoDesc.VS = { vs->GetBufferPointer(), vs->GetBufferSize() };
+			psoDesc.PS = { ps->GetBufferPointer(), ps->GetBufferSize() };
+			psoDesc.SampleMask = UINT_MAX;
+			psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+			psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+			psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+			psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+			psoDesc.InputLayout = { skinLayout, _countof(skinLayout) };
+			psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			psoDesc.NumRenderTargets = 1;
+			psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+			psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+			psoDesc.SampleDesc.Count = 1;
+
+			Microsoft::WRL::ComPtr<ID3D12PipelineState> pso;
+			if (SUCCEEDED(dev_->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pso)))) {
+				pipelines_["StylizedGrass"] = pso;
+				shaderNames_.push_back("StylizedGrass");
+			}
+		}
+	}
 
 	return true;
 }
@@ -1487,16 +1648,18 @@ Renderer::TextureHandle Renderer::LoadTexture2D(const std::string& filePath, boo
 	return handle;
 }
 
-void Renderer::DrawMeshInstanced(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, const std::string& shaderName) {
+void Renderer::DrawMeshInstanced(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, 
+								 const std::string& shaderName, const std::vector<TextureHandle>& extraTex) {
 	// 既存のInstancedDrawCallを探す
 	auto it = std::find_if(instancedDrawCalls_.begin(), instancedDrawCalls_.end(), [&](const InstancedDrawCall& idc) {
-		return idc.mesh == mesh && idc.tex == texture && idc.shaderName == shaderName;
+		return idc.mesh == mesh && idc.tex == texture && idc.shaderName == shaderName && idc.extraTex == extraTex;
 	});
 
 	if (it == instancedDrawCalls_.end()) {
 		InstancedDrawCall newIdc;
 		newIdc.mesh = mesh;
 		newIdc.tex = texture;
+		newIdc.extraTex = extraTex; // ★追加
 		newIdc.shaderName = shaderName;
 		instancedDrawCalls_.push_back(newIdc);
 		it = instancedDrawCalls_.end() - 1;

@@ -9,7 +9,8 @@
 #include <vector>
 #include <wrl.h>
 
-#include "Matrix4x4.h" // エンジンの行列定義が必要
+#include "Matrix4x4.h"
+#include <algorithm> // 追加
 
 namespace Engine {
 
@@ -28,6 +29,7 @@ struct VertexData {
 
 struct MaterialData {
 	std::string textureFilePath;
+	std::vector<std::string> extraTextures; // ★追加: 地形用のスプラットマップやレイヤー
 };
 
 // ボーン単体
@@ -57,6 +59,16 @@ struct NodeAnimation {
 	std::vector<Keyframe<DirectX::XMFLOAT3>> scales;
 };
 
+// BVHノード (空間分割用)
+struct BVHNode {
+	Vector3 min;
+	Vector3 max;
+	int leftChild = -1;
+	int rightChild = -1;
+	uint32_t firstTriangle = 0;
+	uint32_t triangleCount = 0;
+};
+
 // アニメーション全体
 struct Animation {
 	std::string name;
@@ -82,6 +94,10 @@ struct ModelData {
 	// AABB (Local Space)
 	Vector3 min{0, 0, 0};
 	Vector3 max{0, 0, 0};
+
+	// BVHデータ
+	std::vector<BVHNode> bvhNodes;
+	std::vector<uint32_t> bvhIndices; // 並び替えられたインデックス
 };
 
 class Model {
@@ -111,6 +127,13 @@ public:
 	// time: 現在のアニメーション時刻(Tick)
 	// outPalette: 計算結果のボーン行列書き込み先
 	void UpdateSkeleton(const Node& node, const Matrix4x4& parentTransform, const Animation& animation, float time, std::vector<Matrix4x4>& outPalette);
+
+	// BVH構築
+	void BuildBVH();
+
+private:
+	void SubdivideBVH(uint32_t nodeIdx);
+	void UpdateNodeBounds(uint32_t nodeIdx);
 
 	// ------------ 低レベルユーティリティ ------------
 	static Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(ID3D12Device* device, size_t sizeInBytes);
