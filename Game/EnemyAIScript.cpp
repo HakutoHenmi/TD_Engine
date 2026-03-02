@@ -77,14 +77,24 @@ void EnemyAIScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	// ==========================================
 	if (obj.healths.empty() || obj.healths[0].hp > 0.0f) {
 		DirectX::XMFLOAT3 targetPos = {0, 0, 0};
+		// プレイヤーを探す (キャッシュを活用)
 		bool found = false;
-
-		// プレイヤーを探す
-		for (const auto& otherObj : scene->GetObjects()) {
-			if (otherObj.name == "Player") {
-				targetPos = otherObj.translate;
+		if (playerIndexCache_ != static_cast<size_t>(-1) && playerIndexCache_ < scene->GetObjects().size()) {
+			if (scene->GetObjects()[playerIndexCache_].name == "Player") {
+				targetPos = scene->GetObjects()[playerIndexCache_].translate;
 				found = true;
-				break;
+			}
+		}
+
+		if (!found) {
+			const auto& objects = scene->GetObjects();
+			for (size_t i = 0; i < objects.size(); ++i) {
+				if (objects[i].name == "Player") {
+					targetPos = objects[i].translate;
+					playerIndexCache_ = i;
+					found = true;
+					break;
+				}
 			}
 		}
 

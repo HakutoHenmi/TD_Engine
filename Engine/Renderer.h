@@ -199,6 +199,9 @@ public:
 	// インスタンス描画の予約
 	void DrawMeshInstanced(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, const std::string& shaderName = "Default");
 
+	// ★追加: パーティクル インスタンス描画
+	void DrawParticleInstanced(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, const Vector4& uvScaleOffset, const std::string& shaderName = "Particle");
+
 	// ★追加: パーティクル描画 (UVスケール・オフセット付き)
 	void DrawParticle(MeshHandle mesh, TextureHandle texture, const Transform& transform, 
 					  const Vector4& mulColor, const Vector4& uvScaleOffset, 
@@ -264,6 +267,7 @@ private:
 	struct InstanceData {
 		Matrix4x4 world;
 		Vector4 color;
+		Vector4 uvScaleOffset; // ★追加: UVスケール・オフセット用
 	};
 
 	struct InstancedDrawCall {
@@ -411,6 +415,7 @@ private:
 
 	std::vector<DrawCall> drawCalls_; // ★追加: ドローコールバッファ
 	std::vector<InstancedDrawCall> instancedDrawCalls_; // ★追加: インスタンスドローコール
+	std::vector<InstancedDrawCall> instancedParticleDrawCalls_; // ★追加: パーティクル用
 	std::vector<SpriteDrawCall> spriteDrawCalls_; // ★追加: スプライト用
 
 	// ★変更: Mesh構造体ではなくModelクラスへのスマートポインタで管理

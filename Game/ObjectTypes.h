@@ -34,7 +34,12 @@ enum class ComponentType {
 	Script, // ★追加: スクリプトコンポーネント
 	RectTransform, UIImage, UIText, UIButton // ★追加: UIコンポーネント
 };
-struct Component { ComponentType type; bool enabled = true; };
+struct Component { 
+	ComponentType type = ComponentType::MeshRenderer; 
+	bool enabled = true; 
+	Component() = default;
+	Component(ComponentType t) : type(t), enabled(true) {}
+};
 
 struct MeshRendererComponent : public Component {
 	uint32_t modelHandle = 0;
@@ -47,6 +52,7 @@ struct MeshRendererComponent : public Component {
 	DirectX::XMFLOAT2 uvOffset = {0, 0};
 	uint32_t lightmapHandle = 0;
 	std::string lightmapPath;
+	std::string shaderName = "Default"; // ★追加
 	MeshRendererComponent() { type = ComponentType::MeshRenderer; }
 };
 
@@ -255,6 +261,7 @@ struct SceneObject {
 	uint32_t textureHandle = 0;
 	std::string modelPath;   // ★追加: 保存/復元用パス
 	std::string texturePath;  // ★追加: 保存/復元用パス
+	std::string shaderName = "Default"; // ★追加
 
 	// コンポーネント
 	std::vector<MeshRendererComponent> meshRenderers;
