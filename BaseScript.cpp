@@ -82,7 +82,7 @@ void BaseScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	float toZ = target->translate.z - obj.translate.z;
 
 	// ベクトルの長さを計算して正規化します（Yは無視)
-	if (std::fabs(toX) < 0.0001f && std::fabs(toZ) < 0.0001f) {
+	if (std::fabs(toX) < 0.0001f && std::fabs(toZ) < 0.0001f) {　
 		return;
 	}
 	// ベクトルの長さを計算
