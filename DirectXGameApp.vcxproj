@@ -181,6 +181,7 @@ exit /b 0
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="BaseScript.cpp" />
     <ClCompile Include="Game\Editor\EditorUI.cpp" />
     <ClCompile Include="Game\KamikazeEnemyScript.cpp" />
     <ClCompile Include="Game\Scenes\GameScene.cpp" />
@@ -195,8 +196,10 @@ exit /b 0
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">MaxSpeed</Optimization>
       <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</WholeProgramOptimization>
     </ClCompile>
+    <ClCompile Include="TowerScript.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BaseScript.h" />
     <ClInclude Include="Game\Editor\EditorUI.h" />
     <ClInclude Include="Game\KamikazeEnemyScript.h" />
     <ClInclude Include="Game\Scenes\GameScene.h" />
@@ -219,6 +222,7 @@ exit /b 0
     <ClInclude Include="Game\Systems\AudioSystem.h" />
     <ClInclude Include="Game\Systems\ScriptSystem.h" />
     <ClInclude Include="Game\Systems\CleanupSystem.h" />
+    <ClInclude Include="TowerScript.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="DirectXGameEngine.vcxproj">
