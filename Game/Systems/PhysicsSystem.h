@@ -2,6 +2,8 @@
 #include "ISystem.h"
 #include <cmath>
 #include <cfloat>
+#include <vector>
+#include <algorithm>
 
 namespace Game {
 
@@ -95,19 +97,24 @@ public:
 							obj.translate.y += pushAxis.y * minOverlap;
 							obj.translate.z += pushAxis.z * minOverlap;
 
-							if (cm && pushAxis.y > 0.5f) {
-								cm->isGrounded = true;
-								if (cm->velocityY < 0) cm->velocityY = 0;
-							}
-
 							DirectX::XMVECTOR vel = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&rb.velocity));
 							DirectX::XMVECTOR pA = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&pushAxis));
 							float dotV = DirectX::XMVectorGetX(DirectX::XMVector3Dot(vel, pA));
 							if (dotV < 0) {
-								DirectX::XMVECTOR vN = DirectX::XMVectorScale(pA, dotV);
-								vel = DirectX::XMVectorSubtract(vel, vN);
+								if (pushAxis.y > 0.6f) { // 接地
+									if (cm) cm->isGrounded = true;
+									DirectX::XMVECTOR vN = DirectX::XMVectorScale(pA, dotV);
+									vel = DirectX::XMVectorSubtract(vel, vN);
+									vel = DirectX::XMVectorScale(vel, 0.95f);
+								} else if (std::abs(pushAxis.y) < 0.3f) { // 壁
+									vel = DirectX::XMVectorSubtract(vel, DirectX::XMVectorScale(pA, 1.2f * dotV));
+								} else { // スロープ
+									DirectX::XMVECTOR vN = DirectX::XMVectorScale(pA, dotV);
+									vel = DirectX::XMVectorSubtract(vel, vN);
+								}
 								DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&rb.velocity), vel);
 							}
+							if (cm && pushAxis.y > 0.6f) cm->velocityY = 0;
 							GetObbAxes(obj, bc, axes1, c1, e1);
 						}
 					}
@@ -122,87 +129,161 @@ public:
 
 						const auto& data = model->GetData();
 						Engine::Matrix4x4 otherWorld = other.GetTransform().ToMatrix();
+
+						// --- Broad Phase: Box World AABB ---
+						Engine::Vector3 boxMin_world, boxMax_world;
+						auto UpdateBoxAABB = [&]() {
+							boxMin_world = {FLT_MAX, FLT_MAX, FLT_MAX};
+							boxMax_world = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+							for (int k = 0; k < 8; ++k) {
+								Engine::Vector3 p = c1;
+								p.x += ((k & 1) ? 1 : -1) * axes1[0].x * e1.x + ((k & 2) ? 1 : -1) * axes1[1].x * e1.y + ((k & 4) ? 1 : -1) * axes1[2].x * e1.z;
+								p.y += ((k & 1) ? 1 : -1) * axes1[0].y * e1.x + ((k & 2) ? 1 : -1) * axes1[1].y * e1.y + ((k & 4) ? 1 : -1) * axes1[2].y * e1.z;
+								p.z += ((k & 1) ? 1 : -1) * axes1[0].z * e1.x + ((k & 2) ? 1 : -1) * axes1[1].z * e1.y + ((k & 4) ? 1 : -1) * axes1[2].z * e1.z;
+								boxMin_world.x = std::min(boxMin_world.x, p.x); boxMin_world.y = std::min(boxMin_world.y, p.y); boxMin_world.z = std::min(boxMin_world.z, p.z);
+								boxMax_world.x = std::max(boxMax_world.x, p.x); boxMax_world.y = std::max(boxMax_world.y, p.y); boxMax_world.z = std::max(boxMax_world.z, p.z);
+							}
+						};
+						UpdateBoxAABB();
+
+						// --- Broad Phase: Mesh World AABB ---
+						Engine::Vector3 meshMin_world = {FLT_MAX, FLT_MAX, FLT_MAX}, meshMax_world = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+						for (int k = 0; k < 8; ++k) {
+							Engine::Vector3 p = {(k & 1) ? data.max.x : data.min.x, (k & 2) ? data.max.y : data.min.y, (k & 4) ? data.max.z : data.min.z};
+							p = Engine::TransformCoord(p, otherWorld);
+							meshMin_world.x = std::min(meshMin_world.x, p.x); meshMin_world.y = std::min(meshMin_world.y, p.y); meshMin_world.z = std::min(meshMin_world.z, p.z);
+							meshMax_world.x = std::max(meshMax_world.x, p.x); meshMax_world.y = std::max(meshMax_world.y, p.y); meshMax_world.z = std::max(meshMax_world.z, p.z);
+						}
+
+						if (boxMax_world.x < meshMin_world.x || boxMin_world.x > meshMax_world.x ||
+							boxMax_world.y < meshMin_world.y || boxMin_world.y > meshMax_world.y ||
+							boxMax_world.z < meshMin_world.z || boxMin_world.z > meshMax_world.z) continue;
+
+						DirectX::XMMATRIX worldMat = DirectX::XMLoadFloat4x4(reinterpret_cast<const DirectX::XMFLOAT4X4*>(&otherWorld));
 						Engine::Matrix4x4 invWorld = Engine::Matrix4x4::Inverse(otherWorld);
 
-						// Box in Local Space
-						Engine::Vector3 c1_local = Engine::TransformCoord(c1, invWorld);
-						Engine::Vector3 axes1_local[3];
-						for (int k = 0; k < 3; ++k) {
-							axes1_local[k] = Engine::Normalize(Engine::TransformNormal(axes1[k], invWorld));
-						}
+						// --- Local Space OBB & AABB ---
+						Engine::Vector3 c1_local, axes1_local[3], boxMin_local, boxMax_local;
+						auto UpdateLocalBounds = [&]() {
+							c1_local = Engine::TransformCoord(c1, invWorld);
+							axes1_local[0] = Engine::TransformNormal(axes1[0], invWorld);
+							axes1_local[1] = Engine::TransformNormal(axes1[1], invWorld);
+							axes1_local[2] = Engine::TransformNormal(axes1[2], invWorld);
+							boxMin_local = {FLT_MAX, FLT_MAX, FLT_MAX};
+							boxMax_local = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+							for (int k = 0; k < 8; ++k) {
+								Engine::Vector3 p = c1_local;
+								p.x += ((k & 1) ? 1 : -1) * axes1_local[0].x * e1.x + ((k & 2) ? 1 : -1) * axes1_local[1].x * e1.y + ((k & 4) ? 1 : -1) * axes1_local[2].x * e1.z;
+								p.y += ((k & 1) ? 1 : -1) * axes1_local[0].y * e1.x + ((k & 2) ? 1 : -1) * axes1_local[1].y * e1.y + ((k & 4) ? 1 : -1) * axes1_local[2].y * e1.z;
+								p.z += ((k & 1) ? 1 : -1) * axes1_local[0].z * e1.x + ((k & 2) ? 1 : -1) * axes1_local[1].z * e1.y + ((k & 4) ? 1 : -1) * axes1_local[2].z * e1.z;
+								boxMin_local.x = (std::min)(boxMin_local.x, p.x); boxMin_local.y = (std::min)(boxMin_local.y, p.y); boxMin_local.z = (std::min)(boxMin_local.z, p.z);
+								boxMax_local.x = (std::max)(boxMax_local.x, p.x); boxMax_local.y = (std::max)(boxMax_local.y, p.y); boxMax_local.z = (std::max)(boxMax_local.z, p.z);
+							}
+						};
 
-						// Box AABB in Local Space (Broad phase)
-						Engine::Vector3 boxMin_local = {FLT_MAX, FLT_MAX, FLT_MAX};
-						Engine::Vector3 boxMax_local = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
-						for (int i = 0; i < 8; ++i) {
-							Engine::Vector3 p = c1_local;
-							p.x += ((i & 1) ? 1 : -1) * axes1_local[0].x * e1.x +
-							       ((i & 2) ? 1 : -1) * axes1_local[1].x * e1.y +
-							       ((i & 4) ? 1 : -1) * axes1_local[2].x * e1.z;
-							p.y += ((i & 1) ? 1 : -1) * axes1_local[0].y * e1.x +
-							       ((i & 2) ? 1 : -1) * axes1_local[1].y * e1.y +
-							       ((i & 4) ? 1 : -1) * axes1_local[2].y * e1.z;
-							p.z += ((i & 1) ? 1 : -1) * axes1_local[0].z * e1.x +
-							       ((i & 2) ? 1 : -1) * axes1_local[1].z * e1.y +
-							       ((i & 4) ? 1 : -1) * axes1_local[2].z * e1.z;
-							boxMin_local.x = std::min(boxMin_local.x, p.x);
-							boxMin_local.y = std::min(boxMin_local.y, p.y);
-							boxMin_local.z = std::min(boxMin_local.z, p.z);
-							boxMax_local.x = std::max(boxMax_local.x, p.x);
-							boxMax_local.y = std::max(boxMax_local.y, p.y);
-							boxMax_local.z = std::max(boxMax_local.z, p.z);
-						}
+						// --- Iterative Collision Resolution ---
+						const int maxIterations = 5; 
+						for (int iter = 0; iter < maxIterations; ++iter) {
+							bool collisionOccurred = false;
+							UpdateLocalBounds();
+							UpdateBoxAABB();
 
-						// Mesh-level AABB check
-						if (boxMax_local.x < data.min.x || boxMin_local.x > data.max.x ||
-							boxMax_local.y < data.min.y || boxMin_local.y > data.max.y ||
-							boxMax_local.z < data.min.z || boxMin_local.z > data.max.z) continue;
+							struct ContactInfo {
+								Engine::Vector3 normal;
+								float depth;
+								bool found = false;
+							} bestContact;
 
-						for (size_t i = 0; i < data.indices.size(); i += 3) {
-							float p0[4] = {data.vertices[data.indices[i]].position.x, data.vertices[data.indices[i]].position.y, data.vertices[data.indices[i]].position.z, 1.0f};
-							float p1[4] = {data.vertices[data.indices[i+1]].position.x, data.vertices[data.indices[i+1]].position.y, data.vertices[data.indices[i+1]].position.z, 1.0f};
-							float p2[4] = {data.vertices[data.indices[i+2]].position.x, data.vertices[data.indices[i+2]].position.y, data.vertices[data.indices[i+2]].position.z, 1.0f};
-
-							// Triangle AABB check
-							float triMinX = std::min({p0[0], p1[0], p2[0]});
-							float triMaxX = std::max({p0[0], p1[0], p2[0]});
-							if (boxMax_local.x < triMinX || boxMin_local.x > triMaxX) continue;
-
-							float triMinY = std::min({p0[1], p1[1], p2[1]});
-							float triMaxY = std::max({p0[1], p1[1], p2[1]});
-							if (boxMax_local.y < triMinY || boxMin_local.y > triMaxY) continue;
-
-							float triMinZ = std::min({p0[2], p1[1], p2[2]}); // Typo fix: p1[2]
-							triMinZ = std::min({p0[2], p1[2], p2[2]});
-							float triMaxZ = std::max({p0[2], p1[2], p2[2]});
-							if (boxMax_local.z < triMinZ || boxMin_local.z > triMaxZ) continue;
-
-							DirectX::XMVECTOR v[3] = { DirectX::XMLoadFloat4((DirectX::XMFLOAT4*)p0), DirectX::XMLoadFloat4((DirectX::XMFLOAT4*)p1), DirectX::XMLoadFloat4((DirectX::XMFLOAT4*)p2) };
-
-							Engine::Vector3 pushAxis_local;
-							float overlap_local;
-							if (TestObbTriangle(c1_local, axes1_local, e1, v[0], v[1], v[2], pushAxis_local, overlap_local)) {
-								Engine::Vector3 pushAxisWorld = Engine::Normalize(Engine::TransformNormal(pushAxis_local, otherWorld));
-								obj.translate.x += pushAxisWorld.x * overlap_local;
-								obj.translate.y += pushAxisWorld.y * overlap_local;
-								obj.translate.z += pushAxisWorld.z * overlap_local;
-
-								if (cm && pushAxisWorld.y > 0.5f) {
-									cm->isGrounded = true;
-									if (cm->velocityY < 0) cm->velocityY = 0;
+							auto FilterDeepest = [&](DirectX::XMVECTOR v_world[3]) {
+								Engine::Vector3 pAxisW; float ov;
+								if (TestObbTriangle(c1, axes1, e1, v_world[0], v_world[1], v_world[2], pAxisW, ov)) {
+									if (!bestContact.found || ov > bestContact.depth) {
+										bestContact.normal = pAxisW;
+										bestContact.depth = ov;
+										bestContact.found = true;
+									}
 								}
+							};
+
+							if (gmc.collisionType == MeshCollisionType::Mesh) {
+								if (!data.bvhNodes.empty()) {
+									std::vector<uint32_t> stack;
+									stack.push_back(0); 
+									while (!stack.empty()) {
+										uint32_t nodeIdx = stack.back(); stack.pop_back();
+										const auto& node = data.bvhNodes[nodeIdx];
+										if (boxMax_local.x < node.min.x || boxMin_local.x > node.max.x ||
+											boxMax_local.y < node.min.y || boxMin_local.y > node.max.y ||
+											boxMax_local.z < node.min.z || boxMin_local.z > node.max.z) continue;
+
+										if (node.leftChild == -1) {
+											for (uint32_t i = 0; i < node.triangleCount; ++i) {
+												uint32_t triIdx = data.bvhIndices[node.firstTriangle + i];
+												DirectX::XMVECTOR v_world[3] = {
+													DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&data.vertices[data.indices[triIdx * 3]].position)), worldMat),
+													DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&data.vertices[data.indices[triIdx * 3 + 1]].position)), worldMat),
+													DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&data.vertices[data.indices[triIdx * 3 + 2]].position)), worldMat)
+												};
+												FilterDeepest(v_world);
+											}
+										} else {
+											stack.push_back(node.leftChild);
+											stack.push_back(node.rightChild);
+										}
+									}
+								} else {
+									for (size_t i = 0; i < data.indices.size(); i += 3) {
+										DirectX::XMVECTOR v_world[3] = {
+											DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&data.vertices[data.indices[i]].position)), worldMat),
+											DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&data.vertices[data.indices[i+1]].position)), worldMat),
+											DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&data.vertices[data.indices[i+2]].position)), worldMat)
+										};
+										FilterDeepest(v_world);
+									}
+								}
+							} else if (gmc.collisionType == MeshCollisionType::Convex) {
+								float overlapAxes[3] = {
+									(std::min)(boxMax_world.x, meshMax_world.x) - (std::max)(boxMin_world.x, meshMin_world.x),
+									(std::min)(boxMax_world.y, meshMax_world.y) - (std::max)(boxMin_world.y, meshMin_world.y),
+									(std::min)(boxMax_world.z, meshMax_world.z) - (std::max)(boxMin_world.z, meshMin_world.z)
+								};
+								if (overlapAxes[0] > 0 && overlapAxes[1] > 0 && overlapAxes[2] > 0) {
+									int minAxis = overlapAxes[1] < overlapAxes[0] ? (overlapAxes[2] < overlapAxes[1] ? 2 : 1) : (overlapAxes[2] < overlapAxes[0] ? 2 : 0);
+									bestContact.depth = overlapAxes[minAxis];
+									bestContact.found = (bestContact.depth < (minAxis == 0 ? e1.x : (minAxis == 1 ? e1.y : e1.z)) * 4.0f);
+									if (bestContact.found) {
+										bestContact.normal = {0,0,0};
+										if (minAxis == 0) bestContact.normal.x = (boxMin_world.x < meshMin_world.x) ? -1.0f : 1.0f;
+										if (minAxis == 1) bestContact.normal.y = (boxMin_world.y < meshMin_world.y) ? -1.0f : 1.0f;
+										if (minAxis == 2) bestContact.normal.z = (boxMin_world.z < meshMin_world.z) ? -1.0f : 1.0f;
+									}
+								}
+							}
+
+							if (bestContact.found) {
+								const float skinWidth = 0.002f;
+								float pushDist = bestContact.depth + skinWidth;
+								obj.translate.x += bestContact.normal.x * pushDist;
+								obj.translate.y += bestContact.normal.y * pushDist;
+								obj.translate.z += bestContact.normal.z * pushDist;
 
 								DirectX::XMVECTOR vel = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&rb.velocity));
-								DirectX::XMVECTOR pA = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&pushAxisWorld));
-								float dotV = DirectX::XMVectorGetX(DirectX::XMVector3Dot(vel, pA));
-								if (dotV < 0) {
-									DirectX::XMVECTOR vN = DirectX::XMVectorScale(pA, dotV);
-									vel = DirectX::XMVectorSubtract(vel, vN);
+								DirectX::XMVECTOR n = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&bestContact.normal));
+								float dotVN = DirectX::XMVectorGetX(DirectX::XMVector3Dot(vel, n));
+								if (dotVN < 0) {
+									vel = DirectX::XMVectorSubtract(vel, DirectX::XMVectorScale(n, dotVN));
+									if (bestContact.normal.y > 0.6f) { // Ground
+										float speed = DirectX::XMVectorGetX(DirectX::XMVector3Length(vel));
+										if (speed < 0.2f) vel = DirectX::XMVectorZero();
+										else vel = DirectX::XMVectorScale(vel, 0.9f);
+										if (cm) { cm->isGrounded = true; cm->velocityY = 0; }
+									}
 									DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&rb.velocity), vel);
 								}
+								collisionOccurred = true;
 								GetObbAxes(obj, bc, axes1, c1, e1);
-								c1_local = Engine::TransformCoord(c1, invWorld);
 							}
+							if (!collisionOccurred) break;
 						}
 					}
 				}
@@ -235,12 +316,16 @@ private:
 		for (int i = 0; i < 3; ++i) boxAxes[i] = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&axes[i]));
 
 		std::vector<DirectX::XMVECTOR> testAxes;
-		// 1. Box normals
-		for (int i = 0; i < 3; ++i) testAxes.push_back(boxAxes[i]);
-		// 2. Triangle normal
+		
+		// 1. 三角形の法線
 		DirectX::XMVECTOR triNormal = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(edges[0], edges[1]));
+		if (DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(triNormal)) < 1e-6f) return false; 
 		testAxes.push_back(triNormal);
-		// 3. Edge-Edge cross products
+
+		// 2. Boxの各軸
+		for (int i = 0; i < 3; ++i) testAxes.push_back(boxAxes[i]);
+
+		// 3. 辺同士の外積
 		for (int i = 0; i < 3; ++i) {
 			for (int j = 0; j < 3; ++j) {
 				DirectX::XMVECTOR axis = DirectX::XMVector3Cross(boxAxes[i], edges[j]);
@@ -253,32 +338,40 @@ private:
 		float minOverlap = FLT_MAX;
 		DirectX::XMVECTOR bestAxis = DirectX::XMVectorZero();
 
-		for (const auto& axis : testAxes) {
-			// Project box
+		for (size_t i = 0; i < testAxes.size(); ++i) {
+			const auto& axis = testAxes[i];
 			float rBox = extents.x * std::abs(DirectX::XMVectorGetX(DirectX::XMVector3Dot(axis, boxAxes[0]))) +
 						 extents.y * std::abs(DirectX::XMVectorGetX(DirectX::XMVector3Dot(axis, boxAxes[1]))) +
 						 extents.z * std::abs(DirectX::XMVectorGetX(DirectX::XMVector3Dot(axis, boxAxes[2])));
 			
-			// Project triangle
-			float minTri = FLT_MAX, maxTri = -FLT_MAX;
 			float boxProj = DirectX::XMVectorGetX(DirectX::XMVector3Dot(axis, boxCenter));
-			for (int i = 0; i < 3; ++i) {
-				float p = DirectX::XMVectorGetX(DirectX::XMVector3Dot(axis, tri[i]));
-				minTri = std::min(minTri, p);
-				maxTri = std::max(maxTri, p);
-			}
-
 			float minBox = boxProj - rBox;
 			float maxBox = boxProj + rBox;
 
-			if (maxBox < minTri || maxTri < minBox) return false;
+			float minTri = FLT_MAX, maxTri = -FLT_MAX;
+			for (int v = 0; v < 3; ++v) {
+				float p = DirectX::XMVectorGetX(DirectX::XMVector3Dot(axis, tri[v]));
+				minTri = (std::min)(minTri, p);
+				maxTri = (std::max)(maxTri, p);
+			}
 
-			float overlap = std::min(maxBox, maxTri) - std::max(minBox, minTri);
-			if (overlap < minOverlap) {
+			// 分離しているかチェック (Separating Axis Theorem)
+			float overlap0 = maxBox - minTri;
+			float overlap1 = maxTri - minBox;
+			if (overlap0 <= 0.0f || overlap1 <= 0.0f) return false;
+
+			// 重なり量（押し戻しに必要な最小距離）を計算
+			float overlap = (std::min)(overlap0, overlap1);
+			
+			// 平地での安定性のために法線（i=0）を優先
+			float bias = (i == 0) ? 0.01f : 0.0f;
+			if (overlap < minOverlap - bias) {
 				minOverlap = overlap;
 				bestAxis = axis;
-				// 向きを調整 (Triangle -> Box)
-				if (boxProj < (minTri + maxTri) * 0.5f) {
+				
+				// 向きを「三角形からボックスへ向かう」方向に統一
+				DirectX::XMVECTOR triCenter = DirectX::XMVectorScale(DirectX::XMVectorAdd(DirectX::XMVectorAdd(tri[0], tri[1]), tri[2]), 1.0f / 3.0f);
+				if (DirectX::XMVectorGetX(DirectX::XMVector3Dot(bestAxis, DirectX::XMVectorSubtract(boxCenter, triCenter))) < 0) {
 					bestAxis = DirectX::XMVectorNegate(bestAxis);
 				}
 			}
@@ -292,7 +385,7 @@ private:
 	static void GetObbAxes(const SceneObject& o, const BoxColliderComponent& cb,
 		Engine::Vector3 axes[3], Engine::Vector3& center, Engine::Vector3& extents) {
 		Engine::Matrix4x4 mat = o.GetTransform().ToMatrix();
-		DirectX::XMMATRIX worldMat = DirectX::XMLoadFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&mat));
+		DirectX::XMMATRIX worldMat = DirectX::XMLoadFloat4x4(reinterpret_cast<const DirectX::XMFLOAT4X4*>(&mat));
 		DirectX::XMVECTOR c = DirectX::XMVector3TransformCoord(
 			DirectX::XMVectorSet(cb.center.x, cb.center.y, cb.center.z, 1.0f), worldMat);
 		DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&center), c);

@@ -151,6 +151,12 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 	ss << "      \"rotate\": [" << o.rotate.x << ", " << o.rotate.y << ", " << o.rotate.z << "],\n";
 	ss << "      \"scale\": [" << o.scale.x << ", " << o.scale.y << ", " << o.scale.z << "],\n";
 	ss << "      \"color\": [" << o.color.x << ", " << o.color.y << ", " << o.color.z << ", " << o.color.w << "],\n";
+	ss << "      \"extraTexturePaths\": [";
+	for (size_t i = 0; i < o.extraTexturePaths.size(); ++i) {
+		ss << "\"" << EscapeJson(o.extraTexturePaths[i]) << "\"" << (i == o.extraTexturePaths.size() - 1 ? "" : ", ");
+	}
+	ss << "],\n";
+	ss << "      \"shaderName\": \"" << EscapeJson(o.shaderName) << "\",\n";
 	ss << "      \"components\": [\n";
 	bool first = true;
 	for (const auto& mr : o.meshRenderers) {
@@ -159,7 +165,11 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 		first = false;
 		ss << "        {\"type\": \"MeshRenderer\", \"enabled\": " << (mr.enabled ? "true" : "false") << ", \"modelPath\": \"" << EscapeJson(mr.modelPath) << "\", \"texturePath\": \""
 		   << EscapeJson(mr.texturePath) << "\", \"color\": [" << mr.color.x << "," << mr.color.y << "," << mr.color.z << "," << mr.color.w << "], \"uvTiling\": [" << mr.uvTiling.x << ","
-		   << mr.uvTiling.y << "], \"uvOffset\": [" << mr.uvOffset.x << "," << mr.uvOffset.y << "], \"lightmapPath\": \"" << EscapeJson(mr.lightmapPath) << "\", \"shaderName\": \"" << EscapeJson(mr.shaderName) << "\"}";
+		   << mr.uvTiling.y << "], \"uvOffset\": [" << mr.uvOffset.x << "," << mr.uvOffset.y << "], \"extraTexturePaths\": [";
+		for (size_t i = 0; i < mr.extraTexturePaths.size(); ++i) {
+			ss << "\"" << EscapeJson(mr.extraTexturePaths[i]) << "\"" << (i == mr.extraTexturePaths.size() - 1 ? "" : ", ");
+		}
+		ss << "], \"lightmapPath\": \"" << EscapeJson(mr.lightmapPath) << "\", \"shaderName\": \"" << EscapeJson(mr.shaderName) << "\"}";
 	}
 	for (const auto& bc : o.boxColliders) {
 		if (!first)
@@ -210,8 +220,8 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 		if (!first)
 			ss << ",\n";
 		first = false;
-		ss << "        {\"type\": \"GpuMeshCollider\", \"enabled\": " << (gmc.enabled ? "true" : "false") << ", \"isTrigger\": " << (gmc.isTrigger ? "true" : "false") << ", \"meshPath\": \""
-		   << EscapeJson(gmc.meshPath) << "\"}";
+		ss << "        {\"type\": \"GpuMeshCollider\", \"enabled\": " << (gmc.enabled ? "true" : "false") << ", \"isTrigger\": " << (gmc.isTrigger ? "true" : "false")
+		   << ", \"collisionType\": " << (int)gmc.collisionType << ", \"meshPath\": \"" << EscapeJson(gmc.meshPath) << "\"}";
 	}
 	// ★追加: PlayerInput
 	for (const auto& pi : o.playerInputs) {
@@ -432,6 +442,33 @@ static size_t FindBlockEnd(const std::string& str, size_t startPos) {
 	}
 	return std::string::npos;
 }
+
+static std::vector<std::string> ExtractStringArray(const std::string& block, const std::string& key) {
+	std::vector<std::string> res;
+	auto pos = block.find("\"" + key + "\"");
+	if (pos == std::string::npos) return res;
+	auto arrStart = block.find("[", pos);
+	if (arrStart == std::string::npos) return res;
+	auto arrEnd = FindBlockEnd(block, arrStart);
+	if (arrEnd == std::string::npos) return res;
+
+	std::string ab = block.substr(arrStart + 1, arrEnd - arrStart - 1);
+	size_t cur = 0;
+	while (cur < ab.size()) {
+		auto q1 = ab.find("\"", cur);
+		if (q1 == std::string::npos) break;
+		size_t q2 = q1 + 1;
+		while (q2 < ab.size()) {
+			if (ab[q2] == '\\') q2 += 2;
+			else if (ab[q2] == '"') break;
+			else q2++;
+		}
+		if (q2 >= ab.size()) break;
+		res.push_back(UnescapeJson(ab.substr(q1 + 1, q2 - q1 - 1)));
+		cur = q2 + 1;
+	}
+	return res;
+}
 static std::vector<float> ExtractArray(const std::string& block, const std::string& key) {
 	std::vector<float> r;
 	auto pos = block.find("\"" + key + "\"");
@@ -524,6 +561,10 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 			mr.lightmapPath = ExtractString(cblock, "lightmapPath");
 			if (!mr.lightmapPath.empty())
 				mr.lightmapHandle = renderer->LoadTexture2D(mr.lightmapPath);
+			mr.extraTexturePaths = ExtractStringArray(cblock, "extraTexturePaths");
+			for (const auto& p : mr.extraTexturePaths) {
+				mr.extraTextureHandles.push_back(renderer->LoadTexture2D(p));
+			}
 			mr.shaderName = ExtractString(cblock, "shaderName");
 			if (mr.shaderName.empty()) mr.shaderName = "Default";
 			obj.meshRenderers.push_back(mr);
@@ -642,6 +683,7 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 				gmc.isTrigger = true;
 			else
 				gmc.isTrigger = false;
+			gmc.collisionType = (MeshCollisionType)(int)ExtractFloat(cblock, "collisionType", 0.0f);
 			gmc.meshPath = ExtractString(cblock, "meshPath");
 			if (!gmc.meshPath.empty())
 				gmc.meshHandle = renderer->LoadObjMesh(gmc.meshPath);
@@ -893,6 +935,9 @@ void EditorUI::LoadScene(GameScene* scene, const std::string& path) {
 		obj.name = ExtractString(block, "name");
 		obj.modelPath = ExtractString(block, "modelPath");
 		obj.texturePath = ExtractString(block, "texturePath");
+		obj.extraTexturePaths = ExtractStringArray(block, "extraTexturePaths");
+		obj.shaderName = ExtractString(block, "shaderName");
+		if (obj.shaderName.empty()) obj.shaderName = "Default";
 		{
 			auto lkPos = block.find("\"locked\"");
 			if (lkPos != std::string::npos && block.find("true", lkPos) != std::string::npos && block.find("true", lkPos) < lkPos + 30)
@@ -2079,6 +2124,62 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					ImGui::ColorEdit4("Color##MR", &mr.color.x);
 					ImGui::DragFloat2("UV Tiling", &mr.uvTiling.x, 0.01f);
 					ImGui::DragFloat2("UV Offset", &mr.uvOffset.x, 0.01f);
+					
+					// ★追加: Shader選択
+					if (ImGui::BeginCombo("Shader", mr.shaderName.c_str())) {
+						if (ImGui::Selectable("Default", mr.shaderName == "Default")) mr.shaderName = "Default";
+						if (ImGui::Selectable("EnhancedTerrain", mr.shaderName == "EnhancedTerrain")) mr.shaderName = "EnhancedTerrain";
+						if (ImGui::Selectable("StylizedGrass", mr.shaderName == "StylizedGrass")) mr.shaderName = "StylizedGrass";
+						ImGui::EndCombo();
+					}
+
+					if (mr.shaderName == "EnhancedTerrain") {
+						ImGui::Separator();
+						ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "Terrain Settings");
+						const char* layerNames[] = { "Splat Map", "Layer 0 (Grass)", "Layer 1 (Rock)", "Layer 2 (Dirt)", "Layer 3 (Sand)", "Detail Map" };
+						if (mr.extraTexturePaths.size() < 5) mr.extraTexturePaths.resize(5);
+						if (mr.extraTextureHandles.size() < 5) mr.extraTextureHandles.resize(5);
+
+						for (int i = 0; i < 6; ++i) {
+							std::string path = (i == 0) ? mr.texturePath : mr.extraTexturePaths[i - 1];
+							ImGui::Text("%s: %s", layerNames[i], path.empty() ? "(none)" : path.c_str());
+							if (ImGui::BeginDragDropTarget()) {
+								if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
+									std::string newPath((const char*)pl->Data, pl->DataSize - 1);
+									if (newPath.find(".png") != std::string::npos || newPath.find(".jpg") != std::string::npos) {
+										uint32_t handle = Engine::Renderer::GetInstance()->LoadTexture2D(newPath);
+										if (i == 0) {
+											mr.texturePath = newPath;
+											mr.textureHandle = handle;
+										} else {
+											mr.extraTexturePaths[i - 1] = newPath;
+											mr.extraTextureHandles[i - 1] = handle;
+										}
+										EditorUI::Log(std::string(layerNames[i]) + ": " + newPath);
+									}
+								}
+								ImGui::EndDragDropTarget();
+							}
+						}
+						ImGui::Separator();
+					}
+
+					if (mr.shaderName == "StylizedGrass") {
+						ImGui::Separator();
+						ImGui::TextColored(ImVec4(0.4f, 1.0f, 1.0f, 1.0f), "Grass Settings");
+						ImGui::Text("Tip: uv.y=0 is Tip, uv.y=1 is Bottom");
+						auto* renderer = Engine::Renderer::GetInstance();
+						static float windDir[2] = { 1.0f, 0.0f };
+						static float windSpeed = 0.5f;
+						static float windStrength = 0.2f;
+						bool windChanged = false;
+						if (ImGui::DragFloat2("Wind Direction", windDir, 0.01f)) windChanged = true;
+						if (ImGui::DragFloat("Wind Speed", &windSpeed, 0.01f)) windChanged = true;
+						if (ImGui::DragFloat("Wind Strength", &windStrength, 0.01f)) windChanged = true;
+						if (windChanged) renderer->SetWindParams(Engine::Vector4{ windDir[0], windDir[1], windSpeed, windStrength });
+						ImGui::Separator();
+					}
+
 					ImGui::Text("Lightmap: %s", mr.lightmapPath.empty() ? "(none)" : mr.lightmapPath.c_str());
 					if (ImGui::BeginDragDropTarget()) {
 						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
@@ -2329,6 +2430,13 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				if (ImGui::TreeNode("GpuMeshCollider")) {
 					ImGui::Checkbox("Enabled##GMC", &gmc.enabled);
 					ImGui::Checkbox("Is Trigger##GMC", &gmc.isTrigger);
+					
+					const char* collisionTypes[] = { "Mesh", "Convex" };
+					int currentType = (int)gmc.collisionType;
+					if (ImGui::Combo("Collision Type##GMC", &currentType, collisionTypes, IM_ARRAYSIZE(collisionTypes))) {
+						gmc.collisionType = (MeshCollisionType)currentType;
+					}
+
 					ImGui::Text("Mesh: %s", gmc.meshPath.empty() ? "(none)" : gmc.meshPath.c_str());
 					if (ImGui::BeginDragDropTarget()) {
 						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {

@@ -197,7 +197,8 @@ public:
 	void DrawMesh(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, const std::string& shaderName = "Default");
 
 	// インスタンス描画の予約
-	void DrawMeshInstanced(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, const std::string& shaderName = "Default");
+	void DrawMeshInstanced(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, 
+						   const std::string& shaderName = "Default", const std::vector<TextureHandle>& extraTex = {});
 
 	// ★追加: パーティクル インスタンス描画
 	void DrawParticleInstanced(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, const Vector4& uvScaleOffset, const std::string& shaderName = "Particle");
@@ -243,6 +244,10 @@ public:
 
 	bool CreatePSOAlpha(const std::string& name, ID3DBlob* vsBlob, ID3DBlob* psBlob);
 
+	// ★追加: 風とプレイヤーの位置設定
+	void SetWindParams(const Vector4& p) { cbFrame_.windParams = p; }
+	void SetPlayerPos(const Vector3& p) { cbFrame_.playerPos = p; }
+
 private:
 	struct Mesh {
 		Microsoft::WRL::ComPtr<ID3D12Resource> vb;
@@ -255,6 +260,7 @@ private:
 	struct DrawCall {
 		MeshHandle mesh;
 		TextureHandle tex;
+		std::vector<TextureHandle> extraTex; // ★追加: 地形用の追加テクスチャ
 		Transform tr;
 		Vector4 color;
 		std::string shaderName;
@@ -273,6 +279,7 @@ private:
 	struct InstancedDrawCall {
 		MeshHandle mesh;
 		TextureHandle tex;
+		std::vector<TextureHandle> extraTex; // ★追加
 		std::string shaderName;
 		std::vector<InstanceData> instances;
 	};
@@ -295,7 +302,8 @@ private:
 	};
 
 private:
-	uint32_t AllocateSrvIndex();
+	uint32_t AllocateSrvIndex(uint32_t count = 1);
+	uint32_t AllocateDynamicSrvIndex(uint32_t count = 1);
 	Microsoft::WRL::ComPtr<ID3DBlob> CompileShader(const char* src, const char* entry, const char* target);
 	Microsoft::WRL::ComPtr<ID3DBlob> CompileShaderFromFile(const wchar_t* filePath, const char* entry, const char* target);
 
@@ -319,6 +327,9 @@ private:
 	uint32_t srvInc_ = 0;
 
 	uint32_t srvCursor_ = 10;
+	uint32_t srvDynamicCursor_ = 0;
+	static constexpr uint32_t kSrvStaticMax = 1000;
+	static constexpr uint32_t kSrvHeapTotal = 2048;
 	
 	// ★追加: RTV割り当て用
 	uint32_t rtvCursor_ = WindowDX::kBackBufferCount; // スワップチェーンの分をスキップ
@@ -328,6 +339,7 @@ private:
 	UploadRing upload_[kFrameCount]{};
 
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSig3D_;
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSigTerrain_; // ★追加: 地形用
 
 	// ★追加: コンピュート用
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSigCompute_;
@@ -400,6 +412,9 @@ private:
 		Matrix4x4 viewProj;
 		Vector3 cameraPos;
 		float time = 0.0f;
+		Vector4 windParams = {1.0f, 0.0f, 0.5f, 0.2f}; // x,y:方向, z:速度, w:強さ
+		Vector3 playerPos = {0.0f, 0.0f, 0.0f};
+		float pad;
 	} cbFrame_{};
 #ifdef _MSC_VER
 #pragma warning(pop)

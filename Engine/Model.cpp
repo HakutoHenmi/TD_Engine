@@ -326,6 +326,10 @@ bool Model::Load(ID3D12Device* device, ID3D12GraphicsCommandList* cmd, const std
 			hasTexture_ = true;
 		}
 	}
+
+	// BVH構築
+	BuildBVH();
+
 	return true;
 }
 
@@ -351,6 +355,106 @@ void Model::DrawInstanced(ID3D12GraphicsCommandList* cmd, UINT instanceCount, UI
 	cmd->IASetIndexBuffer(&ibv_);
 	cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	cmd->DrawIndexedInstanced(indexCount_, instanceCount, 0, 0, 0);
+}
+
+void Model::BuildBVH() {
+	if (data_.indices.empty()) return;
+
+	data_.bvhNodes.clear();
+	data_.bvhIndices.clear();
+
+	uint32_t numTriangles = (uint32_t)data_.indices.size() / 3;
+	data_.bvhIndices.reserve(numTriangles);
+	for (uint32_t i = 0; i < numTriangles; ++i) data_.bvhIndices.push_back(i);
+
+	// Root node
+	BVHNode root;
+	root.firstTriangle = 0;
+	root.triangleCount = numTriangles;
+	data_.bvhNodes.push_back(root);
+
+	UpdateNodeBounds(0);
+	SubdivideBVH(0);
+}
+
+void Model::UpdateNodeBounds(uint32_t nodeIdx) {
+	BVHNode& node = data_.bvhNodes[nodeIdx];
+	node.min = {FLT_MAX, FLT_MAX, FLT_MAX};
+	node.max = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+
+	for (uint32_t i = 0; i < node.triangleCount; ++i) {
+		uint32_t triIdx = data_.bvhIndices[node.firstTriangle + i];
+		for (int v = 0; v < 3; ++v) {
+			const auto& pos = data_.vertices[data_.indices[triIdx * 3 + v]].position;
+			node.min.x = std::min(node.min.x, pos.x);
+			node.min.y = std::min(node.min.y, pos.y);
+			node.min.z = std::min(node.min.z, pos.z);
+			node.max.x = std::max(node.max.x, pos.x);
+			node.max.y = std::max(node.max.y, pos.y);
+			node.max.z = std::max(node.max.z, pos.z);
+		}
+	}
+}
+
+void Model::SubdivideBVH(uint32_t nodeIdx) {
+	// ノードの参照を取得（注意：bvhNodesの再確保により無効になる可能性があるため、分割後に再取得する）
+	if (data_.bvhNodes[nodeIdx].triangleCount <= 4) return;
+
+	// 分割軸の決定 (最も長い軸を選択)
+	Vector3 extent = data_.bvhNodes[nodeIdx].max - data_.bvhNodes[nodeIdx].min;
+	int axis = 0;
+	if (extent.y > extent.x) axis = 1;
+	if (extent.z > (axis == 0 ? extent.x : extent.y)) axis = 2;
+
+	float splitPos = ((axis == 0 ? data_.bvhNodes[nodeIdx].min.x : (axis == 1 ? data_.bvhNodes[nodeIdx].min.y : data_.bvhNodes[nodeIdx].min.z)) +
+					  (axis == 0 ? data_.bvhNodes[nodeIdx].max.x : (axis == 1 ? data_.bvhNodes[nodeIdx].max.y : data_.bvhNodes[nodeIdx].max.z))) * 0.5f;
+
+	// 三角形を左右に分ける (in-place partitioning)
+	int i = data_.bvhNodes[nodeIdx].firstTriangle;
+	int j = data_.bvhNodes[nodeIdx].firstTriangle + data_.bvhNodes[nodeIdx].triangleCount - 1;
+	while (i <= j) {
+		uint32_t triIdx = data_.bvhIndices[i];
+		Vector3 center = (Vector3{data_.vertices[data_.indices[triIdx * 3]].position.x, data_.vertices[data_.indices[triIdx * 3]].position.y, data_.vertices[data_.indices[triIdx * 3]].position.z} +
+						  Vector3{data_.vertices[data_.indices[triIdx * 3 + 1]].position.x, data_.vertices[data_.indices[triIdx * 3 + 1]].position.y, data_.vertices[data_.indices[triIdx * 3 + 1]].position.z} +
+						  Vector3{data_.vertices[data_.indices[triIdx * 3 + 2]].position.x, data_.vertices[data_.indices[triIdx * 3 + 2]].position.y, data_.vertices[data_.indices[triIdx * 3 + 2]].position.z}) / 3.0f;
+		
+		float val = (axis == 0 ? center.x : (axis == 1 ? center.y : center.z));
+		if (val < splitPos) i++;
+		else {
+			std::swap(data_.bvhIndices[i], data_.bvhIndices[j]);
+			j--;
+		}
+	}
+
+	uint32_t leftCount = i - data_.bvhNodes[nodeIdx].firstTriangle;
+	if (leftCount == 0 || leftCount == data_.bvhNodes[nodeIdx].triangleCount) return;
+
+	uint32_t firstTri = data_.bvhNodes[nodeIdx].firstTriangle;
+	uint32_t triCount = data_.bvhNodes[nodeIdx].triangleCount;
+
+	// 子ノードを作成
+	int leftIdx = (int)data_.bvhNodes.size();
+	BVHNode left;
+	left.firstTriangle = firstTri;
+	left.triangleCount = leftCount;
+	data_.bvhNodes.push_back(left);
+
+	int rightIdx = (int)data_.bvhNodes.size();
+	BVHNode right;
+	right.firstTriangle = i;
+	right.triangleCount = triCount - leftCount;
+	data_.bvhNodes.push_back(right);
+
+	// 親ノードを更新
+	data_.bvhNodes[nodeIdx].leftChild = leftIdx;
+	data_.bvhNodes[nodeIdx].rightChild = rightIdx;
+	data_.bvhNodes[nodeIdx].triangleCount = 0;
+
+	UpdateNodeBounds(leftIdx);
+	UpdateNodeBounds(rightIdx);
+
+	SubdivideBVH(leftIdx);
+	SubdivideBVH(rightIdx);
 }
 
 void Model::UpdateSkeleton(const Node& node, const Matrix4x4& parentTransform, const Animation& animation, float time, std::vector<Matrix4x4>& outPalette) {
