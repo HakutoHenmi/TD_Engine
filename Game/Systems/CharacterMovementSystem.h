@@ -20,33 +20,33 @@ public:
 			for (auto& cm : obj.characterMovements) {
 				if (!cm.enabled) continue;
 
-				auto camRot = ctx.camera->Rotation();
-				float cy = std::cos(camRot.y);
-				float sy = std::sin(camRot.y);
+				for (auto& rb : obj.rigidbodies) {
+					if (!rb.enabled) continue;
 
-				float moveX = moveDir.x * cy + moveDir.y * sy;
-				float moveZ = -moveDir.x * sy + moveDir.y * cy;
+					auto camRot = ctx.camera->Rotation();
+					float cy = std::cos(camRot.y);
+					float sy = std::sin(camRot.y);
 
-				obj.translate.x += moveX * cm.speed * ctx.dt;
-				obj.translate.z += moveZ * cm.speed * ctx.dt;
+					float moveX = moveDir.x * cy + moveDir.y * sy;
+					float moveZ = -moveDir.x * sy + moveDir.y * cy;
 
-				if (std::abs(moveDir.x) > 0.01f || std::abs(moveDir.y) > 0.01f) {
-					float targetYaw = std::atan2(moveX, moveZ);
-					obj.rotate.y = targetYaw;
+					// 水平速度を設定
+					rb.velocity.x = moveX * cm.speed;
+					rb.velocity.z = moveZ * cm.speed;
+
+					if (std::abs(moveDir.x) > 0.01f || std::abs(moveDir.y) > 0.01f) {
+						float targetYaw = std::atan2(moveX, moveZ);
+						obj.rotate.y = targetYaw;
+					}
+
+					// ジャンプ処理 (垂直速度)
+					if (cm.isGrounded && wantJump) {
+						rb.velocity.y = cm.jumpPower;
+						cm.isGrounded = false;
+					}
+					
+					// PhysicsSystemが rb.velocity に基づいて obj.translate を更新する
 				}
-
-				if (!cm.isGrounded) {
-					cm.velocityY -= cm.gravity * ctx.dt;
-				}
-
-				if (cm.isGrounded && wantJump) {
-					cm.velocityY = cm.jumpPower;
-					cm.isGrounded = false;
-				}
-
-				obj.translate.y += cm.velocityY * ctx.dt;
-
-				// 床判定(1.0f)は削除（PhysicsSystemでコライダー同士が処理する）
 			}
 		}
 	}

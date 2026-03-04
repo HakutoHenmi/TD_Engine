@@ -477,6 +477,19 @@ void Renderer::FlushDrawCalls() {
 			}
 		}
 
+		// ★トゥーン: アウトライン先行描画パス
+		// Toon/ToonSkinning のドローコールに対して、アウトラインPSOで先に描画し、その後にモデル本体を描画する
+		if (dc.shaderName == "Toon" || dc.shaderName == "ToonSkinning") {
+			// アウトラインPSOを選択
+			std::string outlineName = dc.isSkinned ? "ToonSkinningOutline" : "ToonOutline";
+			if (pipelines_.count(outlineName)) {
+				list_->SetPipelineState(pipelines_[outlineName].Get());
+				model->Draw(list_);
+			}
+			// 本体PSOに戻す
+			list_->SetPipelineState(pso);
+		}
+
 		model->Draw(list_);
 	}
 
@@ -495,6 +508,10 @@ void Renderer::FlushDrawCalls() {
 			if (defaultShaderName == "ParticleInstanced") {
 				if (sName == "Particle") sName = "ParticleInstanced";
 				else if (sName == "ParticleAdditive") sName = "ParticleAdditiveInstanced";
+			}
+			// ★修正: Toon/ToonSkinningはインスタンス描画非対応のためデフォルトにフォールバック
+			if (sName == "Toon" || sName == "ToonSkinning" || sName == "ToonOutline" || sName == "ToonSkinningOutline") {
+				sName = defaultShaderName;
 			}
 
 			if (pipelines_.count(sName)) {
@@ -1555,6 +1572,102 @@ float4 main(PSIn i) : SV_TARGET { return i.color; }
 				shaderNames_.push_back("StylizedGrass");
 			}
 		}
+	}
+
+	// ---------------------------------------------------------
+	// ★追加: トゥーンシェーダー・アウトライン用パイプライン
+	// ---------------------------------------------------------
+	{
+		// --- Toon (通常メッシュ) ---
+		auto vsToon = CompileShaderFromFile(L"Resources/shaders/ToonVS.hlsl", "main", "vs_5_0");
+		auto psToon = CompileShaderFromFile(L"Resources/shaders/ToonPS.hlsl", "main", "ps_5_0");
+		if (vsToon && psToon) {
+			CreatePSO("Toon", vsToon.Get(), psToon.Get());
+		}
+
+		// --- ToonOutline (アウトライン用: 前面カリング) ---
+		auto vsOutline = CompileShaderFromFile(L"Resources/shaders/ToonOutlineVS.hlsl", "main", "vs_5_0");
+		auto psOutline = CompileShaderFromFile(L"Resources/shaders/ToonOutlinePS.hlsl", "main", "ps_5_0");
+		if (vsOutline && psOutline) {
+			// アウトラインPSOは前面カリング（裏面を描画 = 膨張した部分が見える）
+			D3D12_INPUT_ELEMENT_DESC outlineLayout[] = {
+				{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+				{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+				{"NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+				{"WEIGHTS",  0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 36, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+				{"BONES",    0, DXGI_FORMAT_R32G32B32A32_UINT,  0, 52, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+			};
+
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
+			psoDesc.pRootSignature = rootSig3D_.Get();
+			psoDesc.VS = { vsOutline->GetBufferPointer(), vsOutline->GetBufferSize() };
+			psoDesc.PS = { psOutline->GetBufferPointer(), psOutline->GetBufferSize() };
+			psoDesc.InputLayout = { outlineLayout, _countof(outlineLayout) };
+			psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+			psoDesc.NumRenderTargets = 1;
+			psoDesc.SampleDesc.Count = 1;
+			psoDesc.SampleMask = UINT_MAX;
+
+			auto rast = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+			rast.CullMode = D3D12_CULL_MODE_FRONT; // ★前面カリング（輪郭のみ見える）
+			psoDesc.RasterizerState = rast;
+
+			psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+			psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+			psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+
+			Microsoft::WRL::ComPtr<ID3D12PipelineState> outlinePso;
+			if (SUCCEEDED(dev_->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&outlinePso)))) {
+				pipelines_["ToonOutline"] = outlinePso;
+			}
+		}
+
+		// --- ToonSkinning (スキニング対応トゥーン) ---
+		auto vsToonSkin = CompileShaderFromFile(L"Resources/shaders/ToonSkinningVS.hlsl", "main", "vs_5_0");
+		if (vsToonSkin && psToon) {
+			CreatePSO("ToonSkinning", vsToonSkin.Get(), psToon.Get());
+		}
+
+		// --- ToonSkinningOutline (スキニング対応アウトライン) ---
+		auto vsSkinOutline = CompileShaderFromFile(L"Resources/shaders/ToonSkinningOutlineVS.hlsl", "main", "vs_5_0");
+		if (vsSkinOutline && psOutline) {
+			D3D12_INPUT_ELEMENT_DESC outlineSkinLayout[] = {
+				{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+				{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+				{"NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+				{"WEIGHTS",  0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 36, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+				{"BONES",    0, DXGI_FORMAT_R32G32B32A32_UINT,  0, 52, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+			};
+
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
+			psoDesc.pRootSignature = rootSig3D_.Get();
+			psoDesc.VS = { vsSkinOutline->GetBufferPointer(), vsSkinOutline->GetBufferSize() };
+			psoDesc.PS = { psOutline->GetBufferPointer(), psOutline->GetBufferSize() };
+			psoDesc.InputLayout = { outlineSkinLayout, _countof(outlineSkinLayout) };
+			psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+			psoDesc.NumRenderTargets = 1;
+			psoDesc.SampleDesc.Count = 1;
+			psoDesc.SampleMask = UINT_MAX;
+
+			auto rast = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+			rast.CullMode = D3D12_CULL_MODE_FRONT;
+			psoDesc.RasterizerState = rast;
+
+			psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+			psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+			psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+
+			Microsoft::WRL::ComPtr<ID3D12PipelineState> skinOutlinePso;
+			if (SUCCEEDED(dev_->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&skinOutlinePso)))) {
+				pipelines_["ToonSkinningOutline"] = skinOutlinePso;
+			}
+		}
+
+		// シェーダー名リストに追加 (エディタのドロップダウンに表示される)
+		shaderNames_.push_back("Toon");
+		shaderNames_.push_back("ToonSkinning");
 	}
 
 	return true;

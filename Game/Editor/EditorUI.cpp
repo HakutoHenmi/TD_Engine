@@ -1209,13 +1209,38 @@ static int HitTestGizmoAxis(DirectX::XMVECTOR rayOrig, DirectX::XMVECTOR rayDir,
 			}
 		}
 		return bestAxis;
-	} else {
-		float thickness = 0.15f;
+	} else if (mode == GizmoMode::Scale) {
+		float boxSize = 0.2f;
+		float bestT = FLT_MAX;
+		int bestAxis = -1;
+		for (int a = 0; a < 3; ++a) {
+			DirectX::XMFLOAT3 bmin, bmax;
+			if (a == 0) {
+				bmin = {axisLen, -boxSize, -boxSize};
+				bmax = {axisLen + boxSize * 2, boxSize, boxSize};
+			} else if (a == 1) {
+				bmin = {-boxSize, axisLen, -boxSize};
+				bmax = {boxSize, axisLen + boxSize * 2, boxSize};
+			} else {
+				bmin = {-boxSize, -boxSize, axisLen};
+				bmax = {boxSize, boxSize, axisLen + boxSize * 2};
+			}
+			float t;
+			if (RayIntersectsAABB(localOrig, localDir, bmin, bmax, t)) {
+				if (t < bestT) {
+					bestT = t;
+					bestAxis = a;
+				}
+			}
+		}
+		return bestAxis;
+	} else { // Translate
+		float thickness = 0.2f;
 		DirectX::XMFLOAT3 axes[3][2] = {
-		    {{-thickness, -thickness, -thickness}, {axisLen, thickness, thickness}},
-		    {{-thickness, -thickness, -thickness}, {thickness, axisLen, thickness}},
-		    {{-thickness, -thickness, -thickness}, {thickness, thickness, axisLen}},
-		};
+		    {{0, -thickness, -thickness}, {axisLen, thickness, thickness}},
+		    {{-thickness, 0, -thickness}, {thickness, axisLen, thickness}},
+		    {{-thickness, -thickness, 0}, {thickness, thickness, axisLen}}};
+
 		float bestT = FLT_MAX;
 		int bestAxis = -1;
 		for (int a = 0; a < 3; ++a) {
@@ -1409,6 +1434,18 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 		ImGui::Spacing();
 		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
 		ImGui::Spacing();
+		
+		static bool pipeMode = false;
+		static Engine::Vector3 pipeStartNode = {0,0,0};
+		static bool hasPipeStart = false;
+		if (ImGui::Button(pipeMode ? "Pipe Mode [ON]" : "Pipe Mode [OFF]")) {
+			pipeMode = !pipeMode;
+			if (!pipeMode) hasPipeStart = false;
+		}
+
+		ImGui::Spacing();
+		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+		ImGui::Spacing();
 		if (gameScene) {
 			if (gameScene->isPlaying_) {
 				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(.8f, .2f, .2f, 1));
@@ -1460,7 +1497,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	}
 	if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_D, false) && gameScene) {
 		std::vector<SceneObject> dups;
-		for (int i : gameScene->selectedIndices_)
+		for (int i : gameScene->selectedIndices_) {
 			if (i < (int)gameScene->objects_.size()) {
 				auto o = gameScene->objects_[i];
 				o.name = GenerateCopyName(o.name, gameScene->objects_);
@@ -1468,12 +1505,15 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				o.translate.x += 1;
 				dups.push_back(o);
 			}
-		for (auto& d : dups)
+		}
+		for (auto& d : dups) {
 			gameScene->objects_.push_back(d);
+		}
 	}
 	if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A, false) && gameScene) {
-		for (int i = 0; i < (int)gameScene->objects_.size(); ++i)
+		for (int i = 0; i < (int)gameScene->objects_.size(); ++i) {
 			gameScene->selectedIndices_.insert(i);
+		}
 	}
 	if (!io.WantTextInput && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
 		if (ImGui::IsKeyPressed(ImGuiKey_T, false))
@@ -1514,6 +1554,109 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	// ★ 画像の絶対スクリーン座標を記録 (ピッキング用)
 	ImVec2 windowPos = ImGui::GetWindowPos();
 	ImVec2 curScreen = ImGui::GetCursorScreenPos();
+	
+	// ---- ★パイププレビュー処理の実装 ----
+	static int previewPipeId = -1;
+	static int previewJointId = -1;
+	static bool pipeMode = false;
+	static Engine::Vector3 pipeStartNode = {0,0,0};
+	static bool hasPipeStart = false;
+
+	if (gameScene && !gameScene->isPlaying_ && pipeMode && hasPipeStart) {
+		ImVec2 mousePos = ImGui::GetMousePos();
+		float localX = mousePos.x - curScreen.x;
+		float localY = mousePos.y - curScreen.y;
+		bool insideImage = (localX >= 0 && localY >= 0 && localX <= tW && localY <= tH);
+
+		if (insideImage) {
+			auto viewMat = gameScene->camera_.View();
+			auto projMat = gameScene->camera_.Proj();
+			DirectX::XMVECTOR rayOrig, rayDir;
+			ScreenToWorldRay(localX, localY, tW, tH, viewMat, projMat, rayOrig, rayDir);
+
+			float bestDist = FLT_MAX;
+			Engine::Vector3 hitPoint = {0, 0, 0};
+			bool hitTerrain = false;
+
+			for (auto& obj : gameScene->objects_) {
+				if ((!obj.gpuMeshColliders.empty() && obj.name.find("Terrain") != std::string::npos) || obj.name.find("Floor") != std::string::npos) {
+					auto* model = renderer->GetModel(obj.gpuMeshColliders[0].meshHandle);
+					if (model) {
+						float d; Engine::Vector3 hp;
+						if (model->RayCast(rayOrig, rayDir, obj.GetTransform().ToMatrix(), d, hp)) {
+							if (d < bestDist) {
+								bestDist = d;
+								hitPoint = hp;
+								hitTerrain = true;
+							}
+						}
+					}
+				}
+			}
+
+			if (hitTerrain) {
+				Engine::Vector3 startPos = pipeStartNode;
+				startPos.y += 0.5f;
+				Engine::Vector3 endNode = hitPoint;
+				endNode.y += 0.5f;
+
+				Engine::Vector3 diff = endNode - startPos;
+				Engine::Vector3 dir = Engine::Normalize(diff);
+				float length = std::sqrt(diff.x*diff.x + diff.y*diff.y + diff.z*diff.z);
+				float cyLen = length * 0.5f;
+				Engine::Vector3 center = startPos + diff * 0.5f;
+
+				// 一時オブジェクトの生成/更新
+				if (previewPipeId == -1) {
+					SceneObject pipe;
+					pipe.name = "_PreviewPipe";
+					pipe.scale = {0.4f, 0.4f, cyLen};
+					pipe.translate = {center.x, center.y, center.z};
+					pipe.rotate = {Engine::LookRotation(dir).x, Engine::LookRotation(dir).y, Engine::LookRotation(dir).z};
+					pipe.modelPath = "Resources/models/cylinder.obj";
+					pipe.modelHandle = renderer->LoadObjMesh(pipe.modelPath);
+					MeshRendererComponent mr; mr.modelHandle = pipe.modelHandle; mr.modelPath = pipe.modelPath; mr.shaderName = "Toon"; 
+					pipe.meshRenderers.push_back(mr);
+					gameScene->objects_.push_back(pipe);
+					previewPipeId = (int)gameScene->objects_.size() - 1;
+
+					SceneObject joint;
+					joint.name = "_PreviewJoint";
+					joint.translate = {endNode.x, endNode.y, endNode.z};
+					joint.scale = {0.8f, 0.8f, 0.8f};
+					joint.modelPath = "Resources/models/sphere.obj";
+					joint.modelHandle = renderer->LoadObjMesh(joint.modelPath);
+					MeshRendererComponent mrJ; mrJ.modelHandle = joint.modelHandle; mrJ.modelPath = joint.modelPath; mrJ.shaderName = "Toon";
+					joint.meshRenderers.push_back(mrJ);
+					gameScene->objects_.push_back(joint);
+					previewJointId = (int)gameScene->objects_.size() - 1;
+				} else {
+					if (previewPipeId < gameScene->objects_.size() && gameScene->objects_[previewPipeId].name == "_PreviewPipe") {
+						auto& p = gameScene->objects_[previewPipeId];
+						p.scale = {0.4f, 0.4f, cyLen};
+						p.translate = {center.x, center.y, center.z};
+						p.rotate = {Engine::LookRotation(dir).x, Engine::LookRotation(dir).y, Engine::LookRotation(dir).z};
+					}
+					if (previewJointId < gameScene->objects_.size() && gameScene->objects_[previewJointId].name == "_PreviewJoint") {
+						auto& j = gameScene->objects_[previewJointId];
+						j.translate = {endNode.x, endNode.y, endNode.z};
+					}
+				}
+			}
+		}
+	} else if (previewPipeId != -1) {
+        // プレビュー削除（末尾から追加される前提でインデックス降順で削除）
+        if (previewJointId != -1 && previewJointId < gameScene->objects_.size()) {
+            gameScene->objects_.erase(gameScene->objects_.begin() + previewJointId);
+        }
+        if (previewPipeId != -1 && previewPipeId < gameScene->objects_.size()) {
+            gameScene->objects_.erase(gameScene->objects_.begin() + previewPipeId);
+        }
+		previewPipeId = -1;
+		previewJointId = -1;
+	}
+
+
 	ImGui::Image((ImTextureID)renderer->GetGameFinalSRV().ptr, ImVec2(tW, tH));
 	// ★追加: プレハブやモデルのドラッグ＆ドロップ受け入れ先
 	if (ImGui::BeginDragDropTarget()) {
@@ -1556,6 +1699,110 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				DirectX::XMVECTOR rayOrig, rayDir;
 				ScreenToWorldRay(localX, localY, tW, tH, viewMat, projMat, rayOrig, rayDir);
 
+				// ★ パイプ設置モード
+				if (pipeMode) {
+					float bestDist = FLT_MAX;
+					Engine::Vector3 hitPoint = {0, 0, 0};
+					bool hitTerrain = false;
+					
+					// 地形(TerrainやFloor)とのレイキャスト判定
+					for (auto& obj : gameScene->objects_) {
+						if (!obj.gpuMeshColliders.empty() && obj.name.find("Terrain") != std::string::npos || obj.name.find("Floor") != std::string::npos) {
+							auto* model = renderer->GetModel(obj.gpuMeshColliders[0].meshHandle);
+							if (model) {
+								float d; Engine::Vector3 hp;
+								if (model->RayCast(rayOrig, rayDir, obj.GetTransform().ToMatrix(), d, hp)) {
+									if (d < bestDist) {
+										bestDist = d;
+										hitPoint = hp;
+										hitTerrain = true;
+									}
+								}
+							}
+						}
+					}
+
+					if (hitTerrain) {
+						if (!hasPipeStart) {
+							// 始点ノードを配置
+							pipeStartNode = hitPoint;
+							hasPipeStart = true;
+							
+							// 見た目としてのジョイント（球）を配置
+							SceneObject joint;
+							joint.name = "PipeJoint";
+							joint.translate = {hitPoint.x, hitPoint.y + 0.5f, hitPoint.z}; // 地面から少し浮かせる
+							joint.scale = {0.8f, 0.8f, 0.8f};
+							joint.modelPath = "Resources/models/sphere.obj";
+							joint.modelHandle = renderer->LoadObjMesh(joint.modelPath);
+							MeshRendererComponent mr;
+							mr.modelHandle = joint.modelHandle;
+							mr.modelPath = joint.modelPath;
+							mr.shaderName = "Toon"; // トゥーン対応
+							joint.meshRenderers.push_back(mr);
+							gameScene->objects_.push_back(joint);
+						} else {
+							// 終点ノードを決定し、間にパイプを生成
+							Engine::Vector3 endNode = hitPoint;
+							
+							// 2点間の距離と計算
+							Engine::Vector3 startPos = pipeStartNode;
+							// 地面から少し浮かせる
+							startPos.y += 0.5f;
+							endNode.y += 0.5f;
+
+							Engine::Vector3 diff = endNode - startPos;
+							Engine::Vector3 dir = Engine::Normalize(diff);
+							float length = std::sqrt(diff.x*diff.x + diff.y*diff.y + diff.z*diff.z);
+
+							// シリンダーのスケール（Z軸方向に長さ分、太さは一定）
+							// プリミティブのシリンダーは高さが2.0（-1〜1）の場合が多いので 半分にして調整
+							float cyLen = length * 0.5f;
+
+							// モデルとメッシュコンポーネントの準備
+							SceneObject pipe;
+							pipe.name = "PipeSegment";
+							
+							// 中点に設置
+							Engine::Vector3 center = startPos + diff * 0.5f;
+							pipe.translate = {center.x, center.y, center.z};
+							// 太さ0.4、長さcyLen
+							pipe.scale = {0.4f, 0.4f, cyLen};
+
+							pipe.rotate = {Engine::LookRotation(dir).x, Engine::LookRotation(dir).y, Engine::LookRotation(dir).z};
+
+							pipe.modelPath = "Resources/models/cylinder.obj"; // 円柱モデルが必要
+							pipe.modelHandle = renderer->LoadObjMesh(pipe.modelPath);
+							MeshRendererComponent mr;
+							mr.modelHandle = pipe.modelHandle;
+							mr.modelPath = pipe.modelPath;
+							mr.shaderName = "Toon"; 
+							pipe.meshRenderers.push_back(mr);
+							gameScene->objects_.push_back(pipe);
+
+							// 終点ノードにまたジョイントを置く
+							SceneObject joint;
+							joint.name = "PipeJoint";
+							joint.translate = {endNode.x, endNode.y, endNode.z};
+							joint.scale = {0.8f, 0.8f, 0.8f};
+							joint.modelPath = "Resources/models/sphere.obj";
+							joint.modelHandle = renderer->LoadObjMesh(joint.modelPath);
+							MeshRendererComponent mrJ;
+							mrJ.modelHandle = joint.modelHandle;
+							mrJ.modelPath = joint.modelPath;
+							mrJ.shaderName = "Toon";
+							joint.meshRenderers.push_back(mrJ);
+							gameScene->objects_.push_back(joint);
+
+							// 次の始点を終点に持っていく
+						pipeStartNode = hitPoint;
+					}
+				}
+				// パイプモード中は通常の選択は行わない
+				goto EndClickProcessing;
+			}
+			
+			{
 				// 1. ギズモ軸ヒットテスト
 				bool hitGizmo = false;
 				if (gameScene->selectedObjectIndex_ >= 0 && gameScene->selectedObjectIndex_ < (int)gameScene->objects_.size() && !gameScene->objects_[gameScene->selectedObjectIndex_].locked) {
@@ -1646,7 +1893,10 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 						gameScene->selectedObjectIndex_ = -1;
 					}
 				}
-			}
+			} // 1. ギズモ軸ヒットテストスコープ終了
+
+			EndClickProcessing:;
+			} // if (ImGui::IsMouseClicked) の終了
 
 			// --- ★ ギズモ軸ドラッグ中 ---
 			if (gizmoDragging && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
@@ -1763,7 +2013,6 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				objectDragging = false;
 				dragStartTransforms.clear();
 			}
-		}
 
 		// --- カメラ操作（右クリック） ---
 		auto camP = gameScene->camera_.Position();
@@ -1773,7 +2022,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 			ImGui::ResetMouseDragDelta(ImGuiMouseButton_Right);
 			camR.y += d.x * 0.003f;
 			camR.x += d.y * 0.003f;
-			float lim = DirectX::XMConvertToRadians(89.0f);
+			constexpr float lim = DirectX::XMConvertToRadians(89.0f);
 			if (camR.x > lim)
 				camR.x = lim;
 			if (camR.x < -lim)
@@ -1805,18 +2054,20 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 			auto r = DirectX::XMMatrixRotationRollPitchYaw(camR.x, camR.y, camR.z);
 			DirectX::XMFLOAT3 fw = {0, 0, 1};
 			DirectX::XMStoreFloat3(&camP, DirectX::XMVectorAdd(DirectX::XMLoadFloat3(&camP), DirectX::XMVectorScale(DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(&fw), r), wh * zs)));
-			gameScene->camera_.SetPosition(camP);
+				gameScene->camera_.SetPosition(camP);
+			}
 		}
-	}
-	// ドラッグがウィンドウ外に行った場合のリセット
-	if ((gizmoDragging || objectDragging) && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-		gizmoDragging = false;
-		gizmoDragAxis = -1;
-		objectDragging = false;
-	}
 
-	if (gameScene && tH > 0.0f)
-		gameScene->camera_.SetProjection(DirectX::XMConvertToRadians(45.0f), tW / tH, 0.1f, 1000.0f);
+		// ドラッグがウィンドウ外に行った場合のリセット
+		if ((gizmoDragging || objectDragging) && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+			gizmoDragging = false;
+			gizmoDragAxis = -1;
+			objectDragging = false;
+		}
+
+		if (gameScene && tH > 0.0f)
+			gameScene->camera_.SetProjection(DirectX::XMConvertToRadians(45.0f), tW / tH, 0.1f, 1000.0f);
+	}
 	ImGui::End();
 	ImGui::PopStyleVar();
 
@@ -2128,6 +2379,8 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					// ★追加: Shader選択
 					if (ImGui::BeginCombo("Shader", mr.shaderName.c_str())) {
 						if (ImGui::Selectable("Default", mr.shaderName == "Default")) mr.shaderName = "Default";
+						if (ImGui::Selectable("Toon", mr.shaderName == "Toon")) mr.shaderName = "Toon";
+						if (ImGui::Selectable("ToonSkinning", mr.shaderName == "ToonSkinning")) mr.shaderName = "ToonSkinning";
 						if (ImGui::Selectable("EnhancedTerrain", mr.shaderName == "EnhancedTerrain")) mr.shaderName = "EnhancedTerrain";
 						if (ImGui::Selectable("StylizedGrass", mr.shaderName == "StylizedGrass")) mr.shaderName = "StylizedGrass";
 						ImGui::EndCombo();
@@ -2995,7 +3248,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 	} else
 		ImGui::Text("No Object Selected");
 	ImGui::End();
-}
+} // ShowInspector
 
 // ====== Project ======
 void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
@@ -3276,7 +3529,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 	struct ProjectEntry {
 		std::string path; // フルパス
 		std::string name; // ファイル名のみ
-		bool isDir;
+		bool isDir = false;
 		std::string ext; // 小文字拡張子
 	};
 	std::vector<ProjectEntry> entries;

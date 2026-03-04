@@ -457,25 +457,117 @@ void Model::SubdivideBVH(uint32_t nodeIdx) {
 	SubdivideBVH(rightIdx);
 }
 
-void Model::UpdateSkeleton(const Node& node, const Matrix4x4& parentTransform, const Animation& animation, float time, std::vector<Matrix4x4>& outPalette) {
-	Matrix4x4 localTransform = node.transform;
-	auto it = animation.nodeAnimations.find(node.name);
-	if (it != animation.nodeAnimations.end()) {
-		const auto& anim = it->second;
-		Vector3 s = CalculateScale(anim.scales, time);
-		XMFLOAT4 r = CalculateRotation(anim.rotations, time);
-		Vector3 t = CalculateTranslation(anim.translations, time);
-		// 一時変数に受けてアドレスエラーを回避
-		XMMATRIX m = XMMatrixAffineTransformation(XMLoadFloat3((XMFLOAT3*)&s), XMVectorZero(), XMLoadFloat4(&r), XMLoadFloat3((XMFLOAT3*)&t));
-		localTransform = XMToM4(m);
+bool Model::RayIntersectsAABB(const DirectX::XMVECTOR& rayOrig, const DirectX::XMVECTOR& rayDir, const Vector3& bmin, const Vector3& bmax, float& tOut) {
+	XMFLOAT3 orig; XMStoreFloat3(&orig, rayOrig);
+	XMFLOAT3 dir; XMStoreFloat3(&dir, rayDir);
+	float tmin = -FLT_MAX, tmax = FLT_MAX;
+	float mn[3] = {bmin.x, bmin.y, bmin.z};
+	float mx[3] = {bmax.x, bmax.y, bmax.z};
+	float o[3] = {orig.x, orig.y, orig.z};
+	float d[3] = {dir.x, dir.y, dir.z};
+	for (int i = 0; i < 3; ++i) {
+		if (std::fabs(d[i]) < 1e-8f) {
+			if (o[i] < mn[i] || o[i] > mx[i]) return false;
+		} else {
+			float t1 = (mn[i] - o[i]) / d[i];
+			float t2 = (mx[i] - o[i]) / d[i];
+			if (t1 > t2) std::swap(t1, t2);
+			if (t1 > tmin) tmin = t1;
+			if (t2 < tmax) tmax = t2;
+			if (tmin > tmax) return false;
+		}
 	}
-	Matrix4x4 globalTransform = Matrix4x4::Multiply(localTransform, parentTransform);
-	if (data_.boneMapping.count(node.name)) {
-		int idx = data_.boneMapping[node.name];
-		outPalette[idx] = Matrix4x4::Multiply(data_.bones[idx].offsetMatrix, globalTransform);
+	if (tmax < 0) return false;
+	tOut = tmin > 0 ? tmin : tmax;
+	return true;
+}
+
+bool Model::RayCast(const DirectX::XMVECTOR& rayOrig, const DirectX::XMVECTOR& rayDir, const Matrix4x4& worldTransform, float& outDist, Vector3& outHitPoint) const {
+	if (data_.bvhNodes.empty() || data_.indices.empty()) return false;
+
+	// XMMATRIXに変換
+	DirectX::XMMATRIX worldMat = DirectX::XMLoadFloat4x4(reinterpret_cast<const DirectX::XMFLOAT4X4*>(&worldTransform));
+	DirectX::XMMATRIX invWorld = DirectX::XMMatrixInverse(nullptr, worldMat);
+
+	// ワールド空間のRayをローカル空間に変換
+	DirectX::XMVECTOR localOrig = DirectX::XMVector3TransformCoord(rayOrig, invWorld);
+	DirectX::XMVECTOR localDir = DirectX::XMVector3Normalize(DirectX::XMVector3TransformNormal(rayDir, invWorld));
+
+	float minDistLocal = FLT_MAX;
+	bool hit = false;
+	
+	std::vector<uint32_t> stack;
+	stack.push_back(0);
+
+	while (!stack.empty()) {
+		uint32_t nodeIdx = stack.back();
+		stack.pop_back();
+
+		const BVHNode& node = data_.bvhNodes[nodeIdx];
+		float tBox;
+		if (!RayIntersectsAABB(localOrig, localDir, node.min, node.max, tBox)) {
+			continue;
+		}
+		if (tBox >= minDistLocal) {
+			continue; // これ以上近い結果は望めない
+		}
+
+		if (node.leftChild == -1) {
+			// 葉ノード: 三角形と交差判定
+			for (uint32_t i = 0; i < node.triangleCount; ++i) {
+				uint32_t triIdx = data_.bvhIndices[node.firstTriangle + i];
+				
+				DirectX::XMVECTOR v0 = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&data_.vertices[data_.indices[triIdx * 3]].position));
+				DirectX::XMVECTOR v1 = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&data_.vertices[data_.indices[triIdx * 3 + 1]].position));
+				DirectX::XMVECTOR v2 = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&data_.vertices[data_.indices[triIdx * 3 + 2]].position));
+
+				// DirectXMathのTriangleTests機能を使う (bvhで代用)
+				// Möller–Trumbore intersection algorithm
+				DirectX::XMVECTOR edge1 = DirectX::XMVectorSubtract(v1, v0);
+				DirectX::XMVECTOR edge2 = DirectX::XMVectorSubtract(v2, v0);
+				DirectX::XMVECTOR h = DirectX::XMVector3Cross(localDir, edge2);
+				float a = DirectX::XMVectorGetX(DirectX::XMVector3Dot(edge1, h));
+
+				if (a > -1e-6f && a < 1e-6f) continue; // 平行
+
+				float f = 1.0f / a;
+				DirectX::XMVECTOR s = DirectX::XMVectorSubtract(localOrig, v0);
+				float u = f * DirectX::XMVectorGetX(DirectX::XMVector3Dot(s, h));
+				if (u < 0.0f || u > 1.0f) continue;
+
+				DirectX::XMVECTOR q = DirectX::XMVector3Cross(s, edge1);
+				float v = f * DirectX::XMVectorGetX(DirectX::XMVector3Dot(localDir, q));
+				if (v < 0.0f || u + v > 1.0f) continue;
+
+				float t = f * DirectX::XMVectorGetX(DirectX::XMVector3Dot(edge2, q));
+				if (t > 1e-6f && t < minDistLocal) {
+					minDistLocal = t;
+					hit = true;
+				}
+			}
+		} else {
+			// 子ノードへ（近い方から処理するとより効率的だが、今回はスタックにそのまま積む）
+			stack.push_back(node.leftChild);
+			stack.push_back(node.rightChild);
+		}
 	}
-	for (const auto& child : node.children)
-		UpdateSkeleton(child, globalTransform, animation, time, outPalette);
+
+	if (hit) {
+		// ローカル上の交差座標を計算
+		DirectX::XMVECTOR hitLocal = DirectX::XMVectorAdd(localOrig, DirectX::XMVectorScale(localDir, minDistLocal));
+		// ワールド座標に戻す
+		DirectX::XMVECTOR hitWorld = DirectX::XMVector3TransformCoord(hitLocal, worldMat);
+		DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&outHitPoint), hitWorld);
+		// 距離を計算 (ワールド空間上)
+		outDist = DirectX::XMVectorGetX(DirectX::XMVector3Length(DirectX::XMVectorSubtract(hitWorld, rayOrig)));
+		return true;
+	}
+
+	return false;
+}
+
+void Model::UpdateSkeleton(const Node& /*node*/, const Matrix4x4& /*parentMatrix*/, const Animation& /*animation*/, float /*time*/, std::vector<Matrix4x4>& /*skeletonParams*/) {
+	// (未使用) 互換性のためのダミー実装
 }
 
 } // namespace Engine

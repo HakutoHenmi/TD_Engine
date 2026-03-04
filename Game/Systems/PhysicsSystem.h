@@ -102,7 +102,9 @@ public:
 							float dotV = DirectX::XMVectorGetX(DirectX::XMVector3Dot(vel, pA));
 							if (dotV < 0) {
 								if (pushAxis.y > 0.6f) { // 接地
-									if (cm) cm->isGrounded = true;
+									if (cm) {
+										cm->isGrounded = true;
+									}
 									DirectX::XMVECTOR vN = DirectX::XMVectorScale(pA, dotV);
 									vel = DirectX::XMVectorSubtract(vel, vN);
 									vel = DirectX::XMVectorScale(vel, 0.95f);
@@ -114,7 +116,6 @@ public:
 								}
 								DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&rb.velocity), vel);
 							}
-							if (cm && pushAxis.y > 0.6f) cm->velocityY = 0;
 							GetObbAxes(obj, bc, axes1, c1, e1);
 						}
 					}
@@ -261,11 +262,17 @@ public:
 							}
 
 							if (bestContact.found) {
-								const float skinWidth = 0.002f;
-								float pushDist = bestContact.depth + skinWidth;
-								obj.translate.x += bestContact.normal.x * pushDist;
-								obj.translate.y += bestContact.normal.y * pushDist;
-								obj.translate.z += bestContact.normal.z * pushDist;
+								// めり込み量分だけ押し戻す
+								obj.translate.x += bestContact.normal.x * bestContact.depth;
+								obj.translate.y += bestContact.normal.y * bestContact.depth;
+								obj.translate.z += bestContact.normal.z * bestContact.depth;
+
+								// 接地判定は速度に関わらず法線の向きで判断
+								if (bestContact.normal.y > 0.6f) {
+									if (cm) {
+										cm->isGrounded = true;
+									}
+								}
 
 								DirectX::XMVECTOR vel = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&rb.velocity));
 								DirectX::XMVECTOR n = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&bestContact.normal));
@@ -276,7 +283,6 @@ public:
 										float speed = DirectX::XMVectorGetX(DirectX::XMVector3Length(vel));
 										if (speed < 0.2f) vel = DirectX::XMVectorZero();
 										else vel = DirectX::XMVectorScale(vel, 0.9f);
-										if (cm) { cm->isGrounded = true; cm->velocityY = 0; }
 									}
 									DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&rb.velocity), vel);
 								}

@@ -159,11 +159,11 @@ public:
 	struct CustomRenderTarget {
 		Microsoft::WRL::ComPtr<ID3D12Resource> texture;
 		Microsoft::WRL::ComPtr<ID3D12Resource> depth;
-		D3D12_CPU_DESCRIPTOR_HANDLE rtv;
-		D3D12_CPU_DESCRIPTOR_HANDLE dsv;
-		D3D12_GPU_DESCRIPTOR_HANDLE srvGpu;
-		uint32_t width;
-		uint32_t height;
+		D3D12_CPU_DESCRIPTOR_HANDLE rtv{};
+		D3D12_CPU_DESCRIPTOR_HANDLE dsv{};
+		D3D12_GPU_DESCRIPTOR_HANDLE srvGpu{};
+		uint32_t width = 0;
+		uint32_t height = 0;
 	};
 
 	CustomRenderTarget CreateRenderTarget(uint32_t width, uint32_t height);

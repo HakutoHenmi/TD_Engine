@@ -4,7 +4,7 @@
 #include <Windows.h>
 #include <memory>
 
-int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int cmdShow) {
+int WINAPI WinMain(_In_ HINSTANCE hInst, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int cmdShow) {
 	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
 	// ★変更: 開発用ディレクトリ (TD_Engine) を優先する
@@ -15,7 +15,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int cmdShow) {
 		if (lastSlash)
 			*lastSlash = L'\0';
 
-		wchar_t devPath[MAX_PATH];
+		wchar_t devPath[MAX_PATH] = {};
 		wcscpy_s(devPath, exePath);
 		wcscat_s(devPath, L"\\..\\..\\..\\TD_Engine");
 

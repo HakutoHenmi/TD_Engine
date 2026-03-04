@@ -131,9 +131,13 @@ public:
 	// BVH構築
 	void BuildBVH();
 
+	// レイテスト（AABBおよびTriangle交差判定）
+	bool RayCast(const DirectX::XMVECTOR& rayOrig, const DirectX::XMVECTOR& rayDir, const Matrix4x4& worldTransform, float& outDist, Vector3& outHitPoint) const;
+
 private:
 	void SubdivideBVH(uint32_t nodeIdx);
 	void UpdateNodeBounds(uint32_t nodeIdx);
+	static bool RayIntersectsAABB(const DirectX::XMVECTOR& rayOrig, const DirectX::XMVECTOR& rayDir, const Vector3& bmin, const Vector3& bmax, float& tOut);
 
 	// ------------ 低レベルユーティリティ ------------
 	static Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(ID3D12Device* device, size_t sizeInBytes);
