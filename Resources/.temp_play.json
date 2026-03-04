@@ -20,7 +20,7 @@
       "extraTexturePaths": [],
       "shaderName": "Default",
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,0.2,0.2,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,0.2,0.2,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"},
         {"type": "Hurtbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "tag": "Body", "damageMultiplier": 1},
         {"type": "Health", "enabled": true, "hp": 100, "maxHp": 100, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false}
       ]
@@ -39,6 +39,21 @@
       "components": [
         {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources\\Stages\\karimap.obj", "texturePath": "Resources\\uvChecker.png", "color": [0.69112,0.38692,0.38692,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": ["Resources\\Terrain\\grass.png", "Resources\\Terrain\\rock.png", "Resources\\Terrain\\dirt.png", "Resources\\basecolor.jpg", "Resources\\white1x1.png"], "lightmapPath": "", "shaderName": "EnhancedTerrain"},
         {"type": "GpuMeshCollider", "enabled": true, "isTrigger": false, "collisionType": 0, "meshPath": "Resources\\Stages\\karimap.obj"}
+      ]
+    },
+    {
+      "name": "Model",
+      "locked": false,
+      "modelPath": "Resources\\walk.gltf",
+      "texturePath": "",
+      "translate": [10.4991, 3.39298, 2.15136],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources\\walk.gltf", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
       ]
     },
     {
@@ -107,14 +122,14 @@
       "locked": false,
       "modelPath": "Resources/cube/cube.obj",
       "texturePath": "Resources/white1x1.png",
-      "translate": [0, 16.72, 0],
+      "translate": [0.435737, 16.6527, 0.684708],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "color": [0.2, 0.5, 1, 1],
       "extraTexturePaths": [],
       "shaderName": "Default",
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [0.2,0.5,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [0.2,0.5,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"},
         {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
         {"type": "Rigidbody", "enabled": true, "velocity": [0,0,0], "useGravity": true, "isKinematic": false},
         {"type": "GpuMeshCollider", "enabled": true, "isTrigger": false, "collisionType": 0, "meshPath": "Resources/cube/cube.obj"},

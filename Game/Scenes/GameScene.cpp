@@ -72,8 +72,8 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 	systems_.clear();
 	systems_.push_back(std::make_unique<PlayerInputSystem>());
 	systems_.push_back(std::make_unique<CharacterMovementSystem>());
-	systems_.push_back(std::make_unique<CameraFollowSystem>());
 	systems_.push_back(std::make_unique<PhysicsSystem>());
+	systems_.push_back(std::make_unique<CameraFollowSystem>());
 	systems_.push_back(std::make_unique<HealthSystem>());
 
 	auto scriptSys = std::make_unique<ScriptSystem>();
@@ -356,9 +356,14 @@ void GameScene::Draw() {
 					renderer_->DrawSkinnedMesh(
 					    mr.modelHandle, mr.textureHandle, obj.GetTransform(), bonePalette, {obj.color.x * mr.color.x, obj.color.y * mr.color.y, obj.color.z * mr.color.z, obj.color.w * mr.color.w});
 				} else {
-					renderer_->DrawMeshInstanced(
-					    mr.modelHandle, mr.textureHandle, obj.GetTransform(), {obj.color.x * mr.color.x, obj.color.y * mr.color.y, obj.color.z * mr.color.z, obj.color.w * mr.color.w}, mr.shaderName,
-					    mr.extraTextureHandles);
+					// ★変更: Toon系シェーダーの場合は非インスタンス描画を使用（アウトライン2パス処理のため）
+					if (mr.shaderName == "Toon" || mr.shaderName == "ToonSkinning") {
+						renderer_->DrawMesh(mr.modelHandle, mr.textureHandle, obj.GetTransform(), {obj.color.x * mr.color.x, obj.color.y * mr.color.y, obj.color.z * mr.color.z, obj.color.w * mr.color.w}, mr.shaderName);
+					} else {
+						renderer_->DrawMeshInstanced(
+							mr.modelHandle, mr.textureHandle, obj.GetTransform(), {obj.color.x * mr.color.x, obj.color.y * mr.color.y, obj.color.z * mr.color.z, obj.color.w * mr.color.w}, mr.shaderName,
+							mr.extraTextureHandles);
+					}
 				}
 			}
 		}
@@ -393,11 +398,15 @@ void GameScene::Draw() {
 			if (hasAnim) {
 				renderer_->DrawSkinnedMesh(obj.modelHandle, obj.textureHandle, obj.GetTransform(), bonePalette, {obj.color.x, obj.color.y, obj.color.z, obj.color.w});
 			} else {
-				// ★変更: インスタンス描画を使用
-				std::vector<uint32_t> extraHandles;
-				for (const auto& p : obj.extraTexturePaths)
-					extraHandles.push_back(renderer_->LoadTexture2D(p));
-				renderer_->DrawMeshInstanced(obj.modelHandle, obj.textureHandle, obj.GetTransform(), {obj.color.x, obj.color.y, obj.color.z, obj.color.w}, obj.shaderName, extraHandles);
+				// ★変更: Toon系シェーダーの場合は非インスタンス描画を使用
+				if (obj.shaderName == "Toon" || obj.shaderName == "ToonSkinning") {
+					renderer_->DrawMesh(obj.modelHandle, obj.textureHandle, obj.GetTransform(), {obj.color.x, obj.color.y, obj.color.z, obj.color.w}, obj.shaderName);
+				} else {
+					std::vector<uint32_t> extraHandles;
+					for (const auto& p : obj.extraTexturePaths)
+						extraHandles.push_back(renderer_->LoadTexture2D(p));
+					renderer_->DrawMeshInstanced(obj.modelHandle, obj.textureHandle, obj.GetTransform(), {obj.color.x, obj.color.y, obj.color.z, obj.color.w}, obj.shaderName, extraHandles);
+				}
 			}
 		}
 	}

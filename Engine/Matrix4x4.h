@@ -164,5 +164,42 @@ inline Vector3 TransformCoord(const Vector3& v, const Matrix4x4& m) {
 	};
 }
 
+// 方向ベクトルからオイラー角（X,Y,Z軸回転）を計算する（Z軸が正面の場合）
+inline Vector3 LookRotation(const Vector3& direction, const Vector3& up = {0.0f, 1.0f, 0.0f}) {
+	using namespace DirectX;
+	XMVECTOR dir = XMVector3Normalize(XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&direction)));
+	if (XMVectorGetX(XMVector3LengthSq(dir)) < 1e-6f) return {0, 0, 0};
+	
+	XMVECTOR upVec = XMVector3Normalize(XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&up)));
+	
+	// もし方向ベクトルが真上や真下を向いている場合の特例処理
+	if (std::abs(XMVectorGetX(XMVector3Dot(dir, upVec))) > 0.999f) {
+		upVec = XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f); // Fallback up
+	}
+
+	XMVECTOR right = XMVector3Normalize(XMVector3Cross(upVec, dir));
+	XMVECTOR realUp = XMVector3Normalize(XMVector3Cross(dir, right));
+
+	XMFLOAT4X4 rotMat;
+	XMStoreFloat4x4(&rotMat, XMMatrixIdentity());
+	rotMat._11 = XMVectorGetX(right); rotMat._12 = XMVectorGetY(right); rotMat._13 = XMVectorGetZ(right);
+	rotMat._21 = XMVectorGetX(realUp); rotMat._22 = XMVectorGetY(realUp); rotMat._23 = XMVectorGetZ(realUp);
+	rotMat._31 = XMVectorGetX(dir); rotMat._32 = XMVectorGetY(dir); rotMat._33 = XMVectorGetZ(dir);
+
+	// 回転テンソルからオイラー角（Pitch, Yaw, Roll）への変換
+	float pitch = std::asin(-rotMat._32);
+	float yaw = 0.0f;
+	float roll = 0.0f;
+
+	if (std::cos(pitch) > 1e-4f) {
+		yaw = std::atan2(rotMat._31, rotMat._33);
+		roll = std::atan2(rotMat._12, rotMat._22);
+	} else {
+		yaw = std::atan2(-rotMat._13, rotMat._11);
+		roll = 0.0f;
+	}
+
+	return {pitch, yaw, roll};
+}
 
 } // namespace Engine
