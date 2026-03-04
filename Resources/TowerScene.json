@@ -13,12 +13,14 @@
       "locked": false,
       "modelPath": "Resources\\sword.obj",
       "texturePath": "",
-      "translate": [0, 0, 0],
+      "translate": [-4.12, 0, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources\\sword.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "lightmapPath": ""},
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources\\sword.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
         {"type": "Tag", "enabled": true, "tag": "Base"},
         {"type": "Script", "enabled": true, "scriptPath": "BaseScript"}
       ]
@@ -32,12 +34,14 @@
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "color": [0, 0, 0, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "lightmapPath": ""},
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
         {"type": "Tag", "enabled": true, "tag": "Untagged"},
         {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [1,1,1], "damage": 10, "isActive": false, "tag": "Default"},
         {"type": "Health", "enabled": true, "hp": 100, "maxHp": 100, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
-        {"type": "Script", "enabled": true, "scriptPath": ""}
+        {"type": "Script", "enabled": true, "scriptPath": "Canon"}
       ]
     },
     {
@@ -49,6 +53,8 @@
       "rotate": [0, 0, 0],
       "scale": [1.47, 1, 1],
       "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
       "components": [
         {"type": "AudioSource", "enabled": true, "soundPath": "Resources\\Sound\\BGM1.mp3", "volume": 1, "loop": true, "playOnStart": false, "is3D": false, "maxDistance": 50}
       ]
@@ -62,8 +68,10 @@
       "rotate": [0, 0, 0],
       "scale": [1, 2, 1],
       "color": [0.9, 0.2, 0.2, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "lightmapPath": ""},
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
         {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
         {"type": "Tag", "enabled": true, "tag": "Enemy"},
         {"type": "Health", "enabled": true, "hp": 30, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
@@ -79,8 +87,10 @@
       "rotate": [0, 0, 0],
       "scale": [1, 2, 1],
       "color": [0.9, 0.2, 0.2, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "lightmapPath": ""},
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
         {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
         {"type": "Tag", "enabled": true, "tag": "Enemy"},
         {"type": "Health", "enabled": true, "hp": 30, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
@@ -96,8 +106,10 @@
       "rotate": [0, 0, 0],
       "scale": [1, 2, 1],
       "color": [0.9, 0.2, 0.2, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "lightmapPath": ""},
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
         {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
         {"type": "Tag", "enabled": true, "tag": "Enemy"},
         {"type": "Health", "enabled": true, "hp": 30, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
@@ -113,8 +125,29 @@
       "rotate": [0, 0, 0],
       "scale": [1, 2, 1],
       "color": [0.9, 0.2, 0.2, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "lightmapPath": ""},
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
+        {"type": "Tag", "enabled": true, "tag": "Enemy"},
+        {"type": "Health", "enabled": true, "hp": 30, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
+        {"type": "Script", "enabled": true, "scriptPath": "EnemyAIScript"}
+      ]
+    },
+    {
+      "name": "Enemy_B_4",
+      "locked": false,
+      "modelPath": "Resources/cube/cube.obj",
+      "texturePath": "Resources/white1x1.png",
+      "translate": [6.8, 1, 12],
+      "rotate": [0, 0, 0],
+      "scale": [1, 2, 1],
+      "color": [0.9, 0.2, 0.2, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
         {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
         {"type": "Tag", "enabled": true, "tag": "Enemy"},
         {"type": "Health", "enabled": true, "hp": 30, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
@@ -130,99 +163,29 @@
       "rotate": [0, 0, 0],
       "scale": [20, 1, 20],
       "color": [0.8, 0.8, 0.8, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/plane.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "lightmapPath": ""},
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/plane.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
         {"type": "BoxCollider", "enabled": true, "center": [0,-0.5,0], "size": [20,1,20], "isTrigger": false}
       ]
     },
     {
-      "name": "KamikazeEnemyScript",
+      "name": "Pipe",
       "locked": false,
       "modelPath": "Resources/cube/cube.obj",
       "texturePath": "Resources/white1x1.png",
-      "translate": [5, 1, 10],
+      "translate": [7.42246, -0.334103, 0.297585],
       "rotate": [0, 0, 0],
-      "scale": [1, 2, 1],
-      "color": [0.9, 0.2, 0.2, 1],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "lightmapPath": ""},
-        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
-        {"type": "Tag", "enabled": true, "tag": "KamikazeEnemyScript"},
-        {"type": "CharacterMovement", "enabled": true, "speed": 5, "jumpPower": 6, "gravity": 9.8},
-        {"type": "Health", "enabled": true, "hp": 30, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
-        {"type": "Script", "enabled": true, "scriptPath": "KamikazeEnemyScript"}
-      ]
-    },
-    {
-      "name": "KamikazeEnemyScript_1",
-      "locked": false,
-      "modelPath": "Resources/cube/cube.obj",
-      "texturePath": "Resources/white1x1.png",
-      "translate": [9.92643, 1.86957, 14.1559],
-      "rotate": [0, 0, 0],
-      "scale": [1, 2, 1],
-      "color": [0.9, 0.2, 0.2, 1],
-      "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "lightmapPath": ""},
-        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
-        {"type": "Tag", "enabled": true, "tag": "KamikazeEnemyScript"},
-        {"type": "CharacterMovement", "enabled": true, "speed": 5, "jumpPower": 6, "gravity": 9.8},
-        {"type": "Health", "enabled": true, "hp": 30, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
-        {"type": "Script", "enabled": true, "scriptPath": "KamikazeEnemyScript"}
-      ]
-    },
-    {
-      "name": "KamikazeEnemyScript_2",
-      "locked": false,
-      "modelPath": "Resources/cube/cube.obj",
-      "texturePath": "Resources/white1x1.png",
-      "translate": [14.0979, 1.82526, 17.2202],
-      "rotate": [0, 0, 0],
-      "scale": [1, 2, 1],
-      "color": [0.9, 0.2, 0.2, 1],
-      "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "lightmapPath": ""},
-        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
-        {"type": "Tag", "enabled": true, "tag": "KamikazeEnemyScript"},
-        {"type": "CharacterMovement", "enabled": true, "speed": 5, "jumpPower": 6, "gravity": 9.8},
-        {"type": "Health", "enabled": true, "hp": 30, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
-        {"type": "Script", "enabled": true, "scriptPath": "KamikazeEnemyScript"}
-      ]
-    },
-    {
-      "name": "KamikazeEnemyScript_3",
-      "locked": false,
-      "modelPath": "Resources/cube/cube.obj",
-      "texturePath": "Resources/white1x1.png",
-      "translate": [19.2523, 1.94343, 22.2474],
-      "rotate": [0, 0, 0],
-      "scale": [1, 2, 1],
-      "color": [0.9, 0.2, 0.2, 1],
-      "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "lightmapPath": ""},
-        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
-        {"type": "Tag", "enabled": true, "tag": "KamikazeEnemyScript"},
-        {"type": "CharacterMovement", "enabled": true, "speed": 5, "jumpPower": 6, "gravity": 9.8},
-        {"type": "Health", "enabled": true, "hp": 30, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
-        {"type": "Script", "enabled": true, "scriptPath": "KamikazeEnemyScript"}
-      ]
-    },
-    {
-      "name": "KamikazeEnemyScript_4",
-      "locked": false,
-      "modelPath": "Resources/cube/cube.obj",
-      "texturePath": "Resources/white1x1.png",
-      "translate": [22.4867, 1.98774, 24.4249],
-      "rotate": [0, 0, 0],
-      "scale": [1, 2, 1],
-      "color": [0.9, 0.2, 0.2, 1],
-      "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "lightmapPath": ""},
-        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
-        {"type": "Tag", "enabled": true, "tag": "KamikazeEnemyScript"},
-        {"type": "CharacterMovement", "enabled": true, "speed": 5, "jumpPower": 6, "gravity": 9.8},
-        {"type": "Health", "enabled": true, "hp": 30, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
-        {"type": "Script", "enabled": true, "scriptPath": "KamikazeEnemyScript"}
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "Tag", "enabled": true, "tag": "Pipe"},
+        {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "damage": 10, "isActive": false, "tag": "Default"},
+        {"type": "Script", "enabled": true, "scriptPath": "PipeScript"}
       ]
     },
     {
@@ -234,6 +197,8 @@
       "rotate": [0.785398, 0.523599, 0],
       "scale": [1, 1, 1],
       "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
       "components": [
         {"type": "DirectionalLight", "enabled": true, "color": [1,1,1], "intensity": 1}
       ]

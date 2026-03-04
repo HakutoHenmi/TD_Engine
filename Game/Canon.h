@@ -18,6 +18,10 @@ private:
 	                              // クールダウン
 	float attackTimer_ = 0.0f;
 	float rotationSpeed_ = 1.0f; // タワーの回転速度（ラジアン/秒）
+
+		int objectCount = 0;
+	int pipeCount = 0;
+	int enemyCount = 0;
 };
 
 } // namespace Game

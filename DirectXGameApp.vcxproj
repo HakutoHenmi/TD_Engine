@@ -185,6 +185,7 @@ exit /b 0
     <ClCompile Include="Game\Canon.cpp" />
     <ClCompile Include="Game\Editor\EditorUI.cpp" />
     <ClCompile Include="Game\KamikazeEnemyScript.cpp" />
+    <ClCompile Include="Game\PipeScript.cpp" />
     <ClCompile Include="Game\Scenes\GameScene.cpp" />
     <ClCompile Include="Game\Scenes\TitleScene.cpp" />
     <ClCompile Include="Game\ScriptEngine.cpp" />
@@ -203,6 +204,7 @@ exit /b 0
     <ClInclude Include="Game\Canon.h" />
     <ClInclude Include="Game\Editor\EditorUI.h" />
     <ClInclude Include="Game\KamikazeEnemyScript.h" />
+    <ClInclude Include="Game\PipeScript.h" />
     <ClInclude Include="Game\Scenes\GameScene.h" />
     <ClInclude Include="Game\Scenes\TitleScene.h" />
     <ClInclude Include="Game\ObjectTypes.h" />

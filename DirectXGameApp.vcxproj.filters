@@ -21,6 +21,7 @@
     <ClCompile Include="Game\KamikazeEnemyScript.cpp" />
     <ClCompile Include="BaseScript.cpp" />
     <ClCompile Include="Game\Canon.cpp" />
+    <ClCompile Include="Game\PipeScript.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
@@ -56,6 +57,7 @@
     <ClInclude Include="Game\KamikazeEnemyScript.h" />
     <ClInclude Include="BaseScript.h" />
     <ClInclude Include="Game\Canon.h" />
+    <ClInclude Include="Game\PipeScript.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">

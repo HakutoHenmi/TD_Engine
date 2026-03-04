@@ -4,7 +4,27 @@
 #include "ScriptEngine.h"
 #include <cmath>
 
+#include "../imgui/imgui.h"
 namespace Game {
+
+struct TilePos {
+	int x;
+	int z;
+};
+
+//static int RoundToInt(float v) {
+//	if (v >= 0.0f) {
+//		return (int)(v + 0.5f);
+//	}
+//	return (int)(v - 0.5f);
+//}
+//
+//static TilePos GetTilePosXZ(const SceneObject& obj) {
+//	TilePos pos;
+//	pos.x = RoundToInt(obj.translate.x);
+//	pos.z = RoundToInt(obj.translate.z);
+//	return pos;
+//}
 
 static bool HasTag(const SceneObject& obj, const char* tagName) {
 	for (int i = 0; i < (int)obj.tags.size(); ++i) {
@@ -14,20 +34,90 @@ static bool HasTag(const SceneObject& obj, const char* tagName) {
 	}
 	return false;
 }
+//static bool HasPipeAt(GameScene* scene, int tx, int tz) {
+//	for (const SceneObject& other : scene->GetObjects()) {
+//
+//		if (!HasTag(other, "Pipe")) {
+//			continue;
+//		}
+//
+//		TilePos p = GetTilePosXZ(other);
+//		if (p.x == tx && p.z == tz) {
+//			return true;
+//		}
+//	}
+//	return false;
+//}
 
-void Canon::Start(SceneObject& obj, GameScene* /*scene*/) { (void)obj;
+static bool IsCanonConnectedToPipe(GameScene* scene, const SceneObject& canonObj) {
+	const float connectRange = 2.0f;  // つながる距離
+	const float axisTolerance = 0.6f; // 軸のズレ許容（小さいほど4方向っぽい）
 
-attackTimer_ = 0.0f;
+	for (const SceneObject& other : scene->GetObjects()) {
 
+		if (!HasTag(other, "Pipe")) {
+			continue;
+		}
+
+		float dx = other.translate.x - canonObj.translate.x;
+		float dz = other.translate.z - canonObj.translate.z;
+
+		float dist = std::sqrt(dx * dx + dz * dz);
+		if (dist > connectRange) {
+			continue;
+		}
+
+		float absDx = std::fabs(dx);
+		float absDz = std::fabs(dz);
+
+		// 4方向っぽくする：XかZのどちらかがほぼ同じラインならOK
+		if (absDx <= axisTolerance || absDz <= axisTolerance) {
+			return true;
+		}
+	}
+
+	return false;
+}
+void Canon::Start(SceneObject& obj, GameScene* /*scene*/) {
+	(void)obj;
+
+	attackTimer_ = 0.0f;
 }
 
 void Canon::Update(SceneObject& obj, GameScene* scene, float dt) {
+
+
+	for (const SceneObject& other : scene->GetObjects()) {
+		objectCount += 1;
+
+		if (HasTag(other, "Pipe")) {
+			pipeCount += 1;
+		}
+
+		if (HasTag(other, "Enemy")) {
+			enemyCount += 1;
+		}
+	}
+
+	ImGui::Begin("Debug Pipe");
+	ImGui::Text("Objects: %d", objectCount);
+	ImGui::Text("Pipes  : %d", pipeCount);
+	ImGui::Text("Enemies: %d", enemyCount);
+
+	bool connected = IsCanonConnectedToPipe(scene, obj);
+	ImGui::Text("Canon connected: %s", connected ? "YES" : "NO");
+	ImGui::End();
+
+	// objectCount と pipeCount を表示
 
 	// クールダウン
 	if (attackTimer_ > 0.0f) {
 		attackTimer_ -= dt;
 	}
 
+	if (!IsCanonConnectedToPipe(scene, obj)) {
+		return; // Pipeが繋がってない
+	}
 	// 一番近い Enemy を探す（範囲内）
 	const SceneObject* target = nullptr;
 	float bestDistance = attackRange_;

@@ -6,13 +6,36 @@
 
 namespace Game {
 
-static bool HasTag(const SceneObject& obj, const char* tagName) {
-	for (int i = 0; i < (int)obj.tags.size(); ++i) { // タグ配列を最初から最後までループして、指定されたタグがあるか確認
-		if (obj.tags[i].tag == tagName) {            // タグが見つかったらtrueを返す
+bool BaseScript::HasTag(const SceneObject& obj, const char* tagName) {
+	for (int i = 0; i < (int)obj.tags.size(); ++i) {
+		if (obj.tags[i].tag == tagName) {
 			return true;
 		}
 	}
-	return false; // タグが見つからなかったらfalseを返す
+	return false;
+}
+
+const SceneObject* BaseScript::FindNearestPipe(const SceneObject& canonObj, GameScene* scene, float connectRange) {
+	const SceneObject* nearestPipe = nullptr;
+	float bestDistance = connectRange;
+
+	for (const SceneObject& other : scene->GetObjects()) {
+
+		if (!HasTag(other, "Pipe")) {
+			continue;
+		}
+
+		float dx = other.translate.x - canonObj.translate.x;
+		float dz = other.translate.z - canonObj.translate.z;
+		float distance = std::sqrt(dx * dx + dz * dz);
+
+		if (distance < bestDistance) {
+			bestDistance = distance;
+			nearestPipe = &other;
+		}
+	}
+
+	return nearestPipe;
 }
 
 void BaseScript::Start(SceneObject& obj, GameScene* /*scene*/) {
@@ -23,7 +46,7 @@ void BaseScript::Start(SceneObject& obj, GameScene* /*scene*/) {
 void BaseScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 
 	// タワーを回転させる
-	obj.rotate.y += rotationSpeed_ * dt;
+	// obj.rotate.y += rotationSpeed_ * dt;
 
 	// 発射クールダウン
 	if (attackTimer_ > 0.0f) {
@@ -32,7 +55,6 @@ void BaseScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 
 	//  一番近いEnemyを探す（範囲内）
 	const SceneObject* target = nullptr; // 最初はターゲットなし
-
 
 	// 最初は「最大攻撃距離」にしておく
 	float bestDistance = attackRange_;
@@ -52,7 +74,7 @@ void BaseScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 		float dz = other.translate.z - obj.translate.z;
 		float distance = std::sqrt(dx * dx + dz * dz);
 
-	// 範囲内 かつ 今までより近いなら更新
+		// 範囲内 かつ 今までより近いなら更新
 		if (distance < bestDistance) {
 			bestDistance = distance;
 			target = &other;
