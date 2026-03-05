@@ -23,32 +23,43 @@ namespace fs = std::filesystem;
 static std::deque<UndoCommand> undoStack;
 static std::deque<UndoCommand> redoStack;
 static constexpr size_t kMaxUndoDepth = 100;
-// ★ non-static: GameScene.cppからexternで参照
+// 笘・non-static: GameScene.cpp縺九ｉextern縺ｧ蜿ら・
 GizmoMode currentGizmoMode = GizmoMode::Translate;
 static std::deque<LogEntry> consoleLog;
 static constexpr size_t kMaxConsoleLines = 500;
 static float globalTime = 0.0f;
 
-// ★ ビューポート操作用の状態 (non-static: extern参照)
+// 笘・繝薙Η繝ｼ繝昴・繝域桃菴懃畑縺ｮ迥ｶ諷・(non-static: extern蜿ら・)
 bool gizmoDragging = false;
 int gizmoDragAxis = -1; // 0=X, 1=Y, 2=Z
 static std::map<int, Engine::Transform> dragStartTransforms = {};
 static ImVec2 gizmoDragStartMouse = {};
-static bool objectDragging = false;               // ★ 自由ドラッグ中フラグ
-static std::vector<SceneObject> clipboardObjects; // Ctrl+C コピー用
+static bool objectDragging = false;               // 笘・閾ｪ逕ｱ繝峨Λ繝・げ荳ｭ繝輔Λ繧ｰ
+static std::vector<SceneObject> clipboardObjects; // Ctrl+C 繧ｳ繝斐・逕ｨ
 
-// ★ Gameウィンドウの画像座標 (ピッキング用)
+// 笘・Game繧ｦ繧｣繝ｳ繝峨え縺ｮ逕ｻ蜒丞ｺｧ讓・(繝斐ャ繧ｭ繝ｳ繧ｰ逕ｨ)
 static ImVec2 gameImageMin = {};
 static ImVec2 gameImageMax = {};
 
-// ★ コピー/複製時のユニーク名生成
+// 笘・繝代う繝励Δ繝ｼ繝臥畑縺ｮ迥ｶ諷具ｼ医ヵ繧｡繧､繝ｫ蜈ｨ菴薙〒蜈ｱ譛会ｼ・
+static bool pipeMode = false;
+static Engine::Vector3 pipeStartNode = {0, 0, 0};
+static bool hasPipeStart = false;
+static int previewPipeId = -1;
+static int previewJointId = -1;
+static bool useAngleSnap = false; // 笘・隗貞ｺｦ繧ｹ繝翫ャ繝励・ON/OFF
+static float snapAngleStep = 15.0f; // 笘・繧ｹ繝翫ャ繝苓ｧ貞ｺｦ・亥ｺｦ・・
+static bool useNodeSnap = false; // ★ 他ノードへの軸スナップ
+static float nodeSnapThreshold = 1.0f; // ★ ノードスナップの閾値
+
+// 笘・繧ｳ繝斐・/隍・｣ｽ譎ゅ・繝ｦ繝九・繧ｯ蜷咲函謌・
 static std::string GenerateCopyName(const std::string& baseName, const std::vector<SceneObject>& objects) {
-	// 末尾の "_数字" や " (Copy)" を除去してベース名を取得
+	// 譛ｫ蟆ｾ縺ｮ "_謨ｰ蟄・ 繧・" (Copy)" 繧帝勁蜴ｻ縺励※繝吶・繧ｹ蜷阪ｒ蜿門ｾ・
 	std::string base = baseName;
-	// " (Copy)" の繰り返しを除去
+	// " (Copy)" 縺ｮ郢ｰ繧願ｿ斐＠繧帝勁蜴ｻ
 	while (base.size() > 7 && base.substr(base.size() - 7) == " (Copy)")
 		base = base.substr(0, base.size() - 7);
-	// "_数字" を除去
+	// "_謨ｰ蟄・ 繧帝勁蜴ｻ
 	{
 		auto pos = base.rfind('_');
 		if (pos != std::string::npos && pos + 1 < base.size()) {
@@ -64,7 +75,7 @@ static std::string GenerateCopyName(const std::string& baseName, const std::vect
 	}
 	if (base.empty())
 		base = "Object";
-	// 既存のオブジェクト名から最大番号を探す
+	// 譌｢蟄倥・繧ｪ繝悶ず繧ｧ繧ｯ繝亥錐縺九ｉ譛螟ｧ逡ｪ蜿ｷ繧呈爾縺・
 	int maxNum = 0;
 	for (const auto& obj : objects) {
 		if (obj.name.size() > base.size() + 1 && obj.name.substr(0, base.size()) == base && obj.name[base.size()] == '_') {
@@ -198,7 +209,7 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 		ss << "        {\"type\": \"Rigidbody\", \"enabled\": " << (rb.enabled ? "true" : "false") << ", \"velocity\": [" << rb.velocity.x << "," << rb.velocity.y << "," << rb.velocity.z
 		   << "], \"useGravity\": " << (rb.useGravity ? "true" : "false") << ", \"isKinematic\": " << (rb.isKinematic ? "true" : "false") << "}";
 	}
-	// ★追加: ParticleEmitterのシリアライズ
+	// 笘・ｿｽ蜉: ParticleEmitter縺ｮ繧ｷ繝ｪ繧｢繝ｩ繧､繧ｺ
 	for (const auto& pe : o.particleEmitters) {
 		if (!first)
 			ss << ",\n";
@@ -223,14 +234,14 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 		ss << "        {\"type\": \"GpuMeshCollider\", \"enabled\": " << (gmc.enabled ? "true" : "false") << ", \"isTrigger\": " << (gmc.isTrigger ? "true" : "false")
 		   << ", \"collisionType\": " << (int)gmc.collisionType << ", \"meshPath\": \"" << EscapeJson(gmc.meshPath) << "\"}";
 	}
-	// ★追加: PlayerInput
+	// 笘・ｿｽ蜉: PlayerInput
 	for (const auto& pi : o.playerInputs) {
 		if (!first)
 			ss << ",\n";
 		first = false;
 		ss << "        {\"type\": \"PlayerInput\", \"enabled\": " << (pi.enabled ? "true" : "false") << "}";
 	}
-	// ★追加: CharacterMovement
+	// 笘・ｿｽ蜉: CharacterMovement
 	for (const auto& cm : o.characterMovements) {
 		if (!first)
 			ss << ",\n";
@@ -238,7 +249,7 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 		ss << "        {\"type\": \"CharacterMovement\", \"enabled\": " << (cm.enabled ? "true" : "false") << ", \"speed\": " << cm.speed << ", \"jumpPower\": " << cm.jumpPower
 		   << ", \"gravity\": " << cm.gravity << "}";
 	}
-	// ★追加: CameraTarget
+	// 笘・ｿｽ蜉: CameraTarget
 	for (const auto& ct : o.cameraTargets) {
 		if (!first)
 			ss << ",\n";
@@ -246,7 +257,7 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 		ss << "        {\"type\": \"CameraTarget\", \"enabled\": " << (ct.enabled ? "true" : "false") << ", \"distance\": " << ct.distance << ", \"height\": " << ct.height
 		   << ", \"smoothSpeed\": " << ct.smoothSpeed << "}";
 	}
-	// ★追加: Light Components
+	// 笘・ｿｽ蜉: Light Components
 	for (const auto& dl : o.directionalLights) {
 		if (!first)
 			ss << ",\n";
@@ -269,7 +280,7 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 		   << "], \"intensity\": " << sl.intensity << ", \"range\": " << sl.range << ", \"innerCos\": " << sl.innerCos << ", \"outerCos\": " << sl.outerCos << ", \"atten\": [" << sl.atten.x << ","
 		   << sl.atten.y << "," << sl.atten.z << "]}";
 	}
-	// ★追加: AudioSource
+	// 笘・ｿｽ蜉: AudioSource
 	for (const auto& as : o.audioSources) {
 		if (!first)
 			ss << ",\n";
@@ -278,14 +289,14 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 		   << ", \"loop\": " << (as.loop ? "true" : "false") << ", \"playOnStart\": " << (as.playOnStart ? "true" : "false") << ", \"is3D\": " << (as.is3D ? "true" : "false")
 		   << ", \"maxDistance\": " << as.maxDistance << "}";
 	}
-	// ★追加: AudioListener
+	// 笘・ｿｽ蜉: AudioListener
 	for (const auto& al : o.audioListeners) {
 		if (!first)
 			ss << ",\n";
 		first = false;
 		ss << "        {\"type\": \"AudioListener\", \"enabled\": " << (al.enabled ? "true" : "false") << "}";
 	}
-	// ★追加: Hitbox
+	// 笘・ｿｽ蜉: Hitbox
 	for (const auto& hb : o.hitboxes) {
 		if (!first)
 			ss << ",\n";
@@ -294,7 +305,7 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 		   << hb.size.x << "," << hb.size.y << "," << hb.size.z << "], \"damage\": " << hb.damage << ", \"isActive\": " << (hb.isActive ? "true" : "false") << ", \"tag\": \"" << EscapeJson(hb.tag)
 		   << "\"}";
 	}
-	// ★追加: Hurtbox
+	// 笘・ｿｽ蜉: Hurtbox
 	for (const auto& hb : o.hurtboxes) {
 		if (!first)
 			ss << ",\n";
@@ -302,7 +313,7 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 		ss << "        {\"type\": \"Hurtbox\", \"enabled\": " << (hb.enabled ? "true" : "false") << ", \"center\": [" << hb.center.x << "," << hb.center.y << "," << hb.center.z << "], \"size\": ["
 		   << hb.size.x << "," << hb.size.y << "," << hb.size.z << "], \"tag\": \"" << EscapeJson(hb.tag) << "\", \"damageMultiplier\": " << hb.damageMultiplier << "}";
 	}
-	// ★追加: Health
+	// 笘・ｿｽ蜉: Health
 	for (const auto& hc : o.healths) {
 		if (!first)
 			ss << ",\n";
@@ -310,14 +321,14 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 		ss << "        {\"type\": \"Health\", \"enabled\": " << (hc.enabled ? "true" : "false") << ", \"hp\": " << hc.hp << ", \"maxHp\": " << hc.maxHp << ", \"stamina\": " << hc.stamina
 		   << ", \"maxStamina\": " << hc.maxStamina << ", \"invincibleTime\": " << hc.invincibleTime << ", \"isDead\": " << (hc.isDead ? "true" : "false") << "}";
 	}
-	// ★追加: Script
+	// 笘・ｿｽ蜉: Script
 	for (const auto& sc : o.scripts) {
 		if (!first)
 			ss << ",\n";
 		first = false;
 		ss << "        {\"type\": \"Script\", \"enabled\": " << (sc.enabled ? "true" : "false") << ", \"scriptPath\": \"" << EscapeJson(sc.scriptPath) << "\"}";
 	}
-	// ★追加: UI Components
+	// 笘・ｿｽ蜉: UI Components
 	for (const auto& rt : o.rectTransforms) {
 		if (!first) ss << ",\n"; first = false;
 		ss << "        {\"type\": \"RectTransform\", \"enabled\": " << (rt.enabled ? "true" : "false") << ", \"pos\": [" << rt.pos.x << "," << rt.pos.y << "], \"size\": [" << rt.size.x << "," << rt.size.y << "], \"anchor\": [" << rt.anchor.x << "," << rt.anchor.y << "], \"pivot\": [" << rt.pivot.x << "," << rt.pivot.y << "], \"rotation\": " << rt.rotation << "}";
@@ -359,7 +370,7 @@ void EditorUI::SaveScene(GameScene* scene, const std::string& path) {
 	f << "  },\n";
 	f << "  \"objects\": [\n";
 
-	// ★追加: Gitでの競合(コンフリクト)を防ぐため、オブジェクトを名前順にソートして保存する
+	// 笘・ｿｽ蜉: Git縺ｧ縺ｮ遶ｶ蜷・繧ｳ繝ｳ繝輔Μ繧ｯ繝・繧帝亟縺舌◆繧√√が繝悶ず繧ｧ繧ｯ繝医ｒ蜷榊燕鬆・↓繧ｽ繝ｼ繝医＠縺ｦ菫晏ｭ倥☆繧・
 	std::vector<SceneObject> sortedObjects = scene->objects_;
 	std::stable_sort(sortedObjects.begin(), sortedObjects.end(), [](const SceneObject& a, const SceneObject& b) {
 		return a.name < b.name;
@@ -622,18 +633,18 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 			else
 				rb.isKinematic = false;
 			obj.rigidbodies.push_back(rb);
-		} else if (type == "ParticleEmitter") { // ★追加
+		} else if (type == "ParticleEmitter") { // 笘・ｿｽ蜉
 			ParticleEmitterComponent pe;
 			pe.enabled = enabled;
 			pe.emitter.Initialize(*Engine::Renderer::GetInstance(), "LoadedEmitter");
 
-			// assetPath があれば ParticleEmitter 自身にファイルから復元させる
+			// assetPath 縺後≠繧後・ ParticleEmitter 閾ｪ霄ｫ縺ｫ繝輔ぃ繧､繝ｫ縺九ｉ蠕ｩ蜈・＆縺帙ｋ
 			pe.assetPath = ExtractString(cblock, "assetPath");
 			if (!pe.assetPath.empty()) {
 				pe.emitter.LoadFromJson(pe.assetPath);
 			}
 
-			// JSON内にも上書きパラメーターがある場合のフォールバック（従来との互換性用）
+			// JSON蜀・↓繧ゆｸ頑嶌縺阪ヱ繝ｩ繝｡繝ｼ繧ｿ繝ｼ縺後≠繧句ｴ蜷医・繝輔か繝ｼ繝ｫ繝舌ャ繧ｯ・亥ｾ捺擂縺ｨ縺ｮ莠呈鋤諤ｧ逕ｨ・・
 			auto& p = pe.emitter.params;
 			auto boolCheck = [&](const std::string& k, bool def) {
 				auto pos = cblock.find("\"" + k + "\"");
@@ -675,7 +686,7 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 			if (cblock.find("\"isAdditive\"") != std::string::npos)
 				p.isAdditive = boolCheck("isAdditive", false);
 			obj.particleEmitters.push_back(pe);
-		} else if (type == "GpuMeshCollider") { // ★追加
+		} else if (type == "GpuMeshCollider") { // 笘・ｿｽ蜉
 			GpuMeshColliderComponent gmc;
 			gmc.enabled = enabled;
 			auto tPos = cblock.find("\"isTrigger\"");
@@ -688,11 +699,11 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 			if (!gmc.meshPath.empty())
 				gmc.meshHandle = renderer->LoadObjMesh(gmc.meshPath);
 			obj.gpuMeshColliders.push_back(gmc);
-		} else if (type == "PlayerInput") { // ★追加
+		} else if (type == "PlayerInput") { // 笘・ｿｽ蜉
 			PlayerInputComponent pi;
 			pi.enabled = enabled;
 			obj.playerInputs.push_back(pi);
-		} else if (type == "CharacterMovement") { // ★追加
+		} else if (type == "CharacterMovement") { // 笘・ｿｽ蜉
 			CharacterMovementComponent cm;
 			cm.enabled = enabled;
 			if (cblock.find("\"speed\"") != std::string::npos)
@@ -702,7 +713,7 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 			if (cblock.find("\"gravity\"") != std::string::npos)
 				cm.gravity = ExtractFloat(cblock, "gravity", 9.8f);
 			obj.characterMovements.push_back(cm);
-		} else if (type == "CameraTarget") { // ★追加
+		} else if (type == "CameraTarget") { // 笘・ｿｽ蜉
 			CameraTargetComponent ct;
 			ct.enabled = enabled;
 			if (cblock.find("\"distance\"") != std::string::npos)
@@ -712,7 +723,7 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 			if (cblock.find("\"smoothSpeed\"") != std::string::npos)
 				ct.smoothSpeed = ExtractFloat(cblock, "smoothSpeed", 5.0f);
 			obj.cameraTargets.push_back(ct);
-		} else if (type == "DirectionalLight") { // ★追加
+		} else if (type == "DirectionalLight") { // 笘・ｿｽ蜉
 			DirectionalLightComponent dl;
 			dl.enabled = enabled;
 			auto col = ExtractArray(cblock, "color");
@@ -721,7 +732,7 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 			if (cblock.find("\"intensity\"") != std::string::npos)
 				dl.intensity = ExtractFloat(cblock, "intensity", 1.0f);
 			obj.directionalLights.push_back(dl);
-		} else if (type == "PointLight") { // ★追加
+		} else if (type == "PointLight") { // 笘・ｿｽ蜉
 			PointLightComponent pl;
 			pl.enabled = enabled;
 			auto col = ExtractArray(cblock, "color");
@@ -735,7 +746,7 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 			if (atten.size() >= 3)
 				pl.atten = {atten[0], atten[1], atten[2]};
 			obj.pointLights.push_back(pl);
-		} else if (type == "SpotLight") { // ★追加
+		} else if (type == "SpotLight") { // 笘・ｿｽ蜉
 			SpotLightComponent sl;
 			sl.enabled = enabled;
 			auto col = ExtractArray(cblock, "color");
@@ -753,7 +764,7 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 			if (atten.size() >= 3)
 				sl.atten = {atten[0], atten[1], atten[2]};
 			obj.spotLights.push_back(sl);
-		} else if (type == "AudioSource") { // ★追加
+		} else if (type == "AudioSource") { // 笘・ｿｽ蜉
 			AudioSourceComponent as;
 			as.enabled = enabled;
 			as.soundPath = ExtractString(cblock, "soundPath");
@@ -773,18 +784,18 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 				as.is3D = boolCheck("is3D", true);
 			if (cblock.find("\"maxDistance\"") != std::string::npos)
 				as.maxDistance = ExtractFloat(cblock, "maxDistance", 50.0f);
-			// 音声ファイルをロード
+			// 髻ｳ螢ｰ繝輔ぃ繧､繝ｫ繧偵Ο繝ｼ繝・
 			if (!as.soundPath.empty()) {
 				auto* audio = Engine::Audio::GetInstance();
 				if (audio)
 					as.soundHandle = audio->Load(as.soundPath);
 			}
 			obj.audioSources.push_back(as);
-		} else if (type == "AudioListener") { // ★追加
+		} else if (type == "AudioListener") { // 笘・ｿｽ蜉
 			AudioListenerComponent al;
 			al.enabled = enabled;
 			obj.audioListeners.push_back(al);
-		} else if (type == "Hitbox") { // ★追加
+		} else if (type == "Hitbox") { // 笘・ｿｽ蜉
 			HitboxComponent hb;
 			hb.enabled = enabled;
 			auto cen = ExtractArray(cblock, "center");
@@ -804,7 +815,7 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 			if (hb.tag.empty())
 				hb.tag = "Default";
 			obj.hitboxes.push_back(hb);
-		} else if (type == "Hurtbox") { // ★追加
+		} else if (type == "Hurtbox") { // 笘・ｿｽ蜉
 			HurtboxComponent hb;
 			hb.enabled = enabled;
 			auto cen = ExtractArray(cblock, "center");
@@ -819,7 +830,7 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 			if (cblock.find("\"damageMultiplier\"") != std::string::npos)
 				hb.damageMultiplier = ExtractFloat(cblock, "damageMultiplier", 1.0f);
 			obj.hurtboxes.push_back(hb);
-		} else if (type == "Health") { // ★追加
+		} else if (type == "Health") { // 笘・ｿｽ蜉
 			HealthComponent hc;
 			hc.enabled = enabled;
 			if (cblock.find("\"hp\"") != std::string::npos)
@@ -838,7 +849,7 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 			else
 				hc.isDead = false;
 			obj.healths.push_back(hc);
-		} else if (type == "Script") { // ★追加
+		} else if (type == "Script") { // 笘・ｿｽ蜉
 			ScriptComponent sc;
 			sc.enabled = enabled;
 			sc.scriptPath = ExtractString(cblock, "scriptPath");
@@ -889,7 +900,7 @@ void EditorUI::LoadScene(GameScene* scene, const std::string& path) {
 	f.close();
 
 	auto* renderer = Engine::Renderer::GetInstance();
-	// ★追加: Scene Settings の読み込み
+	// 笘・ｿｽ蜉: Scene Settings 縺ｮ隱ｭ縺ｿ霎ｼ縺ｿ
 	auto settingsStart = content.find("\"settings\"");
 	if (settingsStart != std::string::npos) {
 		auto blockStart = content.find("{", settingsStart);
@@ -926,7 +937,7 @@ void EditorUI::LoadScene(GameScene* scene, const std::string& path) {
 		objStart = content.find("{", objStart);
 		if (objStart == std::string::npos || objStart > arrEnd)
 			break;
-		// 最初の "{" の位置から探すため、FindBlockEndはobjStartから開始（FindBlockEnd内で"{"をカウントする）
+		// 譛蛻昴・ "{" 縺ｮ菴咲ｽｮ縺九ｉ謗｢縺吶◆繧√：indBlockEnd縺ｯobjStart縺九ｉ髢句ｧ具ｼ・indBlockEnd蜀・〒"{"繧偵き繧ｦ繝ｳ繝医☆繧具ｼ・
 		auto objEnd = FindBlockEnd(content, objStart);
 		if (objEnd == std::string::npos || objEnd > arrEnd)
 			break;
@@ -1003,7 +1014,7 @@ void EditorUI::AddScene(GameScene* scene, const std::string& path) {
 		std::string block = content.substr(objStart, objEnd - objStart + 1);
 		SceneObject obj;
 		obj.name = ExtractString(block, "name");
-		// 同じ名前がある場合はコピー名を生成（任意：上書きの方がいい場合もあるが安全のため）
+		// 蜷後§蜷榊燕縺後≠繧句ｴ蜷医・繧ｳ繝斐・蜷阪ｒ逕滓・・井ｻｻ諢擾ｼ壻ｸ頑嶌縺阪・譁ｹ縺後＞縺・ｴ蜷医ｂ縺ゅｋ縺悟ｮ牙・縺ｮ縺溘ａ・・
 		obj.name = GenerateCopyName(obj.name, scene->objects_);
 
 		obj.modelPath = ExtractString(block, "modelPath");
@@ -1090,7 +1101,7 @@ void EditorUI::LoadPrefab(GameScene* scene, const std::string& path) {
 
 	ParseComponents(obj, block, r);
 
-	// 後方互換性：コンポーネントが無く、モデルがあればデフォルトを付与
+	// 蠕梧婿莠呈鋤諤ｧ・壹さ繝ｳ繝昴・繝阪Φ繝医′辟｡縺上√Δ繝・Ν縺後≠繧後・繝・ヵ繧ｩ繝ｫ繝医ｒ莉倅ｸ・
 	if (obj.meshRenderers.empty() && !obj.modelPath.empty()) {
 		MeshRendererComponent mr;
 		mr.modelHandle = obj.modelHandle;
@@ -1105,7 +1116,7 @@ void EditorUI::LoadPrefab(GameScene* scene, const std::string& path) {
 	Log("Prefab loaded and instantiated: " + path);
 }
 
-// ====== ★ Ray-AABB 交差判定 ======
+// ====== 笘・Ray-AABB 莠､蟾ｮ蛻､螳・======
 static bool RayIntersectsAABB(DirectX::XMVECTOR rayOrig, DirectX::XMVECTOR rayDir, const DirectX::XMFLOAT3& bmin, const DirectX::XMFLOAT3& bmax, float& tOut) {
 	using namespace DirectX;
 	XMFLOAT3 orig;
@@ -1143,21 +1154,21 @@ static bool RayIntersectsAABB(DirectX::XMVECTOR rayOrig, DirectX::XMVECTOR rayDi
 	return true;
 }
 
-// ★ スクリーン座標からワールドRayを構築
+// 笘・繧ｹ繧ｯ繝ｪ繝ｼ繝ｳ蠎ｧ讓吶°繧峨Ρ繝ｼ繝ｫ繝嘘ay繧呈ｧ狗ｯ・
 static void ScreenToWorldRay(float screenX, float screenY, float imageW, float imageH, DirectX::XMMATRIX view, DirectX::XMMATRIX proj, DirectX::XMVECTOR& outOrig, DirectX::XMVECTOR& outDir) {
 	using namespace DirectX;
-	// NDC座標に変換 [-1, 1]
+	// NDC蠎ｧ讓吶↓螟画鋤 [-1, 1]
 	float ndcX = (screenX / imageW) * 2.0f - 1.0f;
-	float ndcY = 1.0f - (screenY / imageH) * 2.0f; // Y反転
+	float ndcY = 1.0f - (screenY / imageH) * 2.0f; // Y蜿崎ｻ｢
 
 	XMMATRIX invProj = XMMatrixInverse(nullptr, proj);
 	XMMATRIX invView = XMMatrixInverse(nullptr, view);
 
-	// Near plane と Far plane のポイント
+	// Near plane 縺ｨ Far plane 縺ｮ繝昴う繝ｳ繝・
 	XMVECTOR nearPoint = XMVector3TransformCoord(XMVectorSet(ndcX, ndcY, 0.0f, 1.0f), invProj);
 	XMVECTOR farPoint = XMVector3TransformCoord(XMVectorSet(ndcX, ndcY, 1.0f, 1.0f), invProj);
 
-	// ビュー空間→ワールド空間
+	// 繝薙Η繝ｼ遨ｺ髢凪・繝ｯ繝ｼ繝ｫ繝臥ｩｺ髢・
 	nearPoint = XMVector3TransformCoord(nearPoint, invView);
 	farPoint = XMVector3TransformCoord(farPoint, invView);
 
@@ -1165,7 +1176,7 @@ static void ScreenToWorldRay(float screenX, float screenY, float imageW, float i
 	outDir = XMVector3Normalize(XMVectorSubtract(farPoint, nearPoint));
 }
 
-// ★ ギズモ軸のRayヒット判定（ローカル空間に変換して判定）
+// 笘・繧ｮ繧ｺ繝｢霆ｸ縺ｮRay繝偵ャ繝亥愛螳夲ｼ医Ο繝ｼ繧ｫ繝ｫ遨ｺ髢薙↓螟画鋤縺励※蛻､螳夲ｼ・
 static int HitTestGizmoAxis(DirectX::XMVECTOR rayOrig, DirectX::XMVECTOR rayDir, const Engine::Transform& objTransform, float axisLen, GizmoMode mode) {
 	Engine::Matrix4x4 mat = objTransform.ToMatrix();
 	DirectX::XMMATRIX worldMat = DirectX::XMLoadFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&mat));
@@ -1190,7 +1201,7 @@ static int HitTestGizmoAxis(DirectX::XMVECTOR rayOrig, DirectX::XMVECTOR rayDir,
 
 		for (int a = 0; a < 3; ++a) {
 			float N[3] = {0, 0, 0};
-			N[a] = 1.0f; // a=0: YZ平面, a=1: ZX平面, a=2: XY平面
+			N[a] = 1.0f; // a=0: YZ蟷ｳ髱｢, a=1: ZX蟷ｳ髱｢, a=2: XY蟷ｳ髱｢
 			float denom = dir.x * N[0] + dir.y * N[1] + dir.z * N[2];
 			if (std::fabs(denom) > 1e-5f) {
 				float t = (-orig.x * N[0] - orig.y * N[1] - orig.z * N[2]) / denom;
@@ -1279,17 +1290,17 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	static int aspectMode = 0;
 	const char* aspectNames[] = {"Free Aspect", "16:9", "4:3"};
 
-	// ★追加: アニメーションウィンドウの呼び出し
+	// 笘・ｿｽ蜉: 繧｢繝九Γ繝ｼ繧ｷ繝ｧ繝ｳ繧ｦ繧｣繝ｳ繝峨え縺ｮ蜻ｼ縺ｳ蜃ｺ縺・
 	ShowAnimationWindow(renderer, gameScene);
 
-	// ★追加: Play Mode Monitor
+	// 笘・ｿｽ蜉: Play Mode Monitor
 	ShowPlayModeMonitor(gameScene);
-	ShowPlayModeMonitor(gameScene); // ★追加: Play Mode Monitor
+	ShowPlayModeMonitor(gameScene); // 笘・ｿｽ蜉: Play Mode Monitor
 
 	// ====== Menu Bar ======
 	if (ImGui::BeginMenuBar()) {
 		if (ImGui::BeginMenu("File")) {
-			// ★追加: 現在のシーン名を入力/表示するバッファ
+			// 笘・ｿｽ蜉: 迴ｾ蝨ｨ縺ｮ繧ｷ繝ｼ繝ｳ蜷阪ｒ蜈･蜉・陦ｨ遉ｺ縺吶ｋ繝舌ャ繝輔ぃ
 			static char currentSceneName[128] = "scene.json";
 			ImGui::InputText("Current Scene", currentSceneName, sizeof(currentSceneName));
 
@@ -1298,7 +1309,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 			}
 
 			if (ImGui::BeginMenu("Load Scene...")) {
-				// Resourcesフォルダ内のjsonファイルを列挙
+				// Resources繝輔か繝ｫ繝蜀・・json繝輔ぃ繧､繝ｫ繧貞・謖・
 				try {
 					for (const auto& entry : std::filesystem::directory_iterator("Resources")) {
 						if (entry.path().extension() == ".json") {
@@ -1435,12 +1446,28 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
 		ImGui::Spacing();
 		
-		static bool pipeMode = false;
-		static Engine::Vector3 pipeStartNode = {0,0,0};
-		static bool hasPipeStart = false;
 		if (ImGui::Button(pipeMode ? "Pipe Mode [ON]" : "Pipe Mode [OFF]")) {
 			pipeMode = !pipeMode;
 			if (!pipeMode) hasPipeStart = false;
+		}
+		
+		if (pipeMode) {
+			ImGui::SameLine();
+			ImGui::Checkbox("Snap Angle", &useAngleSnap);
+			if (useAngleSnap) {
+				ImGui::SameLine();
+				ImGui::PushItemWidth(80);
+				ImGui::SliderFloat("Step##Angle", &snapAngleStep, 5.0f, 90.0f, "%.0f deg");
+				ImGui::PopItemWidth();
+			}
+			ImGui::SameLine();
+			ImGui::Checkbox("Node Snap", &useNodeSnap);
+			if (useNodeSnap) {
+				ImGui::SameLine();
+				ImGui::PushItemWidth(80);
+				ImGui::SliderFloat("Dist##NodeSnap", &nodeSnapThreshold, 0.1f, 5.0f, "%.1f");
+				ImGui::PopItemWidth();
+			}
 		}
 
 		ImGui::Spacing();
@@ -1530,7 +1557,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	ShowSceneSettings(renderer);
 	ShowConsole();
 
-	// ======== Game ウィンドウ ========
+	// ======== Game 繧ｦ繧｣繝ｳ繝峨え ========
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	ImGui::Begin("Game");
 	ImVec2 cp = ImGui::GetCursorPos(), av = ImGui::GetContentRegionAvail();
@@ -1551,16 +1578,11 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	float offX = (av.x - tW) * .5f, offY = (av.y - tH) * .5f;
 	ImGui::SetCursorPos(ImVec2(cp.x + offX, cp.y + offY));
 
-	// ★ 画像の絶対スクリーン座標を記録 (ピッキング用)
+	// 笘・逕ｻ蜒上・邨ｶ蟇ｾ繧ｹ繧ｯ繝ｪ繝ｼ繝ｳ蠎ｧ讓吶ｒ險倬鹸 (繝斐ャ繧ｭ繝ｳ繧ｰ逕ｨ)
 	ImVec2 windowPos = ImGui::GetWindowPos();
 	ImVec2 curScreen = ImGui::GetCursorScreenPos();
 	
-	// ---- ★パイププレビュー処理の実装 ----
-	static int previewPipeId = -1;
-	static int previewJointId = -1;
-	static bool pipeMode = false;
-	static Engine::Vector3 pipeStartNode = {0,0,0};
-	static bool hasPipeStart = false;
+	// ---- 笘・ヱ繧､繝励・繝ｬ繝薙Η繝ｼ蜃ｦ逅・・螳溯｣・----
 
 	if (gameScene && !gameScene->isPlaying_ && pipeMode && hasPipeStart) {
 		ImVec2 mousePos = ImGui::GetMousePos();
@@ -1579,17 +1601,46 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 			bool hitTerrain = false;
 
 			for (auto& obj : gameScene->objects_) {
-				if ((!obj.gpuMeshColliders.empty() && obj.name.find("Terrain") != std::string::npos) || obj.name.find("Floor") != std::string::npos) {
-					auto* model = renderer->GetModel(obj.gpuMeshColliders[0].meshHandle);
-					if (model) {
-						float d; Engine::Vector3 hp;
-						if (model->RayCast(rayOrig, rayDir, obj.GetTransform().ToMatrix(), d, hp)) {
-							if (d < bestDist) {
-								bestDist = d;
-								hitPoint = hp;
-								hitTerrain = true;
-							}
+				bool isTerrain = (obj.name.find("Terrain") != std::string::npos) || (obj.name.find("Floor") != std::string::npos);
+				if (!isTerrain) continue;
+
+				Engine::Model* model = nullptr;
+				if (!obj.gpuMeshColliders.empty()) {
+					model = renderer->GetModel(obj.gpuMeshColliders[0].meshHandle);
+				}
+				if (!model && obj.modelHandle != 0) {
+					model = renderer->GetModel(obj.modelHandle);
+				}
+				if (!model && !obj.meshRenderers.empty() && obj.meshRenderers[0].modelHandle != 0) {
+					model = renderer->GetModel(obj.meshRenderers[0].modelHandle);
+				}
+				if (model) {
+					float d; Engine::Vector3 hp;
+					if (model->RayCast(rayOrig, rayDir, obj.GetTransform().ToMatrix(), d, hp)) {
+						if (d < bestDist) {
+							bestDist = d;
+							hitPoint = hp;
+							hitTerrain = true;
 						}
+					}
+				}
+			}
+
+			// 笘・縺吶〒縺ｫ蟋狗せ縺後≠繧翫∝慍蠖｢縺ｫ繝偵ャ繝医＠縺ｪ縺九▲縺溷ｴ蜷医・莉ｮ諠ｳ蟷ｳ髱｢縺ｨ縺ｮ莠､轤ｹ繧定ｨ育ｮ励☆繧・
+			if (hasPipeStart && !hitTerrain) {
+				// 蠎翫・鬮倥＆・亥渕貅也せ + 0.5f・峨・豌ｴ蟷ｳ髱｢・・y = height
+				float height = pipeStartNode.y + 0.5f;
+				// Ray: P = Orig + t * Dir
+				// P.y = height => Orig.y + t * Dir.y = height => t = (height - Orig.y) / Dir.y
+				float dirY = DirectX::XMVectorGetY(rayDir);
+				if (std::abs(dirY) > 1e-6f) { // 豌ｴ蟷ｳ譁ｹ蜷代〒縺ｪ縺・ｴ蜷医・縺ｿ
+					float t = (height - DirectX::XMVectorGetY(rayOrig)) / dirY;
+					if (t > 0 && t < bestDist) {
+						bestDist = t;
+						// 莠､轤ｹ繧呈ｱゅａ繧・
+						DirectX::XMVECTOR pVec = DirectX::XMVectorAdd(rayOrig, DirectX::XMVectorScale(rayDir, t));
+						hitPoint = {DirectX::XMVectorGetX(pVec), height, DirectX::XMVectorGetZ(pVec)};
+						hitTerrain = true;
 					}
 				}
 			}
@@ -1598,22 +1649,65 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				Engine::Vector3 startPos = pipeStartNode;
 				startPos.y += 0.5f;
 				Engine::Vector3 endNode = hitPoint;
-				endNode.y += 0.5f;
+				// 莉ｮ諠ｳ蟷ｳ髱｢縺ｨ繝偵ャ繝医＠縺溷ｴ蜷医・縺吶〒縺ｫhitPoint.y縺梧ｭ｣縺励＞鬮倥＆縺ｫ縺ｪ縺｣縺ｦ縺・ｋ縺溘ａ陬懈ｭ｣縺ｯ荳崎ｦ√∝慍蠖｢縺九ｉ蜿門ｾ励＠縺溷ｴ蜷医・縺ｿ陬懈ｭ｣
+				if (std::abs(endNode.y - startPos.y) > 0.01f) endNode.y += 0.5f;
+
+				// 笘・隗貞ｺｦ陬懈ｭ｣・医い繝ｳ繧ｰ繝ｫ繧ｹ繝翫ャ繝暦ｼ牙・逅・
+				if (useAngleSnap) {
+					Engine::Vector3 diffSnap = endNode - startPos;
+					float lengthXZ = std::sqrt(diffSnap.x*diffSnap.x + diffSnap.z*diffSnap.z);
+					if (lengthXZ > 0.001f) {
+						float angle = std::atan2(diffSnap.z, diffSnap.x);
+						float stepRad = snapAngleStep * 3.14159265f / 180.0f;
+						float snappedAngle = std::round(angle / stepRad) * stepRad;
+						endNode.x = startPos.x + std::cos(snappedAngle) * lengthXZ;
+						endNode.z = startPos.z + std::sin(snappedAngle) * lengthXZ;
+					}
+				}
+
+				// ★ 既存ジョイントに対する座標スナップ処理（平行・直角配置の補助）
+				if (useNodeSnap && gameScene) {
+					float bestXDist = nodeSnapThreshold;
+					float bestZDist = nodeSnapThreshold;
+					float snapX = endNode.x;
+					float snapZ = endNode.z;
+					
+					for (const auto& obj : gameScene->objects_) {
+						if (obj.name == "PipeJoint" || obj.name == "_PreviewJoint") { // 他のジョイントを探す
+							float distX = std::abs(obj.translate.x - endNode.x);
+							float distZ = std::abs(obj.translate.z - endNode.z);
+							if (distX < bestXDist) {
+								bestXDist = distX;
+								snapX = obj.translate.x;
+							}
+							if (distZ < bestZDist) {
+								bestZDist = distZ;
+								snapZ = obj.translate.z;
+							}
+						}
+					}
+					// 閾値以内のものがあればその座標に強制スナップ
+					endNode.x = snapX;
+					endNode.z = snapZ;
+				}
 
 				Engine::Vector3 diff = endNode - startPos;
 				Engine::Vector3 dir = Engine::Normalize(diff);
 				float length = std::sqrt(diff.x*diff.x + diff.y*diff.y + diff.z*diff.z);
-				float cyLen = length * 0.5f;
+				// 繧ｷ繝ｪ繝ｳ繝繝ｼ縺ｯ鬮倥＆3.0縺ｪ縺ｮ縺ｧ縲・聞縺輔ｒ蜷医ｏ縺帙ｋ縺ｫ縺ｯ 3.0 縺ｧ蜑ｲ繧九ゅ∪縺溘∫帥菴薙↓繧√ｊ霎ｼ縺ｾ縺帙ｋ縺溘ａ縺ｫ蟆代＠遏ｭ縺上☆繧・
+				float cyLen = (length - 0.2f) / 3.0f;
+				if (cyLen < 0.01f) cyLen = 0.01f;
 				Engine::Vector3 center = startPos + diff * 0.5f;
 
-				// 一時オブジェクトの生成/更新
+				// 荳譎ゅが繝悶ず繧ｧ繧ｯ繝医・逕滓・/譖ｴ譁ｰ
 				if (previewPipeId == -1) {
 					SceneObject pipe;
 					pipe.name = "_PreviewPipe";
-					pipe.scale = {0.4f, 0.4f, cyLen};
+					pipe.scale = {0.35f, cyLen, 0.35f}; // 蜀・浤・・霆ｸ譁ｹ蜷托ｼ峨・髟ｷ縺輔ｒ驕ｩ逕ｨ縲ょｰ代＠邏ｰ縺上☆繧・
 					pipe.translate = {center.x, center.y, center.z};
-					pipe.rotate = {Engine::LookRotation(dir).x, Engine::LookRotation(dir).y, Engine::LookRotation(dir).z};
-					pipe.modelPath = "Resources/models/cylinder.obj";
+					auto euler = Engine::LookRotation(dir);
+					pipe.rotate = {euler.x - 3.14159265f * 0.5f, euler.y, euler.z}; // 蜀・浤繧貞偵☆縺溘ａ縺ｫPitch縺九ｉ90蠎ｦ貂帷ｮ・
+					pipe.modelPath = "Resources/Cylinder/cylinder.obj";
 					pipe.modelHandle = renderer->LoadObjMesh(pipe.modelPath);
 					MeshRendererComponent mr; mr.modelHandle = pipe.modelHandle; mr.modelPath = pipe.modelPath; mr.shaderName = "Toon"; 
 					pipe.meshRenderers.push_back(mr);
@@ -1623,8 +1717,8 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 					SceneObject joint;
 					joint.name = "_PreviewJoint";
 					joint.translate = {endNode.x, endNode.y, endNode.z};
-					joint.scale = {0.8f, 0.8f, 0.8f};
-					joint.modelPath = "Resources/models/sphere.obj";
+					joint.scale = {1.0f, 1.0f, 1.0f}; // 繧ｸ繝ｧ繧､繝ｳ繝医ｒ蟆代＠螟ｧ縺阪￥縺励※繝代う繝励・遶ｯ繧帝國縺・
+					joint.modelPath = "Resources/player_ball/ball.obj";
 					joint.modelHandle = renderer->LoadObjMesh(joint.modelPath);
 					MeshRendererComponent mrJ; mrJ.modelHandle = joint.modelHandle; mrJ.modelPath = joint.modelPath; mrJ.shaderName = "Toon";
 					joint.meshRenderers.push_back(mrJ);
@@ -1633,9 +1727,10 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				} else {
 					if (previewPipeId < gameScene->objects_.size() && gameScene->objects_[previewPipeId].name == "_PreviewPipe") {
 						auto& p = gameScene->objects_[previewPipeId];
-						p.scale = {0.4f, 0.4f, cyLen};
+						p.scale = {0.35f, cyLen, 0.35f}; // 蜀・浤・・霆ｸ譁ｹ蜷托ｼ峨・髟ｷ縺輔ｒ驕ｩ逕ｨ
 						p.translate = {center.x, center.y, center.z};
-						p.rotate = {Engine::LookRotation(dir).x, Engine::LookRotation(dir).y, Engine::LookRotation(dir).z};
+                        auto euler = Engine::LookRotation(dir);
+						p.rotate = {euler.x - 3.14159265f * 0.5f, euler.y, euler.z}; // 蜀・浤繧貞偵☆縺溘ａ縺ｫPitch縺九ｉ90蠎ｦ貂帷ｮ・
 					}
 					if (previewJointId < gameScene->objects_.size() && gameScene->objects_[previewJointId].name == "_PreviewJoint") {
 						auto& j = gameScene->objects_[previewJointId];
@@ -1645,7 +1740,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 			}
 		}
 	} else if (previewPipeId != -1) {
-        // プレビュー削除（末尾から追加される前提でインデックス降順で削除）
+        // 繝励Ξ繝薙Η繝ｼ蜑企勁・域忰蟆ｾ縺九ｉ霑ｽ蜉縺輔ｌ繧句燕謠舌〒繧､繝ｳ繝・ャ繧ｯ繧ｹ髯埼・〒蜑企勁・・
         if (previewJointId != -1 && previewJointId < gameScene->objects_.size()) {
             gameScene->objects_.erase(gameScene->objects_.begin() + previewJointId);
         }
@@ -1658,7 +1753,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 
 
 	ImGui::Image((ImTextureID)renderer->GetGameFinalSRV().ptr, ImVec2(tW, tH));
-	// ★追加: プレハブやモデルのドラッグ＆ドロップ受け入れ先
+	// 笘・ｿｽ蜉: 繝励Ξ繝上ヶ繧・Δ繝・Ν縺ｮ繝峨Λ繝・げ・・ラ繝ｭ繝・・蜿励￠蜈･繧悟・
 	if (ImGui::BeginDragDropTarget()) {
 		if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
 			std::string path((const char*)pl->Data, pl->DataSize - 1);
@@ -1683,7 +1778,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 
 	bool gameHovered = ImGui::IsWindowHovered();
 
-	// ====== ★ ビューポートクリック選択 + ギズモドラッグ ======
+	// ====== 笘・繝薙Η繝ｼ繝昴・繝医け繝ｪ繝・け驕ｸ謚・+ 繧ｮ繧ｺ繝｢繝峨Λ繝・げ ======
 	if (gameScene && gameHovered && tW > 0 && tH > 0 && !gameScene->IsPlaying()) {
 		ImVec2 mousePos = ImGui::GetMousePos();
 		float localX = mousePos.x - gameImageMin.x;
@@ -1694,84 +1789,152 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 		auto projMat = gameScene->camera_.Proj();
 
 		if (insideImage) {
-			// --- ★ 左クリック → ギズモ軸 → オブジェクト選択 → 自由ドラッグ開始 ---
+			// --- 笘・蟾ｦ繧ｯ繝ｪ繝・け 竊・繧ｮ繧ｺ繝｢霆ｸ 竊・繧ｪ繝悶ず繧ｧ繧ｯ繝磯∈謚・竊・閾ｪ逕ｱ繝峨Λ繝・げ髢句ｧ・---
 			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
 				DirectX::XMVECTOR rayOrig, rayDir;
 				ScreenToWorldRay(localX, localY, tW, tH, viewMat, projMat, rayOrig, rayDir);
 
-				// ★ パイプ設置モード
+				// 笘・繝代う繝苓ｨｭ鄂ｮ繝｢繝ｼ繝・
 				if (pipeMode) {
 					float bestDist = FLT_MAX;
 					Engine::Vector3 hitPoint = {0, 0, 0};
 					bool hitTerrain = false;
 					
-					// 地形(TerrainやFloor)とのレイキャスト判定
+					// 蝨ｰ蠖｢(Terrain繧Ёloor)縺ｨ縺ｮ繝ｬ繧､繧ｭ繝｣繧ｹ繝亥愛螳・
 					for (auto& obj : gameScene->objects_) {
-						if (!obj.gpuMeshColliders.empty() && obj.name.find("Terrain") != std::string::npos || obj.name.find("Floor") != std::string::npos) {
-							auto* model = renderer->GetModel(obj.gpuMeshColliders[0].meshHandle);
-							if (model) {
-								float d; Engine::Vector3 hp;
-								if (model->RayCast(rayOrig, rayDir, obj.GetTransform().ToMatrix(), d, hp)) {
-									if (d < bestDist) {
-										bestDist = d;
-										hitPoint = hp;
-										hitTerrain = true;
-									}
+						bool isTerrain = (obj.name.find("Terrain") != std::string::npos) || (obj.name.find("Floor") != std::string::npos);
+						if (!isTerrain) continue;
+
+						Engine::Model* model = nullptr;
+						if (!obj.gpuMeshColliders.empty()) {
+							model = renderer->GetModel(obj.gpuMeshColliders[0].meshHandle);
+						}
+						if (!model && obj.modelHandle != 0) {
+							model = renderer->GetModel(obj.modelHandle);
+						}
+						if (!model && !obj.meshRenderers.empty() && obj.meshRenderers[0].modelHandle != 0) {
+							model = renderer->GetModel(obj.meshRenderers[0].modelHandle);
+						}
+						if (model) {
+							float d; Engine::Vector3 hp;
+							if (model->RayCast(rayOrig, rayDir, obj.GetTransform().ToMatrix(), d, hp)) {
+								if (d < bestDist) {
+									bestDist = d;
+									hitPoint = hp;
+									hitTerrain = true;
 								}
+							}
+						}
+					}
+
+					// 笘・縺吶〒縺ｫ蟋狗せ縺後≠繧翫∝慍蠖｢縺ｫ繝偵ャ繝医＠縺ｪ縺九▲縺溷ｴ蜷医・莉ｮ諠ｳ蟷ｳ髱｢・・=鬮倥＆・峨→縺ｮ莠､轤ｹ繧定ｨ育ｮ・
+					if (hasPipeStart && !hitTerrain) {
+						float height = pipeStartNode.y + 0.5f;
+						float dirY = DirectX::XMVectorGetY(rayDir);
+						if (std::abs(dirY) > 1e-6f) {
+							float t = (height - DirectX::XMVectorGetY(rayOrig)) / dirY;
+							if (t > 0 && t < bestDist) {
+								bestDist = t;
+								DirectX::XMVECTOR pVec = DirectX::XMVectorAdd(rayOrig, DirectX::XMVectorScale(rayDir, t));
+								hitPoint = {DirectX::XMVectorGetX(pVec), height, DirectX::XMVectorGetZ(pVec)};
+								hitTerrain = true;
 							}
 						}
 					}
 
 					if (hitTerrain) {
 						if (!hasPipeStart) {
-							// 始点ノードを配置
+							// 蟋狗せ繝弱・繝峨ｒ驟咲ｽｮ
 							pipeStartNode = hitPoint;
 							hasPipeStart = true;
 							
-							// 見た目としてのジョイント（球）を配置
+							// 隕九◆逶ｮ縺ｨ縺励※縺ｮ繧ｸ繝ｧ繧､繝ｳ繝茨ｼ育帥・峨ｒ驟咲ｽｮ
 							SceneObject joint;
 							joint.name = "PipeJoint";
-							joint.translate = {hitPoint.x, hitPoint.y + 0.5f, hitPoint.z}; // 地面から少し浮かせる
-							joint.scale = {0.8f, 0.8f, 0.8f};
-							joint.modelPath = "Resources/models/sphere.obj";
+							joint.translate = {hitPoint.x, hitPoint.y + 0.5f, hitPoint.z}; // 蝨ｰ髱｢縺九ｉ蟆代＠豬ｮ縺九○繧・
+							joint.scale = {1.0f, 1.0f, 1.0f};
+							joint.modelPath = "Resources/player_ball/ball.obj";
 							joint.modelHandle = renderer->LoadObjMesh(joint.modelPath);
 							MeshRendererComponent mr;
 							mr.modelHandle = joint.modelHandle;
 							mr.modelPath = joint.modelPath;
-							mr.shaderName = "Toon"; // トゥーン対応
+							mr.shaderName = "Toon"; // 繝医ぇ繝ｼ繝ｳ蟇ｾ蠢・
 							joint.meshRenderers.push_back(mr);
 							gameScene->objects_.push_back(joint);
 						} else {
-							// 終点ノードを決定し、間にパイプを生成
+							// 邨らせ繝弱・繝峨ｒ豎ｺ螳壹＠縲・俣縺ｫ繝代う繝励ｒ逕滓・
 							Engine::Vector3 endNode = hitPoint;
 							
-							// 2点間の距離と計算
+							// 2轤ｹ髢薙・霍晞屬縺ｨ險育ｮ・
 							Engine::Vector3 startPos = pipeStartNode;
-							// 地面から少し浮かせる
 							startPos.y += 0.5f;
-							endNode.y += 0.5f;
+							
+							// 莉ｮ諠ｳ蟷ｳ髱｢縺ｨ縺ｮ莠､蟾ｮ譎ゅ・譌｢縺ｫ鬮倥＆縺瑚｣懈ｭ｣縺輔ｌ縺ｦ縺・ｋ蜿ｯ閭ｽ諤ｧ縺後≠繧九・縺ｧ縲∝ｷｮ繧堤｢ｺ隱・
+							if (std::abs(endNode.y - startPos.y) > 0.01f) {
+								endNode.y += 0.5f;
+							}
+
+							// 笘・隗貞ｺｦ陬懈ｭ｣・医い繝ｳ繧ｰ繝ｫ繧ｹ繝翫ャ繝暦ｼ牙・逅・
+							if (useAngleSnap) {
+								Engine::Vector3 diffSnap = endNode - startPos;
+								float lengthXZ = std::sqrt(diffSnap.x*diffSnap.x + diffSnap.z*diffSnap.z);
+								if (lengthXZ > 0.001f) {
+									float angle = std::atan2(diffSnap.z, diffSnap.x);
+									float stepRad = snapAngleStep * 3.14159265f / 180.0f;
+									float snappedAngle = std::round(angle / stepRad) * stepRad;
+									endNode.x = startPos.x + std::cos(snappedAngle) * lengthXZ;
+									endNode.z = startPos.z + std::sin(snappedAngle) * lengthXZ;
+								}
+							}
+
+							// ★ 既存ジョイントに対する座標スナップ処理（平行・直角配置の補助）
+							if (useNodeSnap && gameScene) {
+								float bestXDist = nodeSnapThreshold;
+								float bestZDist = nodeSnapThreshold;
+								float snapX = endNode.x;
+								float snapZ = endNode.z;
+								
+								for (const auto& obj : gameScene->objects_) {
+									if (obj.name == "PipeJoint") {
+										float distX = std::abs(obj.translate.x - endNode.x);
+										float distZ = std::abs(obj.translate.z - endNode.z);
+										if (distX < bestXDist) {
+											bestXDist = distX;
+											snapX = obj.translate.x;
+										}
+										if (distZ < bestZDist) {
+											bestZDist = distZ;
+											snapZ = obj.translate.z;
+										}
+									}
+								}
+								// 閾値以内のものがあればその座標に強制スナップ
+								endNode.x = snapX;
+								endNode.z = snapZ;
+							}
 
 							Engine::Vector3 diff = endNode - startPos;
 							Engine::Vector3 dir = Engine::Normalize(diff);
 							float length = std::sqrt(diff.x*diff.x + diff.y*diff.y + diff.z*diff.z);
 
-							// シリンダーのスケール（Z軸方向に長さ分、太さは一定）
-							// プリミティブのシリンダーは高さが2.0（-1〜1）の場合が多いので 半分にして調整
-							float cyLen = length * 0.5f;
+							// 繧ｷ繝ｪ繝ｳ繝繝ｼ縺ｯ鬮倥＆3.0縺ｪ縺ｮ縺ｧ縲・聞縺輔ｒ蜷医ｏ縺帙ｋ縺ｫ縺ｯ 3.0 縺ｧ蜑ｲ繧九ゅ∪縺溘∫帥菴薙↓繧√ｊ霎ｼ縺ｾ縺帙ｋ縺溘ａ縺ｫ蟆代＠遏ｭ縺上☆繧・
+							float cyLen = (length - 0.2f) / 3.0f;
+							if (cyLen < 0.01f) cyLen = 0.01f;
 
-							// モデルとメッシュコンポーネントの準備
+							// 繝｢繝・Ν縺ｨ繝｡繝・す繝･繧ｳ繝ｳ繝昴・繝阪Φ繝医・貅門ｙ
 							SceneObject pipe;
 							pipe.name = "PipeSegment";
 							
-							// 中点に設置
+							// 荳ｭ轤ｹ縺ｫ險ｭ鄂ｮ
 							Engine::Vector3 center = startPos + diff * 0.5f;
 							pipe.translate = {center.x, center.y, center.z};
-							// 太さ0.4、長さcyLen
-							pipe.scale = {0.4f, 0.4f, cyLen};
+							// 螟ｪ縺・.35縲・聞縺苗yLen
+							pipe.scale = {0.35f, cyLen, 0.35f}; // 蜀・浤・・霆ｸ譁ｹ蜷托ｼ峨・髟ｷ縺輔ｒ驕ｩ逕ｨ
 
-							pipe.rotate = {Engine::LookRotation(dir).x, Engine::LookRotation(dir).y, Engine::LookRotation(dir).z};
+							auto euler = Engine::LookRotation(dir);
+							pipe.rotate = {euler.x - 3.14159265f * 0.5f, euler.y, euler.z}; // 蜀・浤繧貞偵☆縺溘ａ縺ｫPitch縺九ｉ90蠎ｦ貂帷ｮ・
 
-							pipe.modelPath = "Resources/models/cylinder.obj"; // 円柱モデルが必要
+							pipe.modelPath = "Resources/Cylinder/cylinder.obj"; // 蜀・浤繝｢繝・Ν縺悟ｿ・ｦ・
 							pipe.modelHandle = renderer->LoadObjMesh(pipe.modelPath);
 							MeshRendererComponent mr;
 							mr.modelHandle = pipe.modelHandle;
@@ -1780,12 +1943,12 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 							pipe.meshRenderers.push_back(mr);
 							gameScene->objects_.push_back(pipe);
 
-							// 終点ノードにまたジョイントを置く
+							// 邨らせ繝弱・繝峨↓縺ｾ縺溘ず繝ｧ繧､繝ｳ繝医ｒ鄂ｮ縺・
 							SceneObject joint;
 							joint.name = "PipeJoint";
 							joint.translate = {endNode.x, endNode.y, endNode.z};
-							joint.scale = {0.8f, 0.8f, 0.8f};
-							joint.modelPath = "Resources/models/sphere.obj";
+							joint.scale = {1.0f, 1.0f, 1.0f};
+							joint.modelPath = "Resources/player_ball/ball.obj";
 							joint.modelHandle = renderer->LoadObjMesh(joint.modelPath);
 							MeshRendererComponent mrJ;
 							mrJ.modelHandle = joint.modelHandle;
@@ -1794,16 +1957,16 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 							joint.meshRenderers.push_back(mrJ);
 							gameScene->objects_.push_back(joint);
 
-							// 次の始点を終点に持っていく
-						pipeStartNode = hitPoint;
+							// 谺｡縺ｮ蟋狗せ繧堤ｵらせ縺ｫ謖√▲縺ｦ縺・￥
+						pipeStartNode = {endNode.x, endNode.y - 0.5f, endNode.z};
 					}
 				}
-				// パイプモード中は通常の選択は行わない
+				// 繝代う繝励Δ繝ｼ繝我ｸｭ縺ｯ騾壼ｸｸ縺ｮ驕ｸ謚槭・陦後ｏ縺ｪ縺・
 				goto EndClickProcessing;
 			}
 			
 			{
-				// 1. ギズモ軸ヒットテスト
+				// 1. 繧ｮ繧ｺ繝｢霆ｸ繝偵ャ繝医ユ繧ｹ繝・
 				bool hitGizmo = false;
 				if (gameScene->selectedObjectIndex_ >= 0 && gameScene->selectedObjectIndex_ < (int)gameScene->objects_.size() && !gameScene->objects_[gameScene->selectedObjectIndex_].locked) {
 					auto& selObj = gameScene->objects_[gameScene->selectedObjectIndex_];
@@ -1822,16 +1985,16 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 					}
 				}
 
-				// 2. オブジェクト選択 + 自由ドラッグ開始
+				// 2. 繧ｪ繝悶ず繧ｧ繧ｯ繝磯∈謚・+ 閾ｪ逕ｱ繝峨Λ繝・げ髢句ｧ・
 				if (!hitGizmo) {
 					float bestT = FLT_MAX;
 					int bestIdx = -1;
 					for (int i = 0; i < (int)gameScene->objects_.size(); ++i) {
 						const auto& obj = gameScene->objects_[i];
 						if (obj.locked)
-							continue; // ★ ロック済みオブジェクトは選択不可
+							continue; // 笘・繝ｭ繝・け貂医∩繧ｪ繝悶ず繧ｧ繧ｯ繝医・驕ｸ謚樔ｸ榊庄
 
-						// ★ OBB判定: Rayをオブジェクトのローカル空間に変換
+						// 笘・OBB蛻､螳・ Ray繧偵が繝悶ず繧ｧ繧ｯ繝医・繝ｭ繝ｼ繧ｫ繝ｫ遨ｺ髢薙↓螟画鋤
 						Engine::Matrix4x4 mat = obj.GetTransform().ToMatrix();
 						DirectX::XMMATRIX worldMat = DirectX::XMLoadFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&mat));
 						DirectX::XMVECTOR det;
@@ -1841,7 +2004,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 						DirectX::XMVECTOR localTarget = DirectX::XMVector3TransformCoord(DirectX::XMVectorAdd(rayOrig, rayDir), invWorld);
 						DirectX::XMVECTOR localDir = DirectX::XMVectorSubtract(localTarget, localOrig);
 
-						// 最小サイズ保証
+						// 譛蟆上し繧､繧ｺ菫晁ｨｼ
 						float hx = 1.0f;
 						if (std::fabs(obj.scale.x) < 0.6f && std::fabs(obj.scale.x) > 0.001f)
 							hx = 0.3f / std::fabs(obj.scale.x);
@@ -1856,7 +2019,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 
 						float tLocal;
 						if (RayIntersectsAABB(localOrig, localDir, bmin, bmax, tLocal)) {
-							// tLocal は worldDir (正規化済) の長さ(1)に対する係数と一致
+							// tLocal 縺ｯ worldDir (豁｣隕丞喧貂・ 縺ｮ髟ｷ縺・1)縺ｫ蟇ｾ縺吶ｋ菫よ焚縺ｨ荳閾ｴ
 							if (tLocal < bestT) {
 								bestT = tLocal;
 								bestIdx = i;
@@ -1865,21 +2028,21 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 					}
 					if (bestIdx >= 0) {
 						if (io.KeyCtrl) {
-							// Ctrl+クリック: トグル追加
+							// Ctrl+繧ｯ繝ｪ繝・け: 繝医げ繝ｫ霑ｽ蜉
 							if (gameScene->selectedIndices_.count(bestIdx))
 								gameScene->selectedIndices_.erase(bestIdx);
 							else
 								gameScene->selectedIndices_.insert(bestIdx);
 						} else if (io.KeyShift) {
-							// Shift+クリック: 追加選択
+							// Shift+繧ｯ繝ｪ繝・け: 霑ｽ蜉驕ｸ謚・
 							gameScene->selectedIndices_.insert(bestIdx);
 						} else {
-							// 通常クリック: 単一選択
+							// 騾壼ｸｸ繧ｯ繝ｪ繝・け: 蜊倅ｸ驕ｸ謚・
 							gameScene->selectedIndices_ = {bestIdx};
 						}
 						gameScene->selectedObjectIndex_ = bestIdx;
 
-						// ★ 自由ドラッグ開始
+						// 笘・閾ｪ逕ｱ繝峨Λ繝・げ髢句ｧ・
 						objectDragging = true;
 						gizmoDragStartMouse = mousePos;
 						dragStartTransforms.clear();
@@ -1893,12 +2056,12 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 						gameScene->selectedObjectIndex_ = -1;
 					}
 				}
-			} // 1. ギズモ軸ヒットテストスコープ終了
+			} // 1. 繧ｮ繧ｺ繝｢霆ｸ繝偵ャ繝医ユ繧ｹ繝医せ繧ｳ繝ｼ繝礼ｵゆｺ・
 
 			EndClickProcessing:;
-			} // if (ImGui::IsMouseClicked) の終了
+			} // if (ImGui::IsMouseClicked) 縺ｮ邨ゆｺ・
 
-			// --- ★ ギズモ軸ドラッグ中 ---
+			// --- 笘・繧ｮ繧ｺ繝｢霆ｸ繝峨Λ繝・げ荳ｭ ---
 			if (gizmoDragging && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
 				ImVec2 delta = ImVec2(mousePos.x - gizmoDragStartMouse.x, mousePos.y - gizmoDragStartMouse.y);
 				for (int idx : gameScene->selectedIndices_) {
@@ -1910,7 +2073,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 							float dx = (gizmoDragAxis == 0) ? delta.x * s : 0;
 							float dy = (gizmoDragAxis == 1) ? -delta.y * s : 0;
 							float dz = (gizmoDragAxis == 2) ? delta.x * s : 0;
-							// ローカル軸に沿って移動する
+							// 繝ｭ繝ｼ繧ｫ繝ｫ霆ｸ縺ｫ豐ｿ縺｣縺ｦ遘ｻ蜍輔☆繧・
 							auto rotMat = DirectX::XMMatrixRotationRollPitchYaw(initT.rotate.x, initT.rotate.y, initT.rotate.z);
 							DirectX::XMVECTOR moveV = DirectX::XMVector3TransformNormal(DirectX::XMVectorSet(dx, dy, dz, 0), rotMat);
 							DirectX::XMFLOAT3 moveF;
@@ -1947,10 +2110,10 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				}
 			}
 
-			// --- ★ 自由ドラッグ中（ギズモではなくオブジェクト直接ドラッグ）---
+			// --- 笘・閾ｪ逕ｱ繝峨Λ繝・げ荳ｭ・医ぐ繧ｺ繝｢縺ｧ縺ｯ縺ｪ縺上が繝悶ず繧ｧ繧ｯ繝育峩謗･繝峨Λ繝・げ・・--
 			if (objectDragging && !gizmoDragging && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
 				ImVec2 delta = ImVec2(mousePos.x - gizmoDragStartMouse.x, mousePos.y - gizmoDragStartMouse.y);
-				if (std::fabs(delta.x) > 2.0f || std::fabs(delta.y) > 2.0f) { // デッドゾーン
+				if (std::fabs(delta.x) > 2.0f || std::fabs(delta.y) > 2.0f) { // 繝・ャ繝峨だ繝ｼ繝ｳ
 					auto camR2 = gameScene->camera_.Rotation();
 					auto rotMat = DirectX::XMMatrixRotationRollPitchYaw(camR2.x, camR2.y, camR2.z);
 					DirectX::XMFLOAT3 right = {1, 0, 0}, up = {0, 1, 0};
@@ -1971,7 +2134,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				}
 			}
 
-			// --- ★ ドラッグ終了 (Undo登録) ---
+			// --- 笘・繝峨Λ繝・げ邨ゆｺ・(Undo逋ｻ骭ｲ) ---
 			if ((gizmoDragging || objectDragging) && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
 				std::vector<int> targetIndices;
 				std::vector<Engine::Transform> oldTransforms;
@@ -2014,7 +2177,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				dragStartTransforms.clear();
 			}
 
-		// --- カメラ操作（右クリック） ---
+		// --- 繧ｫ繝｡繝ｩ謫堺ｽ懶ｼ亥承繧ｯ繝ｪ繝・け・・---
 		auto camP = gameScene->camera_.Position();
 		auto camR = gameScene->camera_.Rotation();
 		if (ImGui::IsMouseDragging(ImGuiMouseButton_Right, 1.0f)) {
@@ -2058,7 +2221,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 			}
 		}
 
-		// ドラッグがウィンドウ外に行った場合のリセット
+		// 繝峨Λ繝・げ縺後え繧｣繝ｳ繝峨え螟悶↓陦後▲縺溷ｴ蜷医・繝ｪ繧ｻ繝・ヨ
 		if ((gizmoDragging || objectDragging) && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
 			gizmoDragging = false;
 			gizmoDragAxis = -1;
@@ -2071,7 +2234,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	ImGui::End();
 	ImGui::PopStyleVar();
 
-	// ★ DrawSelectionGizmo削除: GameScene::Draw()内で描画するように移動済み
+	// 笘・DrawSelectionGizmo蜑企勁: GameScene::Draw()蜀・〒謠冗判縺吶ｋ繧医≧縺ｫ遘ｻ蜍墓ｸ医∩
 	ImGui::End(); // DockSpace
 }
 
@@ -2150,7 +2313,7 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 					     }});
 			}
 			ImGui::Separator();
-			// ★ 一括ロック/解除
+			// 笘・荳諡ｬ繝ｭ繝・け/隗｣髯､
 			if (ImGui::MenuItem("Lock All")) {
 				for (auto& o : scene->objects_)
 					o.locked = true;
@@ -2178,7 +2341,7 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 		for (int i = 0; i < (int)scene->objects_.size(); ++i) {
 			bool sel = scene->selectedIndices_.count(i) > 0;
 			bool locked = scene->objects_[i].locked;
-			// ★ ロックトグルボタン
+			// 笘・繝ｭ繝・け繝医げ繝ｫ繝懊ち繝ｳ
 			ImGui::PushID(i);
 			if (locked)
 				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
@@ -2195,7 +2358,7 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 			if (locked)
 				lb = "[L] " + lb;
 			lb += "##" + std::to_string(i);
-			// ★ ロック済みオブジェクトは選択不可
+			// 笘・繝ｭ繝・け貂医∩繧ｪ繝悶ず繧ｧ繧ｯ繝医・驕ｸ謚樔ｸ榊庄
 			if (locked) {
 				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
 				ImGui::Selectable(lb.c_str(), sel, ImGuiSelectableFlags_Disabled);
@@ -2253,16 +2416,16 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					     scene->objects_[i].name = nN;
 			     }});
 		}
-		// ★ ロックチェックボックス
+		// 笘・繝ｭ繝・け繝√ぉ繝・け繝懊ャ繧ｯ繧ｹ
 		ImGui::SameLine();
 		ImGui::Checkbox("Lock", &obj.locked);
-		// ★追加: Prefab保存ボタン
+		// 笘・ｿｽ蜉: Prefab菫晏ｭ倥・繧ｿ繝ｳ
 		ImGui::SameLine();
 		if (ImGui::Button("Save Prefab")) {
 			std::string ppath = "Resources/" + obj.name + ".prefab";
 			std::ofstream pf(ppath);
 			if (pf.is_open()) {
-				// SerializeSceneObjectは4スペースインデントのコンテキストで囲んでいるため、それをそのまま使用する
+				// SerializeSceneObject縺ｯ4繧ｹ繝壹・繧ｹ繧､繝ｳ繝・Φ繝医・繧ｳ繝ｳ繝・く繧ｹ繝医〒蝗ｲ繧薙〒縺・ｋ縺溘ａ縲√◎繧後ｒ縺昴・縺ｾ縺ｾ菴ｿ逕ｨ縺吶ｋ
 				pf << "{\n  \"prefab\":\n" << SerializeSceneObject(obj) << "\n}\n";
 				pf.close();
 				Log("Prefab saved: " + ppath);
@@ -2275,7 +2438,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 			ImGui::Text("** LOCKED - Transform editing disabled **");
 			ImGui::PopStyleColor();
 		}
-		// ★ ロック中、またはプレイ中はTransformとコンポーネント編集を無効化
+		// 笘・繝ｭ繝・け荳ｭ縲√∪縺溘・繝励Ξ繧､荳ｭ縺ｯTransform縺ｨ繧ｳ繝ｳ繝昴・繝阪Φ繝育ｷｨ髮・ｒ辟｡蜉ｹ蛹・
 		if (obj.locked || scene->IsPlaying())
 			ImGui::BeginDisabled();
 		ImGui::Separator();
@@ -2376,7 +2539,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					ImGui::DragFloat2("UV Tiling", &mr.uvTiling.x, 0.01f);
 					ImGui::DragFloat2("UV Offset", &mr.uvOffset.x, 0.01f);
 					
-					// ★追加: Shader選択
+					// 笘・ｿｽ蜉: Shader驕ｸ謚・
 					if (ImGui::BeginCombo("Shader", mr.shaderName.c_str())) {
 						if (ImGui::Selectable("Default", mr.shaderName == "Default")) mr.shaderName = "Default";
 						if (ImGui::Selectable("Toon", mr.shaderName == "Toon")) mr.shaderName = "Toon";
@@ -2532,14 +2695,14 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				}
 				ImGui::PopID();
 			}
-			// ★追加: ParticleEmitter コンポーネント
+			// 笘・ｿｽ蜉: ParticleEmitter 繧ｳ繝ｳ繝昴・繝阪Φ繝・
 			for (size_t ci = 0; ci < obj.particleEmitters.size(); ++ci) {
 				auto& pe = obj.particleEmitters[ci];
 				ImGui::PushID(5000 + (int)ci);
 				if (ImGui::TreeNode("Particle Emitter")) {
 					ImGui::Checkbox("Enabled##PE", &pe.enabled);
 
-					// ★追加: アセットパスとD&D
+					// 笘・ｿｽ蜉: 繧｢繧ｻ繝・ヨ繝代せ縺ｨD&D
 					ImGui::Text("Asset: %s", pe.assetPath.empty() ? "(none)" : pe.assetPath.c_str());
 					if (ImGui::BeginDragDropTarget()) {
 						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
@@ -2556,7 +2719,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					if (pe.enabled) {
 						Engine::EmitterParams& p = pe.emitter.params;
 
-						// --- ファイル連携 ---
+						// --- 繝輔ぃ繧､繝ｫ騾｣謳ｺ ---
 						ImGui::Separator();
 						ImGui::Text("Asset Link");
 						char assetBuf[256];
@@ -2565,7 +2728,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 							std::string newPath = assetBuf;
 							if (newPath != pe.assetPath) {
 								pe.assetPath = newPath;
-								// パスが変更されたら自動的に読み込む
+								// 繝代せ縺悟､画峩縺輔ｌ縺溘ｉ閾ｪ蜍慕噪縺ｫ隱ｭ縺ｿ霎ｼ繧
 								pe.emitter.LoadFromJson(pe.assetPath);
 							}
 						}
@@ -2603,7 +2766,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 						}
 						ImGui::Separator();
 
-						// --- プレビュー/基本設定 ---
+						// --- 繝励Ξ繝薙Η繝ｼ/蝓ｺ譛ｬ險ｭ螳・---
 						ImGui::Checkbox("Is Playing##PE", &pe.emitter.isPlaying);
 
 						if (ImGui::CollapsingHeader("Emission##PE", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -2614,7 +2777,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 							}
 						}
 
-						// 形状
+						// 蠖｢迥ｶ
 						if (ImGui::CollapsingHeader("Shape##PEHeader", ImGuiTreeNodeFlags_DefaultOpen)) {
 							int shapeType = static_cast<int>(p.shape);
 							const char* shapeNames[] = {"Point", "Sphere", "Cone"};
@@ -2656,7 +2819,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 							ImGui::Checkbox("Additive Blend##PE", &p.isAdditive);
 							ImGui::Checkbox("Use Billboard##PE", &p.useBillboard);
 
-							// UVアニメーション
+							// UV繧｢繝九Γ繝ｼ繧ｷ繝ｧ繝ｳ
 							ImGui::Separator();
 							ImGui::Checkbox("Use UV Animation##PE", &p.useUvAnim);
 							if (p.useUvAnim) {
@@ -2676,7 +2839,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				}
 				ImGui::PopID();
 			}
-			// ★追加: GpuMeshCollider コンポーネント
+			// 笘・ｿｽ蜉: GpuMeshCollider 繧ｳ繝ｳ繝昴・繝阪Φ繝・
 			for (size_t ci = 0; ci < obj.gpuMeshColliders.size(); ++ci) {
 				auto& gmc = obj.gpuMeshColliders[ci];
 				ImGui::PushID(6000 + (int)ci);
@@ -2717,7 +2880,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
-			// ★追加: PlayerInput コンポーネント
+			// 笘・ｿｽ蜉: PlayerInput 繧ｳ繝ｳ繝昴・繝阪Φ繝・
 			for (size_t ci = 0; ci < obj.playerInputs.size(); ++ci) {
 				auto& pi = obj.playerInputs[ci];
 				ImGui::PushID(7000 + (int)ci);
@@ -2737,7 +2900,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
-			// ★追加: CharacterMovement コンポーネント
+			// 笘・ｿｽ蜉: CharacterMovement 繧ｳ繝ｳ繝昴・繝阪Φ繝・
 			for (size_t ci = 0; ci < obj.characterMovements.size(); ++ci) {
 				auto& cm = obj.characterMovements[ci];
 				ImGui::PushID(8000 + (int)ci);
@@ -2759,7 +2922,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
-			// ★追加: CameraTarget コンポーネント
+			// 笘・ｿｽ蜉: CameraTarget 繧ｳ繝ｳ繝昴・繝阪Φ繝・
 			for (size_t ci = 0; ci < obj.cameraTargets.size(); ++ci) {
 				auto& ct = obj.cameraTargets[ci];
 				ImGui::PushID(9000 + (int)ci);
@@ -2779,7 +2942,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
-			// ★追加: DirectionalLight コンポーネント
+			// 笘・ｿｽ蜉: DirectionalLight 繧ｳ繝ｳ繝昴・繝阪Φ繝・
 			for (size_t ci = 0; ci < obj.directionalLights.size(); ++ci) {
 				auto& dl = obj.directionalLights[ci];
 				ImGui::PushID(10000 + (int)ci);
@@ -2798,7 +2961,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
-			// ★追加: PointLight コンポーネント
+			// 笘・ｿｽ蜉: PointLight 繧ｳ繝ｳ繝昴・繝阪Φ繝・
 			for (size_t ci = 0; ci < obj.pointLights.size(); ++ci) {
 				auto& pl = obj.pointLights[ci];
 				ImGui::PushID(11000 + (int)ci);
@@ -2819,7 +2982,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
-			// ★追加: SpotLight コンポーネント
+			// 笘・ｿｽ蜉: SpotLight 繧ｳ繝ｳ繝昴・繝阪Φ繝・
 			for (size_t ci = 0; ci < obj.spotLights.size(); ++ci) {
 				auto& sl = obj.spotLights[ci];
 				ImGui::PushID(12000 + (int)ci);
@@ -2842,18 +3005,18 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
-			// ★追加: AudioSource コンポーネント
+			// 笘・ｿｽ蜉: AudioSource 繧ｳ繝ｳ繝昴・繝阪Φ繝・
 			for (size_t ci = 0; ci < obj.audioSources.size(); ++ci) {
 				auto& as = obj.audioSources[ci];
 				ImGui::PushID(13000 + (int)ci);
 				if (ImGui::TreeNode("AudioSource")) {
 					ImGui::Checkbox("Enabled##AS", &as.enabled);
-					// サウンドファイルパス
+					// 繧ｵ繧ｦ繝ｳ繝峨ヵ繧｡繧､繝ｫ繝代せ
 					char pathBuf[256];
 					strcpy_s(pathBuf, as.soundPath.c_str());
 					if (ImGui::InputText("Sound Path##AS", pathBuf, sizeof(pathBuf))) {
 						as.soundPath = pathBuf;
-						// パス変更時に再ロード
+						// 繝代せ螟画峩譎ゅ↓蜀阪Ο繝ｼ繝・
 						if (!as.soundPath.empty()) {
 							auto* audio = Engine::Audio::GetInstance();
 							if (audio)
@@ -2885,7 +3048,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					ImGui::Checkbox("3D Sound##AS", &as.is3D);
 					if (as.is3D)
 						ImGui::DragFloat("Max Distance##AS", &as.maxDistance, 0.5f, 0.0f, 500.0f);
-					// Play/Stop ボタン
+					// Play/Stop 繝懊ち繝ｳ
 					if (as.isPlaying) {
 						if (ImGui::Button("Stop##AS")) {
 							auto* audio = Engine::Audio::GetInstance();
@@ -2917,7 +3080,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
-			// ★追加: AudioListener コンポーネント
+			// 笘・ｿｽ蜉: AudioListener 繧ｳ繝ｳ繝昴・繝阪Φ繝・
 			for (size_t ci = 0; ci < obj.audioListeners.size(); ++ci) {
 				auto& al = obj.audioListeners[ci];
 				ImGui::PushID(14000 + (int)ci);
@@ -2935,7 +3098,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
-			// ★追加: RectTransform コンポーネント
+			// 笘・ｿｽ蜉: RectTransform 繧ｳ繝ｳ繝昴・繝阪Φ繝・
 			for (size_t ci = 0; ci < obj.rectTransforms.size(); ++ci) {
 				auto& rt = obj.rectTransforms[ci];
 				ImGui::PushID(14000 + (int)ci);
@@ -2957,15 +3120,15 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
-			// ★追加: UIImage コンポーネント
+			// 笘・ｿｽ蜉: UIImage 繧ｳ繝ｳ繝昴・繝阪Φ繝・
 			for (size_t ci = 0; ci < obj.images.size(); ++ci) {
 				auto& img = obj.images[ci];
-				auto* renderer = scene->GetRenderer(); // ★追加
+				auto* renderer = scene->GetRenderer(); // 笘・ｿｽ蜉
 				ImGui::PushID(15000 + (int)ci);
 				if (ImGui::TreeNode("UIImage")) {
 					ImGui::Checkbox("Enabled##Img", &img.enabled);
 					ImGui::ColorEdit4("Color##Img", &img.color.x);
-					// テクスチャ
+					// 繝・け繧ｹ繝√Ε
 					char pathBuf[256];
 					strcpy_s(pathBuf, img.texturePath.c_str());
 					if (ImGui::InputText("Texture##Img", pathBuf, sizeof(pathBuf))) {
@@ -2997,7 +3160,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
-			// ★追加: UIButton コンポーネント
+			// 笘・ｿｽ蜉: UIButton 繧ｳ繝ｳ繝昴・繝阪Φ繝・
 			for (size_t ci = 0; ci < obj.buttons.size(); ++ci) {
 				auto& btn = obj.buttons[ci];
 				ImGui::PushID(16000 + (int)ci);
@@ -3018,7 +3181,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
-			// ★追加: UIText コンポーネント
+			// 笘・ｿｽ蜉: UIText 繧ｳ繝ｳ繝昴・繝阪Φ繝・
 			for (size_t ci = 0; ci < obj.texts.size(); ++ci) {
 				auto& txt = obj.texts[ci];
 				ImGui::PushID(17000 + (int)ci);
@@ -3042,7 +3205,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
-			// ★追加: Hitbox コンポーネント (攻撃判定)
+			// 笘・ｿｽ蜉: Hitbox 繧ｳ繝ｳ繝昴・繝阪Φ繝・(謾ｻ謦・愛螳・
 			for (size_t ci = 0; ci < obj.hitboxes.size(); ++ci) {
 				auto& hb = obj.hitboxes[ci];
 				ImGui::PushID(15000 + (int)ci);
@@ -3071,7 +3234,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
-			// ★追加: Hurtbox コンポーネント (食らい判定)
+			// 笘・ｿｽ蜉: Hurtbox 繧ｳ繝ｳ繝昴・繝阪Φ繝・(鬟溘ｉ縺・愛螳・
 			for (size_t ci = 0; ci < obj.hurtboxes.size(); ++ci) {
 				auto& hb = obj.hurtboxes[ci];
 				ImGui::PushID(16000 + (int)ci);
@@ -3095,7 +3258,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
-			// ★追加: Health コンポーネント (ステータス管理)
+			// 笘・ｿｽ蜉: Health 繧ｳ繝ｳ繝昴・繝阪Φ繝・(繧ｹ繝・・繧ｿ繧ｹ邂｡逅・
 			for (size_t ci = 0; ci < obj.healths.size(); ++ci) {
 				auto& hc = obj.healths[ci];
 				ImGui::PushID(17000 + (int)ci);
@@ -3118,7 +3281,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
-			// ★追加: Script コンポーネント (テキストスクリプト)
+			// 笘・ｿｽ蜉: Script 繧ｳ繝ｳ繝昴・繝阪Φ繝・(繝・く繧ｹ繝医せ繧ｯ繝ｪ繝励ヨ)
 			for (size_t ci = 0; ci < obj.scripts.size(); ++ci) {
 				auto& sc = obj.scripts[ci];
 				ImGui::PushID(18000 + (int)ci);
@@ -3131,10 +3294,10 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "(e.g., PlayerScript)");
 
 					// ==========================================
-					// ★追加: VS Codeを開くボタン
+					// 笘・ｿｽ蜉: VS Code繧帝幕縺上・繧ｿ繝ｳ
 					// ==========================================
 					if (ImGui::Button("Open in VS Code")) {
-						// code コマンドでワークスペースと対象ファイルを開く
+						// code 繧ｳ繝槭Φ繝峨〒繝ｯ繝ｼ繧ｯ繧ｹ繝壹・繧ｹ縺ｨ蟇ｾ雎｡繝輔ぃ繧､繝ｫ繧帝幕縺・
 						std::string cmd = "code . " + sc.scriptPath + ".cpp " + sc.scriptPath + ".h";
 						system(cmd.c_str());
 					}
@@ -3170,50 +3333,50 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				if (ImGui::MenuItem("Rigidbody")) {
 					obj.rigidbodies.push_back({});
 				}
-				if (ImGui::MenuItem("ParticleEmitter")) { // ★追加
+				if (ImGui::MenuItem("ParticleEmitter")) { // 笘・ｿｽ蜉
 					ParticleEmitterComponent pe;
 					pe.emitter.Initialize(*Engine::Renderer::GetInstance(), "NewEmitter");
 					obj.particleEmitters.push_back(pe);
 				}
-				if (ImGui::MenuItem("GpuMeshCollider")) { // ★追加
+				if (ImGui::MenuItem("GpuMeshCollider")) { // 笘・ｿｽ蜉
 					GpuMeshColliderComponent gmc;
-					gmc.meshHandle = obj.modelHandle; // デフォルトでオブジェクトのメッシュを使用
+					gmc.meshHandle = obj.modelHandle; // 繝・ヵ繧ｩ繝ｫ繝医〒繧ｪ繝悶ず繧ｧ繧ｯ繝医・繝｡繝・す繝･繧剃ｽｿ逕ｨ
 					gmc.meshPath = obj.modelPath;
 					obj.gpuMeshColliders.push_back(gmc);
 				}
 				if (ImGui::MenuItem("PlayerInput")) {
 					obj.playerInputs.push_back({});
-				} // ★追加
+				} // 笘・ｿｽ蜉
 				if (ImGui::MenuItem("CharacterMovement")) {
 					obj.characterMovements.push_back({});
-				} // ★追加
+				} // 笘・ｿｽ蜉
 				if (ImGui::MenuItem("CameraTarget")) {
 					obj.cameraTargets.push_back({});
-				} // ★追加
+				} // 笘・ｿｽ蜉
 				ImGui::Separator();
 				if (ImGui::MenuItem("DirectionalLight")) {
 					obj.directionalLights.push_back({});
-				} // ★追加
+				} // 笘・ｿｽ蜉
 				if (ImGui::MenuItem("PointLight")) {
 					obj.pointLights.push_back({});
-				} // ★追加
+				} // 笘・ｿｽ蜉
 				if (ImGui::MenuItem("SpotLight")) {
 					obj.spotLights.push_back({});
-				} // ★追加
+				} // 笘・ｿｽ蜉
 				ImGui::Separator();
 				if (ImGui::MenuItem("AudioSource")) {
 					obj.audioSources.push_back({});
-				} // ★追加
+				} // 笘・ｿｽ蜉
 				if (ImGui::MenuItem("AudioListener")) {
 					obj.audioListeners.push_back({});
-				} // ★追加
+				} // 笘・ｿｽ蜉
 				ImGui::Separator();
 				if (ImGui::MenuItem("Hitbox")) {
 					obj.hitboxes.push_back({});
-				} // ★追加
+				} // 笘・ｿｽ蜉
 				if (ImGui::MenuItem("Hurtbox")) {
 					obj.hurtboxes.push_back({});
-				} // ★追加
+				} // 笘・ｿｽ蜉
 				ImGui::Separator();
 				if (ImGui::MenuItem("RectTransform")) {
 					obj.rectTransforms.push_back({});
@@ -3230,11 +3393,11 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::Separator();
 				if (ImGui::MenuItem("Health")) {
 					obj.healths.push_back({});
-				} // ★追加
+				} // 笘・ｿｽ蜉
 				ImGui::Separator();
 				if (ImGui::MenuItem("Script")) {
 					obj.scripts.push_back({});
-				} // ★追加
+				} // 笘・ｿｽ蜉
 				ImGui::EndPopup();
 			}
 		}
@@ -3255,7 +3418,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 	(void)scene;
 	ImGui::Begin("Project");
 
-	// ★ 静的変数: フォルダナビゲーション・キャッシュ・音声再生
+	// 笘・髱咏噪螟画焚: 繝輔か繝ｫ繝繝翫ン繧ｲ繝ｼ繧ｷ繝ｧ繝ｳ繝ｻ繧ｭ繝｣繝・す繝･繝ｻ髻ｳ螢ｰ蜀咲函
 	static std::string currentDir = "Resources";
 	static std::map<std::string, Engine::Renderer::TextureHandle> thumbnailCache;
 	static float iconSize = 80.0f;
@@ -3263,33 +3426,33 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 	static size_t playingVoiceHandle = 0;
 	static std::string playingAudioPath;
 
-	// ★ ファイル操作用の状態変数
+	// 笘・繝輔ぃ繧､繝ｫ謫堺ｽ懃畑縺ｮ迥ｶ諷句､画焚
 	static bool renaming = false;
-	static std::string renamingPath; // 名前変更対象のフルパス
+	static std::string renamingPath; // 蜷榊燕螟画峩蟇ｾ雎｡縺ｮ繝輔Ν繝代せ
 	static char renameBuffer[256] = {};
 	static bool showDeleteConfirm = false;
-	static std::string deletingPath; // 削除対象のフルパス
-	static std::string deletingName; // 削除対象の表示名
+	static std::string deletingPath; // 蜑企勁蟇ｾ雎｡縺ｮ繝輔Ν繝代せ
+	static std::string deletingName; // 蜑企勁蟇ｾ雎｡縺ｮ陦ｨ遉ｺ蜷・
 	static bool creatingFolder = false;
 	static char newFolderNameBuf[256] = {};
 
-	// ★ 追加: スクリプト作成用の状態変数
+	// 笘・霑ｽ蜉: 繧ｹ繧ｯ繝ｪ繝励ヨ菴懈・逕ｨ縺ｮ迥ｶ諷句､画焚
 	static bool creatingScript = false;
 	static char newScriptNameBuf[256] = "NewScript";
 
 	if (!fs::exists(currentDir))
 		currentDir = "Resources";
 
-	// --- パンくずリスト ---
+	// --- 繝代Φ縺上★繝ｪ繧ｹ繝・---
 	{
 		std::string accumulated;
 		std::string remaining = currentDir;
-		// "Resources" をルートとして分割表示
+		// "Resources" 繧偵Ν繝ｼ繝医→縺励※蛻・牡陦ｨ遉ｺ
 		std::istringstream iss(remaining);
 		std::string token;
 		bool first = true;
 		while (std::getline(iss, token, '\\')) {
-			// '/' でも分割
+			// '/' 縺ｧ繧ょ・蜑ｲ
 			std::istringstream iss2(token);
 			std::string t2;
 			while (std::getline(iss2, t2, '/')) {
@@ -3310,7 +3473,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 		}
 	}
 
-	// ★ ツールバー: + ボタン (新規フォルダ作成)
+	// 笘・繝・・繝ｫ繝舌・: + 繝懊ち繝ｳ (譁ｰ隕上ヵ繧ｩ繝ｫ繝菴懈・)
 	ImGui::SameLine(0, 8);
 	if (ImGui::SmallButton("+##createFolder")) {
 		creatingFolder = true;
@@ -3332,7 +3495,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 
 	ImGui::Separator();
 
-	// --- ★ 新規フォルダ作成ダイアログ ---
+	// --- 笘・譁ｰ隕上ヵ繧ｩ繝ｫ繝菴懈・繝繧､繧｢繝ｭ繧ｰ ---
 	if (creatingFolder) {
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.15f, 0.15f, 0.2f, 1.0f));
 		ImGui::BeginChild("##createFolderPanel", ImVec2(0, 32), true);
@@ -3360,7 +3523,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 		ImGui::PopStyleColor();
 	}
 
-	// --- ★ C++スクリプト作成ダイアログ ---
+	// --- 笘・C++繧ｹ繧ｯ繝ｪ繝励ヨ菴懈・繝繧､繧｢繝ｭ繧ｰ ---
 	if (creatingScript) {
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.20f, 0.12f, 0.25f, 1.0f));
 		ImGui::BeginChild("##createScriptPanel", ImVec2(0, 32), true);
@@ -3373,8 +3536,8 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 		if (ImGui::SmallButton("Create##scr") || enterPressedS) {
 			std::string className(newScriptNameBuf);
 			if (!className.empty()) {
-				// Game/ フォルダにヘッダーとソースを生成
-				// ★修正: 実行ディレクトリ(x64/Debug等)にGameフォルダがない場合、親ディレクトリを探索して正しいパスを特定する
+				// Game/ 繝輔か繝ｫ繝縺ｫ繝倥ャ繝繝ｼ縺ｨ繧ｽ繝ｼ繧ｹ繧堤函謌・
+				// 笘・ｿｮ豁｣: 螳溯｡後ョ繧｣繝ｬ繧ｯ繝医Μ(x64/Debug遲・縺ｫGame繝輔か繝ｫ繝縺後↑縺・ｴ蜷医∬ｦｪ繝・ぅ繝ｬ繧ｯ繝医Μ繧呈爾邏｢縺励※豁｣縺励＞繝代せ繧堤音螳壹☆繧・
 				std::string gameDir = "Game";
 				if (!fs::exists(gameDir)) {
 					if (fs::exists("../../Game")) gameDir = "../../Game";
@@ -3386,7 +3549,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 				std::string cppPath = gameDir + "/" + className + ".cpp";
 
 				if (!fs::exists(hPath) && !fs::exists(cppPath)) {
-						// ヘッダーファイル
+						// 繝倥ャ繝繝ｼ繝輔ぃ繧､繝ｫ
 						{
 							std::ofstream f(hPath);
 							if (f.is_open()) {
@@ -3395,11 +3558,11 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 							f << "namespace Game {\n\n";
 							f << "class " << className << " : public IScript {\n";
 							f << "public:\n";
-							f << "\t// 初期化処理（シーン開始時に1回呼ばれる）\n";
+							f << "\t// 蛻晄悄蛹門・逅・ｼ医す繝ｼ繝ｳ髢句ｧ区凾縺ｫ1蝗槫他縺ｰ繧後ｋ・噂n";
 							f << "\tvoid Start(SceneObject& obj, GameScene* scene) override;\n\n";
-							f << "\t// 毎フレーム処理\n";
+							f << "\t// 豈弱ヵ繝ｬ繝ｼ繝蜃ｦ逅・n";
 							f << "\tvoid Update(SceneObject& obj, GameScene* scene, float dt) override;\n\n";
-							f << "\t// オブジェクト破棄時の処理\n";
+							f << "\t// 繧ｪ繝悶ず繧ｧ繧ｯ繝育ｴ譽・凾縺ｮ蜃ｦ逅・n";
 							f << "\tvoid OnDestroy(SceneObject& obj, GameScene* scene) override;\n";
 							f << "};\n\n";
 							f << "} // namespace Game\n";
@@ -3408,7 +3571,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 								LogError("Failed to write header: " + hPath);
 							}
 						}
-						// ソースファイル
+						// 繧ｽ繝ｼ繧ｹ繝輔ぃ繧､繝ｫ
 						{
 							std::ofstream f(cppPath);
 							if (f.is_open()) {
@@ -3418,15 +3581,15 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 							f << "#include \"ScriptEngine.h\"\n\n";
 							f << "namespace Game {\n\n";
 							f << "void " << className << "::Start(SceneObject& /*obj*/, GameScene* /*scene*/) {\n";
-							f << "\t// ここに初期設定を記述\n";
+							f << "\t// 縺薙％縺ｫ蛻晄悄險ｭ螳壹ｒ險倩ｿｰ\n";
 							f << "}\n\n";
 							f << "void " << className << "::Update(SceneObject& obj, GameScene* scene, float dt) {\n";
-							f << "\t// ここに毎フレームの挙動を記述\n";
+							f << "\t// 縺薙％縺ｫ豈弱ヵ繝ｬ繝ｼ繝縺ｮ謖吝虚繧定ｨ倩ｿｰ\n";
 							f << "}\n\n";
 							f << "void " << className << "::OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {\n";
-							f << "\t// 終了時のクリーンアップなどを記述\n";
+							f << "\t// 邨ゆｺ・凾縺ｮ繧ｯ繝ｪ繝ｼ繝ｳ繧｢繝・・縺ｪ縺ｩ繧定ｨ倩ｿｰ\n";
 							f << "}\n\n";
-							f << "// ★ スクリプト自動登録\n";
+							f << "// 笘・繧ｹ繧ｯ繝ｪ繝励ヨ閾ｪ蜍慕匳骭ｲ\n";
 							f << "REGISTER_SCRIPT(" << className << ");\n\n";
 							f << "} // namespace Game\n";
 							f.close();
@@ -3435,7 +3598,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 							}
 						}
 					Log("Script created: " + hPath + " / " + cppPath);
-					// VS Codeで開く
+					// VS Code縺ｧ髢九￥
 					std::string cmd = "code . " + hPath + " " + cppPath;
 					system(cmd.c_str());
 				} else {
@@ -3452,7 +3615,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 		ImGui::PopStyleColor();
 	}
 
-	// --- ★ 名前変更インラインUI ---
+	// --- 笘・蜷榊燕螟画峩繧､繝ｳ繝ｩ繧､繝ｳUI ---
 	if (renaming) {
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.15f, 0.2f, 0.15f, 1.0f));
 		ImGui::BeginChild("##renamePanel", ImVec2(0, 32), true);
@@ -3471,7 +3634,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 					fs::rename(renamingPath, newPath, ec);
 					if (!ec) {
 						Log("Renamed: " + renamingPath + " -> " + newPath);
-						// サムネイルキャッシュの更新
+						// 繧ｵ繝繝阪う繝ｫ繧ｭ繝｣繝・す繝･縺ｮ譖ｴ譁ｰ
 						auto it = thumbnailCache.find(renamingPath);
 						if (it != thumbnailCache.end()) {
 							auto handle = it->second;
@@ -3495,7 +3658,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 		ImGui::PopStyleColor();
 	}
 
-	// --- ★ 削除確認ダイアログ ---
+	// --- 笘・蜑企勁遒ｺ隱阪ム繧､繧｢繝ｭ繧ｰ ---
 	if (showDeleteConfirm) {
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.25f, 0.1f, 0.1f, 1.0f));
 		ImGui::BeginChild("##deleteConfirm", ImVec2(0, 36), true);
@@ -3510,7 +3673,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 			}
 			if (!ec) {
 				Log("Deleted: " + deletingPath);
-				// サムネイルキャッシュのクリア
+				// 繧ｵ繝繝阪う繝ｫ繧ｭ繝｣繝・す繝･縺ｮ繧ｯ繝ｪ繧｢
 				thumbnailCache.erase(deletingPath);
 			} else {
 				LogError("Delete failed: " + ec.message());
@@ -3525,12 +3688,12 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 		ImGui::PopStyleColor();
 	}
 
-	// --- ファイル一覧を収集 ---
+	// --- 繝輔ぃ繧､繝ｫ荳隕ｧ繧貞庶髮・---
 	struct ProjectEntry {
-		std::string path; // フルパス
-		std::string name; // ファイル名のみ
+		std::string path; // 繝輔Ν繝代せ
+		std::string name; // 繝輔ぃ繧､繝ｫ蜷阪・縺ｿ
 		bool isDir = false;
-		std::string ext; // 小文字拡張子
+		std::string ext; // 蟆乗枚蟄玲僑蠑ｵ蟄・
 	};
 	std::vector<ProjectEntry> entries;
 
@@ -3543,7 +3706,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 			pe.ext = "";
 			if (!pe.isDir) {
 				pe.ext = e.path().extension().string();
-				// 小文字化
+				// 蟆乗枚蟄怜喧
 				for (auto& c : pe.ext)
 					c = (char)std::tolower((unsigned char)c);
 			}
@@ -3551,14 +3714,14 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 		}
 	}
 
-	// ソート: フォルダ先、ファイル後
+	// 繧ｽ繝ｼ繝・ 繝輔か繝ｫ繝蜈医√ヵ繧｡繧､繝ｫ蠕・
 	std::sort(entries.begin(), entries.end(), [](const ProjectEntry& a, const ProjectEntry& b) {
 		if (a.isDir != b.isDir)
 			return a.isDir > b.isDir;
 		return a.name < b.name;
 	});
 
-	// --- 「..」上位フォルダボタン ---
+	// --- 縲・.縲堺ｸ贋ｽ阪ヵ繧ｩ繝ｫ繝繝懊ち繝ｳ ---
 	if (currentDir != "Resources") {
 		auto parent = fs::path(currentDir).parent_path().string();
 		if (parent.empty())
@@ -3571,13 +3734,13 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 		ImGui::SameLine();
 	}
 
-	// --- アイコングリッド ---
+	// --- 繧｢繧､繧ｳ繝ｳ繧ｰ繝ｪ繝・ラ ---
 	float panelWidth = ImGui::GetContentRegionAvail().x;
 	float cellWidth = iconSize + 12.0f;
 	int columns = (int)(panelWidth / cellWidth);
 	if (columns < 1)
 		columns = 1;
-	int col = (currentDir != "Resources") ? 1 : 0; // 「..」ボタンの分
+	int col = (currentDir != "Resources") ? 1 : 0; // 縲・.縲阪・繧ｿ繝ｳ縺ｮ蛻・
 
 	for (size_t ei = 0; ei < entries.size(); ++ei) {
 		auto& pe = entries[ei];
@@ -3587,9 +3750,9 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 		bool isModel = (pe.ext == ".obj" || pe.ext == ".gltf" || pe.ext == ".fbx");
 		bool isAudio = (pe.ext == ".mp3" || pe.ext == ".wav" || pe.ext == ".ogg");
 		bool isPrefab = (pe.ext == ".prefab");
-		bool isScript = (pe.ext == ".cpp" || pe.ext == ".h"); // ★追加
+		bool isScript = (pe.ext == ".cpp" || pe.ext == ".h"); // 笘・ｿｽ蜉
 
-		// グリッドレイアウト
+		// 繧ｰ繝ｪ繝・ラ繝ｬ繧､繧｢繧ｦ繝・
 		if (col > 0 && col < columns)
 			ImGui::SameLine();
 		else if (col >= columns)
@@ -3598,7 +3761,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 		ImGui::BeginGroup();
 
 		if (pe.isDir) {
-			// ★ フォルダ: 黄色っぽいボタン
+			// 笘・繝輔か繝ｫ繝: 鮟・牡縺｣縺ｽ縺・・繧ｿ繝ｳ
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.30f, 0.15f, 1.0f));
 			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.50f, 0.45f, 0.20f, 1.0f));
 			if (ImGui::Button("##dir", ImVec2(iconSize, iconSize))) {
@@ -3606,7 +3769,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 			}
 			ImGui::PopStyleColor(2);
 
-			// ★ フォルダへのドラッグ＆ドロップ受け入れ（ファイル移動）
+			// 笘・繝輔か繝ｫ繝縺ｸ縺ｮ繝峨Λ繝・げ・・ラ繝ｭ繝・・蜿励￠蜈･繧鯉ｼ医ヵ繧｡繧､繝ｫ遘ｻ蜍包ｼ・
 			if (ImGui::BeginDragDropTarget()) {
 				if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
 					std::string srcPath((const char*)pl->Data, pl->DataSize - 1);
@@ -3617,7 +3780,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 						fs::rename(srcPath, destPath, ec);
 						if (!ec) {
 							Log("Moved: " + srcPath + " -> " + destPath);
-							// サムネイルキャッシュの移動
+							// 繧ｵ繝繝阪う繝ｫ繧ｭ繝｣繝・す繝･縺ｮ遘ｻ蜍・
 							auto it = thumbnailCache.find(srcPath);
 							if (it != thumbnailCache.end()) {
 								auto handle = it->second;
@@ -3629,7 +3792,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 						}
 					}
 				}
-				// ★ フォルダのドラッグ＆ドロップ移動にも対応
+				// 笘・繝輔か繝ｫ繝縺ｮ繝峨Λ繝・げ・・ラ繝ｭ繝・・遘ｻ蜍輔↓繧ょｯｾ蠢・
 				if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_DIR")) {
 					std::string srcPath((const char*)pl->Data, pl->DataSize - 1);
 					std::string dirName = fs::path(srcPath).filename().string();
@@ -3647,21 +3810,21 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 				ImGui::EndDragDropTarget();
 			}
 
-			// フォルダアイコンのテキスト
+			// 繝輔か繝ｫ繝繧｢繧､繧ｳ繝ｳ縺ｮ繝・く繧ｹ繝・
 			ImVec2 bmin = ImGui::GetItemRectMin();
 			ImVec2 bmax = ImGui::GetItemRectMax();
 			float cx = (bmin.x + bmax.x) * 0.5f;
 			float cy = (bmin.y + bmax.y) * 0.5f;
 			ImGui::GetWindowDrawList()->AddText(ImVec2(cx - 8, cy - 10), IM_COL32(255, 220, 80, 255), "D");
 
-			// ★ フォルダのドラッグ＆ドロップソース
+			// 笘・繝輔か繝ｫ繝縺ｮ繝峨Λ繝・げ・・ラ繝ｭ繝・・繧ｽ繝ｼ繧ｹ
 			if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
 				ImGui::SetDragDropPayload("RESOURCE_DIR", pe.path.c_str(), pe.path.size() + 1);
 				ImGui::Text("[Dir] %s", pe.name.c_str());
 				ImGui::EndDragDropSource();
 			}
 		} else if (isTexture) {
-			// ★ テクスチャ: サムネイルプレビュー
+			// 笘・繝・け繧ｹ繝√Ε: 繧ｵ繝繝阪う繝ｫ繝励Ξ繝薙Η繝ｼ
 			Engine::Renderer::TextureHandle th = 0;
 			auto it = thumbnailCache.find(pe.path);
 			if (it != thumbnailCache.end()) {
@@ -3679,7 +3842,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 				ImGui::Button("TEX", ImVec2(iconSize, iconSize));
 			}
 		} else if (isModel) {
-			// ★ モデル: アイコン
+			// 笘・繝｢繝・Ν: 繧｢繧､繧ｳ繝ｳ
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.30f, 0.40f, 1.0f));
 			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.40f, 0.55f, 1.0f));
 			ImGui::Button("##mdl", ImVec2(iconSize, iconSize));
@@ -3690,7 +3853,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 			float cy = (bmin.y + bmax.y) * 0.5f;
 			ImGui::GetWindowDrawList()->AddText(ImVec2(cx - 12, cy - 10), IM_COL32(100, 200, 255, 255), "3D");
 		} else if (isAudio) {
-			// ★ 音声: 再生/停止ボタン付きアイコン
+			// 笘・髻ｳ螢ｰ: 蜀咲函/蛛懈ｭ｢繝懊ち繝ｳ莉倥″繧｢繧､繧ｳ繝ｳ
 			bool isPlaying = (playingAudioPath == pe.path && playingVoiceHandle != 0);
 			ImVec4 btnColor = isPlaying ? ImVec4(0.5f, 0.2f, 0.2f, 1.0f) : ImVec4(0.20f, 0.35f, 0.20f, 1.0f);
 			ImVec4 btnHover = isPlaying ? ImVec4(0.7f, 0.3f, 0.3f, 1.0f) : ImVec4(0.30f, 0.50f, 0.30f, 1.0f);
@@ -3704,7 +3867,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 						playingVoiceHandle = 0;
 						playingAudioPath.clear();
 					} else {
-						// 前の再生を停止
+						// 蜑阪・蜀咲函繧貞●豁｢
 						if (playingVoiceHandle != 0)
 							audio->Stop(playingVoiceHandle);
 						uint32_t sh = audio->Load(pe.path);
@@ -3724,7 +3887,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 			const char* icon = isPlaying ? "||" : ">";
 			ImGui::GetWindowDrawList()->AddText(ImVec2(cx - 6, cy - 10), IM_COL32(180, 255, 180, 255), icon);
 		} else if (isPrefab) {
-			// ★ Prefab: 青緑アイコン
+			// 笘・Prefab: 髱堤ｷ代い繧､繧ｳ繝ｳ
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.40f, 0.40f, 1.0f));
 			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.30f, 0.50f, 0.50f, 1.0f));
 			ImGui::Button("##prefab", ImVec2(iconSize, iconSize));
@@ -3735,7 +3898,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 			float cy = (bmin.y + bmax.y) * 0.5f;
 			ImGui::GetWindowDrawList()->AddText(ImVec2(cx - 16, cy - 10), IM_COL32(150, 255, 200, 255), "PFB");
 		} else if (isScript) {
-			// ★ C++スクリプト: 紫アイコン
+			// 笘・C++繧ｹ繧ｯ繝ｪ繝励ヨ: 邏ｫ繧｢繧､繧ｳ繝ｳ
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.15f, 0.35f, 1.0f));
 			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.35f, 0.25f, 0.45f, 1.0f));
 			ImGui::Button("##script", ImVec2(iconSize, iconSize));
@@ -3746,7 +3909,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 			float cy = (bmin.y + bmax.y) * 0.5f;
 			ImGui::GetWindowDrawList()->AddText(ImVec2(cx - 12, cy - 10), IM_COL32(200, 150, 255, 255), "C++");
 		} else {
-			// ★ その他ファイル: グレーアイコン
+			// 笘・縺昴・莉悶ヵ繧｡繧､繝ｫ: 繧ｰ繝ｬ繝ｼ繧｢繧､繧ｳ繝ｳ
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.25f, 0.25f, 0.25f, 1.0f));
 			ImGui::Button("##file", ImVec2(iconSize, iconSize));
 			ImGui::PopStyleColor();
@@ -3757,7 +3920,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 			ImGui::GetWindowDrawList()->AddText(ImVec2(cx - 6, cy - 10), IM_COL32(180, 180, 180, 255), "F");
 		}
 
-		// ★追加: スクリプトやテキストファイルをダブルクリックでVS Codeで開く
+		// 笘・ｿｽ蜉: 繧ｹ繧ｯ繝ｪ繝励ヨ繧・ユ繧ｭ繧ｹ繝医ヵ繧｡繧､繝ｫ繧偵ム繝悶Ν繧ｯ繝ｪ繝・け縺ｧVS Code縺ｧ髢九￥
 		if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
 			if (isScript || pe.ext == ".json" || pe.ext == ".txt") {
 				std::string cmd = "code \"" + pe.path + "\"";
@@ -3765,14 +3928,14 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 			}
 		}
 
-		// ★ ドラッグ＆ドロップソース (ファイルのみ — フォルダは上で別途処理)
+		// 笘・繝峨Λ繝・げ・・ラ繝ｭ繝・・繧ｽ繝ｼ繧ｹ (繝輔ぃ繧､繝ｫ縺ｮ縺ｿ 窶・繝輔か繝ｫ繝縺ｯ荳翫〒蛻･騾泌・逅・
 		if (!pe.isDir && ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
 			ImGui::SetDragDropPayload("RESOURCE_PATH", pe.path.c_str(), pe.path.size() + 1);
 			ImGui::Text("%s", pe.name.c_str());
 			ImGui::EndDragDropSource();
 		}
 
-		// ★ 右クリックコンテキストメニュー (アイテム上)
+		// 笘・蜿ｳ繧ｯ繝ｪ繝・け繧ｳ繝ｳ繝・く繧ｹ繝医Γ繝九Η繝ｼ (繧｢繧､繝・Β荳・
 		if (ImGui::BeginPopupContextItem("##itemCtx")) {
 			if (ImGui::MenuItem("Rename")) {
 				renaming = true;
@@ -3794,7 +3957,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 			ImGui::EndPopup();
 		}
 
-		// ファイル名 (切り詰めて表示)
+		// 繝輔ぃ繧､繝ｫ蜷・(蛻・ｊ隧ｰ繧√※陦ｨ遉ｺ)
 		float textWidth = iconSize;
 		std::string displayName = pe.name;
 		if (ImGui::CalcTextSize(displayName.c_str()).x > textWidth) {
@@ -3807,7 +3970,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 		ImGui::TextUnformatted(displayName.c_str());
 		ImGui::PopTextWrapPos();
 
-		// ツールチップ (フルパス)
+		// 繝・・繝ｫ繝√ャ繝・(繝輔Ν繝代せ)
 		if (ImGui::IsItemHovered()) {
 			ImGui::BeginTooltip();
 			ImGui::Text("%s", pe.path.c_str());
@@ -3820,7 +3983,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 		ImGui::PopID();
 	}
 
-	// ★ 背景の右クリックメニュー（何もない場所で右クリック）
+	// 笘・閭梧勹縺ｮ蜿ｳ繧ｯ繝ｪ繝・け繝｡繝九Η繝ｼ・井ｽ輔ｂ縺ｪ縺・ｴ謇縺ｧ蜿ｳ繧ｯ繝ｪ繝・け・・
 	if (ImGui::BeginPopupContextWindow("##bgCtx", ImGuiPopupFlags_NoOpenOverItems | ImGuiPopupFlags_MouseButtonRight)) {
 		if (ImGui::MenuItem("Create Folder")) {
 			creatingFolder = true;
@@ -3828,7 +3991,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 			strncpy_s(newFolderNameBuf, "NewFolder", sizeof(newFolderNameBuf) - 1);
 		}
 		if (ImGui::BeginMenu("Create File")) {
-			// ★追加: C++スクリプト作成ボタン
+			// 笘・ｿｽ蜉: C++繧ｹ繧ｯ繝ｪ繝励ヨ菴懈・繝懊ち繝ｳ
 			if (ImGui::MenuItem("C++ Script")) {
 				creatingScript = true;
 				memset(newScriptNameBuf, 0, sizeof(newScriptNameBuf));
@@ -3875,7 +4038,7 @@ void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
 			system(cmd.c_str());
 		}
 		if (ImGui::MenuItem("Refresh")) {
-			// サムネイルキャッシュクリア（再読み込み）
+			// 繧ｵ繝繝阪う繝ｫ繧ｭ繝｣繝・す繝･繧ｯ繝ｪ繧｢・亥・隱ｭ縺ｿ霎ｼ縺ｿ・・
 			thumbnailCache.clear();
 			Log("Refreshed project view.");
 		}
@@ -3941,7 +4104,7 @@ void EditorUI::ShowConsole() {
 	ImGui::End();
 }
 
-// ====== ★ 選択ギズモ + ハイライト描画 ======
+// ====== 笘・驕ｸ謚槭ぐ繧ｺ繝｢ + 繝上う繝ｩ繧､繝域緒逕ｻ ======
 void EditorUI::DrawSelectionGizmo(Engine::Renderer* renderer, GameScene* scene) {
 	if (!scene)
 		return;
@@ -3952,16 +4115,16 @@ void EditorUI::DrawSelectionGizmo(Engine::Renderer* renderer, GameScene* scene) 
 		Engine::Vector3 pos = {obj.translate.x, obj.translate.y, obj.translate.z};
 		const float al = 2.0f, ar = 0.3f;
 
-		// ★ ギズモの色 (ドラッグ中の軸は明るく、それ以外は通常色)
+		// 笘・繧ｮ繧ｺ繝｢縺ｮ濶ｲ (繝峨Λ繝・げ荳ｭ縺ｮ霆ｸ縺ｯ譏弱ｋ縺上√◎繧御ｻ･螟悶・騾壼ｸｸ濶ｲ)
 		auto axisColor = [](int axis, int dragAxis) -> Engine::Vector4 {
 			bool active = (dragAxis == axis);
 			switch (axis) {
 			case 0:
-				return active ? Engine::Vector4{1.0f, 0.5f, 0.5f, 1.0f} : Engine::Vector4{1.0f, 0.2f, 0.2f, 1.0f}; // X=赤
+				return active ? Engine::Vector4{1.0f, 0.5f, 0.5f, 1.0f} : Engine::Vector4{1.0f, 0.2f, 0.2f, 1.0f}; // X=襍､
 			case 1:
-				return active ? Engine::Vector4{0.5f, 1.0f, 0.5f, 1.0f} : Engine::Vector4{0.2f, 1.0f, 0.2f, 1.0f}; // Y=緑
+				return active ? Engine::Vector4{0.5f, 1.0f, 0.5f, 1.0f} : Engine::Vector4{0.2f, 1.0f, 0.2f, 1.0f}; // Y=邱・
 			case 2:
-				return active ? Engine::Vector4{0.5f, 0.5f, 1.0f, 1.0f} : Engine::Vector4{0.2f, 0.2f, 1.0f, 1.0f}; // Z=青
+				return active ? Engine::Vector4{0.5f, 0.5f, 1.0f, 1.0f} : Engine::Vector4{0.2f, 0.2f, 1.0f, 1.0f}; // Z=髱・
 			default:
 				return {1, 1, 1, 1};
 			}
@@ -3971,15 +4134,15 @@ void EditorUI::DrawSelectionGizmo(Engine::Renderer* renderer, GameScene* scene) 
 		auto cX = axisColor(0, dAxis), cY = axisColor(1, dAxis), cZ = axisColor(2, dAxis);
 
 		if (currentGizmoMode == GizmoMode::Translate) {
-			// X軸 →
+			// X霆ｸ 竊・
 			renderer->DrawLine3D(pos, {pos.x + al, pos.y, pos.z}, cX);
 			renderer->DrawLine3D({pos.x + al, pos.y, pos.z}, {pos.x + al - ar, pos.y + ar * .4f, pos.z}, cX);
 			renderer->DrawLine3D({pos.x + al, pos.y, pos.z}, {pos.x + al - ar, pos.y - ar * .4f, pos.z}, cX);
-			// Y軸 ↑
+			// Y霆ｸ 竊・
 			renderer->DrawLine3D(pos, {pos.x, pos.y + al, pos.z}, cY);
 			renderer->DrawLine3D({pos.x, pos.y + al, pos.z}, {pos.x + ar * .4f, pos.y + al - ar, pos.z}, cY);
 			renderer->DrawLine3D({pos.x, pos.y + al, pos.z}, {pos.x - ar * .4f, pos.y + al - ar, pos.z}, cY);
-			// Z軸
+			// Z霆ｸ
 			renderer->DrawLine3D(pos, {pos.x, pos.y, pos.z + al}, cZ);
 			renderer->DrawLine3D({pos.x, pos.y, pos.z + al}, {pos.x, pos.y + ar * .4f, pos.z + al - ar}, cZ);
 			renderer->DrawLine3D({pos.x, pos.y, pos.z + al}, {pos.x, pos.y - ar * .4f, pos.z + al - ar}, cZ);
@@ -4005,9 +4168,9 @@ void EditorUI::DrawSelectionGizmo(Engine::Renderer* renderer, GameScene* scene) 
 			renderer->DrawLine3D({pos.x, pos.y + e, pos.z + al - e}, {pos.x, pos.y - e, pos.z + al + e}, cZ);
 		}
 
-		// ★ 選択ハイライト: バウンディングボックス (黄色のワイヤーフレーム)
+		// 笘・驕ｸ謚槭ワ繧､繝ｩ繧､繝・ 繝舌え繝ｳ繝・ぅ繝ｳ繧ｰ繝懊ャ繧ｯ繧ｹ (鮟・牡縺ｮ繝ｯ繧､繝､繝ｼ繝輔Ξ繝ｼ繝)
 		float sx = obj.scale.x * 0.5f, sy = obj.scale.y * 0.5f, sz = obj.scale.z * 0.5f;
-		Engine::Vector4 hlColor = {1.0f, 0.85f, 0.0f, 0.9f}; // 明るい黄色
+		Engine::Vector4 hlColor = {1.0f, 0.85f, 0.0f, 0.9f}; // 譏弱ｋ縺・ｻ・牡
 		Engine::Vector3 v[8] = {
 		    {pos.x - sx, pos.y - sy, pos.z - sz},
             {pos.x + sx, pos.y - sy, pos.z - sz},
@@ -4035,7 +4198,7 @@ void EditorUI::DrawSelectionGizmo(Engine::Renderer* renderer, GameScene* scene) 
 		for (auto& eg : edges)
 			renderer->DrawLine3D(v[eg[0]], v[eg[1]], hlColor);
 
-		// ★追加: コライダー可視化 (緑色のワイヤーフレーム)
+		// 笘・ｿｽ蜉: 繧ｳ繝ｩ繧､繝繝ｼ蜿ｯ隕門喧 (邱題牡縺ｮ繝ｯ繧､繝､繝ｼ繝輔Ξ繝ｼ繝)
 		for (const auto& bc : obj.boxColliders) {
 			if (!bc.enabled)
 				continue;
@@ -4043,7 +4206,7 @@ void EditorUI::DrawSelectionGizmo(Engine::Renderer* renderer, GameScene* scene) 
 			float csy = bc.size.y * 0.5f * obj.scale.y;
 			float csz = bc.size.z * 0.5f * obj.scale.z;
 			Engine::Vector3 cp = {pos.x + bc.center.x * obj.scale.x, pos.y + bc.center.y * obj.scale.y, pos.z + bc.center.z * obj.scale.z};
-			Engine::Vector4 colColor = {0.2f, 1.0f, 0.2f, 0.8f}; // 緑色
+			Engine::Vector4 colColor = {0.2f, 1.0f, 0.2f, 0.8f}; // 邱題牡
 			Engine::Vector3 cv[8] = {
 			    {cp.x - csx, cp.y - csy, cp.z - csz},
                 {cp.x + csx, cp.y - csy, cp.z - csz},
@@ -4059,18 +4222,18 @@ void EditorUI::DrawSelectionGizmo(Engine::Renderer* renderer, GameScene* scene) 
 		}
 	}
 }
-// ====== ★ Animation Window ======
+// ====== 笘・Animation Window ======
 void EditorUI::ShowAnimationWindow(Engine::Renderer* renderer, GameScene* scene) {
 	(void)renderer;
 	ImGui::Begin("Animation");
 	if (scene && scene->selectedObjectIndex_ >= 0 && scene->selectedObjectIndex_ < (int)scene->objects_.size()) {
 		auto& obj = scene->objects_[scene->selectedObjectIndex_];
 		if (!obj.animators.empty()) {
-			auto& anim = obj.animators[0]; // 最初のAnimatorを表示
+			auto& anim = obj.animators[0]; // 譛蛻昴・Animator繧定｡ｨ遉ｺ
 			ImGui::Text("Selected: %s (Animator)", obj.name.c_str());
 			ImGui::Separator();
 
-			// アニメーションリスト（モデルが持っているアニメーションを取得）
+			// 繧｢繝九Γ繝ｼ繧ｷ繝ｧ繝ｳ繝ｪ繧ｹ繝茨ｼ医Δ繝・Ν縺梧戟縺｣縺ｦ縺・ｋ繧｢繝九Γ繝ｼ繧ｷ繝ｧ繝ｳ繧貞叙蠕暦ｼ・
 			auto* r = Engine::Renderer::GetInstance();
 			auto* m = r->GetModel(obj.modelHandle);
 			if (m) {
@@ -4089,7 +4252,7 @@ void EditorUI::ShowAnimationWindow(Engine::Renderer* renderer, GameScene* scene)
 						ImGui::EndCombo();
 					}
 
-					// 現在のアニメーションを探す
+					// 迴ｾ蝨ｨ縺ｮ繧｢繝九Γ繝ｼ繧ｷ繝ｧ繝ｳ繧呈爾縺・
 					const Engine::Animation* currentAnimPtr = nullptr;
 					for (const auto& a : data.animations) {
 						if (a.name == anim.currentAnimation) {
@@ -4100,10 +4263,10 @@ void EditorUI::ShowAnimationWindow(Engine::Renderer* renderer, GameScene* scene)
 
 					if (currentAnimPtr) {
 						ImGui::Text("Duration: %.2f ticks (%.1f fps)", currentAnimPtr->duration, currentAnimPtr->ticksPerSecond);
-						// シークバー (タイムライン)
+						// 繧ｷ繝ｼ繧ｯ繝舌・ (繧ｿ繧､繝繝ｩ繧､繝ｳ)
 						ImGui::SliderFloat("Time", &anim.time, 0.0f, currentAnimPtr->duration, "%.2f");
 
-						// 再生コントロール
+						// 蜀咲函繧ｳ繝ｳ繝医Ο繝ｼ繝ｫ
 						if (ImGui::Button(anim.isPlaying ? "Stop" : "Play")) {
 							anim.isPlaying = !anim.isPlaying;
 						}
@@ -4137,7 +4300,7 @@ void EditorUI::ShowPlayModeMonitor(GameScene* scene) {
 
 	ImGui::Begin("Play Mode Monitor");
 
-	// ★ FPSカウンター
+	// 笘・FPS繧ｫ繧ｦ繝ｳ繧ｿ繝ｼ
 	float fps = ImGui::GetIO().Framerate;
 	ImVec4 col = {0.0f, 1.0f, 0.0f, 1.0f};
 	if (fps < 55.0f) col = {1.0f, 1.0f, 0.0f, 1.0f};
