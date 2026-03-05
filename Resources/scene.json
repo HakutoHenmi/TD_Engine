@@ -26,19 +26,18 @@
       ]
     },
     {
-      "name": "Model",
+      "name": "Floor",
       "locked": false,
-      "modelPath": "Resources\\Stages\\karimap.obj",
-      "texturePath": "",
-      "translate": [0, 0, 0],
+      "modelPath": "Resources/cube/cube.obj",
+      "texturePath": "Resources/white1x1.png",
+      "translate": [15.5947, 0.948588, 7.022],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
-      "color": [0.690196, 0.388235, 0.388235, 1],
+      "color": [1, 1, 1, 1],
       "extraTexturePaths": [],
       "shaderName": "Default",
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources\\Stages\\karimap.obj", "texturePath": "Resources\\uvChecker.png", "color": [0.69112,0.38692,0.38692,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": ["Resources\\Terrain\\grass.png", "Resources\\Terrain\\rock.png", "Resources\\Terrain\\dirt.png", "Resources\\basecolor.jpg", "Resources\\white1x1.png"], "lightmapPath": "", "shaderName": "EnhancedTerrain"},
-        {"type": "GpuMeshCollider", "enabled": true, "isTrigger": false, "collisionType": 0, "meshPath": "Resources\\Stages\\karimap.obj"}
+        {"type": "GpuMeshCollider", "enabled": true, "isTrigger": false, "collisionType": 0, "meshPath": "Resources/cube/cube.obj"}
       ]
     },
     {
@@ -54,6 +53,471 @@
       "shaderName": "Default",
       "components": [
         {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources\\walk.gltf", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeJoint",
+      "locked": false,
+      "modelPath": "Resources/player_ball/ball.obj",
+      "texturePath": "",
+      "translate": [16.5161, 2.23665, 8.022],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/player_ball/ball.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeJoint",
+      "locked": false,
+      "modelPath": "Resources/player_ball/ball.obj",
+      "texturePath": "",
+      "translate": [29.3734, 1.24685, 3.53755],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/player_ball/ball.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeJoint",
+      "locked": false,
+      "modelPath": "Resources/player_ball/ball.obj",
+      "texturePath": "",
+      "translate": [35.1453, 4.79056, 4.82163],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/player_ball/ball.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeJoint",
+      "locked": false,
+      "modelPath": "Resources/player_ball/ball.obj",
+      "texturePath": "",
+      "translate": [36.8088, 6.63368, 2.74197],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/player_ball/ball.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeJoint",
+      "locked": false,
+      "modelPath": "Resources/player_ball/ball.obj",
+      "texturePath": "",
+      "translate": [38.2281, 8.5, 3.22599],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/player_ball/ball.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeJoint",
+      "locked": false,
+      "modelPath": "Resources/player_ball/ball.obj",
+      "texturePath": "",
+      "translate": [39.41, 8.5, 5.03903],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/player_ball/ball.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeJoint",
+      "locked": false,
+      "modelPath": "Resources/player_ball/ball.obj",
+      "texturePath": "",
+      "translate": [44.1246, 8.5, 7.24126],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/player_ball/ball.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeJoint",
+      "locked": false,
+      "modelPath": "Resources/player_ball/ball.obj",
+      "texturePath": "",
+      "translate": [43.9356, 6.5, 10.1906],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/player_ball/ball.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeJoint",
+      "locked": false,
+      "modelPath": "Resources/player_ball/ball.obj",
+      "texturePath": "",
+      "translate": [43.4335, 6.5, 17.5794],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/player_ball/ball.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeJoint",
+      "locked": false,
+      "modelPath": "Resources/player_ball/ball.obj",
+      "texturePath": "",
+      "translate": [42.6306, 4.5, 19.5107],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/player_ball/ball.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeJoint",
+      "locked": false,
+      "modelPath": "Resources/player_ball/ball.obj",
+      "texturePath": "",
+      "translate": [39.1617, 4.5, 21.6404],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/player_ball/ball.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeJoint",
+      "locked": false,
+      "modelPath": "Resources/player_ball/ball.obj",
+      "texturePath": "",
+      "translate": [36.7698, 4.5, 20.188],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/player_ball/ball.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeJoint",
+      "locked": false,
+      "modelPath": "Resources/player_ball/ball.obj",
+      "texturePath": "",
+      "translate": [34.4624, 2.5, 19.5916],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/player_ball/ball.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeJoint",
+      "locked": false,
+      "modelPath": "Resources/player_ball/ball.obj",
+      "texturePath": "",
+      "translate": [32.4456, 0.499998, 19.2312],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/player_ball/ball.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeJoint",
+      "locked": false,
+      "modelPath": "Resources/player_ball/ball.obj",
+      "texturePath": "",
+      "translate": [27.6229, 0.5, 16.7291],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/player_ball/ball.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeJoint",
+      "locked": false,
+      "modelPath": "Resources/player_ball/ball.obj",
+      "texturePath": "",
+      "translate": [21.0675, 0.5, 13.9009],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/player_ball/ball.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeSegment",
+      "locked": false,
+      "modelPath": "Resources/Cylinder/cylinder.obj",
+      "texturePath": "",
+      "translate": [22.9448, 1.74175, 5.77978],
+      "rotate": [-1.49824, 1.90639, 0],
+      "scale": [0.35, 4.48428, 0.35],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Cylinder/cylinder.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeSegment",
+      "locked": false,
+      "modelPath": "Resources/Cylinder/cylinder.obj",
+      "texturePath": "",
+      "translate": [32.2594, 3.01871, 4.17959],
+      "rotate": [-2.11071, 1.35189, 0],
+      "scale": [0.35, 2.23118, 0.35],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Cylinder/cylinder.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeSegment",
+      "locked": false,
+      "modelPath": "Resources/Cylinder/cylinder.obj",
+      "texturePath": "",
+      "translate": [35.9771, 5.71212, 3.7818],
+      "rotate": [-2.17619, 2.46691, 0],
+      "scale": [0.35, 1.01291, 0.35],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Cylinder/cylinder.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeSegment",
+      "locked": false,
+      "modelPath": "Resources/Cylinder/cylinder.obj",
+      "texturePath": "",
+      "translate": [37.5185, 7.56684, 2.98398],
+      "rotate": [-2.46473, 1.24214, 0],
+      "scale": [0.35, 0.731374, 0.35],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Cylinder/cylinder.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeSegment",
+      "locked": false,
+      "modelPath": "Resources/Cylinder/cylinder.obj",
+      "texturePath": "",
+      "translate": [38.8191, 8.5, 4.13251],
+      "rotate": [-1.5708, 0.577705, 0],
+      "scale": [0.35, 0.654755, 0.35],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Cylinder/cylinder.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeSegment",
+      "locked": false,
+      "modelPath": "Resources/Cylinder/cylinder.obj",
+      "texturePath": "",
+      "translate": [41.7673, 8.5, 6.14015],
+      "rotate": [-1.5708, 1.1338, 0],
+      "scale": [0.35, 1.66784, 0.35],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Cylinder/cylinder.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeSegment",
+      "locked": false,
+      "modelPath": "Resources/Cylinder/cylinder.obj",
+      "texturePath": "",
+      "translate": [44.0301, 7.5, 8.71595],
+      "rotate": [-0.975865, -0.0639961, -0],
+      "scale": [0.35, 1.12285, 0.35],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Cylinder/cylinder.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeSegment",
+      "locked": false,
+      "modelPath": "Resources/Cylinder/cylinder.obj",
+      "texturePath": "",
+      "translate": [43.6845, 6.5, 13.885],
+      "rotate": [-1.5708, -0.0678414, -0],
+      "scale": [0.35, 2.40195, 0.35],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Cylinder/cylinder.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeSegment",
+      "locked": false,
+      "modelPath": "Resources/Cylinder/cylinder.obj",
+      "texturePath": "",
+      "translate": [43.0321, 5.5, 18.5451],
+      "rotate": [-0.807756, -0.393998, -0],
+      "scale": [0.35, 0.897948, 0.35],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Cylinder/cylinder.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeSegment",
+      "locked": false,
+      "modelPath": "Resources/Cylinder/cylinder.obj",
+      "texturePath": "",
+      "translate": [40.8962, 4.5, 20.5755],
+      "rotate": [-1.5708, -1.02019, -0],
+      "scale": [0.35, 1.29016, 0.35],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Cylinder/cylinder.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeSegment",
+      "locked": false,
+      "modelPath": "Resources/Cylinder/cylinder.obj",
+      "texturePath": "",
+      "translate": [37.9658, 4.5, 20.9142],
+      "rotate": [-1.5708, -2.1165, 0],
+      "scale": [0.35, 0.866115, 0.35],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Cylinder/cylinder.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeSegment",
+      "locked": false,
+      "modelPath": "Resources/Cylinder/cylinder.obj",
+      "texturePath": "",
+      "translate": [35.6161, 3.5, 19.8898],
+      "rotate": [-0.872618, -1.82374, 0],
+      "scale": [0.35, 0.970425, 0.35],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Cylinder/cylinder.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeSegment",
+      "locked": false,
+      "modelPath": "Resources/Cylinder/cylinder.obj",
+      "texturePath": "",
+      "translate": [33.454, 1.5, 19.4114],
+      "rotate": [-0.797422, -1.74759, 0],
+      "scale": [0.35, 0.887687, 0.35],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Cylinder/cylinder.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeSegment",
+      "locked": false,
+      "modelPath": "Resources/Cylinder/cylinder.obj",
+      "texturePath": "",
+      "translate": [30.0343, 0.499999, 17.9802],
+      "rotate": [-1.5708, -2.04939, 0],
+      "scale": [0.35, 1.74438, 0.35],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Cylinder/cylinder.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "name": "PipeSegment",
+      "locked": false,
+      "modelPath": "Resources/Cylinder/cylinder.obj",
+      "texturePath": "",
+      "translate": [24.3452, 0.5, 15.315],
+      "rotate": [-1.5708, -1.9781, 0],
+      "scale": [0.35, 2.31318, 0.35],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Cylinder/cylinder.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
       ]
     },
     {
@@ -153,6 +617,22 @@
       "shaderName": "Default",
       "components": [
         {"type": "DirectionalLight", "enabled": true, "color": [1,0.95,0.8], "intensity": 1.2}
+      ]
+    },
+    {
+      "name": "Terrain",
+      "locked": true,
+      "modelPath": "Resources\\Stages\\karimap.obj",
+      "texturePath": "",
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [0.690196, 0.388235, 0.388235, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources\\Stages\\karimap.obj", "texturePath": "Resources\\uvChecker.png", "color": [0.69112,0.38692,0.38692,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": ["Resources\\Terrain\\grass.png", "Resources\\Terrain\\rock.png", "Resources\\Terrain\\dirt.png", "Resources\\basecolor.jpg", "Resources\\white1x1.png"], "lightmapPath": "", "shaderName": "EnhancedTerrain"},
+        {"type": "GpuMeshCollider", "enabled": true, "isTrigger": false, "collisionType": 0, "meshPath": "Resources\\Stages\\karimap.obj"}
       ]
     }
   ]
