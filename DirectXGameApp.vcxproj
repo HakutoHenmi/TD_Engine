@@ -190,6 +190,7 @@ exit /b 0
     <ClCompile Include="Game\Scenes\GameScene.cpp" />
     <ClCompile Include="Game\Scenes\TitleScene.cpp" />
     <ClCompile Include="Game\ScriptEngine.cpp" />
+    <ClCompile Include="Game\SpikeScript.cpp" />
     <!-- ★追加 -->
     <ClCompile Include="Game\Systems\UISystem.cpp" />
     <ClCompile Include="Game\PlayerScript.cpp" />
@@ -211,6 +212,7 @@ exit /b 0
     <ClInclude Include="Game\Scenes\TitleScene.h" />
     <ClInclude Include="Game\ObjectTypes.h" />
     <ClInclude Include="Game\ScriptEngine.h" />
+    <ClInclude Include="Game\SpikeScript.h" />
     <!-- ★追加 -->
     <ClInclude Include="Game\Systems\UISystem.h" />
     <ClInclude Include="Game\IScript.h" />
