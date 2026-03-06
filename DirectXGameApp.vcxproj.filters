@@ -35,6 +35,7 @@
       <Filter>Scripts</Filter>
     </ClCompile>
     <ClCompile Include="Game\main.cpp" />
+    <ClCompile Include="Game\Scripts\ToObjectMove.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
@@ -106,6 +107,7 @@
     <ClInclude Include="Game\Systems\ScriptSystem.h">
       <Filter>Systems</Filter>
     </ClInclude>
+    <ClInclude Include="Game\Scripts\ToObjectMove.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">
