@@ -20,15 +20,15 @@ private:
 	// ImGuiで追尾するタグをいじれるように
 	void ChangeTargetTag(SceneObject& obj, GameScene* scene, float dt);
 
-private:	// メンバ変数
+private: // メンバ変数
 	// 参照するObjectのポインタと位置
 	// 初期値はPlayer
-	std::string targetName_ = "Player";
+	std::string targetName_ = {};
 	// ImGui編集ようのデータ
-	char tagBuffer_[64] = "Player";
+	char tagBuffer_[64] = {};
 	const SceneObject* target_ = nullptr;
 	DirectX::XMFLOAT3 myPos_ = {};
-	DirectX::XMFLOAT3 targetPos_ = {};	// 移動速度
+	DirectX::XMFLOAT3 targetPos_ = {}; // 移動速度
 	float speed_ = 5.0f;
 };
 
