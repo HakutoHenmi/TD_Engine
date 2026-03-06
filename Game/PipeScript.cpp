@@ -78,7 +78,6 @@ static bool IsConnectedToBulletTankRecursive(GameScene* scene, const SceneObject
 static bool IsConnectedToBulletTank(GameScene* scene, const SceneObject& selfObj) {
 	const float connectRange = 2.5f;
 
-
 	std::vector<const SceneObject*> visitedObjects;
 
 	return IsConnectedToBulletTankRecursive(scene, selfObj, visitedObjects, connectRange);
@@ -90,13 +89,13 @@ void PipeScript::Start(SceneObject& obj, GameScene* scene) {
 }
 
 void PipeScript::Update(SceneObject& obj, GameScene* scene, float dt) {
-	bool connectedToTank = IsConnectedToBulletTank(scene, obj);
-
+	// bool connectedToTank = IsConnectedToBulletTank(scene, obj);
+	(void)scene;
 	float speed = rotationSpeed_;
 
-	if (connectedToTank) {
-		speed = rotationSpeed_ * 3.0f;
-	}
+	// if (connectedToTank) {
+	// speed = rotationSpeed_ * 3.0f;
+	//}
 
 	obj.rotate.z += speed * dt;
 }
