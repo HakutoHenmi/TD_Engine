@@ -11,11 +11,7 @@
 
 namespace Game {
 
-struct TilePos {
-	int x;
-	int z;
-};
-
+// タグ走査
 static bool HasTag(const SceneObject& obj, const char* tagName) {
 	for (int i = 0; i < (int)obj.tags.size(); ++i) {
 		if (obj.tags[i].tag == tagName) {
@@ -25,6 +21,8 @@ static bool HasTag(const SceneObject& obj, const char* tagName) {
 	return false;
 }
 
+
+// 4方向接続チェック（X軸かZ軸のどちらかが近いこと）
 static bool IsConnected4Dir(const SceneObject& a, const SceneObject& b, float connectRange, float axisTolerance) {
 	float dx = b.translate.x - a.translate.x;
 	float dz = b.translate.z - a.translate.z;
@@ -44,6 +42,7 @@ static bool IsConnected4Dir(const SceneObject& a, const SceneObject& b, float co
 	return false;
 }
 
+// すでに訪問したオブジェクトかどうか（ループ防止）
 static bool IsAlreadyVisited(const std::vector<const SceneObject*>& visitedObjects, const SceneObject& obj) {
 	for (int i = 0; i < (int)visitedObjects.size(); ++i) {
 		if (visitedObjects[i] == &obj) {
