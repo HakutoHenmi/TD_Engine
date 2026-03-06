@@ -182,6 +182,7 @@ exit /b 0
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Game\Editor\EditorUI.cpp" />
+    <ClCompile Include="Game\Editor\PipeEditor.cpp" />
     <ClCompile Include="Game\main.cpp" />
     <ClCompile Include="Game\Scenes\GameScene.cpp" />
     <ClCompile Include="Game\Scenes\TitleScene.cpp" />
@@ -197,6 +198,7 @@ exit /b 0
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Editor\EditorUI.h" />
+    <ClInclude Include="Game\Editor\PipeEditor.h" />
     <ClInclude Include="Game\Scenes\GameScene.h" />
     <ClInclude Include="Game\Scenes\TitleScene.h" />
     <ClInclude Include="Game\ObjectTypes.h" />
