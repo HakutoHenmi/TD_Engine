@@ -54,6 +54,7 @@ private:
     Engine::ParticleEditor particleEditor_;
 
     friend class EditorUI;
+    friend class PipeEditor;
 };
 
 } // namespace Game

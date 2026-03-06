@@ -6,6 +6,7 @@
 #include <functional>
 #include <string>
 #include <deque>
+#include <DirectXMath.h>
 
 namespace Game {
 
@@ -41,6 +42,9 @@ public:
 	static void PushUndo(const UndoCommand& cmd);
 	static void Undo();
 	static void Redo();
+
+	// レンダリングサポート用
+	static void ScreenToWorldRay(float screenX, float screenY, float imageW, float imageH, DirectX::XMMATRIX view, DirectX::XMMATRIX proj, DirectX::XMVECTOR& outOrig, DirectX::XMVECTOR& outDir);
 
 	// ★ Console API
 	static void Log(const std::string& msg);
