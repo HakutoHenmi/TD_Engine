@@ -10,6 +10,9 @@
     <ClCompile Include="Game\Editor\EditorUI.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Editor\PipeEditor.cpp">
+      <Filter>Editor</Filter>
+    </ClCompile>
     <ClCompile Include="Game\Systems\UISystem.cpp">
       <Filter>Systems</Filter>
     </ClCompile>
@@ -45,6 +48,9 @@
       <Filter>Scenes</Filter>
     </ClInclude>
     <ClInclude Include="Game\Editor\EditorUI.h">
+      <Filter>Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Editor\PipeEditor.h">
       <Filter>Editor</Filter>
     </ClInclude>
     <ClInclude Include="Game\ObjectTypes.h">

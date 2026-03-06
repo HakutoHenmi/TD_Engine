@@ -33,6 +33,7 @@ public:
     void SetObjects(const std::vector<SceneObject>& o) { objects_ = o; }
     bool IsPlaying() const { return isPlaying_; }
     Engine::Renderer* GetRenderer() const { return renderer_; } // ★追加
+    Engine::Matrix4x4 GetWorldMatrix(int index) const; // ★追加
 
 private:
     Engine::WindowDX* dx_ = nullptr;
@@ -53,6 +54,7 @@ private:
     Engine::ParticleEditor particleEditor_;
 
     friend class EditorUI;
+    friend class PipeEditor;
 };
 
 } // namespace Game

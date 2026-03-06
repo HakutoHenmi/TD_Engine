@@ -229,6 +229,11 @@ struct UIImageComponent : public Component {
 	uint32_t textureHandle = 0;
 	std::string texturePath = "";
 	DirectX::XMFLOAT4 color = {1, 1, 1, 1};
+	bool is9Slice = false;
+	float borderTop = 10.0f;
+	float borderBottom = 10.0f;
+	float borderLeft = 10.0f;
+	float borderRight = 10.0f;
 	UIImageComponent() { type = ComponentType::UIImage; }
 };
 
@@ -258,6 +263,8 @@ struct ScriptComponent : public Component {
 
 // ★ エディター用オブジェクト構造体
 struct SceneObject {
+	uint32_t id = 0;           // ★ 個別識別子
+	uint32_t parentId = 0;     // ★ 親オブジェクトのID（0は親なし）
 	std::string name = "Object";
 	bool locked = false; // ★ ロック: 選択・移動・削除を防止
 	DirectX::XMFLOAT3 translate = {0, 0, 0};

@@ -16,6 +16,8 @@
 #include <sstream>
 #include <string>
 
+#include "PipeEditor.h"
+
 namespace Game {
 namespace fs = std::filesystem;
 
@@ -37,20 +39,13 @@ static ImVec2 gizmoDragStartMouse = {};
 static bool objectDragging = false;               // 笘・閾ｪ逕ｱ繝峨Λ繝・げ荳ｭ繝輔Λ繧ｰ
 static std::vector<SceneObject> clipboardObjects; // Ctrl+C 繧ｳ繝斐・逕ｨ
 
-// 笘・Game繧ｦ繧｣繝ｳ繝峨え縺ｮ逕ｻ蜒丞ｺｧ讓・(繝斐ャ繧ｭ繝ｳ繧ｰ逕ｨ)
+// ★ Gameウィンドウの画像座標 (ピッキング用)
 static ImVec2 gameImageMin = {};
 static ImVec2 gameImageMax = {};
 
-// 笘・繝代う繝励Δ繝ｼ繝臥畑縺ｮ迥ｶ諷具ｼ医ヵ繧｡繧､繝ｫ蜈ｨ菴薙〒蜈ｱ譛会ｼ・
-static bool pipeMode = false;
-static Engine::Vector3 pipeStartNode = {0, 0, 0};
-static bool hasPipeStart = false;
-static int previewPipeId = -1;
-static int previewJointId = -1;
-static bool useAngleSnap = false; // 笘・隗貞ｺｦ繧ｹ繝翫ャ繝励・ON/OFF
-static float snapAngleStep = 15.0f; // 笘・繧ｹ繝翫ャ繝苓ｧ貞ｺｦ・亥ｺｦ・・
-static bool useNodeSnap = false; // ★ 他ノードへの軸スナップ
-static float nodeSnapThreshold = 1.0f; // ★ ノードスナップの閾値
+static PipeEditor s_pipeEditor;
+static uint32_t nextObjectId = 1;
+static uint32_t GenerateId() { return nextObjectId++; }
 
 // 笘・繧ｳ繝斐・/隍・｣ｽ譎ゅ・繝ｦ繝九・繧ｯ蜷咲函謌・
 static std::string GenerateCopyName(const std::string& baseName, const std::vector<SceneObject>& objects) {
@@ -154,6 +149,8 @@ static std::string EscapeJson(const std::string& s) {
 static std::string SerializeSceneObject(const SceneObject& o) {
 	std::stringstream ss;
 	ss << "    {\n";
+	ss << "      \"id\": " << o.id << ",\n";
+	ss << "      \"parentId\": " << o.parentId << ",\n";
 	ss << "      \"name\": \"" << EscapeJson(o.name) << "\",\n";
 	ss << "      \"locked\": " << (o.locked ? "true" : "false") << ",\n";
 	ss << "      \"modelPath\": \"" << EscapeJson(o.modelPath) << "\",\n";
@@ -512,6 +509,21 @@ static float ExtractFloat(const std::string& block, const std::string& key, floa
 	while (start < s.size() && (std::isspace((unsigned char)s[start]) || s[start] == ':' || s[start] == ','))
 		start++;
 	return (float)std::atof(s.c_str() + start);
+}
+
+static uint32_t ExtractUint(const std::string& block, const std::string& key, uint32_t defaultVal) {
+	auto pos = block.find("\"" + key + "\"");
+	if (pos == std::string::npos)
+		return defaultVal;
+	auto col = block.find(":", pos);
+	if (col == std::string::npos)
+		return defaultVal;
+	std::string s = block.substr(col + 1);
+	size_t start = 0;
+	while (start < s.size() && (std::isspace((unsigned char)s[start]) || (unsigned char)s[start] == ':' || (unsigned char)s[start] == ','))
+		start++;
+	if (start >= s.size() || !isdigit((unsigned char)s[start])) return defaultVal;
+	return (uint32_t)std::stoul(s.substr(start));
 }
 
 static bool ExtractBool(const std::string& block, const std::string& key, bool defaultVal) {
@@ -943,6 +955,11 @@ void EditorUI::LoadScene(GameScene* scene, const std::string& path) {
 			break;
 		std::string block = content.substr(objStart, objEnd - objStart + 1);
 		SceneObject obj;
+		obj.id = ExtractUint(block, "id", 0);
+		obj.parentId = ExtractUint(block, "parentId", 0);
+		if (obj.id == 0) obj.id = GenerateId();
+		if (obj.id >= nextObjectId) nextObjectId = obj.id + 1;
+
 		obj.name = ExtractString(block, "name");
 		obj.modelPath = ExtractString(block, "modelPath");
 		obj.texturePath = ExtractString(block, "texturePath");
@@ -1154,8 +1171,7 @@ static bool RayIntersectsAABB(DirectX::XMVECTOR rayOrig, DirectX::XMVECTOR rayDi
 	return true;
 }
 
-// 笘・繧ｹ繧ｯ繝ｪ繝ｼ繝ｳ蠎ｧ讓吶°繧峨Ρ繝ｼ繝ｫ繝嘘ay繧呈ｧ狗ｯ・
-static void ScreenToWorldRay(float screenX, float screenY, float imageW, float imageH, DirectX::XMMATRIX view, DirectX::XMMATRIX proj, DirectX::XMVECTOR& outOrig, DirectX::XMVECTOR& outDir) {
+void EditorUI::ScreenToWorldRay(float screenX, float screenY, float imageW, float imageH, DirectX::XMMATRIX view, DirectX::XMMATRIX proj, DirectX::XMVECTOR& outOrig, DirectX::XMVECTOR& outDir) {
 	using namespace DirectX;
 	// NDC蠎ｧ讓吶↓螟画鋤 [-1, 1]
 	float ndcX = (screenX / imageW) * 2.0f - 1.0f;
@@ -1479,29 +1495,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
 		ImGui::Spacing();
 		
-		if (ImGui::Button(pipeMode ? "Pipe Mode [ON]" : "Pipe Mode [OFF]")) {
-			pipeMode = !pipeMode;
-			if (!pipeMode) hasPipeStart = false;
-		}
-		
-		if (pipeMode) {
-			ImGui::SameLine();
-			ImGui::Checkbox("Snap Angle", &useAngleSnap);
-			if (useAngleSnap) {
-				ImGui::SameLine();
-				ImGui::PushItemWidth(80);
-				ImGui::SliderFloat("Step##Angle", &snapAngleStep, 5.0f, 90.0f, "%.0f deg");
-				ImGui::PopItemWidth();
-			}
-			ImGui::SameLine();
-			ImGui::Checkbox("Node Snap", &useNodeSnap);
-			if (useNodeSnap) {
-				ImGui::SameLine();
-				ImGui::PushItemWidth(80);
-				ImGui::SliderFloat("Dist##NodeSnap", &nodeSnapThreshold, 0.1f, 5.0f, "%.1f");
-				ImGui::PopItemWidth();
-			}
-		}
+		s_pipeEditor.DrawUI();
 
 		ImGui::Spacing();
 		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
@@ -1615,175 +1609,8 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	ImVec2 windowPos = ImGui::GetWindowPos();
 	ImVec2 curScreen = ImGui::GetCursorScreenPos();
 	
-	// ---- 笘・ヱ繧､繝励・繝ｬ繝薙Η繝ｼ蜃ｦ逅・・螳溯｣・----
-
-	if (gameScene && !gameScene->isPlaying_ && pipeMode && hasPipeStart) {
-		ImVec2 mousePos = ImGui::GetMousePos();
-		float localX = mousePos.x - curScreen.x;
-		float localY = mousePos.y - curScreen.y;
-		bool insideImage = (localX >= 0 && localY >= 0 && localX <= tW && localY <= tH);
-
-		if (insideImage) {
-			auto viewMat = gameScene->camera_.View();
-			auto projMat = gameScene->camera_.Proj();
-			DirectX::XMVECTOR rayOrig, rayDir;
-			ScreenToWorldRay(localX, localY, tW, tH, viewMat, projMat, rayOrig, rayDir);
-
-			float bestDist = FLT_MAX;
-			Engine::Vector3 hitPoint = {0, 0, 0};
-			bool hitTerrain = false;
-
-			for (auto& obj : gameScene->objects_) {
-				bool isTerrain = (obj.name.find("Terrain") != std::string::npos) || (obj.name.find("Floor") != std::string::npos);
-				if (!isTerrain) continue;
-
-				Engine::Model* model = nullptr;
-				if (!obj.gpuMeshColliders.empty()) {
-					model = renderer->GetModel(obj.gpuMeshColliders[0].meshHandle);
-				}
-				if (!model && obj.modelHandle != 0) {
-					model = renderer->GetModel(obj.modelHandle);
-				}
-				if (!model && !obj.meshRenderers.empty() && obj.meshRenderers[0].modelHandle != 0) {
-					model = renderer->GetModel(obj.meshRenderers[0].modelHandle);
-				}
-				if (model) {
-					float d; Engine::Vector3 hp;
-					if (model->RayCast(rayOrig, rayDir, obj.GetTransform().ToMatrix(), d, hp)) {
-						if (d < bestDist) {
-							bestDist = d;
-							hitPoint = hp;
-							hitTerrain = true;
-						}
-					}
-				}
-			}
-
-			// 笘・縺吶〒縺ｫ蟋狗せ縺後≠繧翫∝慍蠖｢縺ｫ繝偵ャ繝医＠縺ｪ縺九▲縺溷ｴ蜷医・莉ｮ諠ｳ蟷ｳ髱｢縺ｨ縺ｮ莠､轤ｹ繧定ｨ育ｮ励☆繧・
-			if (hasPipeStart && !hitTerrain) {
-				// 蠎翫・鬮倥＆・亥渕貅也せ + 0.5f・峨・豌ｴ蟷ｳ髱｢・・y = height
-				float height = pipeStartNode.y + 0.5f;
-				// Ray: P = Orig + t * Dir
-				// P.y = height => Orig.y + t * Dir.y = height => t = (height - Orig.y) / Dir.y
-				float dirY = DirectX::XMVectorGetY(rayDir);
-				if (std::abs(dirY) > 1e-6f) { // 豌ｴ蟷ｳ譁ｹ蜷代〒縺ｪ縺・ｴ蜷医・縺ｿ
-					float t = (height - DirectX::XMVectorGetY(rayOrig)) / dirY;
-					if (t > 0 && t < bestDist) {
-						bestDist = t;
-						// 莠､轤ｹ繧呈ｱゅａ繧・
-						DirectX::XMVECTOR pVec = DirectX::XMVectorAdd(rayOrig, DirectX::XMVectorScale(rayDir, t));
-						hitPoint = {DirectX::XMVectorGetX(pVec), height, DirectX::XMVectorGetZ(pVec)};
-						hitTerrain = true;
-					}
-				}
-			}
-
-			if (hitTerrain) {
-				Engine::Vector3 startPos = pipeStartNode;
-				startPos.y += 0.5f;
-				Engine::Vector3 endNode = hitPoint;
-				// 莉ｮ諠ｳ蟷ｳ髱｢縺ｨ繝偵ャ繝医＠縺溷ｴ蜷医・縺吶〒縺ｫhitPoint.y縺梧ｭ｣縺励＞鬮倥＆縺ｫ縺ｪ縺｣縺ｦ縺・ｋ縺溘ａ陬懈ｭ｣縺ｯ荳崎ｦ√∝慍蠖｢縺九ｉ蜿門ｾ励＠縺溷ｴ蜷医・縺ｿ陬懈ｭ｣
-				if (std::abs(endNode.y - startPos.y) > 0.01f) endNode.y += 0.5f;
-
-				// 笘・隗貞ｺｦ陬懈ｭ｣・医い繝ｳ繧ｰ繝ｫ繧ｹ繝翫ャ繝暦ｼ牙・逅・
-				if (useAngleSnap) {
-					Engine::Vector3 diffSnap = endNode - startPos;
-					float lengthXZ = std::sqrt(diffSnap.x*diffSnap.x + diffSnap.z*diffSnap.z);
-					if (lengthXZ > 0.001f) {
-						float angle = std::atan2(diffSnap.z, diffSnap.x);
-						float stepRad = snapAngleStep * 3.14159265f / 180.0f;
-						float snappedAngle = std::round(angle / stepRad) * stepRad;
-						endNode.x = startPos.x + std::cos(snappedAngle) * lengthXZ;
-						endNode.z = startPos.z + std::sin(snappedAngle) * lengthXZ;
-					}
-				}
-
-				// ★ 既存ジョイントに対する座標スナップ処理（平行・直角配置の補助）
-				if (useNodeSnap && gameScene) {
-					float bestXDist = nodeSnapThreshold;
-					float bestZDist = nodeSnapThreshold;
-					float snapX = endNode.x;
-					float snapZ = endNode.z;
-					
-					for (const auto& obj : gameScene->objects_) {
-						if (obj.name == "PipeJoint" || obj.name == "_PreviewJoint") { // 他のジョイントを探す
-							float distX = std::abs(obj.translate.x - endNode.x);
-							float distZ = std::abs(obj.translate.z - endNode.z);
-							if (distX < bestXDist) {
-								bestXDist = distX;
-								snapX = obj.translate.x;
-							}
-							if (distZ < bestZDist) {
-								bestZDist = distZ;
-								snapZ = obj.translate.z;
-							}
-						}
-					}
-					// 閾値以内のものがあればその座標に強制スナップ
-					endNode.x = snapX;
-					endNode.z = snapZ;
-				}
-
-				Engine::Vector3 diff = endNode - startPos;
-				Engine::Vector3 dir = Engine::Normalize(diff);
-				float length = std::sqrt(diff.x*diff.x + diff.y*diff.y + diff.z*diff.z);
-				// 繧ｷ繝ｪ繝ｳ繝繝ｼ縺ｯ鬮倥＆3.0縺ｪ縺ｮ縺ｧ縲・聞縺輔ｒ蜷医ｏ縺帙ｋ縺ｫ縺ｯ 3.0 縺ｧ蜑ｲ繧九ゅ∪縺溘∫帥菴薙↓繧√ｊ霎ｼ縺ｾ縺帙ｋ縺溘ａ縺ｫ蟆代＠遏ｭ縺上☆繧・
-				float cyLen = (length - 0.2f) / 3.0f;
-				if (cyLen < 0.01f) cyLen = 0.01f;
-				Engine::Vector3 center = startPos + diff * 0.5f;
-
-				// 荳譎ゅが繝悶ず繧ｧ繧ｯ繝医・逕滓・/譖ｴ譁ｰ
-				if (previewPipeId == -1) {
-					SceneObject pipe;
-					pipe.name = "_PreviewPipe";
-					pipe.scale = {0.35f, cyLen, 0.35f}; // 蜀・浤・・霆ｸ譁ｹ蜷托ｼ峨・髟ｷ縺輔ｒ驕ｩ逕ｨ縲ょｰ代＠邏ｰ縺上☆繧・
-					pipe.translate = {center.x, center.y, center.z};
-					auto euler = Engine::LookRotation(dir);
-					pipe.rotate = {euler.x - 3.14159265f * 0.5f, euler.y, euler.z}; // 蜀・浤繧貞偵☆縺溘ａ縺ｫPitch縺九ｉ90蠎ｦ貂帷ｮ・
-					pipe.modelPath = "Resources/Cylinder/cylinder.obj";
-					pipe.modelHandle = renderer->LoadObjMesh(pipe.modelPath);
-					MeshRendererComponent mr; mr.modelHandle = pipe.modelHandle; mr.modelPath = pipe.modelPath; mr.shaderName = "Toon"; 
-					pipe.meshRenderers.push_back(mr);
-					gameScene->objects_.push_back(pipe);
-					previewPipeId = (int)gameScene->objects_.size() - 1;
-
-					SceneObject joint;
-					joint.name = "_PreviewJoint";
-					joint.translate = {endNode.x, endNode.y, endNode.z};
-					joint.scale = {1.0f, 1.0f, 1.0f}; // 繧ｸ繝ｧ繧､繝ｳ繝医ｒ蟆代＠螟ｧ縺阪￥縺励※繝代う繝励・遶ｯ繧帝國縺・
-					joint.modelPath = "Resources/player_ball/ball.obj";
-					joint.modelHandle = renderer->LoadObjMesh(joint.modelPath);
-					MeshRendererComponent mrJ; mrJ.modelHandle = joint.modelHandle; mrJ.modelPath = joint.modelPath; mrJ.shaderName = "Toon";
-					joint.meshRenderers.push_back(mrJ);
-					gameScene->objects_.push_back(joint);
-					previewJointId = (int)gameScene->objects_.size() - 1;
-				} else {
-					if (previewPipeId < gameScene->objects_.size() && gameScene->objects_[previewPipeId].name == "_PreviewPipe") {
-						auto& p = gameScene->objects_[previewPipeId];
-						p.scale = {0.35f, cyLen, 0.35f}; // 蜀・浤・・霆ｸ譁ｹ蜷托ｼ峨・髟ｷ縺輔ｒ驕ｩ逕ｨ
-						p.translate = {center.x, center.y, center.z};
-                        auto euler = Engine::LookRotation(dir);
-						p.rotate = {euler.x - 3.14159265f * 0.5f, euler.y, euler.z}; // 蜀・浤繧貞偵☆縺溘ａ縺ｫPitch縺九ｉ90蠎ｦ貂帷ｮ・
-					}
-					if (previewJointId < gameScene->objects_.size() && gameScene->objects_[previewJointId].name == "_PreviewJoint") {
-						auto& j = gameScene->objects_[previewJointId];
-						j.translate = {endNode.x, endNode.y, endNode.z};
-					}
-				}
-			}
-		}
-	} else if (previewPipeId != -1) {
-        // 繝励Ξ繝薙Η繝ｼ蜑企勁・域忰蟆ｾ縺九ｉ霑ｽ蜉縺輔ｌ繧句燕謠舌〒繧､繝ｳ繝・ャ繧ｯ繧ｹ髯埼・〒蜑企勁・・
-        if (previewJointId != -1 && previewJointId < gameScene->objects_.size()) {
-            gameScene->objects_.erase(gameScene->objects_.begin() + previewJointId);
-        }
-        if (previewPipeId != -1 && previewPipeId < gameScene->objects_.size()) {
-            gameScene->objects_.erase(gameScene->objects_.begin() + previewPipeId);
-        }
-		previewPipeId = -1;
-		previewJointId = -1;
-	}
-
+	// ---- パイプ設置エディタ ----
+	s_pipeEditor.UpdateAndDraw(gameScene, renderer, gameImageMin, gameImageMax, tW, tH);
 
 	ImGui::Image((ImTextureID)renderer->GetGameFinalSRV().ptr, ImVec2(tW, tH));
 	// 笘・ｿｽ蜉: 繝励Ξ繝上ヶ繧・Δ繝・Ν縺ｮ繝峨Λ繝・げ・・ラ繝ｭ繝・・蜿励￠蜈･繧悟・
@@ -1827,176 +1654,10 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				DirectX::XMVECTOR rayOrig, rayDir;
 				ScreenToWorldRay(localX, localY, tW, tH, viewMat, projMat, rayOrig, rayDir);
 
-				// 笘・繝代う繝苓ｨｭ鄂ｮ繝｢繝ｼ繝・
-				if (pipeMode) {
-					float bestDist = FLT_MAX;
-					Engine::Vector3 hitPoint = {0, 0, 0};
-					bool hitTerrain = false;
-					
-					// 蝨ｰ蠖｢(Terrain繧Ёloor)縺ｨ縺ｮ繝ｬ繧､繧ｭ繝｣繧ｹ繝亥愛螳・
-					for (auto& obj : gameScene->objects_) {
-						bool isTerrain = (obj.name.find("Terrain") != std::string::npos) || (obj.name.find("Floor") != std::string::npos);
-						if (!isTerrain) continue;
-
-						Engine::Model* model = nullptr;
-						if (!obj.gpuMeshColliders.empty()) {
-							model = renderer->GetModel(obj.gpuMeshColliders[0].meshHandle);
-						}
-						if (!model && obj.modelHandle != 0) {
-							model = renderer->GetModel(obj.modelHandle);
-						}
-						if (!model && !obj.meshRenderers.empty() && obj.meshRenderers[0].modelHandle != 0) {
-							model = renderer->GetModel(obj.meshRenderers[0].modelHandle);
-						}
-						if (model) {
-							float d; Engine::Vector3 hp;
-							if (model->RayCast(rayOrig, rayDir, obj.GetTransform().ToMatrix(), d, hp)) {
-								if (d < bestDist) {
-									bestDist = d;
-									hitPoint = hp;
-									hitTerrain = true;
-								}
-							}
-						}
-					}
-
-					// 笘・縺吶〒縺ｫ蟋狗せ縺後≠繧翫∝慍蠖｢縺ｫ繝偵ャ繝医＠縺ｪ縺九▲縺溷ｴ蜷医・莉ｮ諠ｳ蟷ｳ髱｢・・=鬮倥＆・峨→縺ｮ莠､轤ｹ繧定ｨ育ｮ・
-					if (hasPipeStart && !hitTerrain) {
-						float height = pipeStartNode.y + 0.5f;
-						float dirY = DirectX::XMVectorGetY(rayDir);
-						if (std::abs(dirY) > 1e-6f) {
-							float t = (height - DirectX::XMVectorGetY(rayOrig)) / dirY;
-							if (t > 0 && t < bestDist) {
-								bestDist = t;
-								DirectX::XMVECTOR pVec = DirectX::XMVectorAdd(rayOrig, DirectX::XMVectorScale(rayDir, t));
-								hitPoint = {DirectX::XMVectorGetX(pVec), height, DirectX::XMVectorGetZ(pVec)};
-								hitTerrain = true;
-							}
-						}
-					}
-
-					if (hitTerrain) {
-						if (!hasPipeStart) {
-							// 蟋狗せ繝弱・繝峨ｒ驟咲ｽｮ
-							pipeStartNode = hitPoint;
-							hasPipeStart = true;
-							
-							// 隕九◆逶ｮ縺ｨ縺励※縺ｮ繧ｸ繝ｧ繧､繝ｳ繝茨ｼ育帥・峨ｒ驟咲ｽｮ
-							SceneObject joint;
-							joint.name = "PipeJoint";
-							joint.translate = {hitPoint.x, hitPoint.y + 0.5f, hitPoint.z}; // 蝨ｰ髱｢縺九ｉ蟆代＠豬ｮ縺九○繧・
-							joint.scale = {1.0f, 1.0f, 1.0f};
-							joint.modelPath = "Resources/player_ball/ball.obj";
-							joint.modelHandle = renderer->LoadObjMesh(joint.modelPath);
-							MeshRendererComponent mr;
-							mr.modelHandle = joint.modelHandle;
-							mr.modelPath = joint.modelPath;
-							mr.shaderName = "Toon"; // 繝医ぇ繝ｼ繝ｳ蟇ｾ蠢・
-							joint.meshRenderers.push_back(mr);
-							gameScene->objects_.push_back(joint);
-						} else {
-							// 邨らせ繝弱・繝峨ｒ豎ｺ螳壹＠縲・俣縺ｫ繝代う繝励ｒ逕滓・
-							Engine::Vector3 endNode = hitPoint;
-							
-							// 2轤ｹ髢薙・霍晞屬縺ｨ險育ｮ・
-							Engine::Vector3 startPos = pipeStartNode;
-							startPos.y += 0.5f;
-							
-							// 莉ｮ諠ｳ蟷ｳ髱｢縺ｨ縺ｮ莠､蟾ｮ譎ゅ・譌｢縺ｫ鬮倥＆縺瑚｣懈ｭ｣縺輔ｌ縺ｦ縺・ｋ蜿ｯ閭ｽ諤ｧ縺後≠繧九・縺ｧ縲∝ｷｮ繧堤｢ｺ隱・
-							if (std::abs(endNode.y - startPos.y) > 0.01f) {
-								endNode.y += 0.5f;
-							}
-
-							// 笘・隗貞ｺｦ陬懈ｭ｣・医い繝ｳ繧ｰ繝ｫ繧ｹ繝翫ャ繝暦ｼ牙・逅・
-							if (useAngleSnap) {
-								Engine::Vector3 diffSnap = endNode - startPos;
-								float lengthXZ = std::sqrt(diffSnap.x*diffSnap.x + diffSnap.z*diffSnap.z);
-								if (lengthXZ > 0.001f) {
-									float angle = std::atan2(diffSnap.z, diffSnap.x);
-									float stepRad = snapAngleStep * 3.14159265f / 180.0f;
-									float snappedAngle = std::round(angle / stepRad) * stepRad;
-									endNode.x = startPos.x + std::cos(snappedAngle) * lengthXZ;
-									endNode.z = startPos.z + std::sin(snappedAngle) * lengthXZ;
-								}
-							}
-
-							// ★ 既存ジョイントに対する座標スナップ処理（平行・直角配置の補助）
-							if (useNodeSnap && gameScene) {
-								float bestXDist = nodeSnapThreshold;
-								float bestZDist = nodeSnapThreshold;
-								float snapX = endNode.x;
-								float snapZ = endNode.z;
-								
-								for (const auto& obj : gameScene->objects_) {
-									if (obj.name == "PipeJoint") {
-										float distX = std::abs(obj.translate.x - endNode.x);
-										float distZ = std::abs(obj.translate.z - endNode.z);
-										if (distX < bestXDist) {
-											bestXDist = distX;
-											snapX = obj.translate.x;
-										}
-										if (distZ < bestZDist) {
-											bestZDist = distZ;
-											snapZ = obj.translate.z;
-										}
-									}
-								}
-								// 閾値以内のものがあればその座標に強制スナップ
-								endNode.x = snapX;
-								endNode.z = snapZ;
-							}
-
-							Engine::Vector3 diff = endNode - startPos;
-							Engine::Vector3 dir = Engine::Normalize(diff);
-							float length = std::sqrt(diff.x*diff.x + diff.y*diff.y + diff.z*diff.z);
-
-							// 繧ｷ繝ｪ繝ｳ繝繝ｼ縺ｯ鬮倥＆3.0縺ｪ縺ｮ縺ｧ縲・聞縺輔ｒ蜷医ｏ縺帙ｋ縺ｫ縺ｯ 3.0 縺ｧ蜑ｲ繧九ゅ∪縺溘∫帥菴薙↓繧√ｊ霎ｼ縺ｾ縺帙ｋ縺溘ａ縺ｫ蟆代＠遏ｭ縺上☆繧・
-							float cyLen = (length - 0.2f) / 3.0f;
-							if (cyLen < 0.01f) cyLen = 0.01f;
-
-							// 繝｢繝・Ν縺ｨ繝｡繝・す繝･繧ｳ繝ｳ繝昴・繝阪Φ繝医・貅門ｙ
-							SceneObject pipe;
-							pipe.name = "PipeSegment";
-							
-							// 荳ｭ轤ｹ縺ｫ險ｭ鄂ｮ
-							Engine::Vector3 center = startPos + diff * 0.5f;
-							pipe.translate = {center.x, center.y, center.z};
-							// 螟ｪ縺・.35縲・聞縺苗yLen
-							pipe.scale = {0.35f, cyLen, 0.35f}; // 蜀・浤・・霆ｸ譁ｹ蜷托ｼ峨・髟ｷ縺輔ｒ驕ｩ逕ｨ
-
-							auto euler = Engine::LookRotation(dir);
-							pipe.rotate = {euler.x - 3.14159265f * 0.5f, euler.y, euler.z}; // 蜀・浤繧貞偵☆縺溘ａ縺ｫPitch縺九ｉ90蠎ｦ貂帷ｮ・
-
-							pipe.modelPath = "Resources/Cylinder/cylinder.obj"; // 蜀・浤繝｢繝・Ν縺悟ｿ・ｦ・
-							pipe.modelHandle = renderer->LoadObjMesh(pipe.modelPath);
-							MeshRendererComponent mr;
-							mr.modelHandle = pipe.modelHandle;
-							mr.modelPath = pipe.modelPath;
-							mr.shaderName = "Toon"; 
-							pipe.meshRenderers.push_back(mr);
-							gameScene->objects_.push_back(pipe);
-
-							// 邨らせ繝弱・繝峨↓縺ｾ縺溘ず繝ｧ繧､繝ｳ繝医ｒ鄂ｮ縺・
-							SceneObject joint;
-							joint.name = "PipeJoint";
-							joint.translate = {endNode.x, endNode.y, endNode.z};
-							joint.scale = {1.0f, 1.0f, 1.0f};
-							joint.modelPath = "Resources/player_ball/ball.obj";
-							joint.modelHandle = renderer->LoadObjMesh(joint.modelPath);
-							MeshRendererComponent mrJ;
-							mrJ.modelHandle = joint.modelHandle;
-							mrJ.modelPath = joint.modelPath;
-							mrJ.shaderName = "Toon";
-							joint.meshRenderers.push_back(mrJ);
-							gameScene->objects_.push_back(joint);
-
-							// 谺｡縺ｮ蟋狗せ繧堤ｵらせ縺ｫ謖√▲縺ｦ縺・￥
-						pipeStartNode = {endNode.x, endNode.y - 0.5f, endNode.z};
-					}
+				// パイプモード中は通常の選択・ギズモ操作を行わない
+				if (s_pipeEditor.IsPipeMode()) {
+					goto EndClickProcessing;
 				}
-				// 繝代う繝励Δ繝ｼ繝我ｸｭ縺ｯ騾壼ｸｸ縺ｮ驕ｸ謚槭・陦後ｏ縺ｪ縺・
-				goto EndClickProcessing;
-			}
 			
 			{
 				// 1. 繧ｮ繧ｺ繝｢霆ｸ繝偵ャ繝医ユ繧ｹ繝・
@@ -2357,6 +2018,7 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 						obj.textureHandle = r->LoadTexture2D("Resources/white1x1.png");
 						obj.texturePath = "Resources/white1x1.png";
 					}
+					obj.id = GenerateId();
 					scene->objects_.push_back(obj);
 					int idx = (int)scene->objects_.size() - 1;
 					scene->selectedIndices_ = {idx};
@@ -2435,49 +2097,91 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 			}
 			ImGui::EndPopup();
 		}
-		for (int i = 0; i < (int)scene->objects_.size(); ++i) {
+
+		auto renderNode = [&](auto self, int i, std::set<int>& rendered) -> void {
+			if (i < 0 || i >= (int)scene->objects_.size()) return;
+			if (rendered.count(scene->objects_[i].id)) return;
+			rendered.insert(scene->objects_[i].id);
+
 			bool sel = scene->selectedIndices_.count(i) > 0;
 			bool locked = scene->objects_[i].locked;
-			// 笘・繝ｭ繝・け繝医げ繝ｫ繝懊ち繝ｳ
+
 			ImGui::PushID(i);
-			if (locked)
-				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
-			if (ImGui::SmallButton(locked ? "L##lk" : "U##lk")) {
-				scene->objects_[i].locked = !locked;
-			}
-			if (locked)
-				ImGui::PopStyleColor();
+			if (locked) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 0.4f, 0.4f, 1));
+			if (ImGui::SmallButton(locked ? "L##lk" : "U##lk")) { scene->objects_[i].locked = !locked; }
+			if (locked) ImGui::PopStyleColor();
 			ImGui::SameLine();
 			ImGui::PopID();
-			std::string lb = scene->objects_[i].name;
-			if (lb.empty())
-				lb = "Object " + std::to_string(i);
-			if (locked)
-				lb = "[L] " + lb;
-			lb += "##" + std::to_string(i);
-			// 笘・繝ｭ繝・け貂医∩繧ｪ繝悶ず繧ｧ繧ｯ繝医・驕ｸ謚樔ｸ榊庄
-			if (locked) {
-				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-				ImGui::Selectable(lb.c_str(), sel, ImGuiSelectableFlags_Disabled);
-				ImGui::PopStyleColor();
-			} else {
-				if (ImGui::Selectable(lb.c_str(), sel)) {
-					if (io.KeyCtrl) {
-						if (sel)
-							scene->selectedIndices_.erase(i);
-						else
-							scene->selectedIndices_.insert(i);
-					} else if (io.KeyShift && scene->selectedObjectIndex_ >= 0) {
-						int lo = (std::min)(scene->selectedObjectIndex_, i), hi = (std::max)(scene->selectedObjectIndex_, i);
-						for (int j = lo; j <= hi; ++j)
-							if (!scene->objects_[j].locked)
-								scene->selectedIndices_.insert(j);
-					} else {
-						scene->selectedIndices_ = {i};
-					}
-					scene->selectedObjectIndex_ = i;
+
+			std::string lb = (locked ? "[L] " : "") + scene->objects_[i].name + "##" + std::to_string(i);
+			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
+			if (sel) flags |= ImGuiTreeNodeFlags_Selected;
+			
+			// 子オブジェクトがあるか確認
+			bool hasChildren = false;
+			for(const auto& o : scene->objects_) if(o.parentId == scene->objects_[i].id) { hasChildren = true; break; }
+			if (!hasChildren) flags |= ImGuiTreeNodeFlags_Leaf;
+
+			bool opened = ImGui::TreeNodeEx(lb.c_str(), flags);
+
+			if (ImGui::IsItemClicked()) {
+				if (io.KeyCtrl) {
+					if (sel) scene->selectedIndices_.erase(i);
+					else scene->selectedIndices_.insert(i);
+				} else {
+					scene->selectedIndices_ = {i};
 				}
+				scene->selectedObjectIndex_ = i;
 			}
+
+			// ドラッグ＆ドロップ (ソース)
+			if (ImGui::BeginDragDropSource()) {
+				ImGui::SetDragDropPayload("HIERARCHY_NODE", &i, sizeof(int));
+				ImGui::Text("Move %s", scene->objects_[i].name.c_str());
+				ImGui::EndDragDropSource();
+			}
+			// ドラッグ＆ドロップ (ターゲット - 親子付け)
+			if (ImGui::BeginDragDropTarget()) {
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HIERARCHY_NODE")) {
+					int dragIdx = *(const int*)payload->Data;
+					if (dragIdx != i) {
+						scene->objects_[dragIdx].parentId = scene->objects_[i].id;
+					}
+				}
+				ImGui::EndDragDropTarget();
+			}
+
+			if (opened) {
+				for (int j = 0; j < (int)scene->objects_.size(); ++j) {
+					if (scene->objects_[j].parentId == scene->objects_[i].id) {
+						self(self, j, rendered);
+					}
+				}
+				ImGui::TreePop();
+			}
+		};
+
+		std::set<int> renderedIds;
+		// まず親なし（ルート）を表示
+		for (int i = 0; i < (int)scene->objects_.size(); ++i) {
+			if (scene->objects_[i].parentId == 0) {
+				renderNode(renderNode, i, renderedIds);
+			}
+		}
+		// 親が見つからなかった孤立オブジェクトを表示（安全策）
+		for (int i = 0; i < (int)scene->objects_.size(); ++i) {
+			if (renderedIds.count(scene->objects_[i].id) == 0) {
+				renderNode(renderNode, i, renderedIds);
+			}
+		}
+		
+		// 背景へのドロップで親解除
+		if (ImGui::BeginDragDropTarget()) {
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HIERARCHY_NODE")) {
+				int dragIdx = *(const int*)payload->Data;
+				scene->objects_[dragIdx].parentId = 0;
+			}
+			ImGui::EndDragDropTarget();
 		}
 		if (!io.WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Delete, false) && !scene->selectedIndices_.empty()) {
 			for (auto it = scene->selectedIndices_.rbegin(); it != scene->selectedIndices_.rend(); ++it)
@@ -2513,7 +2217,19 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					     scene->objects_[i].name = nN;
 			     }});
 		}
-		// 笘・繝ｭ繝・け繝√ぉ繝・け繝懊ャ繧ｯ繧ｹ
+		// ★ IDと親設定
+		ImGui::Text("ID: %u", obj.id);
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(120);
+		auto oldParentId = obj.parentId;
+		if (ImGui::InputScalar("Parent ID", ImGuiDataType_U32, &obj.parentId)) {
+			auto newParentId = obj.parentId;
+			int i = scene->selectedObjectIndex_;
+			PushUndo({"Change Parent",
+				[scene, i, oldParentId]() { if (i < (int)scene->objects_.size()) scene->objects_[i].parentId = oldParentId; },
+				[scene, i, newParentId]() { if (i < (int)scene->objects_.size()) scene->objects_[i].parentId = newParentId; }
+			});
+		}
 		ImGui::SameLine();
 		ImGui::Checkbox("Lock", &obj.locked);
 		// 笘・ｿｽ蜉: Prefab菫晏ｭ倥・繧ｿ繝ｳ
@@ -3864,6 +3580,28 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					}
 					if (img.textureHandle != 0) {
 						ImGui::Image((ImTextureID)renderer->GetTextureSrvGpu(img.textureHandle).ptr, ImVec2(64, 64));
+					}
+
+					bool prev9 = img.is9Slice;
+					if (ImGui::Checkbox("9-Slice##Img", &img.is9Slice)) {
+						bool newVal = img.is9Slice;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"UIImage 9-Slice",
+							[scene, i, ci, prev9]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].images.size()) scene->objects_[i].images[ci].is9Slice = prev9; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].images.size()) scene->objects_[i].images[ci].is9Slice = newVal; }
+						});
+					}
+					if (img.is9Slice) {
+						auto bT = img.borderTop, bB = img.borderBottom, bL = img.borderLeft, bR = img.borderRight;
+						ImGui::DragFloat4("Borders (T,B,L,R)##Img", &img.borderTop, 1.0f, 0.0f, 256.0f);
+						if (ImGui::IsItemDeactivatedAfterEdit()) {
+							auto nT = img.borderTop, nB = img.borderBottom, nL = img.borderLeft, nR = img.borderRight;
+							int i = scene->selectedObjectIndex_;
+							PushUndo({"UIImage Borders",
+								[scene, i, ci, bT, bB, bL, bR]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].images.size()) { auto& img2 = scene->objects_[i].images[ci]; img2.borderTop = bT; img2.borderBottom = bB; img2.borderLeft = bL; img2.borderRight = bR; } },
+								[scene, i, ci, nT, nB, nL, nR]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].images.size()) { auto& img2 = scene->objects_[i].images[ci]; img2.borderTop = nT; img2.borderBottom = nB; img2.borderLeft = nL; img2.borderRight = nR; } }
+							});
+						}
 					}
 					if (ImGui::Button("Remove##Img")) {
 						obj.images.erase(obj.images.begin() + ci);

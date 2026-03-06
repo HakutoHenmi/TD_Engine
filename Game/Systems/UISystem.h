@@ -11,9 +11,10 @@ public:
     void Reset(std::vector<SceneObject>& objects) override;
 
 private:
-    void RenderNode(SceneObject& obj, GameContext& ctx);
-    void DrawText(const SceneObject& obj, const UITextComponent& text, const RectTransformComponent& rect, Engine::Renderer* renderer);
-    void ProcessButton(SceneObject& obj, UIButtonComponent& btn, const RectTransformComponent& rect, GameContext& ctx);
+    struct WorldRect { float x, y, w, h; };
+    void RenderNodeWithRect(SceneObject& obj, const WorldRect& wr, GameContext& ctx);
+    void DrawText(const SceneObject& obj, const UITextComponent& text, float worldX, float worldY, float worldW, float worldH, Engine::Renderer* renderer);
+    void ProcessButton(SceneObject& obj, UIButtonComponent& btn, float worldX, float worldY, float worldW, float worldH, GameContext& ctx);
 };
 
 } // namespace Game
