@@ -21,25 +21,19 @@ static bool HasTag(const SceneObject& obj, const char* tagName) {
 	return false;
 }
 
-
-// 4方向接続チェック（X軸かZ軸のどちらかが近いこと）
-static bool IsConnected4Dir(const SceneObject& a, const SceneObject& b, float connectRange, float axisTolerance) {
+// 球体接続判定
+static bool IsConnectedSphere(const SceneObject& a, const SceneObject& b, float connectRange) {
 	float dx = b.translate.x - a.translate.x;
+	float dy = b.translate.y - a.translate.y;
 	float dz = b.translate.z - a.translate.z;
 
-	float dist = std::sqrt(dx * dx + dz * dz);
+	float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+
 	if (dist > connectRange) {
 		return false;
 	}
 
-	float absDx = std::fabs(dx);
-	float absDz = std::fabs(dz);
-
-	if (absDx <= axisTolerance || absDz <= axisTolerance) {
-		return true;
-	}
-
-	return false;
+	return true;
 }
 
 // すでに訪問したオブジェクトかどうか（ループ防止）
@@ -52,7 +46,8 @@ static bool IsAlreadyVisited(const std::vector<const SceneObject*>& visitedObjec
 	return false;
 }
 
-static bool IsPipeConnectedToBulletTankRecursive(GameScene* scene, const SceneObject& currentPipe, std::vector<const SceneObject*>& visitedObjects, float connectRange, float axisTolerance) {
+static bool IsPipeConnectedToBulletTankRecursive(GameScene* scene, const SceneObject& currentPipe, std::vector<const SceneObject*>& visitedObjects, float connectRange) {
+	
 	visitedObjects.push_back(&currentPipe);
 
 	for (const SceneObject& other : scene->GetObjects()) {
@@ -61,7 +56,7 @@ static bool IsPipeConnectedToBulletTankRecursive(GameScene* scene, const SceneOb
 			continue;
 		}
 
-		if (!IsConnected4Dir(currentPipe, other, connectRange, axisTolerance)) {
+		if (!IsConnectedSphere(currentPipe, other, connectRange)) {
 			continue;
 		}
 
@@ -75,7 +70,7 @@ static bool IsPipeConnectedToBulletTankRecursive(GameScene* scene, const SceneOb
 				continue;
 			}
 
-			bool connected = IsPipeConnectedToBulletTankRecursive(scene, other, visitedObjects, connectRange, axisTolerance);
+			bool connected = IsPipeConnectedToBulletTankRecursive(scene, other, visitedObjects, connectRange);
 
 			if (connected) {
 				return true;
@@ -88,21 +83,20 @@ static bool IsPipeConnectedToBulletTankRecursive(GameScene* scene, const SceneOb
 
 static bool IsCanonConnectedToBulletTank(GameScene* scene, const SceneObject& canonObj) {
 	const float connectRange = 2.5f;
-	const float axisTolerance = 0.8f;
-
+	
 	for (const SceneObject& other : scene->GetObjects()) {
 
 		if (!HasTag(other, "Pipe")) {
 			continue;
 		}
 
-		if (!IsConnected4Dir(canonObj, other, connectRange, axisTolerance)) {
+		if (!IsConnectedSphere(canonObj, other, connectRange)) {
 			continue;
 		}
 
 		std::vector<const SceneObject*> visitedObjects;
 
-		bool connected = IsPipeConnectedToBulletTankRecursive(scene, other, visitedObjects, connectRange, axisTolerance);
+		bool connected = IsPipeConnectedToBulletTankRecursive(scene, other, visitedObjects, connectRange);
 
 		if (connected) {
 			return true;
@@ -155,6 +149,7 @@ void Canon::Update(SceneObject& obj, GameScene* scene, float dt) {
 		attackTimer_ -= dt;
 	}
 
+	// 弾倉と繋がっていないなら何もしない
 	if (!connected) {
 		return;
 	}
