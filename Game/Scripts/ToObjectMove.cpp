@@ -1,8 +1,8 @@
 #include "ToObjectMove.h"
+#include "../imgui/imgui.h"
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
-#include "../imgui/imgui.h"
 
 namespace Game {
 
@@ -22,7 +22,7 @@ void ToObjectMove::Start(SceneObject& /*obj*/, GameScene* scene) {
 		auto& objects = scene->GetObjects();
 		for (size_t i = 0; i < objects.size(); ++i) {
 			// そのオブジェクトのTagを調べる
-			if (HasTag(objects[i], "Player")) {
+			if (HasTag(objects[i], targetName_.c_str())) {
 				target_ = &objects[i];
 				break;
 			}
@@ -30,8 +30,16 @@ void ToObjectMove::Start(SceneObject& /*obj*/, GameScene* scene) {
 	}
 }
 
-void ToObjectMove::Update(SceneObject& obj, GameScene* /*scene*/, float dt) {
+void ToObjectMove::Update(SceneObject& obj, GameScene* scene, float dt) {
 	// ここに毎フレームの挙動を記述
+	// タグの変更があれば更新
+	ChangeTargetTag(obj, scene, dt);
+
+	// ターゲットが存在しなければ止める
+	if (target_ == nullptr) {
+		return;
+	}
+
 	// プレイヤーに向かって移動
 	// 自分の位置とプレイヤーの位置を取得
 	myPos_.x = obj.GetTransform().translate.x;
@@ -56,8 +64,6 @@ void ToObjectMove::Update(SceneObject& obj, GameScene* /*scene*/, float dt) {
 		float dirY = diffY / distance;
 		float dirZ = diffZ / distance;
 
-		
-
 		// 新しい位置を計算
 		myPos_.x += dirX * speed_ * dt;
 		myPos_.y += dirY * speed_ * dt;
@@ -72,7 +78,26 @@ void ToObjectMove::Update(SceneObject& obj, GameScene* /*scene*/, float dt) {
 
 void ToObjectMove::OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {
 	// 終了時のクリーンアップなどを記述
+}
 
+void ToObjectMove::ChangeTargetTag(SceneObject& /*obj*/, GameScene* scene, float /*dt*/) {
+	if (ImGui::InputText("Target Tag", tagBuffer_, sizeof(tagBuffer_))) {
+		targetName_ = tagBuffer_;
+
+		// 再検索の前に一旦クリアする
+		target_ = nullptr;
+
+		if (scene != nullptr) {
+			auto& objects = scene->GetObjects();
+			for (size_t i = 0; i < objects.size(); ++i) {
+				// そのオブジェクトのTagを調べる
+				if (HasTag(objects[i], targetName_.c_str())) {
+					target_ = &objects[i];
+					break;
+				}
+			}
+		}
+	}
 }
 
 // ★ スクリプト自動登録
