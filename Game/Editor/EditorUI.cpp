@@ -1388,11 +1388,44 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 			}
 			if (ImGui::MenuItem("Delete", "Del")) {
 				if (gameScene && !gameScene->selectedIndices_.empty()) {
-					for (auto it = gameScene->selectedIndices_.rbegin(); it != gameScene->selectedIndices_.rend(); ++it)
-						if (*it < (int)gameScene->objects_.size() && !gameScene->objects_[*it].locked)
-							gameScene->objects_.erase(gameScene->objects_.begin() + *it);
+					std::vector<int> sortedIndices(gameScene->selectedIndices_.begin(), gameScene->selectedIndices_.end());
+					std::sort(sortedIndices.rbegin(), sortedIndices.rend());
+					
+					std::vector<SceneObject> deletedObjects;
+					std::vector<int> deletedIndices;
+					
+					for (int i : sortedIndices) {
+						if (i < (int)gameScene->objects_.size() && !gameScene->objects_[i].locked) {
+							deletedObjects.push_back(gameScene->objects_[i]);
+							deletedIndices.push_back(i);
+							gameScene->objects_.erase(gameScene->objects_.begin() + i);
+						}
+					}
 					gameScene->selectedIndices_.clear();
 					gameScene->selectedObjectIndex_ = -1;
+					
+					if (!deletedObjects.empty()) {
+						PushUndo({
+							"Delete Selection",
+							[gameScene, deletedObjects, deletedIndices]() {
+								// Restore objects in ascending index order to maintain correct positions
+								for (int idx = (int)deletedObjects.size() - 1; idx >= 0; --idx) {
+									int insertIdx = deletedIndices[idx];
+									gameScene->objects_.insert(gameScene->objects_.begin() + insertIdx, deletedObjects[idx]);
+								}
+							},
+							[gameScene, deletedIndices]() {
+								// Re-delete objects in descending index order
+								for (int i : deletedIndices) {
+									if (i < (int)gameScene->objects_.size()) {
+										gameScene->objects_.erase(gameScene->objects_.begin() + i);
+									}
+								}
+								gameScene->selectedIndices_.clear();
+								gameScene->selectedObjectIndex_ = -1;
+							}
+						});
+					}
 				}
 			}
 			if (ImGui::MenuItem("Select All", "Ctrl+A")) {
@@ -2059,7 +2092,71 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 			} // 1. 繧ｮ繧ｺ繝｢霆ｸ繝偵ャ繝医ユ繧ｹ繝医せ繧ｳ繝ｼ繝礼ｵゆｺ・
 
 			EndClickProcessing:;
-			} // if (ImGui::IsMouseClicked) 縺ｮ邨ゆｺ・
+			} // if (ImGui::IsMouseClicked(Left)) の終了
+
+			// --- ★ 右クリック (Ctrl押下時) -> オブジェクト即時削除 ---
+			if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && io.KeyCtrl) {
+				DirectX::XMVECTOR rayOrig, rayDir;
+				ScreenToWorldRay(localX, localY, tW, tH, viewMat, projMat, rayOrig, rayDir);
+				
+				float bestT = FLT_MAX;
+				int bestIdx = -1;
+				// 交差判定ロジック（左クリックと同じ）
+				for (int i = 0; i < (int)gameScene->objects_.size(); ++i) {
+					const auto& obj = gameScene->objects_[i];
+					if (obj.locked) continue;
+
+					Engine::Matrix4x4 mat = obj.GetTransform().ToMatrix();
+					DirectX::XMMATRIX worldMat = DirectX::XMLoadFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&mat));
+					DirectX::XMVECTOR det;
+					DirectX::XMMATRIX invWorld = DirectX::XMMatrixInverse(&det, worldMat);
+
+					DirectX::XMVECTOR localOrig = DirectX::XMVector3TransformCoord(rayOrig, invWorld);
+					DirectX::XMVECTOR localTarget = DirectX::XMVector3TransformCoord(DirectX::XMVectorAdd(rayOrig, rayDir), invWorld);
+					DirectX::XMVECTOR localDir = DirectX::XMVectorSubtract(localTarget, localOrig);
+
+					float hx = 1.0f; if (std::fabs(obj.scale.x) < 0.6f && std::fabs(obj.scale.x) > 0.001f) hx = 0.3f / std::fabs(obj.scale.x);
+					float hy = 1.0f; if (std::fabs(obj.scale.y) < 0.6f && std::fabs(obj.scale.y) > 0.001f) hy = 0.3f / std::fabs(obj.scale.y);
+					float hz = 1.0f; if (std::fabs(obj.scale.z) < 0.6f && std::fabs(obj.scale.z) > 0.001f) hz = 0.3f / std::fabs(obj.scale.z);
+					DirectX::XMFLOAT3 bmin = {-hx, -hy, -hz};
+					DirectX::XMFLOAT3 bmax = {hx, hy, hz};
+
+					float tLocal;
+					if (RayIntersectsAABB(localOrig, localDir, bmin, bmax, tLocal)) {
+						if (tLocal < bestT) {
+							bestT = tLocal;
+							bestIdx = i;
+						}
+					}
+				}
+
+				if (bestIdx >= 0) {
+					SceneObject deletedObj = gameScene->objects_[bestIdx];
+					gameScene->objects_.erase(gameScene->objects_.begin() + bestIdx);
+					gameScene->selectedIndices_.erase(bestIdx);
+					// 削除によりインデックスがずれるため、選択状態をリセット
+					gameScene->selectedIndices_.clear();
+					gameScene->selectedObjectIndex_ = -1;
+
+					// Undoコマンドの登録
+					PushUndo({
+						"Delete Object (Ctrl+RightClick)",
+						[gameScene, bestIdx, deletedObj]() {
+							// 元に戻す: 指定インデックスにオブジェクトを挿入
+							gameScene->objects_.insert(gameScene->objects_.begin() + bestIdx, deletedObj);
+						},
+						[gameScene, bestIdx]() {
+							// やり直す: 指定インデックスのオブジェクトを削除
+							if (bestIdx >= 0 && bestIdx < (int)gameScene->objects_.size()) {
+								gameScene->objects_.erase(gameScene->objects_.begin() + bestIdx);
+								gameScene->selectedIndices_.clear();
+								gameScene->selectedObjectIndex_ = -1;
+							}
+						}
+					});
+					Log("Deleted object: " + deletedObj.name);
+				}
+			} // if (ImGui::IsMouseClicked(Right)) の終了
 
 			// --- 笘・繧ｮ繧ｺ繝｢霆ｸ繝峨Λ繝・げ荳ｭ ---
 			if (gizmoDragging && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
@@ -2499,7 +2596,22 @@ void EditorUI::ShowInspector(GameScene* scene) {
 		}
 
 		ImGui::Separator();
-		ImGui::ColorEdit4("Color", &obj.color.x);
+		{
+			auto oldColor = obj.color;
+			ImGui::ColorEdit4("Color", &obj.color.x);
+			if (ImGui::IsItemDeactivatedAfterEdit()) {
+				auto newColor = obj.color;
+				int i = scene->selectedObjectIndex_;
+				PushUndo(
+					{"Change Color",
+					 [scene, i, oldColor]() {
+						 if (i < (int)scene->objects_.size()) scene->objects_[i].color = oldColor;
+					 },
+					 [scene, i, newColor]() {
+						 if (i < (int)scene->objects_.size()) scene->objects_[i].color = newColor;
+					 }});
+			}
+		}
 		ImGui::Separator();
 		ImGui::Text("Model: %s", obj.modelPath.empty() ? "(none)" : obj.modelPath.c_str());
 		ImGui::Text("Texture: %s", obj.texturePath.empty() ? "(none)" : obj.texturePath.c_str());
@@ -2534,10 +2646,48 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				auto& mr = obj.meshRenderers[ci];
 				ImGui::PushID((int)ci);
 				if (ImGui::TreeNode("MeshRenderer")) {
-					ImGui::Checkbox("Enabled", &mr.enabled);
+					bool prevEnabled = mr.enabled;
+					if (ImGui::Checkbox("Enabled", &mr.enabled)) {
+						bool newVal = mr.enabled;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"MeshRenderer Enabled", 
+							[scene, i, ci, prevEnabled]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].meshRenderers.size()) scene->objects_[i].meshRenderers[ci].enabled = prevEnabled; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].meshRenderers.size()) scene->objects_[i].meshRenderers[ci].enabled = newVal; }
+						});
+					}
+					
+					auto prevColor = mr.color;
 					ImGui::ColorEdit4("Color##MR", &mr.color.x);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newColor = mr.color;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"MeshRenderer Color", 
+							[scene, i, ci, prevColor]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].meshRenderers.size()) scene->objects_[i].meshRenderers[ci].color = prevColor; },
+							[scene, i, ci, newColor]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].meshRenderers.size()) scene->objects_[i].meshRenderers[ci].color = newColor; }
+						});
+					}
+
+					auto prevTiling = mr.uvTiling;
 					ImGui::DragFloat2("UV Tiling", &mr.uvTiling.x, 0.01f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newTiling = mr.uvTiling;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"MeshRenderer UV Tiling", 
+							[scene, i, ci, prevTiling]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].meshRenderers.size()) scene->objects_[i].meshRenderers[ci].uvTiling = prevTiling; },
+							[scene, i, ci, newTiling]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].meshRenderers.size()) scene->objects_[i].meshRenderers[ci].uvTiling = newTiling; }
+						});
+					}
+
+					auto prevOffset = mr.uvOffset;
 					ImGui::DragFloat2("UV Offset", &mr.uvOffset.x, 0.01f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newOffset = mr.uvOffset;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"MeshRenderer UV Offset", 
+							[scene, i, ci, prevOffset]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].meshRenderers.size()) scene->objects_[i].meshRenderers[ci].uvOffset = prevOffset; },
+							[scene, i, ci, newOffset]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].meshRenderers.size()) scene->objects_[i].meshRenderers[ci].uvOffset = newOffset; }
+						});
+					}
 					
 					// 笘・ｿｽ蜉: Shader驕ｸ謚・
 					if (ImGui::BeginCombo("Shader", mr.shaderName.c_str())) {
@@ -2621,10 +2771,47 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				auto& bc = obj.boxColliders[ci];
 				ImGui::PushID(1000 + (int)ci);
 				if (ImGui::TreeNode("BoxCollider")) {
-					ImGui::Checkbox("Enabled", &bc.enabled);
+					bool prevEnabled = bc.enabled;
+					if (ImGui::Checkbox("Enabled", &bc.enabled)) {
+						bool newVal = bc.enabled;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"BoxCollider Enabled",
+							[scene, i, ci, prevEnabled]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].boxColliders.size()) scene->objects_[i].boxColliders[ci].enabled = prevEnabled; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].boxColliders.size()) scene->objects_[i].boxColliders[ci].enabled = newVal; }
+						});
+					}
+
+					auto prevCenter = bc.center;
 					ImGui::DragFloat3("Center", &bc.center.x, 0.1f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newCenter = bc.center;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"BoxCollider Center",
+							[scene, i, ci, prevCenter]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].boxColliders.size()) scene->objects_[i].boxColliders[ci].center = prevCenter; },
+							[scene, i, ci, newCenter]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].boxColliders.size()) scene->objects_[i].boxColliders[ci].center = newCenter; }
+						});
+					}
+
+					auto prevSize = bc.size;
 					ImGui::DragFloat3("Size", &bc.size.x, 0.1f);
-					ImGui::Checkbox("Is Trigger", &bc.isTrigger);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newSize = bc.size;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"BoxCollider Size",
+							[scene, i, ci, prevSize]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].boxColliders.size()) scene->objects_[i].boxColliders[ci].size = prevSize; },
+							[scene, i, ci, newSize]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].boxColliders.size()) scene->objects_[i].boxColliders[ci].size = newSize; }
+						});
+					}
+
+					bool prevTrigger = bc.isTrigger;
+					if (ImGui::Checkbox("Is Trigger", &bc.isTrigger)) {
+						bool newVal = bc.isTrigger;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"BoxCollider IsTrigger",
+							[scene, i, ci, prevTrigger]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].boxColliders.size()) scene->objects_[i].boxColliders[ci].isTrigger = prevTrigger; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].boxColliders.size()) scene->objects_[i].boxColliders[ci].isTrigger = newVal; }
+						});
+					}
 					if (ImGui::Button("Remove##BC")) {
 						obj.boxColliders.erase(obj.boxColliders.begin() + ci);
 						ImGui::TreePop();
@@ -2641,8 +2828,16 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				if (ImGui::TreeNode("Tag")) {
 					char tb[128];
 					strcpy_s(tb, tg.tag.c_str());
-					if (ImGui::InputText("Tag", tb, sizeof(tb)))
+					std::string oldTag = tg.tag;
+					if (ImGui::InputText("Tag", tb, sizeof(tb))) {
 						tg.tag = tb;
+						std::string newTag = tg.tag;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"Change Tag",
+							[scene, i, ci, oldTag]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].tags.size()) scene->objects_[i].tags[ci].tag = oldTag; },
+							[scene, i, ci, newTag]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].tags.size()) scene->objects_[i].tags[ci].tag = newTag; }
+						});
+					}
 					if (ImGui::Button("Remove##Tag")) {
 						obj.tags.erase(obj.tags.begin() + ci);
 						ImGui::TreePop();
@@ -2657,16 +2852,71 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				auto& an = obj.animators[ci];
 				ImGui::PushID(3000 + (int)ci);
 				if (ImGui::TreeNode("Animator")) {
-					ImGui::Checkbox("Enabled", &an.enabled);
+					bool prevEnabled = an.enabled;
+					if (ImGui::Checkbox("Enabled", &an.enabled)) {
+						bool newVal = an.enabled;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"Animator Enabled",
+							[scene, i, ci, prevEnabled]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].animators.size()) scene->objects_[i].animators[ci].enabled = prevEnabled; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].animators.size()) scene->objects_[i].animators[ci].enabled = newVal; }
+						});
+					}
+					
 					char tb[128];
 					strcpy_s(tb, an.currentAnimation.c_str());
-					if (ImGui::InputText("Animation", tb, sizeof(tb)))
+					std::string oldAnim = an.currentAnimation;
+					if (ImGui::InputText("Animation", tb, sizeof(tb))) {
 						an.currentAnimation = tb;
-					ImGui::Checkbox("Is Playing", &an.isPlaying);
+						std::string newAnim = an.currentAnimation;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"Change Animation",
+							[scene, i, ci, oldAnim]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].animators.size()) scene->objects_[i].animators[ci].currentAnimation = oldAnim; },
+							[scene, i, ci, newAnim]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].animators.size()) scene->objects_[i].animators[ci].currentAnimation = newAnim; }
+						});
+					}
+
+					bool prevPlaying = an.isPlaying;
+					if (ImGui::Checkbox("Is Playing", &an.isPlaying)) {
+						bool newVal = an.isPlaying;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"Animator IsPlaying",
+							[scene, i, ci, prevPlaying]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].animators.size()) scene->objects_[i].animators[ci].isPlaying = prevPlaying; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].animators.size()) scene->objects_[i].animators[ci].isPlaying = newVal; }
+						});
+					}
+
 					ImGui::SameLine();
-					ImGui::Checkbox("Loop", &an.loop);
+					bool prevLoop = an.loop;
+					if (ImGui::Checkbox("Loop", &an.loop)) {
+						bool newVal = an.loop;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"Animator Loop",
+							[scene, i, ci, prevLoop]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].animators.size()) scene->objects_[i].animators[ci].loop = prevLoop; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].animators.size()) scene->objects_[i].animators[ci].loop = newVal; }
+						});
+					}
+
+					auto prevSpeed = an.speed;
 					ImGui::DragFloat("Speed", &an.speed, 0.01f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newSpeed = an.speed;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"Animator Speed",
+							[scene, i, ci, prevSpeed]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].animators.size()) scene->objects_[i].animators[ci].speed = prevSpeed; },
+							[scene, i, ci, newSpeed]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].animators.size()) scene->objects_[i].animators[ci].speed = newSpeed; }
+						});
+					}
+
+					auto prevTime = an.time;
 					ImGui::DragFloat("Time", &an.time, 0.01f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newTime = an.time;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"Animator Time",
+							[scene, i, ci, prevTime]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].animators.size()) scene->objects_[i].animators[ci].time = prevTime; },
+							[scene, i, ci, newTime]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].animators.size()) scene->objects_[i].animators[ci].time = newTime; }
+						});
+					}
 					if (ImGui::Button("Remove##Anim")) {
 						obj.animators.erase(obj.animators.begin() + ci);
 						ImGui::TreePop();
@@ -2681,10 +2931,46 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				auto& rb = obj.rigidbodies[ci];
 				ImGui::PushID(4000 + (int)ci);
 				if (ImGui::TreeNode("Rigidbody")) {
-					ImGui::Checkbox("Enabled", &rb.enabled);
+					bool prevEnabled = rb.enabled;
+					if (ImGui::Checkbox("Enabled", &rb.enabled)) {
+						bool newVal = rb.enabled;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"Rigidbody Enabled",
+							[scene, i, ci, prevEnabled]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rigidbodies.size()) scene->objects_[i].rigidbodies[ci].enabled = prevEnabled; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rigidbodies.size()) scene->objects_[i].rigidbodies[ci].enabled = newVal; }
+						});
+					}
+
+					auto prevVel = rb.velocity;
 					ImGui::DragFloat3("Velocity", &rb.velocity.x, 0.1f);
-					ImGui::Checkbox("Use Gravity", &rb.useGravity);
-					ImGui::Checkbox("Is Kinematic", &rb.isKinematic);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newVel = rb.velocity;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"Rigidbody Velocity",
+							[scene, i, ci, prevVel]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rigidbodies.size()) scene->objects_[i].rigidbodies[ci].velocity = prevVel; },
+							[scene, i, ci, newVel]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rigidbodies.size()) scene->objects_[i].rigidbodies[ci].velocity = newVel; }
+						});
+					}
+
+					bool prevGrav = rb.useGravity;
+					if (ImGui::Checkbox("Use Gravity", &rb.useGravity)) {
+						bool newVal = rb.useGravity;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"Rigidbody Use Gravity",
+							[scene, i, ci, prevGrav]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rigidbodies.size()) scene->objects_[i].rigidbodies[ci].useGravity = prevGrav; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rigidbodies.size()) scene->objects_[i].rigidbodies[ci].useGravity = newVal; }
+						});
+					}
+
+					bool prevKinem = rb.isKinematic;
+					if (ImGui::Checkbox("Is Kinematic", &rb.isKinematic)) {
+						bool newVal = rb.isKinematic;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"Rigidbody Is Kinematic",
+							[scene, i, ci, prevKinem]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rigidbodies.size()) scene->objects_[i].rigidbodies[ci].isKinematic = prevKinem; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rigidbodies.size()) scene->objects_[i].rigidbodies[ci].isKinematic = newVal; }
+						});
+					}
 					if (ImGui::Button("Remove##RB")) {
 						obj.rigidbodies.erase(obj.rigidbodies.begin() + ci);
 						ImGui::TreePop();
@@ -2844,13 +3130,37 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				auto& gmc = obj.gpuMeshColliders[ci];
 				ImGui::PushID(6000 + (int)ci);
 				if (ImGui::TreeNode("GpuMeshCollider")) {
-					ImGui::Checkbox("Enabled##GMC", &gmc.enabled);
-					ImGui::Checkbox("Is Trigger##GMC", &gmc.isTrigger);
+					bool prevEnabled = gmc.enabled;
+					if (ImGui::Checkbox("Enabled##GMC", &gmc.enabled)) {
+						bool newVal = gmc.enabled;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"GpuMeshCollider Enabled",
+							[scene, i, ci, prevEnabled]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].gpuMeshColliders.size()) scene->objects_[i].gpuMeshColliders[ci].enabled = prevEnabled; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].gpuMeshColliders.size()) scene->objects_[i].gpuMeshColliders[ci].enabled = newVal; }
+						});
+					}
+
+					bool prevTrigger = gmc.isTrigger;
+					if (ImGui::Checkbox("Is Trigger##GMC", &gmc.isTrigger)) {
+						bool newVal = gmc.isTrigger;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"GpuMeshCollider IsTrigger",
+							[scene, i, ci, prevTrigger]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].gpuMeshColliders.size()) scene->objects_[i].gpuMeshColliders[ci].isTrigger = prevTrigger; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].gpuMeshColliders.size()) scene->objects_[i].gpuMeshColliders[ci].isTrigger = newVal; }
+						});
+					}
 					
 					const char* collisionTypes[] = { "Mesh", "Convex" };
 					int currentType = (int)gmc.collisionType;
+					MeshCollisionType prevType = gmc.collisionType;
 					if (ImGui::Combo("Collision Type##GMC", &currentType, collisionTypes, IM_ARRAYSIZE(collisionTypes))) {
 						gmc.collisionType = (MeshCollisionType)currentType;
+						MeshCollisionType newType = gmc.collisionType;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"GpuMeshCollider Type",
+							[scene, i, ci, prevType]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].gpuMeshColliders.size()) scene->objects_[i].gpuMeshColliders[ci].collisionType = prevType; },
+							[scene, i, ci, newType]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].gpuMeshColliders.size()) scene->objects_[i].gpuMeshColliders[ci].collisionType = newType; }
+						});
 					}
 
 					ImGui::Text("Mesh: %s", gmc.meshPath.empty() ? "(none)" : gmc.meshPath.c_str());
@@ -2885,7 +3195,15 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				auto& pi = obj.playerInputs[ci];
 				ImGui::PushID(7000 + (int)ci);
 				if (ImGui::TreeNode("PlayerInput")) {
-					ImGui::Checkbox("Enabled##PI", &pi.enabled);
+					bool prevEnabled = pi.enabled;
+					if (ImGui::Checkbox("Enabled##PI", &pi.enabled)) {
+						bool newVal = pi.enabled;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"PlayerInput Enabled",
+							[scene, i, ci, prevEnabled]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].playerInputs.size()) scene->objects_[i].playerInputs[ci].enabled = prevEnabled; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].playerInputs.size()) scene->objects_[i].playerInputs[ci].enabled = newVal; }
+						});
+					}
 					ImGui::Text("MoveDir: (%.2f, %.2f)", pi.moveDir.x, pi.moveDir.y);
 					ImGui::Text("JumpRequested: %s", pi.jumpRequested ? "true" : "false");
 					ImGui::Text("AttackRequested: %s", pi.attackRequested ? "true" : "false");
@@ -2905,10 +3223,48 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				auto& cm = obj.characterMovements[ci];
 				ImGui::PushID(8000 + (int)ci);
 				if (ImGui::TreeNode("CharacterMovement")) {
-					ImGui::Checkbox("Enabled##CM", &cm.enabled);
+					bool prevEnabled = cm.enabled;
+					if (ImGui::Checkbox("Enabled##CM", &cm.enabled)) {
+						bool newVal = cm.enabled;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"CharacterMovement Enabled",
+							[scene, i, ci, prevEnabled]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].characterMovements.size()) scene->objects_[i].characterMovements[ci].enabled = prevEnabled; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].characterMovements.size()) scene->objects_[i].characterMovements[ci].enabled = newVal; }
+						});
+					}
+					
+					auto prevSpeed = cm.speed;
 					ImGui::DragFloat("Speed##CM", &cm.speed, 0.1f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newSpeed = cm.speed;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"CharacterMovement Speed",
+							[scene, i, ci, prevSpeed]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].characterMovements.size()) scene->objects_[i].characterMovements[ci].speed = prevSpeed; },
+							[scene, i, ci, newSpeed]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].characterMovements.size()) scene->objects_[i].characterMovements[ci].speed = newSpeed; }
+						});
+					}
+
+					auto prevJump = cm.jumpPower;
 					ImGui::DragFloat("JumpPower##CM", &cm.jumpPower, 0.1f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newJump = cm.jumpPower;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"CharacterMovement JumpPower",
+							[scene, i, ci, prevJump]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].characterMovements.size()) scene->objects_[i].characterMovements[ci].jumpPower = prevJump; },
+							[scene, i, ci, newJump]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].characterMovements.size()) scene->objects_[i].characterMovements[ci].jumpPower = newJump; }
+						});
+					}
+
+					auto prevGrav = cm.gravity;
 					ImGui::DragFloat("Gravity##CM", &cm.gravity, 0.1f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newGrav = cm.gravity;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"CharacterMovement Gravity",
+							[scene, i, ci, prevGrav]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].characterMovements.size()) scene->objects_[i].characterMovements[ci].gravity = prevGrav; },
+							[scene, i, ci, newGrav]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].characterMovements.size()) scene->objects_[i].characterMovements[ci].gravity = newGrav; }
+						});
+					}
 					ImGui::Text("VelocityY: %.2f", cm.velocityY);
 					ImGui::Text("IsGrounded: %s", cm.isGrounded ? "true" : "false");
 					if (ImGui::Button("Remove##CM")) {
@@ -2927,10 +3283,48 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				auto& ct = obj.cameraTargets[ci];
 				ImGui::PushID(9000 + (int)ci);
 				if (ImGui::TreeNode("CameraTarget")) {
-					ImGui::Checkbox("Enabled##CT", &ct.enabled);
+					bool prevEnabled = ct.enabled;
+					if (ImGui::Checkbox("Enabled##CT", &ct.enabled)) {
+						bool newVal = ct.enabled;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"CameraTarget Enabled",
+							[scene, i, ci, prevEnabled]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].cameraTargets.size()) scene->objects_[i].cameraTargets[ci].enabled = prevEnabled; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].cameraTargets.size()) scene->objects_[i].cameraTargets[ci].enabled = newVal; }
+						});
+					}
+
+					auto prevDist = ct.distance;
 					ImGui::DragFloat("Distance##CT", &ct.distance, 0.1f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newDist = ct.distance;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"CameraTarget Distance",
+							[scene, i, ci, prevDist]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].cameraTargets.size()) scene->objects_[i].cameraTargets[ci].distance = prevDist; },
+							[scene, i, ci, newDist]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].cameraTargets.size()) scene->objects_[i].cameraTargets[ci].distance = newDist; }
+						});
+					}
+
+					auto prevHeight = ct.height;
 					ImGui::DragFloat("Height##CT", &ct.height, 0.1f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newHeight = ct.height;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"CameraTarget Height",
+							[scene, i, ci, prevHeight]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].cameraTargets.size()) scene->objects_[i].cameraTargets[ci].height = prevHeight; },
+							[scene, i, ci, newHeight]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].cameraTargets.size()) scene->objects_[i].cameraTargets[ci].height = newHeight; }
+						});
+					}
+
+					auto prevSmooth = ct.smoothSpeed;
 					ImGui::DragFloat("SmoothSpeed##CT", &ct.smoothSpeed, 0.1f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newSmooth = ct.smoothSpeed;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"CameraTarget SmoothSpeed",
+							[scene, i, ci, prevSmooth]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].cameraTargets.size()) scene->objects_[i].cameraTargets[ci].smoothSpeed = prevSmooth; },
+							[scene, i, ci, newSmooth]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].cameraTargets.size()) scene->objects_[i].cameraTargets[ci].smoothSpeed = newSmooth; }
+						});
+					}
 					if (ImGui::Button("Remove##CT")) {
 						obj.cameraTargets.erase(obj.cameraTargets.begin() + ci);
 						ImGui::TreePop();
@@ -2947,9 +3341,38 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				auto& dl = obj.directionalLights[ci];
 				ImGui::PushID(10000 + (int)ci);
 				if (ImGui::TreeNode("DirectionalLight")) {
-					ImGui::Checkbox("Enabled##DL", &dl.enabled);
+					bool prevEnabled = dl.enabled;
+					if (ImGui::Checkbox("Enabled##DL", &dl.enabled)) {
+						bool newVal = dl.enabled;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"DirectionalLight Enabled",
+							[scene, i, ci, prevEnabled]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].directionalLights.size()) scene->objects_[i].directionalLights[ci].enabled = prevEnabled; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].directionalLights.size()) scene->objects_[i].directionalLights[ci].enabled = newVal; }
+						});
+					}
+
+					// ColorEdit3
+					auto prevColor = dl.color;
 					ImGui::ColorEdit3("Color##DL", &dl.color.x);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newColor = dl.color;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"DirectionalLight Color",
+							[scene, i, ci, prevColor]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].directionalLights.size()) scene->objects_[i].directionalLights[ci].color = prevColor; },
+							[scene, i, ci, newColor]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].directionalLights.size()) scene->objects_[i].directionalLights[ci].color = newColor; }
+						});
+					}
+
+					auto prevIntensity = dl.intensity;
 					ImGui::DragFloat("Intensity##DL", &dl.intensity, 0.01f, 0.0f, 100.0f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newIntensity = dl.intensity;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"DirectionalLight Intensity",
+							[scene, i, ci, prevIntensity]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].directionalLights.size()) scene->objects_[i].directionalLights[ci].intensity = prevIntensity; },
+							[scene, i, ci, newIntensity]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].directionalLights.size()) scene->objects_[i].directionalLights[ci].intensity = newIntensity; }
+						});
+					}
 					if (ImGui::Button("Remove##DL")) {
 						obj.directionalLights.erase(obj.directionalLights.begin() + ci);
 						ImGui::TreePop();
@@ -2966,11 +3389,59 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				auto& pl = obj.pointLights[ci];
 				ImGui::PushID(11000 + (int)ci);
 				if (ImGui::TreeNode("PointLight")) {
-					ImGui::Checkbox("Enabled##PL", &pl.enabled);
+					bool prevEnabled = pl.enabled;
+					if (ImGui::Checkbox("Enabled##PL", &pl.enabled)) {
+						bool newVal = pl.enabled;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"PointLight Enabled",
+							[scene, i, ci, prevEnabled]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].pointLights.size()) scene->objects_[i].pointLights[ci].enabled = prevEnabled; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].pointLights.size()) scene->objects_[i].pointLights[ci].enabled = newVal; }
+						});
+					}
+
+					auto prevColor = pl.color;
 					ImGui::ColorEdit3("Color##PL", &pl.color.x);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newColor = pl.color;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"PointLight Color",
+							[scene, i, ci, prevColor]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].pointLights.size()) scene->objects_[i].pointLights[ci].color = prevColor; },
+							[scene, i, ci, newColor]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].pointLights.size()) scene->objects_[i].pointLights[ci].color = newColor; }
+						});
+					}
+
+					auto prevIntensity = pl.intensity;
 					ImGui::DragFloat("Intensity##PL", &pl.intensity, 0.01f, 0.0f, 100.0f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newIntensity = pl.intensity;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"PointLight Intensity",
+							[scene, i, ci, prevIntensity]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].pointLights.size()) scene->objects_[i].pointLights[ci].intensity = prevIntensity; },
+							[scene, i, ci, newIntensity]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].pointLights.size()) scene->objects_[i].pointLights[ci].intensity = newIntensity; }
+						});
+					}
+
+					auto prevRange = pl.range;
 					ImGui::DragFloat("Range##PL", &pl.range, 0.1f, 0.0f, 1000.0f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newRange = pl.range;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"PointLight Range",
+							[scene, i, ci, prevRange]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].pointLights.size()) scene->objects_[i].pointLights[ci].range = prevRange; },
+							[scene, i, ci, newRange]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].pointLights.size()) scene->objects_[i].pointLights[ci].range = newRange; }
+						});
+					}
+
+					auto prevAtten = pl.atten;
 					ImGui::DragFloat3("Attenuation##PL", &pl.atten.x, 0.001f, 0.0f, 1.0f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newAtten = pl.atten;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"PointLight Attenuation",
+							[scene, i, ci, prevAtten]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].pointLights.size()) scene->objects_[i].pointLights[ci].atten = prevAtten; },
+							[scene, i, ci, newAtten]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].pointLights.size()) scene->objects_[i].pointLights[ci].atten = newAtten; }
+						});
+					}
 					if (ImGui::Button("Remove##PL")) {
 						obj.pointLights.erase(obj.pointLights.begin() + ci);
 						ImGui::TreePop();
@@ -2987,13 +3458,81 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				auto& sl = obj.spotLights[ci];
 				ImGui::PushID(12000 + (int)ci);
 				if (ImGui::TreeNode("SpotLight")) {
-					ImGui::Checkbox("Enabled##SL", &sl.enabled);
+					bool prevEnabled = sl.enabled;
+					if (ImGui::Checkbox("Enabled##SL", &sl.enabled)) {
+						bool newVal = sl.enabled;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"SpotLight Enabled",
+							[scene, i, ci, prevEnabled]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].spotLights.size()) scene->objects_[i].spotLights[ci].enabled = prevEnabled; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].spotLights.size()) scene->objects_[i].spotLights[ci].enabled = newVal; }
+						});
+					}
+
+					auto prevColor = sl.color;
 					ImGui::ColorEdit3("Color##SL", &sl.color.x);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newColor = sl.color;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"SpotLight Color",
+							[scene, i, ci, prevColor]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].spotLights.size()) scene->objects_[i].spotLights[ci].color = prevColor; },
+							[scene, i, ci, newColor]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].spotLights.size()) scene->objects_[i].spotLights[ci].color = newColor; }
+						});
+					}
+
+					auto prevIntensity = sl.intensity;
 					ImGui::DragFloat("Intensity##SL", &sl.intensity, 0.01f, 0.0f, 100.0f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newIntensity = sl.intensity;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"SpotLight Intensity",
+							[scene, i, ci, prevIntensity]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].spotLights.size()) scene->objects_[i].spotLights[ci].intensity = prevIntensity; },
+							[scene, i, ci, newIntensity]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].spotLights.size()) scene->objects_[i].spotLights[ci].intensity = newIntensity; }
+						});
+					}
+
+					auto prevRange = sl.range;
 					ImGui::DragFloat("Range##SL", &sl.range, 0.1f, 0.0f, 1000.0f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newRange = sl.range;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"SpotLight Range",
+							[scene, i, ci, prevRange]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].spotLights.size()) scene->objects_[i].spotLights[ci].range = prevRange; },
+							[scene, i, ci, newRange]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].spotLights.size()) scene->objects_[i].spotLights[ci].range = newRange; }
+						});
+					}
+
+					auto prevInnerCos = sl.innerCos;
 					ImGui::DragFloat("Inner Cos##SL", &sl.innerCos, 0.01f, -1.0f, 1.0f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newInnerCos = sl.innerCos;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"SpotLight InnerCos",
+							[scene, i, ci, prevInnerCos]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].spotLights.size()) scene->objects_[i].spotLights[ci].innerCos = prevInnerCos; },
+							[scene, i, ci, newInnerCos]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].spotLights.size()) scene->objects_[i].spotLights[ci].innerCos = newInnerCos; }
+						});
+					}
+
+					auto prevOuterCos = sl.outerCos;
 					ImGui::DragFloat("Outer Cos##SL", &sl.outerCos, 0.01f, -1.0f, 1.0f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newOuterCos = sl.outerCos;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"SpotLight OuterCos",
+							[scene, i, ci, prevOuterCos]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].spotLights.size()) scene->objects_[i].spotLights[ci].outerCos = prevOuterCos; },
+							[scene, i, ci, newOuterCos]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].spotLights.size()) scene->objects_[i].spotLights[ci].outerCos = newOuterCos; }
+						});
+					}
+
+					auto prevAtten = sl.atten;
 					ImGui::DragFloat3("Attenuation##SL", &sl.atten.x, 0.001f, 0.0f, 1.0f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newAtten = sl.atten;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"SpotLight Attenuation",
+							[scene, i, ci, prevAtten]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].spotLights.size()) scene->objects_[i].spotLights[ci].atten = prevAtten; },
+							[scene, i, ci, newAtten]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].spotLights.size()) scene->objects_[i].spotLights[ci].atten = newAtten; }
+						});
+					}
 					if (ImGui::Button("Remove##SL")) {
 						obj.spotLights.erase(obj.spotLights.begin() + ci);
 						ImGui::TreePop();
@@ -3010,10 +3549,20 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				auto& as = obj.audioSources[ci];
 				ImGui::PushID(13000 + (int)ci);
 				if (ImGui::TreeNode("AudioSource")) {
-					ImGui::Checkbox("Enabled##AS", &as.enabled);
+					bool prevEnabled = as.enabled;
+					if (ImGui::Checkbox("Enabled##AS", &as.enabled)) {
+						bool newVal = as.enabled;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"AudioSource Enabled",
+							[scene, i, ci, prevEnabled]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].audioSources.size()) scene->objects_[i].audioSources[ci].enabled = prevEnabled; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].audioSources.size()) scene->objects_[i].audioSources[ci].enabled = newVal; }
+						});
+					}
 					// 繧ｵ繧ｦ繝ｳ繝峨ヵ繧｡繧､繝ｫ繝代せ
 					char pathBuf[256];
 					strcpy_s(pathBuf, as.soundPath.c_str());
+					std::string oldPath = as.soundPath;
+					uint32_t oldHandle = as.soundHandle;
 					if (ImGui::InputText("Sound Path##AS", pathBuf, sizeof(pathBuf))) {
 						as.soundPath = pathBuf;
 						// 繝代せ螟画峩譎ゅ↓蜀阪Ο繝ｼ繝・
@@ -3022,20 +3571,40 @@ void EditorUI::ShowInspector(GameScene* scene) {
 							if (audio)
 								as.soundHandle = audio->Load(as.soundPath);
 						}
+						std::string newPath = as.soundPath;
+						uint32_t newHandle = as.soundHandle;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"AudioSource Path",
+							[scene, i, ci, oldPath, oldHandle]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].audioSources.size()) { scene->objects_[i].audioSources[ci].soundPath = oldPath; scene->objects_[i].audioSources[ci].soundHandle = oldHandle; } },
+							[scene, i, ci, newPath, newHandle]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].audioSources.size()) { scene->objects_[i].audioSources[ci].soundPath = newPath; scene->objects_[i].audioSources[ci].soundHandle = newHandle; } }
+						});
 					}
 					if (ImGui::BeginDragDropTarget()) {
 						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
 							std::string path((const char*)pl->Data, pl->DataSize - 1);
 							if (path.find(".mp3") != std::string::npos || path.find(".wav") != std::string::npos) {
+								std::string oldPathDrag = as.soundPath;
+								uint32_t oldHandleDrag = as.soundHandle;
+
 								as.soundPath = path;
 								auto* audio = Engine::Audio::GetInstance();
 								if (audio)
 									as.soundHandle = audio->Load(path);
 								EditorUI::Log("AudioSource: " + path);
+
+								std::string newPathDrag = as.soundPath;
+								uint32_t newHandleDrag = as.soundHandle;
+								int i = scene->selectedObjectIndex_;
+								PushUndo({"AudioSource File Drop",
+									[scene, i, ci, oldPathDrag, oldHandleDrag]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].audioSources.size()) { scene->objects_[i].audioSources[ci].soundPath = oldPathDrag; scene->objects_[i].audioSources[ci].soundHandle = oldHandleDrag; } },
+									[scene, i, ci, newPathDrag, newHandleDrag]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].audioSources.size()) { scene->objects_[i].audioSources[ci].soundPath = newPathDrag; scene->objects_[i].audioSources[ci].soundHandle = newHandleDrag; } }
+								});
 							}
 						}
 						ImGui::EndDragDropTarget();
 					}
+
+					auto prevVol = as.volume;
 					if (ImGui::DragFloat("Volume##AS", &as.volume, 0.01f, 0.0f, 1.0f)) {
 						if (as.isPlaying && as.voiceHandle) {
 							auto* audio = Engine::Audio::GetInstance();
@@ -3043,11 +3612,55 @@ void EditorUI::ShowInspector(GameScene* scene) {
 								audio->SetVolume(as.voiceHandle, as.volume);
 						}
 					}
-					ImGui::Checkbox("Loop##AS", &as.loop);
-					ImGui::Checkbox("Play On Start##AS", &as.playOnStart);
-					ImGui::Checkbox("3D Sound##AS", &as.is3D);
-					if (as.is3D)
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newVol = as.volume;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"AudioSource Volume",
+							[scene, i, ci, prevVol]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].audioSources.size()) scene->objects_[i].audioSources[ci].volume = prevVol; },
+							[scene, i, ci, newVol]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].audioSources.size()) scene->objects_[i].audioSources[ci].volume = newVol; }
+						});
+					}
+
+					bool prevLoop = as.loop;
+					if (ImGui::Checkbox("Loop##AS", &as.loop)) {
+						bool newVal = as.loop;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"AudioSource Loop",
+							[scene, i, ci, prevLoop]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].audioSources.size()) scene->objects_[i].audioSources[ci].loop = prevLoop; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].audioSources.size()) scene->objects_[i].audioSources[ci].loop = newVal; }
+						});
+					}
+					bool prevPlayOnStart = as.playOnStart;
+					if (ImGui::Checkbox("Play On Start##AS", &as.playOnStart)) {
+						bool newVal = as.playOnStart;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"AudioSource PlayOnStart",
+							[scene, i, ci, prevPlayOnStart]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].audioSources.size()) scene->objects_[i].audioSources[ci].playOnStart = prevPlayOnStart; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].audioSources.size()) scene->objects_[i].audioSources[ci].playOnStart = newVal; }
+						});
+					}
+
+					bool prevIs3D = as.is3D;
+					if (ImGui::Checkbox("3D Sound##AS", &as.is3D)) {
+						bool newVal = as.is3D;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"AudioSource 3D Sound",
+							[scene, i, ci, prevIs3D]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].audioSources.size()) scene->objects_[i].audioSources[ci].is3D = prevIs3D; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].audioSources.size()) scene->objects_[i].audioSources[ci].is3D = newVal; }
+						});
+					}
+					if (as.is3D) {
+						auto prevMaxDist = as.maxDistance;
 						ImGui::DragFloat("Max Distance##AS", &as.maxDistance, 0.5f, 0.0f, 500.0f);
+						if (ImGui::IsItemDeactivatedAfterEdit()) {
+							auto newMaxDist = as.maxDistance;
+							int i = scene->selectedObjectIndex_;
+							PushUndo({"AudioSource Max Distance",
+								[scene, i, ci, prevMaxDist]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].audioSources.size()) scene->objects_[i].audioSources[ci].maxDistance = prevMaxDist; },
+								[scene, i, ci, newMaxDist]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].audioSources.size()) scene->objects_[i].audioSources[ci].maxDistance = newMaxDist; }
+							});
+						}
+					}
 					// Play/Stop 繝懊ち繝ｳ
 					if (as.isPlaying) {
 						if (ImGui::Button("Stop##AS")) {
@@ -3085,7 +3698,15 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				auto& al = obj.audioListeners[ci];
 				ImGui::PushID(14000 + (int)ci);
 				if (ImGui::TreeNode("AudioListener")) {
-					ImGui::Checkbox("Enabled##AL", &al.enabled);
+					bool prevEnabled = al.enabled;
+					if (ImGui::Checkbox("Enabled##AL", &al.enabled)) {
+						bool newVal = al.enabled;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"AudioListener Enabled",
+							[scene, i, ci, prevEnabled]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].audioListeners.size()) scene->objects_[i].audioListeners[ci].enabled = prevEnabled; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].audioListeners.size()) scene->objects_[i].audioListeners[ci].enabled = newVal; }
+						});
+					}
 					ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "This object receives audio.");
 					if (ImGui::Button("Remove##AL")) {
 						obj.audioListeners.erase(obj.audioListeners.begin() + ci);
@@ -3103,12 +3724,71 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				auto& rt = obj.rectTransforms[ci];
 				ImGui::PushID(14000 + (int)ci);
 				if (ImGui::TreeNode("RectTransform")) {
-					ImGui::Checkbox("Enabled##RT", &rt.enabled);
+					bool prevEnabled = rt.enabled;
+					if (ImGui::Checkbox("Enabled##RT", &rt.enabled)) {
+						bool newVal = rt.enabled;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"RectTransform Enabled",
+							[scene, i, ci, prevEnabled]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rectTransforms.size()) scene->objects_[i].rectTransforms[ci].enabled = prevEnabled; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rectTransforms.size()) scene->objects_[i].rectTransforms[ci].enabled = newVal; }
+						});
+					}
+
+					auto prevPos = rt.pos;
 					ImGui::DragFloat2("Pos##RT", &rt.pos.x, 1.0f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newPos = rt.pos;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"RectTransform Pos",
+							[scene, i, ci, prevPos]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rectTransforms.size()) scene->objects_[i].rectTransforms[ci].pos = prevPos; },
+							[scene, i, ci, newPos]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rectTransforms.size()) scene->objects_[i].rectTransforms[ci].pos = newPos; }
+						});
+					}
+
+					auto prevSize = rt.size;
 					ImGui::DragFloat2("Size##RT", &rt.size.x, 1.0f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newSize = rt.size;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"RectTransform Size",
+							[scene, i, ci, prevSize]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rectTransforms.size()) scene->objects_[i].rectTransforms[ci].size = prevSize; },
+							[scene, i, ci, newSize]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rectTransforms.size()) scene->objects_[i].rectTransforms[ci].size = newSize; }
+						});
+					}
+
+					auto prevAnchor = rt.anchor;
 					ImGui::DragFloat2("Anchor##RT", &rt.anchor.x, 0.01f, 0.0f, 1.0f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newAnchor = rt.anchor;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"RectTransform Anchor",
+							[scene, i, ci, prevAnchor]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rectTransforms.size()) scene->objects_[i].rectTransforms[ci].anchor = prevAnchor; },
+							[scene, i, ci, newAnchor]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rectTransforms.size()) scene->objects_[i].rectTransforms[ci].anchor = newAnchor; }
+						});
+					}
+
+					auto prevPivot = rt.pivot;
 					ImGui::DragFloat2("Pivot##RT", &rt.pivot.x, 0.01f, 0.0f, 1.0f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newPivot = rt.pivot;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"RectTransform Pivot",
+							[scene, i, ci, prevPivot]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rectTransforms.size()) scene->objects_[i].rectTransforms[ci].pivot = prevPivot; },
+							[scene, i, ci, newPivot]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rectTransforms.size()) scene->objects_[i].rectTransforms[ci].pivot = newPivot; }
+						});
+					}
+
+					auto prevRot = rt.rotation;
 					ImGui::DragFloat("Rotation##RT", &rt.rotation, 0.5f);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newRot = rt.rotation;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"RectTransform Rotation",
+							[scene, i, ci, prevRot]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rectTransforms.size()) scene->objects_[i].rectTransforms[ci].rotation = prevRot; },
+							[scene, i, ci, newRot]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].rectTransforms.size()) scene->objects_[i].rectTransforms[ci].rotation = newRot; }
+						});
+					}
+
 					if (ImGui::Button("Remove##RT")) {
 						obj.rectTransforms.erase(obj.rectTransforms.begin() + ci);
 						ImGui::TreePop();
@@ -3126,22 +3806,58 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				auto* renderer = scene->GetRenderer(); // 笘・ｿｽ蜉
 				ImGui::PushID(15000 + (int)ci);
 				if (ImGui::TreeNode("UIImage")) {
-					ImGui::Checkbox("Enabled##Img", &img.enabled);
+					bool prevEnabled = img.enabled;
+					if (ImGui::Checkbox("Enabled##Img", &img.enabled)) {
+						bool newVal = img.enabled;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"UIImage Enabled",
+							[scene, i, ci, prevEnabled]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].images.size()) scene->objects_[i].images[ci].enabled = prevEnabled; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].images.size()) scene->objects_[i].images[ci].enabled = newVal; }
+						});
+					}
+
+					auto prevColor = img.color;
 					ImGui::ColorEdit4("Color##Img", &img.color.x);
+					if (ImGui::IsItemDeactivatedAfterEdit()) {
+						auto newColor = img.color;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"UIImage Color",
+							[scene, i, ci, prevColor]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].images.size()) scene->objects_[i].images[ci].color = prevColor; },
+							[scene, i, ci, newColor]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].images.size()) scene->objects_[i].images[ci].color = newColor; }
+						});
+					}
 					// 繝・け繧ｹ繝√Ε
 					char pathBuf[256];
 					strcpy_s(pathBuf, img.texturePath.c_str());
+					std::string oldPath = img.texturePath;
+					uint32_t oldHandle = img.textureHandle;
 					if (ImGui::InputText("Texture##Img", pathBuf, sizeof(pathBuf))) {
 						img.texturePath = pathBuf;
 						if (renderer && !img.texturePath.empty())
 							img.textureHandle = renderer->LoadTexture2D(img.texturePath);
+						std::string newPath = img.texturePath;
+						uint32_t newHandle = img.textureHandle;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"UIImage Texture",
+							[scene, i, ci, oldPath, oldHandle]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].images.size()) { scene->objects_[i].images[ci].texturePath = oldPath; scene->objects_[i].images[ci].textureHandle = oldHandle; } },
+							[scene, i, ci, newPath, newHandle]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].images.size()) { scene->objects_[i].images[ci].texturePath = newPath; scene->objects_[i].images[ci].textureHandle = newHandle; } }
+						});
 					}
 					if (ImGui::BeginDragDropTarget()) {
 						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
 							std::string path((const char*)pl->Data, pl->DataSize - 1);
 							if (path.find(".png") != std::string::npos || path.find(".jpg") != std::string::npos) {
+								std::string oldPathDrag = img.texturePath;
+								uint32_t oldHandleDrag = img.textureHandle;
 								img.texturePath = path;
 								img.textureHandle = renderer->LoadTexture2D(path);
+								std::string newPathDrag = img.texturePath;
+								uint32_t newHandleDrag = img.textureHandle;
+								int i = scene->selectedObjectIndex_;
+								PushUndo({"UIImage Texture Drop",
+									[scene, i, ci, oldPathDrag, oldHandleDrag]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].images.size()) { scene->objects_[i].images[ci].texturePath = oldPathDrag; scene->objects_[i].images[ci].textureHandle = oldHandleDrag; } },
+									[scene, i, ci, newPathDrag, newHandleDrag]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].images.size()) { scene->objects_[i].images[ci].texturePath = newPathDrag; scene->objects_[i].images[ci].textureHandle = newHandleDrag; } }
+								});
 							}
 						}
 						ImGui::EndDragDropTarget();
