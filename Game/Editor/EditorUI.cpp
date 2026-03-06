@@ -51,6 +51,8 @@ static bool useAngleSnap = false; // 笘・隗貞ｺｦ繧ｹ繝翫ャ繝励・O
 static float snapAngleStep = 15.0f; // 笘・繧ｹ繝翫ャ繝苓ｧ貞ｺｦ・亥ｺｦ・・
 static bool useNodeSnap = false; // ★ 他ノードへの軸スナップ
 static float nodeSnapThreshold = 1.0f; // ★ ノードスナップの閾値
+static uint32_t nextObjectId = 1;
+static uint32_t GenerateId() { return nextObjectId++; }
 
 // 笘・繧ｳ繝斐・/隍・｣ｽ譎ゅ・繝ｦ繝九・繧ｯ蜷咲函謌・
 static std::string GenerateCopyName(const std::string& baseName, const std::vector<SceneObject>& objects) {
@@ -154,6 +156,8 @@ static std::string EscapeJson(const std::string& s) {
 static std::string SerializeSceneObject(const SceneObject& o) {
 	std::stringstream ss;
 	ss << "    {\n";
+	ss << "      \"id\": " << o.id << ",\n";
+	ss << "      \"parentId\": " << o.parentId << ",\n";
 	ss << "      \"name\": \"" << EscapeJson(o.name) << "\",\n";
 	ss << "      \"locked\": " << (o.locked ? "true" : "false") << ",\n";
 	ss << "      \"modelPath\": \"" << EscapeJson(o.modelPath) << "\",\n";
@@ -512,6 +516,21 @@ static float ExtractFloat(const std::string& block, const std::string& key, floa
 	while (start < s.size() && (std::isspace((unsigned char)s[start]) || s[start] == ':' || s[start] == ','))
 		start++;
 	return (float)std::atof(s.c_str() + start);
+}
+
+static uint32_t ExtractUint(const std::string& block, const std::string& key, uint32_t defaultVal) {
+	auto pos = block.find("\"" + key + "\"");
+	if (pos == std::string::npos)
+		return defaultVal;
+	auto col = block.find(":", pos);
+	if (col == std::string::npos)
+		return defaultVal;
+	std::string s = block.substr(col + 1);
+	size_t start = 0;
+	while (start < s.size() && (std::isspace((unsigned char)s[start]) || (unsigned char)s[start] == ':' || (unsigned char)s[start] == ','))
+		start++;
+	if (start >= s.size() || !isdigit((unsigned char)s[start])) return defaultVal;
+	return (uint32_t)std::stoul(s.substr(start));
 }
 
 static bool ExtractBool(const std::string& block, const std::string& key, bool defaultVal) {
@@ -943,6 +962,11 @@ void EditorUI::LoadScene(GameScene* scene, const std::string& path) {
 			break;
 		std::string block = content.substr(objStart, objEnd - objStart + 1);
 		SceneObject obj;
+		obj.id = ExtractUint(block, "id", 0);
+		obj.parentId = ExtractUint(block, "parentId", 0);
+		if (obj.id == 0) obj.id = GenerateId();
+		if (obj.id >= nextObjectId) nextObjectId = obj.id + 1;
+
 		obj.name = ExtractString(block, "name");
 		obj.modelPath = ExtractString(block, "modelPath");
 		obj.texturePath = ExtractString(block, "texturePath");
@@ -2357,6 +2381,7 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 						obj.textureHandle = r->LoadTexture2D("Resources/white1x1.png");
 						obj.texturePath = "Resources/white1x1.png";
 					}
+					obj.id = GenerateId();
 					scene->objects_.push_back(obj);
 					int idx = (int)scene->objects_.size() - 1;
 					scene->selectedIndices_ = {idx};
@@ -2435,49 +2460,91 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 			}
 			ImGui::EndPopup();
 		}
-		for (int i = 0; i < (int)scene->objects_.size(); ++i) {
+
+		auto renderNode = [&](auto self, int i, std::set<int>& rendered) -> void {
+			if (i < 0 || i >= (int)scene->objects_.size()) return;
+			if (rendered.count(scene->objects_[i].id)) return;
+			rendered.insert(scene->objects_[i].id);
+
 			bool sel = scene->selectedIndices_.count(i) > 0;
 			bool locked = scene->objects_[i].locked;
-			// 笘・繝ｭ繝・け繝医げ繝ｫ繝懊ち繝ｳ
+
 			ImGui::PushID(i);
-			if (locked)
-				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
-			if (ImGui::SmallButton(locked ? "L##lk" : "U##lk")) {
-				scene->objects_[i].locked = !locked;
-			}
-			if (locked)
-				ImGui::PopStyleColor();
+			if (locked) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 0.4f, 0.4f, 1));
+			if (ImGui::SmallButton(locked ? "L##lk" : "U##lk")) { scene->objects_[i].locked = !locked; }
+			if (locked) ImGui::PopStyleColor();
 			ImGui::SameLine();
 			ImGui::PopID();
-			std::string lb = scene->objects_[i].name;
-			if (lb.empty())
-				lb = "Object " + std::to_string(i);
-			if (locked)
-				lb = "[L] " + lb;
-			lb += "##" + std::to_string(i);
-			// 笘・繝ｭ繝・け貂医∩繧ｪ繝悶ず繧ｧ繧ｯ繝医・驕ｸ謚樔ｸ榊庄
-			if (locked) {
-				ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-				ImGui::Selectable(lb.c_str(), sel, ImGuiSelectableFlags_Disabled);
-				ImGui::PopStyleColor();
-			} else {
-				if (ImGui::Selectable(lb.c_str(), sel)) {
-					if (io.KeyCtrl) {
-						if (sel)
-							scene->selectedIndices_.erase(i);
-						else
-							scene->selectedIndices_.insert(i);
-					} else if (io.KeyShift && scene->selectedObjectIndex_ >= 0) {
-						int lo = (std::min)(scene->selectedObjectIndex_, i), hi = (std::max)(scene->selectedObjectIndex_, i);
-						for (int j = lo; j <= hi; ++j)
-							if (!scene->objects_[j].locked)
-								scene->selectedIndices_.insert(j);
-					} else {
-						scene->selectedIndices_ = {i};
-					}
-					scene->selectedObjectIndex_ = i;
+
+			std::string lb = (locked ? "[L] " : "") + scene->objects_[i].name + "##" + std::to_string(i);
+			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
+			if (sel) flags |= ImGuiTreeNodeFlags_Selected;
+			
+			// 子オブジェクトがあるか確認
+			bool hasChildren = false;
+			for(const auto& o : scene->objects_) if(o.parentId == scene->objects_[i].id) { hasChildren = true; break; }
+			if (!hasChildren) flags |= ImGuiTreeNodeFlags_Leaf;
+
+			bool opened = ImGui::TreeNodeEx(lb.c_str(), flags);
+
+			if (ImGui::IsItemClicked()) {
+				if (io.KeyCtrl) {
+					if (sel) scene->selectedIndices_.erase(i);
+					else scene->selectedIndices_.insert(i);
+				} else {
+					scene->selectedIndices_ = {i};
 				}
+				scene->selectedObjectIndex_ = i;
 			}
+
+			// ドラッグ＆ドロップ (ソース)
+			if (ImGui::BeginDragDropSource()) {
+				ImGui::SetDragDropPayload("HIERARCHY_NODE", &i, sizeof(int));
+				ImGui::Text("Move %s", scene->objects_[i].name.c_str());
+				ImGui::EndDragDropSource();
+			}
+			// ドラッグ＆ドロップ (ターゲット - 親子付け)
+			if (ImGui::BeginDragDropTarget()) {
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HIERARCHY_NODE")) {
+					int dragIdx = *(const int*)payload->Data;
+					if (dragIdx != i) {
+						scene->objects_[dragIdx].parentId = scene->objects_[i].id;
+					}
+				}
+				ImGui::EndDragDropTarget();
+			}
+
+			if (opened) {
+				for (int j = 0; j < (int)scene->objects_.size(); ++j) {
+					if (scene->objects_[j].parentId == scene->objects_[i].id) {
+						self(self, j, rendered);
+					}
+				}
+				ImGui::TreePop();
+			}
+		};
+
+		std::set<int> renderedIds;
+		// まず親なし（ルート）を表示
+		for (int i = 0; i < (int)scene->objects_.size(); ++i) {
+			if (scene->objects_[i].parentId == 0) {
+				renderNode(renderNode, i, renderedIds);
+			}
+		}
+		// 親が見つからなかった孤立オブジェクトを表示（安全策）
+		for (int i = 0; i < (int)scene->objects_.size(); ++i) {
+			if (renderedIds.count(scene->objects_[i].id) == 0) {
+				renderNode(renderNode, i, renderedIds);
+			}
+		}
+		
+		// 背景へのドロップで親解除
+		if (ImGui::BeginDragDropTarget()) {
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HIERARCHY_NODE")) {
+				int dragIdx = *(const int*)payload->Data;
+				scene->objects_[dragIdx].parentId = 0;
+			}
+			ImGui::EndDragDropTarget();
 		}
 		if (!io.WantTextInput && ImGui::IsKeyPressed(ImGuiKey_Delete, false) && !scene->selectedIndices_.empty()) {
 			for (auto it = scene->selectedIndices_.rbegin(); it != scene->selectedIndices_.rend(); ++it)
@@ -2513,7 +2580,19 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					     scene->objects_[i].name = nN;
 			     }});
 		}
-		// 笘・繝ｭ繝・け繝√ぉ繝・け繝懊ャ繧ｯ繧ｹ
+		// ★ IDと親設定
+		ImGui::Text("ID: %u", obj.id);
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(120);
+		auto oldParentId = obj.parentId;
+		if (ImGui::InputScalar("Parent ID", ImGuiDataType_U32, &obj.parentId)) {
+			auto newParentId = obj.parentId;
+			int i = scene->selectedObjectIndex_;
+			PushUndo({"Change Parent",
+				[scene, i, oldParentId]() { if (i < (int)scene->objects_.size()) scene->objects_[i].parentId = oldParentId; },
+				[scene, i, newParentId]() { if (i < (int)scene->objects_.size()) scene->objects_[i].parentId = newParentId; }
+			});
+		}
 		ImGui::SameLine();
 		ImGui::Checkbox("Lock", &obj.locked);
 		// 笘・ｿｽ蜉: Prefab菫晏ｭ倥・繧ｿ繝ｳ
@@ -3864,6 +3943,28 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					}
 					if (img.textureHandle != 0) {
 						ImGui::Image((ImTextureID)renderer->GetTextureSrvGpu(img.textureHandle).ptr, ImVec2(64, 64));
+					}
+
+					bool prev9 = img.is9Slice;
+					if (ImGui::Checkbox("9-Slice##Img", &img.is9Slice)) {
+						bool newVal = img.is9Slice;
+						int i = scene->selectedObjectIndex_;
+						PushUndo({"UIImage 9-Slice",
+							[scene, i, ci, prev9]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].images.size()) scene->objects_[i].images[ci].is9Slice = prev9; },
+							[scene, i, ci, newVal]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].images.size()) scene->objects_[i].images[ci].is9Slice = newVal; }
+						});
+					}
+					if (img.is9Slice) {
+						auto bT = img.borderTop, bB = img.borderBottom, bL = img.borderLeft, bR = img.borderRight;
+						ImGui::DragFloat4("Borders (T,B,L,R)##Img", &img.borderTop, 1.0f, 0.0f, 256.0f);
+						if (ImGui::IsItemDeactivatedAfterEdit()) {
+							auto nT = img.borderTop, nB = img.borderBottom, nL = img.borderLeft, nR = img.borderRight;
+							int i = scene->selectedObjectIndex_;
+							PushUndo({"UIImage Borders",
+								[scene, i, ci, bT, bB, bL, bR]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].images.size()) { auto& img2 = scene->objects_[i].images[ci]; img2.borderTop = bT; img2.borderBottom = bB; img2.borderLeft = bL; img2.borderRight = bR; } },
+								[scene, i, ci, nT, nB, nL, nR]() { if (i < (int)scene->objects_.size() && ci < scene->objects_[i].images.size()) { auto& img2 = scene->objects_[i].images[ci]; img2.borderTop = nT; img2.borderBottom = nB; img2.borderLeft = nL; img2.borderRight = nR; } }
+							});
+						}
 					}
 					if (ImGui::Button("Remove##Img")) {
 						obj.images.erase(obj.images.begin() + ci);

@@ -32,6 +32,7 @@ public:
 		float h = 64.0f;
 		float rotationRad = 0.0f;
 		Vector4 color{1, 1, 1, 1};
+		Vector4 uvScaleOffset{1.0f, 1.0f, 0.0f, 0.0f}; // ★追加: UVスケール・オフセット
 	};
 
 	// --- ライト構造体 ---
@@ -216,7 +217,15 @@ public:
 		TextureHandle tex;
 		SpriteDesc desc;
 	};
+
+	struct Sprite9SliceDesc {
+		float x, y, w, h;
+		float left, right, top, bottom; // border in pixels
+		Vector4 color{1,1,1,1};
+		float rotationRad = 0;
+	};
 	void DrawSprite(TextureHandle texH, const SpriteDesc& s);
+	void DrawSprite9Slice(TextureHandle texH, const Sprite9SliceDesc& s); // ★追加
 	void FlushSprites(); // スプライトの描画実行
 
 	// ★追加: 3Dライン描画（エディタ用ギズモ・グリッドなど）
