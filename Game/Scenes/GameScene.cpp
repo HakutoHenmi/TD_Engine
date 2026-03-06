@@ -305,6 +305,23 @@ void GameScene::Update() {
 // ★ 汎用スポーン
 void GameScene::SpawnObject(const SceneObject& obj) { pendingSpawns_.push_back(obj); }
 
+Engine::Matrix4x4 GameScene::GetWorldMatrix(int index) const {
+	if (index < 0 || index >= (int)objects_.size()) return Engine::Matrix4x4::Identity();
+	const auto& obj = objects_[index];
+	Engine::Matrix4x4 local = obj.GetTransform().ToMatrix();
+	if (obj.parentId == 0) return local;
+
+	int parentIdx = -1;
+	for (int i = 0; i < (int)objects_.size(); ++i) {
+		if (objects_[i].id == obj.parentId) {
+			parentIdx = i;
+			break;
+		}
+	}
+	if (parentIdx == -1) return local;
+	return Engine::Matrix4x4::Multiply(local, GetWorldMatrix(parentIdx));
+}
+
 void GameScene::Draw() {
 	if (!renderer_)
 		return;
@@ -357,6 +374,11 @@ void GameScene::Draw() {
 					    mr.modelHandle, mr.textureHandle, obj.GetTransform(), bonePalette, {obj.color.x * mr.color.x, obj.color.y * mr.color.y, obj.color.z * mr.color.z, obj.color.w * mr.color.w});
 				} else {
 					// ★変更: Toon系シェーダーの場合は非インスタンス描画を使用（アウトライン2パス処理のため）
+					Engine::Matrix4x4 world = GetWorldMatrix((int)(&obj - &objects_[0]));
+					Engine::Transform worldTr;
+					DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&worldTr.translate), DirectX::XMLoadFloat4x4(reinterpret_cast<const DirectX::XMFLOAT4X4*>(&world)).r[3]);
+					// 注意: 行列からの正確なTRS分解が必要だが、ここでは簡易化。本来はRendererがMatrix4x4を直接受け取るべき。
+					// 現状のRenderer::DrawMeshがTransformを受け取る設計のため、Matrix->Transformへの簡易変換を行う。
 					if (mr.shaderName == "Toon" || mr.shaderName == "ToonSkinning") {
 						renderer_->DrawMesh(mr.modelHandle, mr.textureHandle, obj.GetTransform(), {obj.color.x * mr.color.x, obj.color.y * mr.color.y, obj.color.z * mr.color.z, obj.color.w * mr.color.w}, mr.shaderName);
 					} else {
@@ -442,7 +464,7 @@ void GameScene::DrawSelectionHighlight() {
 		auto& obj = objects_[idx];
 		Engine::Vector3 pos = {obj.translate.x, obj.translate.y, obj.translate.z};
 
-		Engine::Matrix4x4 mat = obj.GetTransform().ToMatrix();
+		Engine::Matrix4x4 mat = GetWorldMatrix(idx);
 		DirectX::XMMATRIX worldMat = DirectX::XMLoadFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&mat));
 
 		Engine::Vector4 hlColor = {1.0f, 0.85f, 0.0f, 1.0f};

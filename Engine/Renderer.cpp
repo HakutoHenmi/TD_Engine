@@ -1896,15 +1896,45 @@ void Renderer::DrawSkinnedMesh(MeshHandle meshH, TextureHandle texH, const Trans
 	dc.tr = tr;
 	dc.color = mulColor;
 	dc.shaderName = "Skinning";
-	dc.isSkinned = true;
+		dc.isSkinned = true;
 	dc.bones = bones;
 	drawCalls_.push_back(dc);
 }
 
 void Renderer::DrawSprite(TextureHandle texH, const SpriteDesc& s) {
-	if (texH == 0 || texH >= textures_.size())
-		return;
-	spriteDrawCalls_.push_back({texH, s});
+	if (texH == 0 || texH >= textures_.size()) return;
+	spriteDrawCalls_.push_back({ texH, s });
+}
+
+void Renderer::DrawSprite9Slice(TextureHandle texH, const Sprite9SliceDesc& s) {
+	if (texH >= textures_.size() || !textures_[texH].res) return;
+
+	D3D12_RESOURCE_DESC texDesc = textures_[texH].res->GetDesc();
+	float tw = (float)texDesc.Width;
+	float th = (float)texDesc.Height;
+
+	float x[4] = { s.x, s.x + s.left, s.x + s.w - s.right, s.x + s.w };
+	float y[4] = { s.y, s.y + s.top, s.y + s.h - s.bottom, s.y + s.h };
+	float u[4] = { 0, s.left / tw, (tw - s.right) / tw, 1 };
+	float v[4] = { 0, s.top / th, (th - s.bottom) / th, 1 };
+
+	for (int row = 0; row < 3; ++row) {
+		for (int col = 0; col < 3; ++col) {
+			float w = x[col + 1] - x[col];
+			float h = y[row + 1] - y[row];
+			if (w <= 0.01f || h <= 0.01f) continue;
+
+			SpriteDesc sd;
+			sd.x = x[col];
+			sd.y = y[row];
+			sd.w = w;
+			sd.h = h;
+			sd.color = s.color;
+			sd.rotationRad = s.rotationRad;
+			sd.uvScaleOffset = { u[col+1] - u[col], v[row+1] - v[row], u[col], v[row] };
+			DrawSprite(texH, sd);
+		}
+	}
 }
 
 void Renderer::FlushSprites() {
@@ -1979,13 +2009,13 @@ void Renderer::FlushSprites() {
 		auto p01 = P(s.x, s.y + s.h);
 		auto p11 = P(s.x + s.w, s.y + s.h);
 
-		V vtx[6] = {
-			{p00.first, p00.second, 0.0f, 0.0f},
-			{p10.first, p10.second, 1.0f, 0.0f},
-			{p01.first, p01.second, 0.0f, 1.0f},
-			{p01.first, p01.second, 0.0f, 1.0f},
-			{p10.first, p10.second, 1.0f, 0.0f},
-			{p11.first, p11.second, 1.0f, 1.0f},
+		V vtx[] = {
+			{p00.first, p00.second, 0 * s.uvScaleOffset.x + s.uvScaleOffset.z, 0 * s.uvScaleOffset.y + s.uvScaleOffset.w},
+			{p10.first, p10.second, 1 * s.uvScaleOffset.x + s.uvScaleOffset.z, 0 * s.uvScaleOffset.y + s.uvScaleOffset.w},
+			{p01.first, p01.second, 0 * s.uvScaleOffset.x + s.uvScaleOffset.z, 1 * s.uvScaleOffset.y + s.uvScaleOffset.w},
+			{p01.first, p01.second, 0 * s.uvScaleOffset.x + s.uvScaleOffset.z, 1 * s.uvScaleOffset.y + s.uvScaleOffset.w},
+			{p10.first, p10.second, 1 * s.uvScaleOffset.x + s.uvScaleOffset.z, 0 * s.uvScaleOffset.y + s.uvScaleOffset.w},
+			{p11.first, p11.second, 1 * s.uvScaleOffset.x + s.uvScaleOffset.z, 1 * s.uvScaleOffset.y + s.uvScaleOffset.w},
 		};
 
 		const uint32_t vbOff = upload_[fi].Allocate(sizeof(vtx), 16);
