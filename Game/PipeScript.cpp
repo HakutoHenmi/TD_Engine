@@ -16,23 +16,18 @@ static bool HasTag(const SceneObject& obj, const char* tagName) {
 	return false;
 }
 
-static bool IsConnected4Dir(const SceneObject& a, const SceneObject& b, float connectRange, float axisTolerance) {
+static bool IsConnectedSphere(const SceneObject& a, const SceneObject& b, float connectRange) {
 	float dx = b.translate.x - a.translate.x;
+	float dy = b.translate.y - a.translate.y;
 	float dz = b.translate.z - a.translate.z;
 
-	float dist = std::sqrt(dx * dx + dz * dz);
+	float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+
 	if (dist > connectRange) {
 		return false;
 	}
 
-	float absDx = std::fabs(dx);
-	float absDz = std::fabs(dz);
-
-	if (absDx <= axisTolerance || absDz <= axisTolerance) {
-		return true;
-	}
-
-	return false;
+	return true;
 }
 
 static bool IsAlreadyVisited(const std::vector<const SceneObject*>& visitedObjects, const SceneObject& obj) {
@@ -44,7 +39,7 @@ static bool IsAlreadyVisited(const std::vector<const SceneObject*>& visitedObjec
 	return false;
 }
 
-static bool IsConnectedToBulletTankRecursive(GameScene* scene, const SceneObject& currentPipe, std::vector<const SceneObject*>& visitedObjects, float connectRange, float axisTolerance) {
+static bool IsConnectedToBulletTankRecursive(GameScene* scene, const SceneObject& currentPipe, std::vector<const SceneObject*>& visitedObjects, float connectRange) {
 	visitedObjects.push_back(&currentPipe);
 
 	for (const SceneObject& other : scene->GetObjects()) {
@@ -53,7 +48,7 @@ static bool IsConnectedToBulletTankRecursive(GameScene* scene, const SceneObject
 			continue;
 		}
 
-		if (!IsConnected4Dir(currentPipe, other, connectRange, axisTolerance)) {
+		if (!IsConnectedSphere(currentPipe, other, connectRange)) {
 			continue;
 		}
 
@@ -69,7 +64,7 @@ static bool IsConnectedToBulletTankRecursive(GameScene* scene, const SceneObject
 				continue;
 			}
 
-			bool connected = IsConnectedToBulletTankRecursive(scene, other, visitedObjects, connectRange, axisTolerance);
+			bool connected = IsConnectedToBulletTankRecursive(scene, other, visitedObjects, connectRange);
 
 			if (connected) {
 				return true;
@@ -82,11 +77,11 @@ static bool IsConnectedToBulletTankRecursive(GameScene* scene, const SceneObject
 
 static bool IsConnectedToBulletTank(GameScene* scene, const SceneObject& selfObj) {
 	const float connectRange = 2.5f;
-	const float axisTolerance = 0.8f;
+
 
 	std::vector<const SceneObject*> visitedObjects;
 
-	return IsConnectedToBulletTankRecursive(scene, selfObj, visitedObjects, connectRange, axisTolerance);
+	return IsConnectedToBulletTankRecursive(scene, selfObj, visitedObjects, connectRange);
 }
 
 void PipeScript::Start(SceneObject& obj, GameScene* scene) {
