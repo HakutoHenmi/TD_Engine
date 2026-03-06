@@ -26,6 +26,21 @@
       ]
     },
     {
+      "name": "BulletTank",
+      "locked": false,
+      "modelPath": "Resources/cube/cube.obj",
+      "texturePath": "Resources/white1x1.png",
+      "translate": [13.205, -0.044103, -0.00894012],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [0.46332, 0.46332, 0.46332, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "Tag", "enabled": true, "tag": "BulletTank"}
+      ]
+    },
+    {
       "name": "Canon",
       "locked": false,
       "modelPath": "Resources/cube/cube.obj",
@@ -175,7 +190,61 @@
       "locked": false,
       "modelPath": "Resources/cube/cube.obj",
       "texturePath": "Resources/white1x1.png",
-      "translate": [7.42246, -0.334103, 0.297585],
+      "translate": [9.08246, -0.334103, 0.297585],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "Tag", "enabled": true, "tag": "Pipe"},
+        {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "damage": 10, "isActive": false, "tag": "Default"},
+        {"type": "Script", "enabled": true, "scriptPath": "PipeScript"}
+      ]
+    },
+    {
+      "name": "Pipe_1",
+      "locked": false,
+      "modelPath": "Resources/cube/cube.obj",
+      "texturePath": "Resources/white1x1.png",
+      "translate": [7.26246, -0.334103, 0.297585],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "Tag", "enabled": true, "tag": "Pipe"},
+        {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "damage": 10, "isActive": false, "tag": "Default"},
+        {"type": "Script", "enabled": true, "scriptPath": "PipeScript"}
+      ]
+    },
+    {
+      "name": "Pipe_2",
+      "locked": false,
+      "modelPath": "Resources/cube/cube.obj",
+      "texturePath": "Resources/white1x1.png",
+      "translate": [9.46246, -0.334103, 0.297585],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "Tag", "enabled": true, "tag": "Pipe"},
+        {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "damage": 10, "isActive": false, "tag": "Default"},
+        {"type": "Script", "enabled": true, "scriptPath": "PipeScript"}
+      ]
+    },
+    {
+      "name": "Pipe_3",
+      "locked": false,
+      "modelPath": "Resources/cube/cube.obj",
+      "texturePath": "Resources/white1x1.png",
+      "translate": [11.3625, -0.334103, 0.297585],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "color": [1, 1, 1, 1],

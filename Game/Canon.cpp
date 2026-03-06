@@ -3,28 +3,18 @@
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
 #include <cmath>
+#include <vector>
 
 #include "../imgui/imgui.h"
+
+#include "../Game/Canon.h"
+
 namespace Game {
 
 struct TilePos {
 	int x;
 	int z;
 };
-
-//static int RoundToInt(float v) {
-//	if (v >= 0.0f) {
-//		return (int)(v + 0.5f);
-//	}
-//	return (int)(v - 0.5f);
-//}
-//
-//static TilePos GetTilePosXZ(const SceneObject& obj) {
-//	TilePos pos;
-//	pos.x = RoundToInt(obj.translate.x);
-//	pos.z = RoundToInt(obj.translate.z);
-//	return pos;
-//}
 
 static bool HasTag(const SceneObject& obj, const char* tagName) {
 	for (int i = 0; i < (int)obj.tags.size(); ++i) {
@@ -34,24 +24,72 @@ static bool HasTag(const SceneObject& obj, const char* tagName) {
 	}
 	return false;
 }
-//static bool HasPipeAt(GameScene* scene, int tx, int tz) {
-//	for (const SceneObject& other : scene->GetObjects()) {
-//
-//		if (!HasTag(other, "Pipe")) {
-//			continue;
-//		}
-//
-//		TilePos p = GetTilePosXZ(other);
-//		if (p.x == tx && p.z == tz) {
-//			return true;
-//		}
-//	}
-//	return false;
-//}
 
-static bool IsCanonConnectedToPipe(GameScene* scene, const SceneObject& canonObj) {
-	const float connectRange = 2.0f;  // つながる距離
-	const float axisTolerance = 0.6f; // 軸のズレ許容（小さいほど4方向っぽい）
+static bool IsConnected4Dir(const SceneObject& a, const SceneObject& b, float connectRange, float axisTolerance) {
+	float dx = b.translate.x - a.translate.x;
+	float dz = b.translate.z - a.translate.z;
+
+	float dist = std::sqrt(dx * dx + dz * dz);
+	if (dist > connectRange) {
+		return false;
+	}
+
+	float absDx = std::fabs(dx);
+	float absDz = std::fabs(dz);
+
+	if (absDx <= axisTolerance || absDz <= axisTolerance) {
+		return true;
+	}
+
+	return false;
+}
+
+static bool IsAlreadyVisited(const std::vector<const SceneObject*>& visitedObjects, const SceneObject& obj) {
+	for (int i = 0; i < (int)visitedObjects.size(); ++i) {
+		if (visitedObjects[i] == &obj) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool IsPipeConnectedToBulletTankRecursive(GameScene* scene, const SceneObject& currentPipe, std::vector<const SceneObject*>& visitedObjects, float connectRange, float axisTolerance) {
+	visitedObjects.push_back(&currentPipe);
+
+	for (const SceneObject& other : scene->GetObjects()) {
+
+		if (&other == &currentPipe) {
+			continue;
+		}
+
+		if (!IsConnected4Dir(currentPipe, other, connectRange, axisTolerance)) {
+			continue;
+		}
+
+		if (HasTag(other, "BulletTank")) {
+			return true;
+		}
+
+		if (HasTag(other, "Pipe")) {
+
+			if (IsAlreadyVisited(visitedObjects, other)) {
+				continue;
+			}
+
+			bool connected = IsPipeConnectedToBulletTankRecursive(scene, other, visitedObjects, connectRange, axisTolerance);
+
+			if (connected) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+static bool IsCanonConnectedToBulletTank(GameScene* scene, const SceneObject& canonObj) {
+	const float connectRange = 2.5f;
+	const float axisTolerance = 0.8f;
 
 	for (const SceneObject& other : scene->GetObjects()) {
 
@@ -59,25 +97,22 @@ static bool IsCanonConnectedToPipe(GameScene* scene, const SceneObject& canonObj
 			continue;
 		}
 
-		float dx = other.translate.x - canonObj.translate.x;
-		float dz = other.translate.z - canonObj.translate.z;
-
-		float dist = std::sqrt(dx * dx + dz * dz);
-		if (dist > connectRange) {
+		if (!IsConnected4Dir(canonObj, other, connectRange, axisTolerance)) {
 			continue;
 		}
 
-		float absDx = std::fabs(dx);
-		float absDz = std::fabs(dz);
+		std::vector<const SceneObject*> visitedObjects;
 
-		// 4方向っぽくする：XかZのどちらかがほぼ同じラインならOK
-		if (absDx <= axisTolerance || absDz <= axisTolerance) {
+		bool connected = IsPipeConnectedToBulletTankRecursive(scene, other, visitedObjects, connectRange, axisTolerance);
+
+		if (connected) {
 			return true;
 		}
 	}
 
 	return false;
 }
+
 void Canon::Start(SceneObject& obj, GameScene* /*scene*/) {
 	(void)obj;
 
@@ -86,6 +121,9 @@ void Canon::Start(SceneObject& obj, GameScene* /*scene*/) {
 
 void Canon::Update(SceneObject& obj, GameScene* scene, float dt) {
 
+	objectCount = 0;
+	pipeCount = 0;
+	enemyCount = 0;
 
 	for (const SceneObject& other : scene->GetObjects()) {
 		objectCount += 1;
@@ -99,25 +137,29 @@ void Canon::Update(SceneObject& obj, GameScene* scene, float dt) {
 		}
 	}
 
+	bool connected = IsCanonConnectedToBulletTank(scene, obj);
+
+	const char* connectedText = "NO";
+	if (connected) {
+		connectedText = "YES";
+	}
+
 	ImGui::Begin("Debug Pipe");
 	ImGui::Text("Objects: %d", objectCount);
 	ImGui::Text("Pipes  : %d", pipeCount);
 	ImGui::Text("Enemies: %d", enemyCount);
-
-	bool connected = IsCanonConnectedToPipe(scene, obj);
-	ImGui::Text("Canon connected: %s", connected ? "YES" : "NO");
+	ImGui::Text("Canon connected to tank: %s", connectedText);
 	ImGui::End();
-
-	// objectCount と pipeCount を表示
 
 	// クールダウン
 	if (attackTimer_ > 0.0f) {
 		attackTimer_ -= dt;
 	}
 
-	if (!IsCanonConnectedToPipe(scene, obj)) {
-		return; // Pipeが繋がってない
+	if (!connected) {
+		return;
 	}
+
 	// 一番近い Enemy を探す（範囲内）
 	const SceneObject* target = nullptr;
 	float bestDistance = attackRange_;
@@ -169,7 +211,7 @@ void Canon::Update(SceneObject& obj, GameScene* scene, float dt) {
 	bullet.translate = obj.translate;
 	bullet.translate.y += 2.0f;
 
-	// 砲口を前に出す（大砲っぽく）
+	// 砲口を前に出す
 	float muzzleOffset = 2.0f;
 	bullet.translate.x += std::sin(desiredYaw) * muzzleOffset;
 	bullet.translate.z += std::cos(desiredYaw) * muzzleOffset;
@@ -183,35 +225,35 @@ void Canon::Update(SceneObject& obj, GameScene* scene, float dt) {
 		bullet.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
 		bullet.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
 
-		MeshRendererComponent mr;
-		mr.modelHandle = bullet.modelHandle;
-		mr.textureHandle = bullet.textureHandle;
-		bullet.meshRenderers.push_back(mr);
+		MeshRendererComponent meshRenderer;
+		meshRenderer.modelHandle = bullet.modelHandle;
+		meshRenderer.textureHandle = bullet.textureHandle;
+		bullet.meshRenderers.push_back(meshRenderer);
 	}
 
 	// 当たり判定
-	HitboxComponent hb;
-	hb.isActive = true;
-	hb.damage = damage_;
-	hb.tag = "Bullet";
-	hb.size = {0.3f, 0.3f, 0.3f};
-	bullet.hitboxes.push_back(hb);
+	HitboxComponent hitbox;
+	hitbox.isActive = true;
+	hitbox.damage = damage_;
+	hitbox.tag = "Bullet";
+	hitbox.size = {0.3f, 0.3f, 0.3f};
+	bullet.hitboxes.push_back(hitbox);
 
 	// 体力
-	HealthComponent hc;
-	hc.hp = 1.0f;
-	hc.maxHp = 1.0f;
-	bullet.healths.push_back(hc);
+	HealthComponent health;
+	health.hp = 1.0f;
+	health.maxHp = 1.0f;
+	bullet.healths.push_back(health);
 
 	// タグ
-	TagComponent tc;
-	tc.tag = "Bullet";
-	bullet.tags.push_back(tc);
+	TagComponent tag;
+	tag.tag = "Bullet";
+	bullet.tags.push_back(tag);
 
 	// 弾スクリプト
-	ScriptComponent sc;
-	sc.scriptPath = "BulletScript";
-	bullet.scripts.push_back(sc);
+	ScriptComponent script;
+	script.scriptPath = "BulletScript";
+	bullet.scripts.push_back(script);
 
 	scene->SpawnObject(bullet);
 

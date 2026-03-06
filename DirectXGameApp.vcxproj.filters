@@ -22,6 +22,7 @@
     <ClCompile Include="BaseScript.cpp" />
     <ClCompile Include="Game\Canon.cpp" />
     <ClCompile Include="Game\PipeScript.cpp" />
+    <ClCompile Include="Game\BulletTank.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
@@ -58,6 +59,7 @@
     <ClInclude Include="BaseScript.h" />
     <ClInclude Include="Game\Canon.h" />
     <ClInclude Include="Game\PipeScript.h" />
+    <ClInclude Include="Game\BulletTank.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">

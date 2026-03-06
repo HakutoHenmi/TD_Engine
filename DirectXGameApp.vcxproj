@@ -182,6 +182,7 @@ exit /b 0
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BaseScript.cpp" />
+    <ClCompile Include="Game\BulletTank.cpp" />
     <ClCompile Include="Game\Canon.cpp" />
     <ClCompile Include="Game\Editor\EditorUI.cpp" />
     <ClCompile Include="Game\KamikazeEnemyScript.cpp" />
@@ -201,6 +202,7 @@ exit /b 0
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BaseScript.h" />
+    <ClInclude Include="Game\BulletTank.h" />
     <ClInclude Include="Game\Canon.h" />
     <ClInclude Include="Game\Editor\EditorUI.h" />
     <ClInclude Include="Game\KamikazeEnemyScript.h" />
