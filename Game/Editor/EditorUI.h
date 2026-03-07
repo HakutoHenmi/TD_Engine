@@ -54,6 +54,9 @@ public:
 	// ★ シーン保存/読み込み
 	static void SaveScene(GameScene* scene, const std::string& path);
 	static void LoadScene(GameScene* scene, const std::string& path);
+	
+	// ★追加: 実行ファイルの場所に関わらず必ずTD_Engineプロジェクトを指す絶対パスを取得
+	static std::string GetUnifiedProjectPath(const std::string& path);
 	static void AddScene(GameScene* scene, const std::string& path); // ★追加
 	static void LoadPrefab(GameScene* scene, const std::string& path);
 

@@ -1670,6 +1670,42 @@ float4 main(PSIn i) : SV_TARGET { return i.color; }
 		shaderNames_.push_back("ToonSkinning");
 	}
 
+	// ★追加: 川用シェーダー
+	{
+		auto vsRiver = CompileShaderFromFile(L"Resources/shaders/RiverVS.hlsl", "main", "vs_5_0");
+		auto psRiver = CompileShaderFromFile(L"Resources/shaders/RiverPS.hlsl", "main", "ps_5_0");
+		if (vsRiver && psRiver) {
+			D3D12_INPUT_ELEMENT_DESC layout[] = {
+				{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+				{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+				{"NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+			};
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC pso{};
+			pso.pRootSignature = rootSig3D_.Get();
+			pso.VS = {vsRiver->GetBufferPointer(), vsRiver->GetBufferSize()};
+			pso.PS = {psRiver->GetBufferPointer(), psRiver->GetBufferSize()};
+			pso.InputLayout = {layout, _countof(layout)};
+			pso.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			pso.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+			pso.NumRenderTargets = 1;
+			pso.SampleDesc.Count = 1;
+			pso.SampleMask = UINT_MAX;
+			auto rast = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+			rast.CullMode = D3D12_CULL_MODE_NONE; // 両面描画
+			rast.DepthBias = -100; // 地形より手前に描画
+			rast.SlopeScaledDepthBias = -1.0f;
+			pso.RasterizerState = rast;
+			pso.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+			pso.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+			pso.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+			Microsoft::WRL::ComPtr<ID3D12PipelineState> riverPso;
+			if (SUCCEEDED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&riverPso)))) {
+				pipelines_["River"] = riverPso;
+				shaderNames_.push_back("River");
+			}
+		}
+	}
+
 	return true;
 }
 
@@ -2462,6 +2498,19 @@ bool Renderer::GetCollisionResult(uint32_t resultIndex) const {
 		return collisionReadbackMapped_[resultIndex] > 0;
 	}
 	return false;
+}
+
+Renderer::MeshHandle Renderer::CreateDynamicMesh(const std::vector<VertexData>& vertices, const std::vector<uint32_t>& indices) {
+	auto model = std::make_shared<Model>();
+	model->InitializeDynamic(dev_, vertices, indices);
+	models_.push_back(model);
+	return (MeshHandle)(models_.size() - 1);
+}
+
+void Renderer::UpdateDynamicMesh(MeshHandle handle, const std::vector<VertexData>& vertices) {
+	if (handle < models_.size() && models_[handle]) {
+		models_[handle]->UpdateVertices(vertices);
+	}
 }
 
 } // namespace Engine

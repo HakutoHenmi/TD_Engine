@@ -12,6 +12,7 @@
 #include "../Systems/HealthSystem.h"
 #include "../Systems/PhysicsSystem.h"
 #include "../Systems/PlayerInputSystem.h"
+#include "../Systems/RiverSystem.h" // ★追加
 #include "../Systems/ScriptSystem.h"
 #include "../Systems/UISystem.h"
 #include "Audio.h"
@@ -34,13 +35,14 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 
 	bool loaded = false;
 	// ★ リリース構成等での自動ロード
-	if (std::filesystem::exists("Resources/scene.json")) {
-		OutputDebugStringA("[GameScene] Resources/scene.json found. Loading...\n");
-		EditorUI::LoadScene(this, "Resources/scene.json");
+	std::string scenePath = EditorUI::GetUnifiedProjectPath("Resources/scene.json");
+	if (std::filesystem::exists(scenePath)) {
+		OutputDebugStringA(("[GameScene] " + scenePath + " found. Loading...\n").c_str());
+		EditorUI::LoadScene(this, scenePath);
 		isPlaying_ = true; // ロード直後からプレイ状態にする
 		loaded = true;
 	} else {
-		OutputDebugStringA("[GameScene] Resources/scene.json NOT found.\n");
+		OutputDebugStringA(("[GameScene] " + scenePath + " NOT found.\n").c_str());
 	}
 
 	// 既にオブジェクトが存在する場合（リスタート時）やロード失敗時は最低限の内容を作成
@@ -102,6 +104,15 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 	// 各Systemのリセット
 	for (auto& sys : systems_) {
 		sys->Reset(objects_);
+	}
+
+	// ★追加: 川の初期メッシュ生成
+	for (auto& obj : objects_) {
+		for (auto& rv : obj.rivers) {
+			if (rv.enabled && rv.meshHandle == 0) {
+				RiverSystem::BuildRiverMesh(rv, renderer_, objects_);
+			}
+		}
 	}
 }
 
@@ -429,6 +440,19 @@ void GameScene::Draw() {
 						extraHandles.push_back(renderer_->LoadTexture2D(p));
 					renderer_->DrawMeshInstanced(obj.modelHandle, obj.textureHandle, obj.GetTransform(), {obj.color.x, obj.color.y, obj.color.z, obj.color.w}, obj.shaderName, extraHandles);
 				}
+			}
+		}
+
+		// ★追加: 川コンポーネントの描画 (メッシュはワールド座標で生成済みなのでIdentity変換)
+		for (const auto& rv : obj.rivers) {
+			if (rv.enabled && rv.meshHandle != 0) {
+				auto tex = renderer_->LoadTexture2D(rv.texturePath);
+				Engine::Transform identity;
+				identity.translate = {0,0,0};
+				identity.rotate = {0,0,0};
+				identity.scale = {1,1,1};
+				// gColorとして {flowSpeed, uvScale, 0, 0} を渡す
+				renderer_->DrawMesh(rv.meshHandle, tex, identity, {rv.flowSpeed, rv.uvScale, 0.0f, 0.0f}, "River");
 			}
 		}
 	}

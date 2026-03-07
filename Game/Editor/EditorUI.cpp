@@ -5,6 +5,7 @@
 #include "Audio.h"
 #include "SceneManager.h"
 #include "WindowDX.h"
+#include "../Systems/RiverSystem.h" // ★追加
 #include <algorithm>
 #include <cctype>
 #include <cfloat>
@@ -37,7 +38,9 @@ int gizmoDragAxis = -1; // 0=X, 1=Y, 2=Z
 static std::map<int, Engine::Transform> dragStartTransforms = {};
 static ImVec2 gizmoDragStartMouse = {};
 static bool objectDragging = false;               // 笘・閾ｪ逕ｱ繝峨Λ繝・げ荳ｭ繝輔Λ繧ｰ
-static std::vector<SceneObject> clipboardObjects; // Ctrl+C 繧ｳ繝斐・逕ｨ
+static std::vector<SceneObject> clipboardObjects; // Ctrl+C コピー用
+static bool s_riverPlaceMode = false; // ★追加: 川ポイント配置モード
+static int s_riverPlaceCompIdx = 0;   // 川コンポーネントindex繧ｳ繝斐・逕ｨ
 
 // ★ Gameウィンドウの画像座標 (ピッキング用)
 static ImVec2 gameImageMin = {};
@@ -342,17 +345,52 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 		if (!first) ss << ",\n"; first = false;
 		ss << "        {\"type\": \"UIButton\", \"enabled\": " << (btn.enabled ? "true" : "false") << ", \"normalColor\": [" << btn.normalColor.x << "," << btn.normalColor.y << "," << btn.normalColor.z << "," << btn.normalColor.w << "], \"hoverColor\": [" << btn.hoverColor.x << "," << btn.hoverColor.y << "," << btn.hoverColor.z << "," << btn.hoverColor.w << "], \"pressedColor\": [" << btn.pressedColor.x << "," << btn.pressedColor.y << "," << btn.pressedColor.z << "," << btn.pressedColor.w << "]}";
 	}
+	
+	for (const auto& rv : o.rivers) {
+		if (!first) ss << ",\n"; first = false;
+		ss << "        {\"type\": \"River\", \"enabled\": " << (rv.enabled ? "true" : "false") << ", \"width\": " << rv.width << ", \"flowSpeed\": " << rv.flowSpeed << ", \"uvScale\": " << rv.uvScale << ", \"texture\": \"" << rv.texturePath << "\", \"points\": [";
+		for (size_t i = 0; i < rv.points.size(); ++i) {
+			ss << rv.points[i].x << "," << rv.points[i].y << "," << rv.points[i].z << (i == rv.points.size() - 1 ? "" : ",");
+		}
+		ss << "]}";
+	}
 	ss << "\n      ]\n";
 	ss << "    }";
 	return ss.str();
 }
 
+std::string EditorUI::GetUnifiedProjectPath(const std::string& path) {
+	std::string absPath = path;
+	if (absPath.length() >= 2 && (absPath[1] == ':' || absPath[0] == '/' || absPath[0] == '\\')) {
+		return absPath; // 既に絶対パス
+	}
+
+	char exePath[MAX_PATH] = { 0 };
+	::GetModuleFileNameA(nullptr, exePath, MAX_PATH);
+	std::filesystem::path currentP = std::filesystem::path(exePath).parent_path();
+	
+	// Engineフォルダを探す
+	while (currentP.has_parent_path() && currentP.filename() != "Engine") {
+		currentP = currentP.parent_path();
+	}
+	
+	if (currentP.filename() == "Engine") {
+		std::filesystem::path projectDir = currentP / "TD_Engine";
+		return (projectDir / path).string();
+	}
+	
+	return path; // フォールバック
+}
+
 void EditorUI::SaveScene(GameScene* scene, const std::string& path) {
 	if (!scene)
 		return;
-	std::ofstream f(path);
+		
+	std::string absPath = GetUnifiedProjectPath(path);
+	
+	std::ofstream f(absPath);
 	if (!f.is_open()) {
-		LogError("Save failed: " + path);
+		LogError("Save failed: " + absPath);
 		return;
 	}
 	f << "{\n  \"settings\": {\n";
@@ -896,6 +934,19 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 			auto hc = ExtractArray(cblock, "hoverColor"); if (hc.size() >= 4) btn.hoverColor = {hc[0], hc[1], hc[2], hc[3]};
 			auto pc = ExtractArray(cblock, "pressedColor"); if (pc.size() >= 4) btn.pressedColor = {pc[0], pc[1], pc[2], pc[3]};
 			obj.buttons.push_back(btn);
+		} else if (type == "River") {
+			RiverComponent rv;
+			rv.enabled = enabled;
+			if (cblock.find("\"width\"") != std::string::npos) rv.width = ExtractFloat(cblock, "width", 2.0f);
+			if (cblock.find("\"flowSpeed\"") != std::string::npos) rv.flowSpeed = ExtractFloat(cblock, "flowSpeed", 1.0f);
+			if (cblock.find("\"uvScale\"") != std::string::npos) rv.uvScale = ExtractFloat(cblock, "uvScale", 1.0f);
+			rv.texturePath = ExtractString(cblock, "texture");
+			if (rv.texturePath.empty()) rv.texturePath = "Resources/Water/water.png";
+			auto pts = ExtractArray(cblock, "points");
+			for(size_t i = 0; i + 2 < pts.size(); i += 3) {
+				rv.points.push_back({pts[i], pts[i+1], pts[i+2]});
+			}
+			obj.rivers.push_back(rv);
 		}
 		pos = endPos + 1;
 	}
@@ -903,9 +954,12 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 void EditorUI::LoadScene(GameScene* scene, const std::string& path) {
 	if (!scene)
 		return;
-	std::ifstream f(path);
+		
+	std::string absPath = GetUnifiedProjectPath(path);
+	
+	std::ifstream f(absPath);
 	if (!f.is_open()) {
-		LogError("Load failed: " + path);
+		LogError("Load failed: " + absPath);
 		return;
 	}
 	std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
@@ -997,6 +1051,16 @@ void EditorUI::LoadScene(GameScene* scene, const std::string& path) {
 		scene->objects_.push_back(obj);
 		objStart = objEnd;
 	}
+	
+	// ★追加: ロードされた川オブジェクトのメッシュを生成
+	for (auto& obj : scene->objects_) {
+		for (auto& rv : obj.rivers) {
+			if (rv.enabled && rv.meshHandle == 0) {
+				Game::RiverSystem::BuildRiverMesh(rv, renderer, scene->objects_);
+			}
+		}
+	}
+	
 	Log("Scene loaded: " + path + " (" + std::to_string(scene->objects_.size()) + " objects)");
 }
 
@@ -1067,6 +1131,16 @@ void EditorUI::AddScene(GameScene* scene, const std::string& path) {
 		scene->objects_.push_back(obj);
 		objStart = objEnd;
 	}
+	
+	// ★追加: ロードされた川オブジェクトのメッシュを生成
+	for (auto& obj : scene->objects_) {
+		for (auto& rv : obj.rivers) {
+			if (rv.enabled && rv.meshHandle == 0) {
+				Game::RiverSystem::BuildRiverMesh(rv, renderer, scene->objects_);
+			}
+		}
+	}
+	
 	Log("Scene added: " + path + " (Total: " + std::to_string(scene->objects_.size()) + " objects)");
 }
 
@@ -1656,6 +1730,31 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 
 				// パイプモード中は通常の選択・ギズモ操作を行わない
 				if (s_pipeEditor.IsPipeMode()) {
+					goto EndClickProcessing;
+				}
+
+				// ★追加: 川配置モード中は地形クリックでポイント追加
+				if (s_riverPlaceMode && gameScene->selectedObjectIndex_ >= 0) {
+					auto& selObj = gameScene->objects_[gameScene->selectedObjectIndex_];
+					if (s_riverPlaceCompIdx < (int)selObj.rivers.size()) {
+						float closestDist = FLT_MAX;
+						DirectX::XMFLOAT3 hitPt = {0,0,0};
+						bool hitTerrain = false;
+						for (const auto& obj2 : gameScene->objects_) {
+							if (!obj2.gpuMeshColliders.empty()) {
+								auto* model = Engine::Renderer::GetInstance()->GetModel(obj2.gpuMeshColliders[0].meshHandle);
+								if (model) {
+									Engine::Vector3 hp; float dist;
+									if (model->RayCast(rayOrig, rayDir, obj2.GetTransform().ToMatrix(), dist, hp)) {
+										if (dist < closestDist) { closestDist = dist; hitPt = {hp.x, hp.y, hp.z}; hitTerrain = true; }
+									}
+								}
+							}
+						}
+						if (hitTerrain) {
+							selObj.rivers[s_riverPlaceCompIdx].points.push_back(hitPt);
+						}
+					}
 					goto EndClickProcessing;
 				}
 			
@@ -3635,6 +3734,71 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
+			// ★追加: River コンポーネント
+			for (size_t ci = 0; ci < obj.rivers.size(); ++ci) {
+				auto& rv = obj.rivers[ci];
+				ImGui::PushID(17000 + (int)ci);
+				if (ImGui::TreeNode("River")) {
+					ImGui::Checkbox("Enabled##River", &rv.enabled);
+					bool changed = false;
+					changed |= ImGui::DragFloat("Width##River", &rv.width, 0.1f, 0.1f, 100.0f);
+					changed |= ImGui::DragFloat("Flow Speed##River", &rv.flowSpeed, 0.01f, -10.0f, 10.0f);
+					changed |= ImGui::DragFloat("UV Scale##River", &rv.uvScale, 0.01f, 0.01f, 10.0f);
+					
+					char texPath[256];
+					strcpy_s(texPath, rv.texturePath.c_str());
+					if (ImGui::InputText("Texture##River", texPath, sizeof(texPath))) {
+						rv.texturePath = texPath;
+					}
+					ImGui::Text("Spline Points");
+					for (size_t pi = 0; pi < rv.points.size(); ++pi) {
+						ImGui::PushID((int)pi);
+						changed |= ImGui::DragFloat3("##Point", &rv.points[pi].x, 0.1f);
+						ImGui::SameLine();
+						if (ImGui::Button("-")) {
+							rv.points.erase(rv.points.begin() + pi);
+							changed = true;
+							ImGui::PopID();
+							break;
+						}
+						ImGui::PopID();
+					}
+					if (ImGui::Button("Add Point")) {
+						if (!rv.points.empty()) {
+							auto last = rv.points.back();
+							last.z += 30.0f;
+							rv.points.push_back(last);
+						} else {
+							rv.points.push_back({obj.translate.x, obj.translate.y, obj.translate.z});
+						}
+					}
+					ImGui::SameLine();
+					if (ImGui::Button("Capture Position")) {
+						rv.points.push_back({obj.translate.x, obj.translate.y, obj.translate.z});
+					}
+					if (ImGui::Button("Build Mesh")) {
+						Game::RiverSystem::BuildRiverMesh(rv, Engine::Renderer::GetInstance(), scene->objects_);
+					}
+					// ★追加: 地形クリックでポイント配置モード
+					bool isThisRiverPlacing = s_riverPlaceMode && s_riverPlaceCompIdx == (int)ci;
+					if (ImGui::Checkbox("Place Points Mode##River", &isThisRiverPlacing)) {
+						s_riverPlaceMode = isThisRiverPlacing;
+						s_riverPlaceCompIdx = (int)ci;
+					}
+					if (isThisRiverPlacing) {
+						ImGui::TextColored({0,1,0,1}, "Click on terrain to place points");
+					}
+					if (ImGui::Button("Remove##River")) {
+						obj.rivers.erase(obj.rivers.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+
 			// 笘・ｿｽ蜉: UIText 繧ｳ繝ｳ繝昴・繝阪Φ繝・
 			for (size_t ci = 0; ci < obj.texts.size(); ++ci) {
 				auto& txt = obj.texts[ci];
@@ -3840,6 +4004,12 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				}
 				if (ImGui::MenuItem("UIButton")) {
 					obj.buttons.push_back({});
+				}
+				if (ImGui::MenuItem("River")) {
+					RiverComponent rv;
+					rv.points.push_back({obj.translate.x, obj.translate.y, obj.translate.z});
+					rv.points.push_back({obj.translate.x, obj.translate.y, obj.translate.z + 50.0f});
+					obj.rivers.push_back(rv);
 				}
 				if (ImGui::MenuItem("UIText")) {
 					obj.texts.push_back({});

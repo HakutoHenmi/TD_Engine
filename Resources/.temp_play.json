@@ -9,6 +9,26 @@
   },
   "objects": [
     {
+      "id": 51,
+      "parentId": 0,
+      "name": "Empty",
+      "locked": false,
+      "modelPath": "",
+      "texturePath": "Resources\\uvChecker.png",
+      "translate": [10.7905, 0.947513, 2.06532],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "Resources\\uvChecker.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"},
+        {"type": "River", "enabled": true, "width": 2, "flowSpeed": 0.34, "uvScale": 1, "texture": "Resources/uvChecker.png", "points": [8.96039,8.8169,26.9277,20.0804,1.0169,17.9477,18.7777,1.00264,6.99556,10.7905,0.947513,2.06532]}
+      ]
+    },
+    {
+      "id": 42,
+      "parentId": 0,
       "name": "EnemyCube",
       "locked": false,
       "modelPath": "Resources/cube/cube.obj",
@@ -26,6 +46,8 @@
       ]
     },
     {
+      "id": 43,
+      "parentId": 0,
       "name": "Model",
       "locked": false,
       "modelPath": "Resources\\Stages\\karimap.obj",
@@ -42,6 +64,8 @@
       ]
     },
     {
+      "id": 44,
+      "parentId": 0,
       "name": "Model",
       "locked": false,
       "modelPath": "Resources\\walk.gltf",
@@ -57,6 +81,8 @@
       ]
     },
     {
+      "id": 45,
+      "parentId": 0,
       "name": "Plane",
       "locked": true,
       "modelPath": "Resources/plane.obj",
@@ -73,6 +99,8 @@
       ]
     },
     {
+      "id": 46,
+      "parentId": 0,
       "name": "Plane",
       "locked": false,
       "modelPath": "Resources/plane.obj",
@@ -88,6 +116,8 @@
       ]
     },
     {
+      "id": 47,
+      "parentId": 0,
       "name": "Plane_1",
       "locked": false,
       "modelPath": "Resources/plane.obj",
@@ -103,6 +133,8 @@
       ]
     },
     {
+      "id": 48,
+      "parentId": 0,
       "name": "Plane_2",
       "locked": false,
       "modelPath": "Resources/plane.obj",
@@ -118,6 +150,8 @@
       ]
     },
     {
+      "id": 49,
+      "parentId": 0,
       "name": "Player",
       "locked": false,
       "modelPath": "Resources/cube/cube.obj",
@@ -141,6 +175,8 @@
       ]
     },
     {
+      "id": 50,
+      "parentId": 0,
       "name": "Sun",
       "locked": false,
       "modelPath": "",
