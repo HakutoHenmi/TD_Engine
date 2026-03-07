@@ -415,12 +415,20 @@ void Renderer::FlushDrawCalls() {
 				D3D12_CPU_DESCRIPTOR_HANDLE dest = window_->SRV_CPU((int)sIdx);
 				D3D12_GPU_DESCRIPTOR_HANDLE destGpu = window_->SRV_GPU((int)sIdx);
 				for (int i = 0; i < 6; ++i) {
-					D3D12_CPU_DESCRIPTOR_HANDLE src;
-					if (i == 0 && dc.tex < textures_.size()) src = textures_[dc.tex].srvCpu;
+					Texture* texObj = &textures_[0];
+					if (i == 0 && dc.tex < textures_.size()) texObj = &textures_[dc.tex];
 					else if (i > 0 && (i - 1) < (int)dc.extraTex.size() && dc.extraTex[i - 1] < textures_.size())
-						src = textures_[dc.extraTex[i - 1]].srvCpu;
-					else src = textures_[0].srvCpu;
-					dev_->CopyDescriptorsSimple(1, dest, src, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+						texObj = &textures_[dc.extraTex[i - 1]];
+
+					if (texObj->res) {
+						D3D12_RESOURCE_DESC resDesc = texObj->res->GetDesc();
+						D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+						srvDesc.Format = resDesc.Format;
+						srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+						srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+						srvDesc.Texture2D.MipLevels = resDesc.MipLevels > 0 ? resDesc.MipLevels : 1;
+						dev_->CreateShaderResourceView(texObj->res.Get(), &srvDesc, dest);
+					}
 					dest.ptr += srvInc_;
 				}
 				list_->SetGraphicsRootDescriptorTable(3, destGpu);
@@ -542,12 +550,20 @@ void Renderer::FlushDrawCalls() {
 						D3D12_CPU_DESCRIPTOR_HANDLE dest = window_->SRV_CPU((int)sIdx);
 						D3D12_GPU_DESCRIPTOR_HANDLE destGpu = window_->SRV_GPU((int)sIdx);
 						for (int i = 0; i < 6; ++i) {
-							D3D12_CPU_DESCRIPTOR_HANDLE src;
-							if (i == 0 && idc.tex < textures_.size()) src = textures_[idc.tex].srvCpu;
+							Texture* texObj = &textures_[0];
+							if (i == 0 && idc.tex < textures_.size()) texObj = &textures_[idc.tex];
 							else if (i > 0 && (i - 1) < (int)idc.extraTex.size() && idc.extraTex[i - 1] < textures_.size())
-								src = textures_[idc.extraTex[i - 1]].srvCpu;
-							else src = textures_[0].srvCpu;
-							dev_->CopyDescriptorsSimple(1, dest, src, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+								texObj = &textures_[idc.extraTex[i - 1]];
+
+							if (texObj->res) {
+								D3D12_RESOURCE_DESC resDesc = texObj->res->GetDesc();
+								D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+								srvDesc.Format = resDesc.Format;
+								srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+								srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+								srvDesc.Texture2D.MipLevels = resDesc.MipLevels > 0 ? resDesc.MipLevels : 1;
+								dev_->CreateShaderResourceView(texObj->res.Get(), &srvDesc, dest);
+							}
 							dest.ptr += srvInc_;
 						}
 						list_->SetGraphicsRootDescriptorTable(3, destGpu);
@@ -2413,7 +2429,10 @@ void Renderer::BeginCollisionCheck(uint32_t maxPairs) {
 			
 			D3D12_HEAP_PROPERTIES defaultHeap = {D3D12_HEAP_TYPE_DEFAULT};
 			D3D12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-			dev_->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &resDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&collisionResultBuffer_));
+			dev_->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &resDesc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&collisionResultBuffer_));
+			
+			auto initBarrier = CD3DX12_RESOURCE_BARRIER::Transition(collisionResultBuffer_.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+			list_->ResourceBarrier(1, &initBarrier);
 
 			D3D12_HEAP_PROPERTIES readbackHeap = {D3D12_HEAP_TYPE_READBACK};
 			D3D12_RESOURCE_DESC readbackDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize);
