@@ -32,7 +32,8 @@ enum class ComponentType {
 	DirectionalLight, PointLight, SpotLight,
 	AudioSource, AudioListener, Hitbox, Hurtbox, Health, // ★追加: 音響 & 戦闘判定 & ステータス
 	Script, // ★追加: スクリプトコンポーネント
-	RectTransform, UIImage, UIText, UIButton // ★追加: UIコンポーネント
+	RectTransform, UIImage, UIText, UIButton, // ★追加: UIコンポーネント
+	River // ★追加: 川コンポーネント
 };
 struct Component { 
 	ComponentType type = ComponentType::MeshRenderer; 
@@ -261,6 +262,17 @@ struct ScriptComponent : public Component {
 	ScriptComponent() { type = ComponentType::Script; }
 };
 
+// ★追加: River コンポーネント
+struct RiverComponent : public Component {
+	std::vector<DirectX::XMFLOAT3> points; // スプライン制御点 (ローカル座標)
+	float width = 2.0f;                    // 川の基本幅
+	float flowSpeed = 1.0f;                // 流れの速さ
+	float uvScale = 1.0f;
+	uint32_t meshHandle = 0;               // 動的生成メッシュハンドル
+	std::string texturePath = "Resources/Water/water.png";
+	RiverComponent() { type = ComponentType::River; }
+};
+
 // ★ エディター用オブジェクト構造体
 struct SceneObject {
 	uint32_t id = 0;           // ★ 個別識別子
@@ -315,6 +327,9 @@ struct SceneObject {
 	std::vector<UIImageComponent> images;
 	std::vector<UITextComponent> texts;
 	std::vector<UIButtonComponent> buttons;
+
+	// ★追加: 川コンポーネント
+	std::vector<RiverComponent> rivers;
 
 	Engine::Transform GetTransform() const {
 		Engine::Transform t;

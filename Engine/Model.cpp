@@ -333,6 +333,36 @@ bool Model::Load(ID3D12Device* device, ID3D12GraphicsCommandList* cmd, const std
 	return true;
 }
 
+void Model::InitializeDynamic(ID3D12Device* device, const std::vector<VertexData>& vertices, const std::vector<uint32_t>& indices) {
+	data_.vertices = vertices;
+	data_.indices = indices;
+	hasTexture_ = false;
+
+	vb_ = CreateBufferResource(device, sizeof(VertexData) * vertices.size());
+	UpdateVertices(vertices);
+	vbv_ = {vb_->GetGPUVirtualAddress(), (UINT)(sizeof(VertexData) * vertices.size()), sizeof(VertexData)};
+
+	ib_ = CreateBufferResource(device, sizeof(uint32_t) * indices.size());
+	void* imap;
+	ib_->Map(0, nullptr, &imap);
+	std::memcpy(imap, indices.data(), sizeof(uint32_t) * indices.size());
+	ib_->Unmap(0, nullptr);
+	ibv_ = {ib_->GetGPUVirtualAddress(), (UINT)(sizeof(uint32_t) * indices.size()), DXGI_FORMAT_R32_UINT};
+	indexCount_ = (uint32_t)indices.size();
+	
+	// 動的メッシュにおけるBVH構築（地形追従などの必要性があれば追加可能）
+	BuildBVH();
+}
+
+void Model::UpdateVertices(const std::vector<VertexData>& vertices) {
+	if (vertices.size() != data_.vertices.size()) return; // 頂点数は固定前提
+	data_.vertices = vertices;
+	void* vmap;
+	vb_->Map(0, nullptr, &vmap);
+	std::memcpy(vmap, vertices.data(), sizeof(VertexData) * vertices.size());
+	vb_->Unmap(0, nullptr);
+}
+
 void Model::CreateSrv(ID3D12Device* device, ID3D12DescriptorHeap* srvHeap, UINT descriptorSize, UINT heapIndex) {
 	if (!hasTexture_)
 		return;

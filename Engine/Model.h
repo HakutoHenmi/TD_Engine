@@ -105,6 +105,12 @@ public:
 	// ファイル読み込み
 	bool Load(ID3D12Device* device, ID3D12GraphicsCommandList* cmd, const std::string& objPath);
 
+	// 動的メッシュ初期化 (新規追加)
+	void InitializeDynamic(ID3D12Device* device, const std::vector<VertexData>& vertices, const std::vector<uint32_t>& indices);
+	
+	// 動的メッシュ頂点更新 (新規追加)
+	void UpdateVertices(const std::vector<VertexData>& vertices);
+
 	// SRV作成
 	void CreateSrv(ID3D12Device* device, ID3D12DescriptorHeap* srvHeap, UINT descriptorSize, UINT heapIndex);
 

@@ -196,6 +196,7 @@ exit /b 0
     <ClCompile Include="Game\Scripts\TowerScript.cpp" />
     <!-- ★追加 -->
     <ClCompile Include="Game\Systems\UISystem.cpp" />
+    <ClCompile Include="Game\Systems\RiverSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Editor\EditorUI.h" />
@@ -224,6 +225,7 @@ exit /b 0
     <ClInclude Include="Game\Systems\AudioSystem.h" />
     <ClInclude Include="Game\Systems\ScriptSystem.h" />
     <ClInclude Include="Game\Systems\CleanupSystem.h" />
+    <ClInclude Include="Game\Systems\RiverSystem.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="DirectXGameEngine.vcxproj">

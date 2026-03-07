@@ -188,6 +188,10 @@ public:
 	TextureHandle LoadTexture2D(const std::string& filePath, bool sRGB = true);
 	MeshHandle LoadObjMesh(const std::string& objFilePath);
 
+	// ★追加: 動的メッシュの作成と更新
+	MeshHandle CreateDynamicMesh(const std::vector<VertexData>& vertices, const std::vector<uint32_t>& indices);
+	void UpdateDynamicMesh(MeshHandle handle, const std::vector<VertexData>& vertices);
+
 	// ★追加: テクスチャのSRVハンドルを取得 (ImGui::Imageでサムネイル表示用)
 	D3D12_GPU_DESCRIPTOR_HANDLE GetTextureSrvGpu(TextureHandle handle) const {
 		if (handle < textures_.size()) return textures_[handle].srvGpu;
