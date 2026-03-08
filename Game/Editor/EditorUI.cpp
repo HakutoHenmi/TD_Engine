@@ -368,10 +368,15 @@ std::string EditorUI::GetUnifiedProjectPath(const std::string& path) {
 	char exePath[MAX_PATH] = { 0 };
 	::GetModuleFileNameA(nullptr, exePath, MAX_PATH);
 	std::filesystem::path currentP = std::filesystem::path(exePath).parent_path();
+	std::filesystem::path exeDir = currentP; // フォールバック用に保存
 	
 	// Engineフォルダを探す
 	while (currentP.has_parent_path() && currentP.filename() != "Engine") {
-		currentP = currentP.parent_path();
+		auto parent = currentP.parent_path();
+		if (parent == currentP) { // ルートディレクトリに到達（無限ループ防止）
+			break;
+		}
+		currentP = parent;
 	}
 	
 	if (currentP.filename() == "Engine") {
@@ -379,7 +384,8 @@ std::string EditorUI::GetUnifiedProjectPath(const std::string& path) {
 		return (projectDir / path).string();
 	}
 	
-	return path; // フォールバック
+	// フォールバック: 実行ファイルのあるディレクトリを基準とする
+	return (exeDir / path).string();
 }
 
 void EditorUI::SaveScene(GameScene* scene, const std::string& path) {
