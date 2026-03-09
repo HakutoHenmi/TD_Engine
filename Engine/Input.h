@@ -26,7 +26,7 @@ public:
 	float GetMouseWheelDelta() const { return wheel_; }
 
 	// ★追加: 絶対座標とボタン状態
-	void GetMousePos(int& x, int& y) const { x = (int)absMouseX_; y = (int)absMouseY_; }
+	void GetMousePos(float& x, float& y) const { x = absMouseX_; y = absMouseY_; }
 	bool IsMouseDown(int button) const { return (mouseState_.rgbButtons[button] & 0x80) != 0; }
 	bool IsMouseTrigger(int button) const { return IsMouseDown(button) && !(prevMouseState_.rgbButtons[button] & 0x80); }
 

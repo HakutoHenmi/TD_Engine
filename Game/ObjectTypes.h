@@ -252,6 +252,11 @@ struct UIButtonComponent : public Component {
 	DirectX::XMFLOAT4 hoverColor = {0.8f, 0.8f, 0.8f, 1.0f};
 	DirectX::XMFLOAT4 pressedColor = {0.6f, 0.6f, 0.6f, 1.0f};
 	std::string onClickCallback = ""; // スクリプト側のメソッド名など
+	
+	// ★追加: 判定エリアの個別調整用
+	DirectX::XMFLOAT2 hitboxOffset = {0.0f, 0.0f};
+	DirectX::XMFLOAT2 hitboxScale = {1.0f, 1.0f};
+
 	UIButtonComponent() { type = ComponentType::UIButton; }
 };
 

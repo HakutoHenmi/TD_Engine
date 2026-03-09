@@ -33,7 +33,7 @@
       "locked": false,
       "modelPath": "Resources/cube/cube.obj",
       "texturePath": "Resources/white1x1.png",
-      "translate": [0, 7.82, 12.22],
+      "translate": [-0.110276, 8.77524, 12.6897],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "color": [1, 0.2, 0.2, 1],
@@ -189,6 +189,25 @@
       "shaderName": "Default",
       "components": [
         {"type": "DirectionalLight", "enabled": true, "color": [1,0.95,0.8], "intensity": 1.2}
+      ]
+    },
+    {
+      "id": 52,
+      "parentId": 0,
+      "name": "UI",
+      "locked": false,
+      "modelPath": "",
+      "texturePath": "Resources/white1x1.png",
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "RectTransform", "enabled": true, "pos": [253.05,-243.403], "size": [568.942,282.15], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources\\uvChecker.png", "color": [1,1,1,1]},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1]}
       ]
     }
   ]
