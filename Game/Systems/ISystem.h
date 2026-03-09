@@ -12,6 +12,7 @@ struct GameContext {
 	float dt = 0.0f;
 	Engine::Camera* camera = nullptr;
 	Engine::Renderer* renderer = nullptr;
+	class GameScene* scene = nullptr; // ★追加
 	Engine::Input* input = nullptr;
 	bool isPlaying = false;
 	std::vector<SceneObject>* pendingSpawns = nullptr; // SpawnObject等の遅延追加用

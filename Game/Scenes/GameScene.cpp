@@ -136,6 +136,7 @@ void GameScene::Update() {
 	ctx_.renderer = renderer_;
 	ctx_.input = Engine::Input::GetInstance();
 	ctx_.isPlaying = isPlaying_;
+	ctx_.scene = this; // ★追加
 	ctx_.pendingSpawns = &pendingSpawns_;
 
 	// GPU Collision Dispatch（エンジン固有処理のため残留）

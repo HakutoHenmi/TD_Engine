@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 
 namespace Game {
 
@@ -14,6 +15,9 @@ public:
 	
 	// 毎フレーム呼ばれる更新処理
 	virtual void Update(SceneObject& /*obj*/, GameScene* /*scene*/, float /*dt*/) {}
+	
+	// UIクリック時に呼ばれる
+	virtual void OnClick(SceneObject& /*obj*/, GameScene* /*scene*/, const std::string& /*callbackName*/) {}
 	
 	// オブジェクト破棄時やスクリプトが外れた時に呼ばれる
 	virtual void OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {}

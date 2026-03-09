@@ -205,7 +205,7 @@
       "extraTexturePaths": [],
       "shaderName": "Default",
       "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [-668.904,-393.313], "size": [568.942,282.15], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "RectTransform", "enabled": true, "pos": [-661.826,-386.866], "size": [568.942,282.15], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "Resources\\uvChecker.png", "color": [1,1,1,1]},
         {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1]}
       ]
