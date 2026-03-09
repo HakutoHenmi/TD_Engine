@@ -31,9 +31,15 @@ static bool IsHitSphere(const SceneObject& a, const SceneObject& b, float hitRan
 	return true;
 }
 
-void SpikeScript::Start(SceneObject& obj, GameScene* scene) {}
+void SpikeScript::Start(SceneObject& obj, GameScene* scene) {
+	(void)obj;
+	(void)scene;
+}
 
 void SpikeScript::Update(SceneObject& obj, GameScene* scene, float dt) {
+
+	(void)dt;
+
 	for (const SceneObject& other : scene->GetObjects()) {
 		if (!HasTag(other, "Enemy")) {
 			continue;
@@ -43,15 +49,13 @@ void SpikeScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 			continue;
 		}
 
-
-
-		obj.healths[0].hp -= 10.0f;
-
-
-
+		// obj.healths[0].hp -= 10.0f;
 	}
 }
 
-void SpikeScript::OnDestroy(SceneObject& obj, GameScene* scene) {}
+void SpikeScript::OnDestroy(SceneObject& obj, GameScene* scene) {
+	(void)obj;
+	(void)scene;
+}
 
 } // namespace Game

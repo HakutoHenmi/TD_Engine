@@ -47,6 +47,9 @@
     <ClCompile Include="Game\Scripts\SpikeScript.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Scripts\EnemyDamageBySpike.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
@@ -128,6 +131,9 @@
     </ClInclude>
     <ClInclude Include="Game\Scripts\PipeScript.h" />
     <ClInclude Include="Game\Scripts\SpikeScript.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Scripts\EnemyDamageBySpike.h">
       <Filter>Scripts</Filter>
     </ClInclude>
   </ItemGroup>

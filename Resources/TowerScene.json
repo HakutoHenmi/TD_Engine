@@ -9,11 +9,13 @@
   },
   "objects": [
     {
+      "id": 52,
+      "parentId": 0,
       "name": "Base",
       "locked": false,
       "modelPath": "Resources\\sword.obj",
       "texturePath": "",
-      "translate": [-4.12, 0, 0],
+      "translate": [-1.7093, 0.0149813, -0.144065],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "color": [1, 1, 1, 1],
@@ -26,6 +28,8 @@
       ]
     },
     {
+      "id": 53,
+      "parentId": 0,
       "name": "BulletTank",
       "locked": false,
       "modelPath": "Resources/cube/cube.obj",
@@ -41,6 +45,8 @@
       ]
     },
     {
+      "id": 54,
+      "parentId": 0,
       "name": "Canon",
       "locked": false,
       "modelPath": "Resources/cube/cube.obj",
@@ -60,11 +66,13 @@
       ]
     },
     {
+      "id": 55,
+      "parentId": 0,
       "name": "Empty",
       "locked": false,
       "modelPath": "",
       "texturePath": "Resources/white1x1.png",
-      "translate": [0.314056, 0.160655, 1.94446],
+      "translate": [0.569255, 0.184186, 1.94853],
       "rotate": [0, 0, 0],
       "scale": [1.47, 1, 1],
       "color": [1, 1, 1, 1],
@@ -75,6 +83,8 @@
       ]
     },
     {
+      "id": 56,
+      "parentId": 0,
       "name": "Enemy_B",
       "locked": false,
       "modelPath": "Resources/cube/cube.obj",
@@ -82,18 +92,24 @@
       "translate": [-11.7224, 2.41194, -0.583361],
       "rotate": [0, 0, 0],
       "scale": [1, 2, 1],
-      "color": [0.9, 0.2, 0.2, 1],
+      "color": [0.903475, 0.376739, 0.376739, 1],
       "extraTexturePaths": [],
       "shaderName": "Default",
       "components": [
         {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
         {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
         {"type": "Tag", "enabled": true, "tag": "Enemy"},
-        {"type": "Health", "enabled": true, "hp": 30, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
-        {"type": "Script", "enabled": true, "scriptPath": "EnemyAIScript"}
+        {"type": "Rigidbody", "enabled": true, "velocity": [0,0,0], "useGravity": true, "isKinematic": false},
+        {"type": "PlayerInput", "enabled": true},
+        {"type": "CharacterMovement", "enabled": true, "speed": 5, "jumpPower": 6, "gravity": 9.8},
+        {"type": "Health", "enabled": true, "hp": 500, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
+        {"type": "Script", "enabled": true, "scriptPath": "PlayerScript"},
+        {"type": "Script", "enabled": true, "scriptPath": "EnemyDamageBySpike"}
       ]
     },
     {
+      "id": 57,
+      "parentId": 0,
       "name": "Enemy_B_1",
       "locked": false,
       "modelPath": "Resources/cube/cube.obj",
@@ -113,6 +129,8 @@
       ]
     },
     {
+      "id": 58,
+      "parentId": 0,
       "name": "Enemy_B_2",
       "locked": false,
       "modelPath": "Resources/cube/cube.obj",
@@ -132,6 +150,8 @@
       ]
     },
     {
+      "id": 59,
+      "parentId": 0,
       "name": "Enemy_B_3",
       "locked": false,
       "modelPath": "Resources/cube/cube.obj",
@@ -151,6 +171,8 @@
       ]
     },
     {
+      "id": 60,
+      "parentId": 0,
       "name": "Enemy_B_4",
       "locked": false,
       "modelPath": "Resources/cube/cube.obj",
@@ -170,6 +192,8 @@
       ]
     },
     {
+      "id": 61,
+      "parentId": 0,
       "name": "Ground",
       "locked": true,
       "modelPath": "Resources/plane.obj",
@@ -186,6 +210,8 @@
       ]
     },
     {
+      "id": 62,
+      "parentId": 0,
       "name": "Pipe",
       "locked": false,
       "modelPath": "Resources/cube/cube.obj",
@@ -204,6 +230,8 @@
       ]
     },
     {
+      "id": 63,
+      "parentId": 0,
       "name": "Pipe_1",
       "locked": false,
       "modelPath": "Resources/cube/cube.obj",
@@ -222,6 +250,8 @@
       ]
     },
     {
+      "id": 64,
+      "parentId": 0,
       "name": "Pipe_2",
       "locked": false,
       "modelPath": "Resources/cube/cube.obj",
@@ -240,6 +270,8 @@
       ]
     },
     {
+      "id": 65,
+      "parentId": 0,
       "name": "Pipe_3",
       "locked": false,
       "modelPath": "Resources/cube/cube.obj",
@@ -258,6 +290,27 @@
       ]
     },
     {
+      "id": 67,
+      "parentId": 0,
+      "name": "Spike",
+      "locked": false,
+      "modelPath": "Resources/cube/cube.obj",
+      "texturePath": "Resources/white1x1.png",
+      "translate": [-19.7516, 1.09917, -0.307945],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "Tag", "enabled": true, "tag": "Spike"},
+        {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "damage": 10, "isActive": false, "tag": "Default"},
+        {"type": "Script", "enabled": true, "scriptPath": "SpikeScript"}
+      ]
+    },
+    {
+      "id": 66,
+      "parentId": 0,
       "name": "Sun",
       "locked": false,
       "modelPath": "",

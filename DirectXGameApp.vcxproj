@@ -190,6 +190,7 @@ exit /b 0
     <ClCompile Include="Game\Scripts\BulletScript.cpp" />
     <ClCompile Include="Game\Scripts\Canon.cpp" />
     <ClCompile Include="Game\Scripts\EnemyAIScript.cpp" />
+    <ClCompile Include="Game\Scripts\EnemyDamageBySpike.cpp" />
     <ClCompile Include="Game\Scripts\KamikazeEnemyScript.cpp" />
     <ClCompile Include="Game\Scripts\PipeScript.cpp" />
     <ClCompile Include="Game\Scripts\PlayerScript.cpp" />
@@ -211,6 +212,7 @@ exit /b 0
     <ClInclude Include="Game\Scripts\BulletScript.h" />
     <ClInclude Include="Game\Scripts\Canon.h" />
     <ClInclude Include="Game\Scripts\EnemyAIScript.h" />
+    <ClInclude Include="Game\Scripts\EnemyDamageBySpike.h" />
     <ClInclude Include="Game\Scripts\IScript.h" />
     <ClInclude Include="Game\Scripts\KamikazeEnemyScript.h" />
     <ClInclude Include="Game\Scripts\PipeScript.h" />
