@@ -43,6 +43,7 @@
     <ClCompile Include="Game\Scripts\Canon.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Scripts\PipeScript.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
@@ -122,6 +123,7 @@
     <ClInclude Include="Game\Scripts\Canon.h">
       <Filter>Scripts</Filter>
     </ClInclude>
+    <ClInclude Include="Game\Scripts\PipeScript.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">
