@@ -39,6 +39,10 @@
     </ClCompile>
     <ClCompile Include="Game\main.cpp" />
     <ClCompile Include="Game\Scripts\ToObjectMove.cpp" />
+    <ClCompile Include="Game\Systems\RiverSystem.cpp" />
+    <ClCompile Include="Game\Scripts\Canon.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
@@ -114,6 +118,10 @@
       <Filter>Systems</Filter>
     </ClInclude>
     <ClInclude Include="Game\Scripts\ToObjectMove.h" />
+    <ClInclude Include="Game\Systems\RiverSystem.h" />
+    <ClInclude Include="Game\Scripts\Canon.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">
