@@ -2,6 +2,7 @@
 #include "../ObjectTypes.h"
 #include "../../Engine/Renderer.h"
 #include "../../Engine/Input.h"
+#include "../Scripts/IScript.h" // ★追加
 #include "../../Engine/WindowDX.h"
 #include "../../externals/imgui/imgui.h"
 #include <unordered_map>
@@ -143,7 +144,7 @@ void UISystem::DrawText(const SceneObject& /*obj*/, const UITextComponent& text,
     drawList->AddText(ImGui::GetFont(), text.fontSize, pos, color, text.text.c_str());
 }
 
-void UISystem::ProcessButton(SceneObject& /*obj*/, UIButtonComponent& btn, float worldX, float worldY, float worldW, float worldH, GameContext& ctx) {
+void UISystem::ProcessButton(SceneObject& obj, UIButtonComponent& btn, float worldX, float worldY, float worldW, float worldH, GameContext& ctx) {
     if (!ctx.input) return;
 
     float mx, my;
@@ -174,8 +175,10 @@ void UISystem::ProcessButton(SceneObject& /*obj*/, UIButtonComponent& btn, float
     btn.isPressed = hovered && ctx.input->IsMouseDown(0); // 左ボタン
 
     if (hovered && ctx.input->IsMouseTrigger(0)) {
-        // クリック時
-        // TODO: 必要に応じてスクリプト側への通知やイベント発行を行う
+        // クリック時: スクリプト側へ通知
+        if (!obj.scripts.empty() && obj.scripts[0].enabled && obj.scripts[0].instance) {
+            obj.scripts[0].instance->OnClick(obj, ctx.scene, btn.onClickCallback);
+        }
     }
 }
 
