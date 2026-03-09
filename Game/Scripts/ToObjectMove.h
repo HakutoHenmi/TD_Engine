@@ -3,6 +3,19 @@
 #include "Scenes/GameScene.h"
 #include <string>
 
+//*** 二次元マップを探索して最短ルートを進むアルゴリズムにする ***//
+
+struct Node {
+	bool isWall = false;		// Wallタグを持ったオブジェクトがあるか
+	int gridX, gridZ;			// グリッド上の座標
+	float gCost;				// スタートからの距離
+	float hCost;				// ゴールまでの推定距離
+	Node* parent = nullptr;		// どのマスからきたか(ルートを逆算する)
+
+	// 最短経路のコストを計算するメソッド
+	float fCost() { return gCost + hCost; }
+};
+
 namespace Game {
 
 class ToObjectMove : public IScript {
@@ -20,16 +33,26 @@ private:
 	// ImGuiで追尾するタグをいじれるように
 	void ChangeTargetTag(SceneObject& obj, GameScene* scene, float dt);
 
+	// オブジェクトの周囲をチェックする関数
+	void ScanSurround(SceneObject& obj, GameScene* scene);
+
 private: // メンバ変数
 	// 参照するObjectのポインタと位置
 	// 初期値はPlayer
 	std::string targetName_ = {};
-	// ImGui編集ようのデータ
+	// ImGui編集用のデータ
 	char tagBuffer_[64] = {};
 	const SceneObject* target_ = nullptr;
 	DirectX::XMFLOAT3 myPos_ = {};
 	DirectX::XMFLOAT3 targetPos_ = {}; // 移動速度
 	float speed_ = 5.0f;
+
+	// グリッド関連
+	static const int GRID_SIZE = 21;	// 21*21にして自分を真ん中に置いた20メートル四方のグリッドに
+	float cellLecgth_ = 1.0f;			// グリッドのセル一つの大きさ
+
+	//マップ探索用
+	Node localGrid_[GRID_SIZE][GRID_SIZE];
 };
 
 } // namespace Game

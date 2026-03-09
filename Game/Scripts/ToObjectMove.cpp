@@ -100,6 +100,32 @@ void ToObjectMove::ChangeTargetTag(SceneObject& /*obj*/, GameScene* scene, float
 	}
 }
 
+void ToObjectMove::ScanSurround(SceneObject& obj, GameScene* scene) {
+	myPos_.x = obj.GetTransform().translate.x;
+	myPos_.y = obj.GetTransform().translate.y;
+	myPos_.z = obj.GetTransform().translate.z;
+
+	for (int z = 0; z < GRID_SIZE; ++z) {
+		for (int x = 0; x < GRID_SIZE; ++x) {
+			// マスのワールド座標を計算
+			float worldX = myPos_.x + (x - GRID_SIZE / 2) * cellLecgth_;
+			float worldZ = myPos_.z + (z - GRID_SIZE / 2) * cellLecgth_;
+
+			localGrid_[z][x].isWall = false;
+			localGrid_[z][x].gridX = x;
+			localGrid_[z][x].gridZ = z;
+
+			// シーン内のオブジェクトと距離判定(簡易的な当たり判定)
+			auto& objects = scene->GetObjects();
+			for (size_t i = 0; i < objects.size(); ++i) {
+				if (HasTag(objects[i], "Wall")) {
+					DirectX::XMColorAdjustContrast wallPos;
+				}
+			}
+		}
+	}
+}
+
 // ★ スクリプト自動登録
 REGISTER_SCRIPT(ToObjectMove);
 
