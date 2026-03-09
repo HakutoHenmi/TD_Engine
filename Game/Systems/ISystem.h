@@ -15,6 +15,11 @@ struct GameContext {
 	Engine::Input* input = nullptr;
 	bool isPlaying = false;
 	std::vector<SceneObject>* pendingSpawns = nullptr; // SpawnObject等の遅延追加用
+
+	// ★追加: 座標系補正用 (エディターGameビュー等での相対座標)
+	bool useOverrideMouse = false;
+	float overrideMouseX = 0.0f;
+	float overrideMouseY = 0.0f;
 };
 
 // System基底インターフェース

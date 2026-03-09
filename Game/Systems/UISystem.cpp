@@ -14,6 +14,45 @@ void UISystem::Update(std::vector<SceneObject>& /*objects*/, GameContext& /*ctx*
     // ボタンの更新や入力判定はワールド座標が確定するDrawフェーズ (RenderNodeWithRect) で実行するため、ここでは何もしない
 }
 
+UISystem::WorldRect UISystem::CalculateWorldRect(const SceneObject& obj, const std::vector<SceneObject>& allObjects, float screenW, float screenH) {
+    if (obj.rectTransforms.empty()) return {0, 0, 0, 0};
+
+    // 親を辿ってパスを構築
+    std::vector<const SceneObject*> path;
+    const SceneObject* current = &obj;
+    while (current) {
+        path.push_back(current);
+        const SceneObject* parent = nullptr;
+        if (current->parentId != 0) {
+            for (const auto& o : allObjects) {
+                if (o.id == current->parentId) {
+                    parent = &o;
+                    break;
+                }
+            }
+        }
+        current = parent;
+    }
+    std::reverse(path.begin(), path.end());
+
+    WorldRect currentRect = { 0, 0, screenW, screenH };
+
+    for (const SceneObject* pObj : path) {
+        if (pObj->rectTransforms.empty()) continue;
+        auto& rect = pObj->rectTransforms[0];
+        
+        float worldW = rect.size.x;
+        float worldH = rect.size.y;
+        float anchorX = currentRect.x + currentRect.w * rect.anchor.x;
+        float anchorY = currentRect.y + currentRect.h * rect.anchor.y;
+        float worldX = anchorX - worldW * rect.pivot.x + rect.pos.x;
+        float worldY = anchorY - worldH * rect.pivot.y + rect.pos.y;
+        
+        currentRect = { worldX, worldY, worldW, worldH };
+    }
+    return currentRect;
+}
+
 void UISystem::Draw(std::vector<SceneObject>& objects, GameContext& ctx) {
     std::unordered_map<uint32_t, WorldRect> cache;
 
@@ -107,12 +146,29 @@ void UISystem::DrawText(const SceneObject& /*obj*/, const UITextComponent& text,
 void UISystem::ProcessButton(SceneObject& /*obj*/, UIButtonComponent& btn, float worldX, float worldY, float worldW, float worldH, GameContext& ctx) {
     if (!ctx.input) return;
 
-    int mx, my;
-    ctx.input->GetMousePos(mx, my);
+    float mx, my;
+    if (ctx.useOverrideMouse) {
+        mx = ctx.overrideMouseX;
+        my = ctx.overrideMouseY;
+    } else {
+        float fmx, fmy;
+        ctx.input->GetMousePos(fmx, fmy);
+        mx = fmx;
+        my = fmy;
+    }
+
+    // hitboxパラメータを適用した実際の判定矩形を計算
+    float hw = worldW * btn.hitboxScale.x;
+    float hh = worldH * btn.hitboxScale.y;
+    // ビジュアルの中央を基準にスケールとオフセットを適用
+    float cx = worldX + worldW * 0.5f + btn.hitboxOffset.x;
+    float cy = worldY + worldH * 0.5f + btn.hitboxOffset.y;
+    float hx = cx - hw * 0.5f;
+    float hy = cy - hh * 0.5f;
 
     // 矩形内判定
-    bool hovered = (mx >= worldX && mx <= worldX + worldW &&
-                    my >= worldY && my <= worldY + worldH);
+    bool hovered = (mx >= hx && mx <= hx + hw &&
+                    my >= hy && my <= hy + hh);
 
     btn.isHovered = hovered;
     btn.isPressed = hovered && ctx.input->IsMouseDown(0); // 左ボタン
