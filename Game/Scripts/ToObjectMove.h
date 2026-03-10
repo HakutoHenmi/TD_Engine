@@ -2,6 +2,8 @@
 #include "IScript.h"
 #include "Scenes/GameScene.h"
 #include <string>
+#include <list>
+#include <vector>
 
 //*** 二次元マップを探索して最短ルートを進むアルゴリズムにする ***//
 
@@ -33,8 +35,20 @@ private:
 	// ImGuiで追尾するタグをいじれるように
 	void ChangeTargetTag(SceneObject& obj, GameScene* scene, float dt);
 
+	// オブジェクトの移動処理
+	void Move(SceneObject& obj, float dt);
+
 	// オブジェクトの周囲をチェックする関数
 	void ScanSurround(SceneObject& obj, GameScene* scene);
+
+	// targetの方向をグリッドに直す
+	void AStar();
+
+	// A*アルゴリズムでルートを計算する関数
+	void CalculatePath(int startX, int startZ, int targetX, int targetZ);
+
+	// オブジェクト周囲のグリッド描画
+	void DrawGrid();
 
 private: // メンバ変数
 	// 参照するObjectのポインタと位置
@@ -49,10 +63,15 @@ private: // メンバ変数
 
 	// グリッド関連
 	static const int GRID_SIZE = 21;	// 21*21にして自分を真ん中に置いた20メートル四方のグリッドに
-	float cellLecgth_ = 1.0f;			// グリッドのセル一つの大きさ
+	float cellLength_ = 2.0f;			// グリッドのセル一つの大きさ
 
-	//マップ探索用
+	// マップ探索用
 	Node localGrid_[GRID_SIZE][GRID_SIZE];
+
+	// 実際のルート探索に必要な変数
+	std::vector<Node*> openList_;
+	std::vector<Node*> closedList_;
+	std::vector<DirectX::XMFLOAT3> path_;	// 最終的な移動ルート
 };
 
 } // namespace Game
