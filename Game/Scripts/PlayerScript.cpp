@@ -71,11 +71,14 @@ void PlayerScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 
 	if (PahaseSystemScript::IsPreparation()) {
 		obj.cameraTargets[0].enabled = false;
+		obj.playerInputs[0].enabled = false;
+
 	} else {
 		UpdateMovement(obj, scene, dt);
 		UpdateAttack(obj, scene, dt);
 		UpdateSword(obj, scene, dt);
 		obj.cameraTargets[0].enabled = true;
+		obj.playerInputs[0].enabled = true;
 	}
 	
 }
