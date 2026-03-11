@@ -21,6 +21,13 @@ public:
 	
 	// オブジェクト破棄時やスクリプトが外れた時に呼ばれる
 	virtual void OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {}
+
+	// エディターUI描画用
+	virtual void OnEditorUI() {}
+
+	// パラメーターの個別保存・読み込み用 (エディター用)
+	virtual std::string SerializeParameters() { return ""; }
+	virtual void DeserializeParameters(const std::string& /*data*/) {}
 };
 
 } // namespace Game

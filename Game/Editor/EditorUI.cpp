@@ -4,6 +4,9 @@
 #include "../Scenes/GameScene.h"
 #include "../Systems/RiverSystem.h" // ★追加
 #include "../Systems/UISystem.h"    // ★追加
+#include "../Scripts/IScript.h"     // ★追加
+#include "../Scripts/ScriptEngine.h" // ★追加
+
 #include "Audio.h"
 #include "PipeEditor.h"
 #include "SceneManager.h"
@@ -336,7 +339,11 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 		if (!first)
 			ss << ",\n";
 		first = false;
-		ss << "        {\"type\": \"Script\", \"enabled\": " << (sc.enabled ? "true" : "false") << ", \"scriptPath\": \"" << EscapeJson(sc.scriptPath) << "\"}";
+		ss << "        {\"type\": \"Script\", \"enabled\": " << (sc.enabled ? "true" : "false") << ", \"scriptPath\": \"" << EscapeJson(sc.scriptPath) << "\"";
+		if (sc.instance) {
+			ss << ", \"paramData\": \"" << EscapeJson(sc.instance->SerializeParameters()) << "\"";
+		}
+		ss << "}";
 	}
 	// ★追加: UI Components
 	for (const auto& rt : o.rectTransforms) {
@@ -943,6 +950,13 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 			ScriptComponent sc;
 			sc.enabled = enabled;
 			sc.scriptPath = ExtractString(cblock, "scriptPath");
+			std::string pData = ExtractString(cblock, "paramData");
+			if (!sc.scriptPath.empty()) {
+				sc.instance = ScriptEngine::GetInstance()->CreateScript(sc.scriptPath);
+				if (sc.instance && !pData.empty()) {
+					sc.instance->DeserializeParameters(pData);
+				}
+			}
 			obj.scripts.push_back(sc);
 		} else if (type == "RectTransform") {
 			RectTransformComponent rt;
@@ -2835,6 +2849,31 @@ void EditorUI::ShowInspector(GameScene* scene) {
 								     scene->objects_[i].meshRenderers[ci].enabled = newVal;
 						     }});
 					}
+					// Model Path
+					ImGui::Text("Model: %s", mr.modelPath.empty() ? "(none)" : mr.modelPath.c_str());
+					if (ImGui::BeginDragDropTarget()) {
+						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
+							std::string path((const char*)pl->Data, pl->DataSize - 1);
+							if (path.find(".obj") != std::string::npos || path.find(".gltf") != std::string::npos || path.find(".glb") != std::string::npos || path.find(".fbx") != std::string::npos) {
+								mr.modelPath = path;
+								mr.modelHandle = Engine::Renderer::GetInstance()->LoadObjMesh(path);
+							}
+						}
+						ImGui::EndDragDropTarget();
+					}
+					// Texture Path
+					ImGui::Text("Texture: %s", mr.texturePath.empty() ? "(none)" : mr.texturePath.c_str());
+					if (ImGui::BeginDragDropTarget()) {
+						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
+							std::string path((const char*)pl->Data, pl->DataSize - 1);
+							if (path.find(".png") != std::string::npos || path.find(".jpg") != std::string::npos || path.find(".jpeg") != std::string::npos || path.find(".bmp") != std::string::npos || path.find(".tga") != std::string::npos) {
+								mr.texturePath = path;
+								mr.textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(path);
+							}
+						}
+						ImGui::EndDragDropTarget();
+					}
+					// Color
 					auto prevColor = mr.color;
 					ImGui::ColorEdit4("Color", &mr.color.x);
 					if (ImGui::IsItemDeactivatedAfterEdit()) {
@@ -2850,6 +2889,51 @@ void EditorUI::ShowInspector(GameScene* scene) {
 							     if (i < (int)scene->objects_.size() && ci < scene->objects_[i].meshRenderers.size())
 								     scene->objects_[i].meshRenderers[ci].color = newColor;
 						     }});
+					}
+					// Shader Name
+					char shaderBuf[128];
+					strcpy_s(shaderBuf, mr.shaderName.c_str());
+					if (ImGui::InputText("Shader##MR", shaderBuf, sizeof(shaderBuf)))
+						mr.shaderName = shaderBuf;
+					// UV Tiling & Offset
+					ImGui::DragFloat2("UV Tiling##MR", &mr.uvTiling.x, 0.01f);
+					ImGui::DragFloat2("UV Offset##MR", &mr.uvOffset.x, 0.01f);
+					// Lightmap
+					ImGui::Text("Lightmap: %s", mr.lightmapPath.empty() ? "(none)" : mr.lightmapPath.c_str());
+					if (ImGui::BeginDragDropTarget()) {
+						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
+							std::string path((const char*)pl->Data, pl->DataSize - 1);
+							if (path.find(".png") != std::string::npos || path.find(".jpg") != std::string::npos || path.find(".jpeg") != std::string::npos) {
+								mr.lightmapPath = path;
+								mr.lightmapHandle = Engine::Renderer::GetInstance()->LoadTexture2D(path);
+							}
+						}
+						ImGui::EndDragDropTarget();
+					}
+					// Extra Textures
+					for (size_t ei = 0; ei < mr.extraTexturePaths.size(); ++ei) {
+						ImGui::PushID((int)ei + 200);
+						ImGui::Text("Extra[%d]: %s", (int)ei, mr.extraTexturePaths[ei].c_str());
+						ImGui::SameLine();
+						if (ImGui::SmallButton("X##ExTex")) {
+							mr.extraTexturePaths.erase(mr.extraTexturePaths.begin() + ei);
+							mr.extraTextureHandles.erase(mr.extraTextureHandles.begin() + ei);
+							ImGui::PopID();
+							break;
+						}
+						ImGui::PopID();
+					}
+					// Extra texture D&D area
+					ImGui::Button("Drop Extra Texture Here##MR");
+					if (ImGui::BeginDragDropTarget()) {
+						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
+							std::string path((const char*)pl->Data, pl->DataSize - 1);
+							if (path.find(".png") != std::string::npos || path.find(".jpg") != std::string::npos || path.find(".jpeg") != std::string::npos) {
+								mr.extraTexturePaths.push_back(path);
+								mr.extraTextureHandles.push_back(Engine::Renderer::GetInstance()->LoadTexture2D(path));
+							}
+						}
+						ImGui::EndDragDropTarget();
 					}
 					if (ImGui::Button("Remove")) {
 						obj.meshRenderers.erase(obj.meshRenderers.begin() + ci);
@@ -2899,6 +2983,203 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				}
 				ImGui::PopID();
 			}
+			// Tag
+			for (size_t ci = 0; ci < obj.tags.size(); ++ci) {
+				auto& tg = obj.tags[ci];
+				ImGui::PushID(5000 + (int)ci);
+				if (ImGui::TreeNode("Tag")) {
+					ImGui::Checkbox("Enabled", &tg.enabled);
+					char tagBuf[256];
+					strcpy_s(tagBuf, tg.tag.c_str());
+					if (ImGui::InputText("Tag##Tag", tagBuf, sizeof(tagBuf)))
+						tg.tag = tagBuf;
+					if (ImGui::Button("Remove")) {
+						obj.tags.erase(obj.tags.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			// Animator
+			for (size_t ci = 0; ci < obj.animators.size(); ++ci) {
+				auto& an = obj.animators[ci];
+				ImGui::PushID(6000 + (int)ci);
+				if (ImGui::TreeNode("Animator")) {
+					ImGui::Checkbox("Enabled", &an.enabled);
+					char animBuf[256];
+					strcpy_s(animBuf, an.currentAnimation.c_str());
+					if (ImGui::InputText("Animation##Anim", animBuf, sizeof(animBuf)))
+						an.currentAnimation = animBuf;
+					ImGui::DragFloat("Speed##Anim", &an.speed, 0.01f, 0.0f, 10.0f);
+					ImGui::DragFloat("Time##Anim", &an.time, 0.01f);
+					ImGui::Checkbox("Playing##Anim", &an.isPlaying);
+					ImGui::Checkbox("Loop##Anim", &an.loop);
+					if (ImGui::Button("Remove")) {
+						obj.animators.erase(obj.animators.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			// ParticleEmitter
+			for (size_t ci = 0; ci < obj.particleEmitters.size(); ++ci) {
+				auto& pe = obj.particleEmitters[ci];
+				ImGui::PushID(7000 + (int)ci);
+				if (ImGui::TreeNode("ParticleEmitter")) {
+					ImGui::Checkbox("Enabled##PE", &pe.enabled);
+					ImGui::Checkbox("Playing##PE", &pe.emitter.isPlaying);
+					auto& p = pe.emitter.params;
+					ImGui::DragFloat("Emit Rate##PE", &p.emitRate, 0.1f, 0.0f, 1000.0f);
+					int bc = p.burstCount;
+					if (ImGui::DragInt("Burst Count##PE", &bc, 1, 0, 1000))
+						p.burstCount = bc;
+					ImGui::DragFloat("Life Time##PE", &p.lifeTime, 0.01f, 0.01f, 30.0f);
+					ImGui::DragFloat("Life Variance##PE", &p.lifeTimeVariance, 0.01f, 0.0f, 10.0f);
+					ImGui::DragFloat3("Start Velocity##PE", &p.startVelocity.x, 0.1f);
+					ImGui::DragFloat3("Velocity Var##PE", &p.velocityVariance.x, 0.1f);
+					ImGui::DragFloat3("Acceleration##PE", &p.acceleration.x, 0.1f);
+					ImGui::DragFloat3("Start Size##PE", &p.startSize.x, 0.01f);
+					ImGui::DragFloat3("End Size##PE", &p.endSize.x, 0.01f);
+					ImGui::ColorEdit4("Start Color##PE", &p.startColor.x);
+					ImGui::ColorEdit4("End Color##PE", &p.endColor.x);
+					ImGui::Checkbox("Additive##PE", &p.isAdditive);
+					char assetBuf[256];
+					strcpy_s(assetBuf, pe.assetPath.c_str());
+					if (ImGui::InputText("Asset Path##PE", assetBuf, sizeof(assetBuf)))
+						pe.assetPath = assetBuf;
+					if (ImGui::BeginDragDropTarget()) {
+						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
+							std::string path((const char*)pl->Data, pl->DataSize - 1);
+							if (path.find(".particle") != std::string::npos || path.find(".json") != std::string::npos) {
+								pe.assetPath = path;
+								pe.emitter.LoadFromJson(path);
+							}
+						}
+						ImGui::EndDragDropTarget();
+					}
+					if (ImGui::Button("Remove##PE")) {
+						obj.particleEmitters.erase(obj.particleEmitters.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			// GpuMeshCollider
+			for (size_t ci = 0; ci < obj.gpuMeshColliders.size(); ++ci) {
+				auto& gmc = obj.gpuMeshColliders[ci];
+				ImGui::PushID(8000 + (int)ci);
+				if (ImGui::TreeNode("GpuMeshCollider")) {
+					ImGui::Checkbox("Enabled##GMC", &gmc.enabled);
+					ImGui::Checkbox("Is Trigger##GMC", &gmc.isTrigger);
+					int ct = (int)gmc.collisionType;
+					const char* ctNames[] = {"Mesh", "Convex"};
+					if (ImGui::Combo("Collision Type##GMC", &ct, ctNames, IM_ARRAYSIZE(ctNames)))
+						gmc.collisionType = (MeshCollisionType)ct;
+					ImGui::Text("Mesh: %s", gmc.meshPath.empty() ? "(none)" : gmc.meshPath.c_str());
+					if (ImGui::BeginDragDropTarget()) {
+						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
+							std::string path((const char*)pl->Data, pl->DataSize - 1);
+							if (path.find(".obj") != std::string::npos || path.find(".gltf") != std::string::npos || path.find(".glb") != std::string::npos || path.find(".fbx") != std::string::npos) {
+								gmc.meshPath = path;
+								gmc.meshHandle = Engine::Renderer::GetInstance()->LoadObjMesh(path);
+							}
+						}
+						ImGui::EndDragDropTarget();
+					}
+					if (ImGui::Button("Remove##GMC")) {
+						obj.gpuMeshColliders.erase(obj.gpuMeshColliders.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			// PlayerInput
+			for (size_t ci = 0; ci < obj.playerInputs.size(); ++ci) {
+				auto& pi = obj.playerInputs[ci];
+				ImGui::PushID(9000 + (int)ci);
+				if (ImGui::TreeNode("PlayerInput")) {
+					ImGui::Checkbox("Enabled##PI", &pi.enabled);
+					ImGui::Text("MoveDir: (%.2f, %.2f)", pi.moveDir.x, pi.moveDir.y);
+					ImGui::Text("Jump: %s  Attack: %s", pi.jumpRequested ? "Yes" : "No", pi.attackRequested ? "Yes" : "No");
+					if (ImGui::Button("Remove##PI")) {
+						obj.playerInputs.erase(obj.playerInputs.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			// CharacterMovement
+			for (size_t ci = 0; ci < obj.characterMovements.size(); ++ci) {
+				auto& cm = obj.characterMovements[ci];
+				ImGui::PushID(10000 + (int)ci);
+				if (ImGui::TreeNode("CharacterMovement")) {
+					ImGui::Checkbox("Enabled##CM", &cm.enabled);
+					ImGui::DragFloat("Speed##CM", &cm.speed, 0.1f, 0.0f, 100.0f);
+					ImGui::DragFloat("Jump Power##CM", &cm.jumpPower, 0.1f, 0.0f, 50.0f);
+					ImGui::DragFloat("Gravity##CM", &cm.gravity, 0.1f, 0.0f, 50.0f);
+					ImGui::Text("VelocityY: %.2f  Grounded: %s", cm.velocityY, cm.isGrounded ? "Yes" : "No");
+					if (ImGui::Button("Remove##CM")) {
+						obj.characterMovements.erase(obj.characterMovements.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			// CameraTarget
+			for (size_t ci = 0; ci < obj.cameraTargets.size(); ++ci) {
+				auto& ct = obj.cameraTargets[ci];
+				ImGui::PushID(11000 + (int)ci);
+				if (ImGui::TreeNode("CameraTarget")) {
+					ImGui::Checkbox("Enabled##CT", &ct.enabled);
+					ImGui::DragFloat("Distance##CT", &ct.distance, 0.1f, 0.1f, 100.0f);
+					ImGui::DragFloat("Height##CT", &ct.height, 0.1f, -50.0f, 50.0f);
+					ImGui::DragFloat("Smooth Speed##CT", &ct.smoothSpeed, 0.1f, 0.0f, 50.0f);
+					if (ImGui::Button("Remove##CT")) {
+						obj.cameraTargets.erase(obj.cameraTargets.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			// DirectionalLight
+			for (size_t ci = 0; ci < obj.directionalLights.size(); ++ci) {
+				auto& dl = obj.directionalLights[ci];
+				ImGui::PushID(12000 + (int)ci);
+				if (ImGui::TreeNode("DirectionalLight")) {
+					ImGui::Checkbox("Enabled##DL", &dl.enabled);
+					ImGui::ColorEdit3("Color##DL", &dl.color.x);
+					ImGui::DragFloat("Intensity##DL", &dl.intensity, 0.01f, 0.0f, 10.0f);
+					if (ImGui::Button("Remove##DL")) {
+						obj.directionalLights.erase(obj.directionalLights.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
 			// AudioSource
 			for (size_t ci = 0; ci < obj.audioSources.size(); ++ci) {
 				auto& as = obj.audioSources[ci];
@@ -2906,10 +3187,82 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				if (ImGui::TreeNode("AudioSource")) {
 					ImGui::Checkbox("Enabled", &as.enabled);
 					ImGui::Text("Clip: %s", as.soundPath.empty() ? "(none)" : as.soundPath.c_str());
+					if (ImGui::BeginDragDropTarget()) {
+						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
+							std::string path((const char*)pl->Data, pl->DataSize - 1);
+							if (path.find(".wav") != std::string::npos || path.find(".mp3") != std::string::npos || path.find(".ogg") != std::string::npos || path.find(".aac") != std::string::npos) {
+								as.soundPath = path;
+								auto* audio = Engine::Audio::GetInstance();
+								if (audio) as.soundHandle = audio->Load(path);
+							}
+						}
+						ImGui::EndDragDropTarget();
+					}
+					ImGui::DragFloat("Volume##AS", &as.volume, 0.01f, 0.0f, 1.0f);
 					ImGui::Checkbox("Loop", &as.loop);
 					ImGui::Checkbox("Play on Start", &as.playOnStart);
+					ImGui::Checkbox("3D Sound##AS", &as.is3D);
+					ImGui::DragFloat("Max Distance##AS", &as.maxDistance, 1.0f, 0.0f, 500.0f);
 					if (ImGui::Button("Remove")) {
 						obj.audioSources.erase(obj.audioSources.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			// AudioListener
+			for (size_t ci = 0; ci < obj.audioListeners.size(); ++ci) {
+				auto& al = obj.audioListeners[ci];
+				ImGui::PushID(13500 + (int)ci);
+				if (ImGui::TreeNode("AudioListener")) {
+					ImGui::Checkbox("Enabled##AL", &al.enabled);
+					if (ImGui::Button("Remove##AL")) {
+						obj.audioListeners.erase(obj.audioListeners.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			// PointLight
+			for (size_t ci = 0; ci < obj.pointLights.size(); ++ci) {
+				auto& pl = obj.pointLights[ci];
+				ImGui::PushID(14000 + (int)ci);
+				if (ImGui::TreeNode("PointLight")) {
+					ImGui::Checkbox("Enabled##PL", &pl.enabled);
+					ImGui::ColorEdit3("Color##PL", &pl.color.x);
+					ImGui::DragFloat("Intensity##PL", &pl.intensity, 0.01f, 0.0f, 10.0f);
+					ImGui::DragFloat("Range##PL", &pl.range, 0.1f, 0.0f, 200.0f);
+					ImGui::DragFloat3("Attenuation##PL", &pl.atten.x, 0.01f);
+					if (ImGui::Button("Remove##PL")) {
+						obj.pointLights.erase(obj.pointLights.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			// SpotLight
+			for (size_t ci = 0; ci < obj.spotLights.size(); ++ci) {
+				auto& sl = obj.spotLights[ci];
+				ImGui::PushID(14500 + (int)ci);
+				if (ImGui::TreeNode("SpotLight")) {
+					ImGui::Checkbox("Enabled##SL", &sl.enabled);
+					ImGui::ColorEdit3("Color##SL", &sl.color.x);
+					ImGui::DragFloat("Intensity##SL", &sl.intensity, 0.01f, 0.0f, 10.0f);
+					ImGui::DragFloat("Range##SL", &sl.range, 0.1f, 0.0f, 200.0f);
+					ImGui::DragFloat("Inner Cos##SL", &sl.innerCos, 0.001f, 0.0f, 1.0f);
+					ImGui::DragFloat("Outer Cos##SL", &sl.outerCos, 0.001f, 0.0f, 1.0f);
+					ImGui::DragFloat3("Attenuation##SL", &sl.atten.x, 0.01f);
+					if (ImGui::Button("Remove##SL")) {
+						obj.spotLights.erase(obj.spotLights.begin() + ci);
 						ImGui::TreePop();
 						ImGui::PopID();
 						goto end_comp;
@@ -3165,6 +3518,19 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					if (ImGui::Button("Open in VS Code")) {
 						std::string cmd = "code . " + sc.scriptPath + ".cpp " + sc.scriptPath + ".h";
 						system(cmd.c_str());
+					}
+
+					if (!sc.instance && !sc.scriptPath.empty() && !scene->IsPlaying()) {
+						sc.instance = ScriptEngine::GetInstance()->CreateScript(sc.scriptPath);
+						if (sc.instance) {
+							sc.instance->Start(obj, scene);
+						}
+					}
+
+					if (sc.instance) {
+						ImGui::Separator();
+						ImGui::Text("Script Parameters");
+						sc.instance->OnEditorUI();
 					}
 
 					if (ImGui::Button("Remove##SC")) {

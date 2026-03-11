@@ -2,6 +2,7 @@
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
+#include "../../externals/imgui/imgui.h" // ★追加
 #include <cmath>
 
 namespace Game {
@@ -141,6 +142,37 @@ void BaseScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 }
 
 void BaseScript::OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {}
+
+void BaseScript::OnEditorUI() {
+	ImGui::DragFloat("Rotation Speed", &rotationSpeed_, 0.1f);
+	ImGui::DragFloat("Attack Interval", &attackInterval_, 0.1f, 0.1f, 10.0f);
+	ImGui::DragFloat("Damage", &damage_, 1.0f, 0.0f, 1000.0f);
+	ImGui::DragFloat("Attack Range", &attackRange_, 1.0f, 1.0f, 100.0f);
+}
+
+std::string BaseScript::SerializeParameters() {
+	std::stringstream ss;
+	ss << "rotationSpeed=" << rotationSpeed_ << ";";
+	ss << "attackInterval=" << attackInterval_ << ";";
+	ss << "damage=" << damage_ << ";";
+	ss << "attackRange=" << attackRange_ << ";";
+	return ss.str();
+}
+
+void BaseScript::DeserializeParameters(const std::string& data) {
+	std::stringstream ss(data);
+	std::string item;
+	while (std::getline(ss, item, ';')) {
+		size_t pos = item.find('=');
+		if (pos == std::string::npos) continue;
+		std::string key = item.substr(0, pos);
+		std::string val = item.substr(pos + 1);
+		if (key == "rotationSpeed") rotationSpeed_ = std::stof(val);
+		else if (key == "attackInterval") attackInterval_ = std::stof(val);
+		else if (key == "damage") damage_ = std::stof(val);
+		else if (key == "attackRange") attackRange_ = std::stof(val);
+	}
+}
 
 REGISTER_SCRIPT(BaseScript);
 
