@@ -216,6 +216,8 @@ void Canon::Update(SceneObject& obj, GameScene* scene, float dt) {
 	bullet.translate.x += std::sin(desiredYaw) * muzzleOffset;
 	bullet.translate.z += std::cos(desiredYaw) * muzzleOffset;
 
+
+
 	bullet.rotate = obj.rotate;
 	bullet.scale = {0.3f, 0.3f, 0.3f};
 
