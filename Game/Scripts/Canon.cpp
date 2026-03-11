@@ -180,15 +180,22 @@ void Canon::Update(SceneObject& obj, GameScene* scene, float dt) {
 
 	// 敵方向（XZ）
 	float toX = target->translate.x - obj.translate.x;
+	float toY = target->translate.y - obj.translate.y;
 	float toZ = target->translate.z - obj.translate.z;
 
-	if (std::fabs(toX) < 0.0001f && std::fabs(toZ) < 0.0001f) {
+	float horizontalDistance = std::sqrt(toX * toX + toZ * toZ);
+
+	if (horizontalDistance < 0.0001f && std::fabs(toY) < 0.0001f) {
 		return;
 	}
 
-	// 大砲を敵の方向へ向ける（毎フレーム）
+// 左右
 	float desiredYaw = std::atan2(toX, toZ);
+
+	// 上下
+	float desiredPitch = std::atan2(toY, horizontalDistance);
 	obj.rotate.y = desiredYaw;
+	obj.rotate.x = -desiredPitch;
 
 	// クールダウン中なら撃たない（向くだけ）
 	if (attackTimer_ > 0.0f) {
@@ -202,7 +209,7 @@ void Canon::Update(SceneObject& obj, GameScene* scene, float dt) {
 	bullet.name = "Bullet";
 
 	bullet.translate = obj.translate;
-	bullet.translate.y += 2.0f;
+	
 
 	// 砲口を前に出す
 	float muzzleOffset = 2.0f;
