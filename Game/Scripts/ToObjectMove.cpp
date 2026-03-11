@@ -344,11 +344,11 @@ void ToObjectMove::DrawGrid() {
 			}
 
 			if (x == GRID_SIZE / 2 && z == GRID_SIZE / 2)
-				ImGui::Text("[S]"); // Self
+				ImGui::Text("|S|"); // Self
 			else if (isPath)
 				ImGui::Text(" * "); // ルート
 			else if (localGrid_[z][x].isWall)
-				ImGui::Text("###"); // 壁
+				ImGui::Text(" # "); // 壁
 			else
 				ImGui::Text(" . ");
 
