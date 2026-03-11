@@ -46,24 +46,6 @@
       ]
     },
     {
-      "id": 43,
-      "parentId": 0,
-      "name": "Model",
-      "locked": false,
-      "modelPath": "Resources\\Stages\\karimap.obj",
-      "texturePath": "",
-      "translate": [0, 0, 0],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "color": [0.690196, 0.388235, 0.388235, 1],
-      "extraTexturePaths": [],
-      "shaderName": "Default",
-      "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources\\Stages\\karimap.obj", "texturePath": "Resources\\uvChecker.png", "color": [0.69112,0.38692,0.38692,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": ["Resources\\Terrain\\grass.png", "Resources\\Terrain\\rock.png", "Resources\\Terrain\\dirt.png", "Resources\\basecolor.jpg", "Resources\\white1x1.png"], "lightmapPath": "", "shaderName": "EnhancedTerrain"},
-        {"type": "GpuMeshCollider", "enabled": true, "isTrigger": false, "collisionType": 0, "meshPath": "Resources\\Stages\\karimap.obj"}
-      ]
-    },
-    {
       "id": 44,
       "parentId": 0,
       "name": "Model",
@@ -78,6 +60,24 @@
       "shaderName": "Default",
       "components": [
         {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources\\walk.gltf", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+      ]
+    },
+    {
+      "id": 68,
+      "parentId": 0,
+      "name": "Model",
+      "locked": false,
+      "modelPath": "Resources\\Stages\\kariMap2.obj",
+      "texturePath": "",
+      "translate": [353.4, -61.3, -232.9],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources\\Stages\\kariMap2.obj", "texturePath": "Resources\\white1x1.png", "color": [0.517375,0.355925,0.171792,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "GpuMeshCollider", "enabled": true, "isTrigger": false, "collisionType": 0, "meshPath": "Resources\\Stages\\kariMap2.obj"}
       ]
     },
     {
@@ -171,7 +171,7 @@
         {"type": "CharacterMovement", "enabled": true, "speed": 7, "jumpPower": 20, "gravity": 9.8},
         {"type": "CameraTarget", "enabled": true, "distance": 10, "height": 3, "smoothSpeed": 5},
         {"type": "Health", "enabled": true, "hp": 1000, "maxHp": 1000, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
-        {"type": "Script", "enabled": true, "scriptPath": "PlayerScript"}
+        {"type": "Script", "enabled": true, "scriptPath": "PlayerScript", "paramData": ""}
       ]
     },
     {
