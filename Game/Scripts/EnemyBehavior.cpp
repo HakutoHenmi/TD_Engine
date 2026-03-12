@@ -332,8 +332,8 @@ void EnemyBehavior::CalculatePath(int startX, int startZ, int targetX, int targe
 
 			Node* neighbor = &localGrid_[nextZ][nextX];
 
-			// 壁or既に調べ終わったマスならスキップ
-			if (neighbor->isWall) {
+			// Walkの時と、壁or既に調べ終わったマスならスキップ
+			if (type_ == Walk && neighbor->isWall) {
 				continue;
 			}
 
