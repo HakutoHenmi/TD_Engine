@@ -1,4 +1,4 @@
-#include "ToObjectMove.h"
+#include "EnemyBehavior.h"
 #include "../imgui/imgui.h"
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
@@ -15,25 +15,23 @@ static bool HasTag(const SceneObject& obj, const char* tagName) {
 	return false; // タグが見つからなかったらfalseを返す
 }
 
-void ToObjectMove::Start(SceneObject& /*obj*/, GameScene* scene) {
+void EnemyBehavior::Start(SceneObject& obj, GameScene* scene) {
 	// ここに初期設定を記述
-	// まだプレイヤーが見つかってなければシーン内のオブジェクトから探す
-	if (target_ == nullptr && scene != nullptr) {
-		auto& objects = scene->GetObjects();
-		for (size_t i = 0; i < objects.size(); ++i) {
-			// そのオブジェクトのTagを調べる
-			if (HasTag(objects[i], targetName_.c_str())) {
-				target_ = &objects[i];
-				break;
-			}
-		}
-	}
+	// 事前に決めたターゲットを検索
+	SearchTarget(obj, scene);
 }
 
-void ToObjectMove::Update(SceneObject& obj, GameScene* scene, float dt) {
+void EnemyBehavior::Update(SceneObject& obj, GameScene* scene, float dt) {
 	// ここに毎フレームの挙動を記述
-	// タグの変更があれば更新
-	ChangeTargetTag(obj, scene, dt);
+	
+	// 自身の情報を常に最新に
+	pOwner_ = &obj;
+	pCurrentScene_ = scene;
+	
+	// 既存のターゲットを失ったときなどに改めて検索
+	if (target_ == nullptr) {
+		SearchTarget(obj, scene);
+	}
 
 	// 周囲の情報をスキャン
 	ScanSurround(obj, scene);
@@ -45,34 +43,93 @@ void ToObjectMove::Update(SceneObject& obj, GameScene* scene, float dt) {
 	Move(obj, dt);
 
 	// デバッグ描画
-	DrawGrid();
+	Debug();
 }
 
-void ToObjectMove::OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {
+void EnemyBehavior::OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {
 	// 終了時のクリーンアップなどを記述
 }
 
-void ToObjectMove::ChangeTargetTag(SceneObject& /*obj*/, GameScene* scene, float /*dt*/) {
-	if (ImGui::InputText("Target Tag", tagBuffer_, sizeof(tagBuffer_))) {
-		targetName_ = tagBuffer_;
+void EnemyBehavior::OnEditorUI() {
+	// 敵の移動タイプ(地面や空中)
+	// ライトの種類を選べるようにする
+	int typeNum = static_cast<int>(type_);
+	const char* types[] = { "Walk", "Fly" };
+	if (ImGui::Combo("Enemy Type", &typeNum, types, IM_ARRAYSIZE(types))) {
+		// 選ばれた番号をそのまま enum にキャストして戻せばOK！
+		type_ = static_cast<MoveType>(typeNum);
+	}
 
-		// 再検索の前に一旦クリアする
-		target_ = nullptr;
+	// 追うオブジェクトのタグを設定
+	// ライトの種類を選べるようにする
+	int targetNum = static_cast<int>(targetType_);
+	const char* targetTypes[] = { "Player", "Core", "Defender" };
+	if (ImGui::Combo("Target", &targetNum, targetTypes, IM_ARRAYSIZE(targetTypes))) {
+		// 選ばれた番号をそのまま enum にキャストして戻せばOK！
+		targetType_ = static_cast<TargetType>(targetNum);
 
-		if (scene != nullptr) {
-			auto& objects = scene->GetObjects();
-			for (size_t i = 0; i < objects.size(); ++i) {
-				// そのオブジェクトのTagを調べる
-				if (HasTag(objects[i], targetName_.c_str())) {
-					target_ = &objects[i];
-					break;
-				}
-			}
+		// タグ名を更新(シーンを動かしたときにすぐに検索できるように)
+		if (targetType_ == Player) {
+			targetName_ = "Player";
+		}
+		else if (targetType_ == Core) {
+			targetName_ = "Core";
+		}
+		else if (targetType_ == Defender) {
+			targetName_ = "Defender";
+		}
+
+		// 追尾するタグが変わったら新たに検索
+		if (pOwner_ && pCurrentScene_) {
+			SearchTarget(*pOwner_, pCurrentScene_);
+		}
+	}
+
+	// 複数存在し得るオブジェクトに対して優先順位を選べるように
+	if (targetType_ >= Defender) {
+		int priorityNum = static_cast<int>(priority_);
+		const char* priorities[] = { "Near", "Far" };
+		if (ImGui::Combo("Priority", &priorityNum, priorities, IM_ARRAYSIZE(priorities))) {
+			priority_ = static_cast<TargetPriority>(priorityNum);
 		}
 	}
 }
 
-void ToObjectMove::Move(SceneObject& obj, float dt) {
+void EnemyBehavior::SearchTarget(SceneObject& obj, GameScene* scene) {
+	if (scene == nullptr) {
+		return;
+	}
+
+	auto& objects = scene->GetObjects();
+	SceneObject* bestTarget = nullptr;
+	float bestDistance = (priority_ == Near) ? FLT_MAX : -1.0f;
+
+	for (size_t i = 0; i < objects.size(); ++i) {
+		if (HasTag(objects[i], targetName_.c_str())) {
+			// 距離を計算
+			float dx = objects[i].GetTransform().translate.x - obj.GetTransform().translate.x;
+			float dz = objects[i].GetTransform().translate.z - obj.GetTransform().translate.z;
+			float distSq = dx * dx + dz * dz;	// 軽量化のために平方根は取らない
+
+			// priorityごとの対応
+			if (priority_ == Near) {	// Near
+				if (distSq < bestDistance) {
+					bestDistance = distSq;
+					bestTarget = const_cast<SceneObject*>(&objects[i]);
+				}
+			}
+			else {	// Far
+				if (distSq > bestDistance) {
+					bestDistance = distSq;
+					bestTarget = const_cast<SceneObject*>(&objects[i]);
+				}
+			}
+		}
+	}
+	target_ = bestTarget;
+}
+
+void EnemyBehavior::Move(SceneObject& obj, float dt) {
 	// ターゲットが存在しない、またはtargetまでのPath(ルート)がなければ止める
 	if (target_ == nullptr || path_.empty()) {
 		return;
@@ -107,7 +164,7 @@ void ToObjectMove::Move(SceneObject& obj, float dt) {
 	}
 }
 
-void ToObjectMove::ScanSurround(SceneObject& obj, GameScene* scene) {
+void EnemyBehavior::ScanSurround(SceneObject& obj, GameScene* scene) {
 	myPos_.x = obj.GetTransform().translate.x;
 	myPos_.y = obj.GetTransform().translate.y;
 	myPos_.z = obj.GetTransform().translate.z;
@@ -163,7 +220,7 @@ void ToObjectMove::ScanSurround(SceneObject& obj, GameScene* scene) {
 	}
 }
 
-void ToObjectMove::AStar() {
+void EnemyBehavior::AStar() {
 	// ターゲットがいればA*を実行
 	if (target_ != nullptr) {
 		// targetの位置を最新の状態に
@@ -200,7 +257,7 @@ void ToObjectMove::AStar() {
 	}
 }
 
-void ToObjectMove::CalculatePath(int startX, int startZ, int targetX, int targetZ) {
+void EnemyBehavior::CalculatePath(int startX, int startZ, int targetX, int targetZ) {
 	// リストをリセットする
 	openList_.clear();
 	closedList_.clear();
@@ -327,8 +384,10 @@ void ToObjectMove::CalculatePath(int startX, int startZ, int targetX, int target
 	}
 }
 
-void ToObjectMove::DrawGrid() {
-	ImGui::Begin("Local Grid Debug");
+void EnemyBehavior::Debug() {
+	ImGui::Begin("Enemy Infomation");
+	ImGui::Text("Target Name : %s", targetName_.c_str());
+	ImGui::Text("Local Grid Debug");
 	for (int z = GRID_SIZE - 1; z >= 0; --z) {
 		for (int x = 0; x < GRID_SIZE; ++x) {
 			// そのマスが path_ に含まれているかチェック
@@ -360,6 +419,6 @@ void ToObjectMove::DrawGrid() {
 }
 
 // ★ スクリプト自動登録
-REGISTER_SCRIPT(ToObjectMove);
+REGISTER_SCRIPT(EnemyBehavior);
 
 } // namespace Game
