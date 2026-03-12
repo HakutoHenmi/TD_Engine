@@ -24,6 +24,11 @@ public:
 	using ScriptCreator = std::function<std::shared_ptr<IScript>()>;
 	void RegisterScript(const std::string& className, ScriptCreator creator);
 	std::shared_ptr<IScript> CreateScript(const std::string& className);
+	std::vector<std::string> GetRegisteredScriptNames() const {
+		std::vector<std::string> names;
+		for (auto const& [name, _] : scriptFactory_) names.push_back(name);
+		return names;
+	}
 
 private:
 	ScriptEngine() {}

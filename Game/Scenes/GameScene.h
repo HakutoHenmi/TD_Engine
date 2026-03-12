@@ -55,6 +55,7 @@ private:
 
     friend class EditorUI;
     friend class PipeEditor;
+    friend class EnemySpawnerEditor;
 };
 
 } // namespace Game

@@ -46,6 +46,23 @@
       ]
     },
     {
+      "id": 69,
+      "parentId": 0,
+      "name": "EnemySpawner",
+      "locked": false,
+      "modelPath": "",
+      "texturePath": "",
+      "translate": [73.6684, 17.9, -0.88176],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "Script", "enabled": true, "scriptPath": "EnemySpawnerScript", "paramData": "{\"enemyScriptPath\":\"EnemyAIScript\",\"enemyType\":0,\"maxCount\":10,\"pattern\":1,\"patternRadius\":4.099999904632568,\"spawnDuration\":20.5,\"waveCount\":3}"}
+      ]
+    },
+    {
       "id": 44,
       "parentId": 0,
       "name": "Model",
