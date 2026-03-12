@@ -194,7 +194,7 @@ exit /b 0
     <ClCompile Include="Game\Scripts\PipeScript.cpp" />
     <ClCompile Include="Game\Scripts\PlayerScript.cpp" />
     <ClCompile Include="Game\Scripts\ScriptEngine.cpp" />
-    <ClCompile Include="Game\Scripts\ToObjectMove.cpp" />
+    <ClCompile Include="Game\Scripts\EnemyBehavior.cpp" />
     <ClCompile Include="Game\Scripts\TowerScript.cpp" />
     <!-- ★追加 -->
     <ClCompile Include="Game\Systems\UISystem.cpp" />
@@ -215,7 +215,7 @@ exit /b 0
     <ClInclude Include="Game\Scripts\PipeScript.h" />
     <ClInclude Include="Game\Scripts\PlayerScript.h" />
     <ClInclude Include="Game\Scripts\ScriptEngine.h" />
-    <ClInclude Include="Game\Scripts\ToObjectMove.h" />
+    <ClInclude Include="Game\Scripts\EnemyBehavior.h" />
     <ClInclude Include="Game\Scripts\TowerScript.h" />
     <!-- ★追加 -->
     <ClInclude Include="Game\Systems\UISystem.h" />
