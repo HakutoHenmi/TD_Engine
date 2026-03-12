@@ -183,6 +183,7 @@ exit /b 0
   <ItemGroup>
     <ClCompile Include="Game\Editor\EditorUI.cpp" />
     <ClCompile Include="Game\Editor\PipeEditor.cpp" />
+    <ClCompile Include="Game\Editor\EnemySpawnerEditor.cpp" />
     <ClCompile Include="Game\main.cpp" />
     <ClCompile Include="Game\Scenes\GameScene.cpp" />
     <ClCompile Include="Game\Scenes\TitleScene.cpp" />
@@ -198,6 +199,7 @@ exit /b 0
     <ClCompile Include="Game\Scripts\ScriptEngine.cpp" />
     <ClCompile Include="Game\Scripts\EnemyBehavior.cpp" />
     <ClCompile Include="Game\Scripts\TowerScript.cpp" />
+    <ClCompile Include="Game\Scripts\EnemySpawnerScript.cpp" />
     <!-- ★追加 -->
     <ClCompile Include="Game\Systems\UISystem.cpp" />
     <ClCompile Include="Game\Systems\RiverSystem.cpp" />
@@ -205,6 +207,7 @@ exit /b 0
   <ItemGroup>
     <ClInclude Include="Game\Editor\EditorUI.h" />
     <ClInclude Include="Game\Editor\PipeEditor.h" />
+    <ClInclude Include="Game\Editor\EnemySpawnerEditor.h" />
     <ClInclude Include="Game\Scenes\GameScene.h" />
     <ClInclude Include="Game\Scenes\TitleScene.h" />
     <ClInclude Include="Game\ObjectTypes.h" />
@@ -221,6 +224,7 @@ exit /b 0
     <ClInclude Include="Game\Scripts\ScriptEngine.h" />
     <ClInclude Include="Game\Scripts\EnemyBehavior.h" />
     <ClInclude Include="Game\Scripts\TowerScript.h" />
+    <ClInclude Include="Game\Scripts\EnemySpawnerScript.h" />
     <!-- ★追加 -->
     <ClInclude Include="Game\Systems\UISystem.h" />
     <ClInclude Include="Game\Systems\ISystem.h" />

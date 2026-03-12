@@ -9,6 +9,7 @@
 
 #include "Audio.h"
 #include "PipeEditor.h"
+#include "EnemySpawnerEditor.h"
 #include "SceneManager.h"
 #include "WindowDX.h"
 #include <algorithm>
@@ -60,6 +61,7 @@ static ImVec2 gameImageMin = {};
 static ImVec2 gameImageMax = {};
 
 static PipeEditor s_pipeEditor;
+static EnemySpawnerEditor s_spawnerEditor;
 static uint32_t nextObjectId = 1;
 static uint32_t GenerateId() { return nextObjectId++; }
 
@@ -1650,6 +1652,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 		ImGui::Spacing();
 
 		s_pipeEditor.DrawUI();
+		s_spawnerEditor.DrawUI();
 
 		ImGui::Spacing();
 		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
@@ -1765,6 +1768,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 
 	// ---- パイプ設置エディタ ----
 	s_pipeEditor.UpdateAndDraw(gameScene, renderer, gameImageMin, gameImageMax, tW, tH);
+	s_spawnerEditor.UpdateAndDraw(gameScene, renderer, gameImageMin, gameImageMax, tW, tH);
 
 	ImGui::Image((ImTextureID)renderer->GetGameFinalSRV().ptr, ImVec2(tW, tH));
 	// 笘・ｿｽ蜉: 繝励Ξ繝上ヶ繧・Δ繝・Ν縺ｮ繝峨Λ繝・げ・・ラ繝ｭ繝・・蜿励￠蜈･繧悟・
@@ -1809,7 +1813,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				ScreenToWorldRay(localX, localY, tW, tH, viewMat, projMat, rayOrig, rayDir);
 
 				// パイプモード中は通常の選択・ギズモ操作を行わない
-				if (s_pipeEditor.IsPipeMode()) {
+				if (s_pipeEditor.IsPipeMode() || s_spawnerEditor.IsSpawnerMode()) {
 					goto EndClickProcessing;
 				}
 
@@ -2890,11 +2894,34 @@ void EditorUI::ShowInspector(GameScene* scene) {
 								     scene->objects_[i].meshRenderers[ci].color = newColor;
 						     }});
 					}
-					// Shader Name
-					char shaderBuf[128];
-					strcpy_s(shaderBuf, mr.shaderName.c_str());
-					if (ImGui::InputText("Shader##MR", shaderBuf, sizeof(shaderBuf)))
-						mr.shaderName = shaderBuf;
+					// Shader Name (Combo)
+					const auto& shaderNames = Engine::Renderer::GetInstance()->GetShaderNames();
+					if (ImGui::BeginCombo("Shader##MR", mr.shaderName.c_str())) {
+						// Default/custom empty string fallback could be considered, but rely on Renderer's registered names
+						for (const auto& sName : shaderNames) {
+							bool isSelected = (mr.shaderName == sName);
+							if (ImGui::Selectable(sName.c_str(), isSelected)) {
+								std::string oldShader = mr.shaderName;
+								std::string newShader = sName;
+								if (oldShader != newShader) {
+									int idx = scene->selectedObjectIndex_;
+									PushUndo(
+									    {"Change Shader",
+									     [scene, idx, ci, oldShader]() {
+										     if (idx < (int)scene->objects_.size() && ci < scene->objects_[idx].meshRenderers.size())
+											     scene->objects_[idx].meshRenderers[ci].shaderName = oldShader;
+									     },
+									     [scene, idx, ci, newShader]() {
+										     if (idx < (int)scene->objects_.size() && ci < scene->objects_[idx].meshRenderers.size())
+											     scene->objects_[idx].meshRenderers[ci].shaderName = newShader;
+									     }});
+									mr.shaderName = newShader;
+								}
+							}
+							if (isSelected) ImGui::SetItemDefaultFocus();
+						}
+						ImGui::EndCombo();
+					}
 					// UV Tiling & Offset
 					ImGui::DragFloat2("UV Tiling##MR", &mr.uvTiling.x, 0.01f);
 					ImGui::DragFloat2("UV Offset##MR", &mr.uvOffset.x, 0.01f);
