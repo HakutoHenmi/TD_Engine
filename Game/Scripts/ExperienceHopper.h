@@ -10,5 +10,8 @@ class ExperienceHopper : public IScript {
 	void OnDestroy(SceneObject& obj, GameScene* scene) override;
 
 private:
+	float spawnTimer_ = 0.0f;
+	
+	float spawnInterval_ = 0.5f;
 };
 } // namespace Game

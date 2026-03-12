@@ -1,6 +1,6 @@
 #include "ExperienceHopper.h"
 #include "ScriptEngine.h"
-
+#include "../imgui/imgui.h"
 namespace Game {
 // タグ走査
 static bool HasTag(const SceneObject& obj, const char* tagName) {
@@ -12,6 +12,17 @@ static bool HasTag(const SceneObject& obj, const char* tagName) {
 	return false;
 }
 
+static int CountExperienceOrbs(GameScene* scene) {
+	int orbCount = 0;
+
+	for (const SceneObject& other : scene->GetObjects()) {
+		if (HasTag(other, "ExperienceOrb")) {
+			orbCount += 1;
+		}
+	}
+
+	return orbCount;
+}
 // 球体接続判定
 static bool IsConnectedSphere(const SceneObject& a, const SceneObject& b, float connectRange) {
 	float dx = b.translate.x - a.translate.x;
@@ -52,7 +63,7 @@ static bool IsPipeConnectedToExperienceMinerRecursive(GameScene* scene, const Sc
 			continue;
 		}
 
-		if (HasTag(other, "ExprienceMiner")) {
+		if (HasTag(other, "ExperienceMiner")) {
 			return true;
 		}
 
@@ -104,21 +115,77 @@ void Game::ExperienceHopper::Start(SceneObject& obj, GameScene* scene) {
 	(void)scene;
 }
 
-void Game::ExperienceHopper::Update(SceneObject& obj, GameScene* scene, float dt) {
-
-	(void)obj;
-	(void)scene;
-
+void ExperienceHopper::Update(SceneObject& obj, GameScene* scene, float dt) {
 	obj.rotate.y += 1.0f * dt;
+
+	if (spawnTimer_ > 0.0f) {
+		spawnTimer_ -= dt;
+	}
+
 	bool connected = IsExperienceHopperConnectedToExperienceMiner(scene, obj);
 
 	if (!connected) {
 		return;
 	}
 
-	if (connected) {
-		obj.translate.y += 5.0f * dt; // 上昇速度を0.5ユニット/秒に設定
+	int orbCount = CountExperienceOrbs(scene);
+
+	if (orbCount >= 10) {
+		return;
 	}
+
+	if (spawnTimer_ > 0.0f) {
+		return;
+	}
+
+	SceneObject orb;
+	orb.name = "ExperienceOrb";
+
+	orb.translate = obj.translate;
+	orb.translate.y += 0.5f;
+	orb.scale = {0.2f, 0.2f, 0.2f};
+	orb.rotate = {0.0f, 0.0f, 0.0f};
+
+	//
+	TagComponent tag;
+	tag.tag = "ExperienceOrb";
+	orb.tags.push_back(tag);
+	// 体力
+	HealthComponent health;
+	health.hp = 1.0f;
+	health.maxHp = 1.0f;
+	orb.healths.push_back(health);
+	// 当たり判定
+	HitboxComponent hitbox;
+	hitbox.isActive = true;
+	hitbox.damage = 0.0f;
+	hitbox.tag = "ExperienceOrb";
+	hitbox.size = {1.0f, 1.0f, 1.0f};
+
+	orb.hitboxes.push_back(hitbox);
+	auto* renderer = scene->GetRenderer();
+	if (renderer) {
+		orb.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
+		orb.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
+
+		MeshRendererComponent meshRenderer;
+		meshRenderer.modelHandle = orb.modelHandle;
+		meshRenderer.textureHandle = orb.textureHandle;
+		orb.meshRenderers.push_back(meshRenderer);
+	}
+	ScriptComponent script;
+	script.scriptPath = "ExperienceOrbScript";
+	orb.scripts.push_back(script);
+
+	scene->SpawnObject(orb);
+
+	spawnTimer_ = 1.0f;
+
+
+	ImGui::Begin("ExperienceHopper Debug");
+	ImGui::Text("OrbCount: %d", CountExperienceOrbs(scene));
+	ImGui::Text("SpawnTimer: %.2f", spawnTimer_);
+	ImGui::End();
 }
 
 void Game::ExperienceHopper::OnDestroy(SceneObject& obj, GameScene* scene) {

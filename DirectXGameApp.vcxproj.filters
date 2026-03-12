@@ -52,6 +52,7 @@
     </ClCompile>
     <ClCompile Include="Game\Scripts\ExperienceMiner.cpp" />
     <ClCompile Include="Game\Scripts\ExperienceHopper.cpp" />
+    <ClCompile Include="Game\Scripts\ExperienceOrbScript.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
@@ -140,6 +141,7 @@
     </ClInclude>
     <ClInclude Include="Game\Scripts\ExperienceMiner.h" />
     <ClInclude Include="Game\Scripts\ExperienceHopper.h" />
+    <ClInclude Include="Game\Scripts\ExperienceOrbScript.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">

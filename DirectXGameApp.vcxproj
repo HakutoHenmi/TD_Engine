@@ -193,6 +193,7 @@ exit /b 0
     <ClCompile Include="Game\Scripts\EnemyDamageBySpike.cpp" />
     <ClCompile Include="Game\Scripts\ExperienceHopper.cpp" />
     <ClCompile Include="Game\Scripts\ExperienceMiner.cpp" />
+    <ClCompile Include="Game\Scripts\ExperienceOrbScript.cpp" />
     <ClCompile Include="Game\Scripts\KamikazeEnemyScript.cpp" />
     <ClCompile Include="Game\Scripts\PipeScript.cpp" />
     <ClCompile Include="Game\Scripts\PlayerScript.cpp" />
@@ -217,6 +218,7 @@ exit /b 0
     <ClInclude Include="Game\Scripts\EnemyDamageBySpike.h" />
     <ClInclude Include="Game\Scripts\ExperienceHopper.h" />
     <ClInclude Include="Game\Scripts\ExperienceMiner.h" />
+    <ClInclude Include="Game\Scripts\ExperienceOrbScript.h" />
     <ClInclude Include="Game\Scripts\IScript.h" />
     <ClInclude Include="Game\Scripts\KamikazeEnemyScript.h" />
     <ClInclude Include="Game\Scripts\PipeScript.h" />

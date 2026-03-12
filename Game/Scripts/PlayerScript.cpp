@@ -72,6 +72,10 @@ void PlayerScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	UpdateSword(obj, scene, dt);
 }
 
+
+
+
+
 void PlayerScript::UpdateMovement(SceneObject& obj, GameScene* /*scene*/, float dt) {
 	bool keyW = (GetAsyncKeyState('W') & 0x8000) != 0;
 	bool keyS = (GetAsyncKeyState('S') & 0x8000) != 0;
