@@ -5,6 +5,8 @@
 #include <iostream>
 #include <cmath>
 
+#include "PahaseSystemScript.h"
+
 namespace Game {
 
 void PlayerScript::Start(SceneObject& obj, GameScene* scene) {
@@ -67,9 +69,18 @@ void PlayerScript::Start(SceneObject& obj, GameScene* scene) {
 void PlayerScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	if (!obj.healths.empty() && obj.healths[0].isDead) return;
 
-	UpdateMovement(obj, scene, dt);
-	UpdateAttack(obj, scene, dt);
-	UpdateSword(obj, scene, dt);
+	if (PahaseSystemScript::IsPreparation()) {
+		obj.cameraTargets[0].enabled = false;
+		obj.playerInputs[0].enabled = false;
+
+	} else {
+		UpdateMovement(obj, scene, dt);
+		UpdateAttack(obj, scene, dt);
+		UpdateSword(obj, scene, dt);
+		obj.cameraTargets[0].enabled = true;
+		obj.playerInputs[0].enabled = true;
+	}
+	
 }
 
 void PlayerScript::UpdateMovement(SceneObject& obj, GameScene* /*scene*/, float dt) {

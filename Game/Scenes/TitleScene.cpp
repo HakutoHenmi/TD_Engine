@@ -19,9 +19,8 @@ void TitleScene::Initialize(Engine::WindowDX* dx) {
 
 void TitleScene::Update() {
 	// Simple logic to switch to Game scene
-	bool isSpacePressed = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
-	if (isSpacePressed) {
-		Engine::SceneManager::GetInstance()->Change("Game");
+	if (Engine::Input::GetInstance()->Trigger(DIK_SPACE)) {
+		Engine::SceneManager::GetInstance()->RequestChange("Game");
 	}
 }
 
@@ -38,7 +37,7 @@ void TitleScene::Draw() {
 void TitleScene::DrawEditor() {
 	ImGui::Begin("Title Menu");
 	if (ImGui::Button("Start Game")) {
-		Engine::SceneManager::GetInstance()->Change("Game");
+		Engine::SceneManager::GetInstance()->RequestChange("Game");
 	}
 	ImGui::Text("Press SPACE to start");
 	ImGui::End();

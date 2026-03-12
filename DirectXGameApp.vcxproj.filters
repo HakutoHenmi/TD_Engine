@@ -44,6 +44,8 @@
       <Filter>Scripts</Filter>
     </ClCompile>
     <ClCompile Include="Game\Scripts\PipeScript.cpp" />
+    <ClCompile Include="Game\Scripts\PahaseSystemScript.cpp" />
+    <ClCompile Include="Game\Scripts\PreparationCamera.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
@@ -124,6 +126,8 @@
       <Filter>Scripts</Filter>
     </ClInclude>
     <ClInclude Include="Game\Scripts\PipeScript.h" />
+    <ClInclude Include="Game\Scripts\PahaseSystemScript.h" />
+    <ClInclude Include="Game\Scripts\PreparationCamera.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">
