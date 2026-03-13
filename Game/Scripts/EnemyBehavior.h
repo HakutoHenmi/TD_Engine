@@ -94,6 +94,7 @@ private: // メンバ変数
 	std::string targetName_ = "Player";	// 一旦初期値をPlayerに
 	const SceneObject* target_ = nullptr;
 	DirectX::XMFLOAT3 myPos_ = {};
+	float groundHeight_ = 0.0f;	// FlyTypeが地面の高さを取るため
 	DirectX::XMFLOAT3 targetPos_ = {}; // 移動速度
 	float speed_ = 5.0f;
 
