@@ -389,6 +389,18 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 		}
 		ss << "]}";
 	}
+	for (const auto& var : o.variables) {
+		if (!first) ss << ",\n";
+		first = false;
+		ss << "        {\"type\": \"Variable\", \"enabled\": " << (var.enabled ? "true" : "false") << ", \"values\": {";
+		bool firstV = true;
+		for (auto const& [key, val] : var.values) {
+			if (!firstV) ss << ", ";
+			firstV = false;
+			ss << "\"" << EscapeJson(key) << "\": " << val;
+		}
+		ss << "}}";
+	}
 	ss << "\n      ]\n";
 	ss << "    }";
 	return ss.str();
@@ -798,6 +810,36 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 			if (!gmc.meshPath.empty())
 				gmc.meshHandle = renderer->LoadObjMesh(gmc.meshPath);
 			obj.gpuMeshColliders.push_back(gmc);
+		} else if (type == "Variable") {
+			VariableComponent vc;
+			vc.enabled = enabled;
+			auto vPos = cblock.find("\"values\"");
+			if (vPos != std::string::npos) {
+				auto s = cblock.find("{", vPos);
+				auto e = FindBlockEnd(cblock, s);
+				if (s != std::string::npos && e != std::string::npos) {
+					std::string vblock = cblock.substr(s + 1, e - s - 1);
+					// 簡略的なパース（"key": val）
+					size_t cur = 0;
+					while (cur < vblock.size()) {
+						auto q1 = vblock.find("\"", cur);
+						if (q1 == std::string::npos) break;
+						auto q2 = vblock.find("\"", q1 + 1);
+						if (q2 == std::string::npos) break;
+						std::string key = vblock.substr(q1 + 1, q2 - q1 - 1);
+						auto col = vblock.find(":", q2);
+						if (col == std::string::npos) break;
+						char* endPtr = nullptr;
+						float val = (float)std::strtod(vblock.c_str() + col + 1, &endPtr);
+						vc.values[key] = val;
+						cur = (size_t)(endPtr - vblock.c_str());
+						auto comma = vblock.find(",", cur);
+						if (comma != std::string::npos) cur = comma + 1;
+						else cur = vblock.size();
+					}
+				}
+			}
+			obj.variables.push_back(vc);
 		} else if (type == "PlayerInput") { // 笘・ｿｽ蜉
 			PlayerInputComponent pi;
 			pi.enabled = enabled;
@@ -1919,7 +1961,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 								// Shift+繧ｯ繝ｪ繝・け: 霑ｽ蜉驕ｸ謚・
 								gameScene->selectedIndices_.insert(bestIdx);
 							} else {
-								// 騾壼ｸｸ繧ｯ繝ｪ繝・け: 蜊倅ｸ驕ｸ謚・
+								// 騾壼ｸｸ繧ｯ繝ｪ繝・け: 蜊倅ｸｸ驕ｸ謚・
 								gameScene->selectedIndices_ = {bestIdx};
 							}
 							gameScene->selectedObjectIndex_ = bestIdx;
@@ -3571,6 +3613,48 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
+			// Variable
+			for (size_t ci = 0; ci < obj.variables.size(); ++ci) {
+				auto& vc = obj.variables[ci];
+				ImGui::PushID(24000 + (int)ci);
+				if (ImGui::TreeNode("Variables")) {
+					ImGui::Checkbox("Enabled##VC", &vc.enabled);
+					
+					std::string keyToDelete = "";
+					for (auto& [key, val] : vc.values) {
+						ImGui::PushID(key.c_str());
+						ImGui::Text("%s", key.c_str());
+						ImGui::SameLine(100);
+						ImGui::SetNextItemWidth(-30);
+						ImGui::DragFloat("##val", &val, 0.1f);
+						ImGui::SameLine();
+						if (ImGui::Button("x")) keyToDelete = key;
+						ImGui::PopID();
+					}
+					if (!keyToDelete.empty()) vc.values.erase(keyToDelete);
+
+					static char newVarName[64] = "";
+					ImGui::SetNextItemWidth(100);
+					ImGui::InputText("##NewVar", newVarName, sizeof(newVarName));
+					ImGui::SameLine();
+					if (ImGui::Button("Add Variable")) {
+						if (strlen(newVarName) > 0) {
+							vc.values[newVarName] = 0.0f;
+							newVarName[0] = '\0';
+						}
+					}
+
+					if (ImGui::Button("Remove##VC")) {
+						obj.variables.erase(obj.variables.begin() + ci);
+						ImGui::TreePop();
+						ImGui::PopID();
+						goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+
 		end_comp:
 			ImGui::Separator();
 			if (ImGui::Button("Add Component"))
@@ -3640,6 +3724,8 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					obj.healths.push_back({});
 				if (ImGui::MenuItem("Script"))
 					obj.scripts.push_back({});
+				if (ImGui::MenuItem("Variables"))
+					obj.variables.push_back({});
 				ImGui::EndPopup();
 			}
 		}
