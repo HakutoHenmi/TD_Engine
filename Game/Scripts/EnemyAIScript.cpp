@@ -5,6 +5,10 @@
 #include <cmath>
 #include <cstdlib> // rand()用
 #include <iostream>
+#include "../../externals/imgui/imgui.h"
+#include "../../Engine/ThirdParty/nlohmann/json.hpp"
+
+using json = nlohmann::json;
 
 namespace Game {
 
@@ -116,6 +120,28 @@ void EnemyAIScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 }
 
 void EnemyAIScript::OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {}
+
+void EnemyAIScript::OnEditorUI() {
+	ImGui::SliderFloat("移動速度", &speed_, 0.0f, 20.0f, "%.1f m/s");
+	ImGui::SliderFloat("索敵範囲", &sightRange_, 0.0f, 200.0f, "%.1f m");
+}
+
+std::string EnemyAIScript::SerializeParameters() {
+	json j;
+	j["speed"] = speed_;
+	j["sightRange"] = sightRange_;
+	return j.dump();
+}
+
+void EnemyAIScript::DeserializeParameters(const std::string& data) {
+	if (data.empty()) return;
+	try {
+		json j = json::parse(data);
+		if (j.contains("speed")) speed_ = j["speed"].get<float>();
+		if (j.contains("sightRange")) sightRange_ = j["sightRange"].get<float>();
+	} catch (...) {
+	}
+}
 
 // ★ スクリプト自動登録
 REGISTER_SCRIPT(EnemyAIScript);
