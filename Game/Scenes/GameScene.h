@@ -35,6 +35,11 @@ public:
     Engine::Renderer* GetRenderer() const { return renderer_; } // ★追加
     Engine::Matrix4x4 GetWorldMatrix(int index) const; // ★追加
 
+	// ★追加: 名前でオブジェクトを検索するヘルパー
+	SceneObject* FindObjectByName(const std::string& name);
+	// ★追加: 指定座標のメッシュ表面の高さを取得
+	float GetHeightAt(float x, float z);
+
 private:
     Engine::WindowDX* dx_ = nullptr;
     Engine::Renderer* renderer_ = nullptr;

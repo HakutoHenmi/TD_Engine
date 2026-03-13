@@ -3,6 +3,7 @@
 #include <DirectXMath.h>
 #include <string>
 #include <vector>
+#include <memory>
 
 namespace Game {
 
@@ -30,8 +31,11 @@ public:
 
 	// --- パラメータ (公開) ---
 	int waveCount = 1;            // ウェーブ数
+	int startWave = 0;            // 開始ウェーブ (0-indexed)
+	float waveDelay = 2.0f;       // ウェーブ開始時の待機時間 (秒)
 	int enemyType = 0;            // エネミー種類 (ID) - 後方互換のため維持
 	std::string enemyScriptPath = "EnemyAIScript"; // 出現させるエネミーのスクリプト名
+	std::string enemyScriptParams = "";            // 出現させる敵スクリプトのパラメータ(JSON)
 	float spawnDuration = 10.0f;  // 開始～終了までの全体時間 (秒)
 	SpawnPattern pattern = SpawnPattern::Point; // 配列パターン
 	float patternRadius = 3.0f;   // Circle/Line の半径・長さ
@@ -42,6 +46,11 @@ private:
 	int currentWave_ = 0;
 	int spawnedThisWave_ = 0;
 	float elapsedTime_ = 0.0f;
+	bool isWaitingDelay_ = true;
+
+	// エディタUI用の一時的なスクリプトインスタンス
+	std::shared_ptr<IScript> editorScriptInstance_ = nullptr;
+	std::string lastLoadedPath_ = "";
 
 	// 計算されたインターバル
 	float CalcInterval() const;

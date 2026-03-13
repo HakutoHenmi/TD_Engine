@@ -9,9 +9,9 @@
 
 struct Node {
 	bool isWall = false;    // Wallタグを持ったオブジェクトがあるか
-	int gridX, gridZ;       // グリッド上の座標
-	float gCost;            // スタートからの距離
-	float hCost;            // ゴールまでの推定距離
+	int gridX = 0, gridZ = 0;       // グリッド上の座標
+	float gCost = 0.0f;            // スタートからの距離
+	float hCost = 0.0f;            // ゴールまでの推定距離
 	Node* parent = nullptr; // どのマスからきたか(ルートを逆算する)
 
 	// 最短経路のコストを計算するメソッド

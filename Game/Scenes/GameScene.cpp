@@ -317,6 +317,55 @@ void GameScene::Update() {
 // ★ 汎用スポーン
 void GameScene::SpawnObject(const SceneObject& obj) { pendingSpawns_.push_back(obj); }
 
+// ★追加: 名前でオブジェクトを検索
+SceneObject* GameScene::FindObjectByName(const std::string& name) {
+	for (auto& obj : objects_) {
+		if (obj.name == name) {
+			return &obj;
+		}
+	}
+	return nullptr;
+}
+
+// ★追加: 指定座標のメッシュ表面の高さを取得
+float GameScene::GetHeightAt(float x, float z) {
+	float maxHeight = -1000.0f;
+	bool hitAny = false;
+
+	// レイの開始位置（十分に高い位置）と方向（真下）
+	DirectX::XMVECTOR rayPos = DirectX::XMVectorSet(x, 1000.0f, z, 1.0f);
+	DirectX::XMVECTOR rayDir = DirectX::XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f);
+
+	for (const auto& obj : objects_) {
+		// メッシュレンダラーまたはGPUメッシュコライダーを持つオブジェクトを対象にする
+		uint32_t modelHandle = 0;
+		if (!obj.gpuMeshColliders.empty() && obj.gpuMeshColliders[0].enabled) {
+			modelHandle = obj.gpuMeshColliders[0].meshHandle;
+			if (modelHandle == 0) modelHandle = obj.modelHandle;
+		} else if (obj.modelHandle != 0) {
+			// コライダーがない場合でもモデルがあれば判定対象にする（必要に応じて調整）
+			modelHandle = obj.modelHandle;
+		}
+
+		if (modelHandle == 0) continue;
+
+		auto* model = renderer_->GetModel(modelHandle);
+		if (!model) continue;
+
+		float dist = 0.0f;
+		Engine::Vector3 hitPoint;
+		// Model::RayCast は Local Space で判定するため、内部でワールド行列を考慮している
+		if (model->RayCast(rayPos, rayDir, obj.GetTransform().ToMatrix(), dist, hitPoint)) {
+			if (hitPoint.y > maxHeight) {
+				maxHeight = hitPoint.y;
+				hitAny = true;
+			}
+		}
+	}
+
+	return hitAny ? maxHeight : 0.0f;
+}
+
 Engine::Matrix4x4 GameScene::GetWorldMatrix(int index) const {
 	if (index < 0 || index >= (int)objects_.size()) return Engine::Matrix4x4::Identity();
 	const auto& obj = objects_[index];

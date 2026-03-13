@@ -22,15 +22,26 @@ float EnemySpawnerScript::CalcInterval() const {
 }
 
 void EnemySpawnerScript::Start(SceneObject& /*obj*/, GameScene* /*scene*/) {
-	currentWave_ = 0;
+	currentWave_ = startWave;
 	spawnedThisWave_ = 0;
 	elapsedTime_ = 0.0f;
+	isWaitingDelay_ = true;
 }
 
 void EnemySpawnerScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	if (currentWave_ >= waveCount) return;
 
 	elapsedTime_ += dt;
+
+	// ウェーブ開始前の遅延
+	if (isWaitingDelay_) {
+		if (elapsedTime_ < waveDelay) {
+			return;
+		}
+		elapsedTime_ = 0.0f; // 遅延終了後、出現タイマーリセット
+		isWaitingDelay_ = false;
+	}
+
 	float interval = CalcInterval();
 	int shouldHaveSpawned = (interval > 0.0001f) ? static_cast<int>(elapsedTime_ / interval) + 1 : maxCount;
 	if (shouldHaveSpawned > maxCount) shouldHaveSpawned = maxCount;
@@ -64,91 +75,42 @@ void EnemySpawnerScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 
 		auto* renderer = Engine::Renderer::GetInstance();
 
-		if (enemyType == 42) {
-			enemy.scale = {1.0f, 1.0f, 1.0f};
-
-			if (renderer) {
-				enemy.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
-				enemy.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
-				MeshRendererComponent mr;
-				mr.modelHandle = enemy.modelHandle;
-				mr.textureHandle = enemy.textureHandle;
-				mr.color = {1.0f, 0.2f, 0.2f, 1.0f}; // Red cube
-				mr.shaderName = "Toon";
-				enemy.meshRenderers.push_back(mr);
-			}
-
-			// BoxCollider
-			BoxColliderComponent bc;
-			bc.size = {1.0f, 2.0f, 1.0f};
-			enemy.boxColliders.push_back(bc);
-
-			// Rigidbody
-			RigidbodyComponent rb;
-			rb.useGravity = true;
-			enemy.rigidbodies.push_back(rb);
-
-			// Hurtbox
-			HurtboxComponent hurtbox;
-			hurtbox.size = {2.0f, 2.0f, 2.0f};
-			hurtbox.tag = "Body";
-			hurtbox.damageMultiplier = 1.0f;
-			enemy.hurtboxes.push_back(hurtbox);
-
-			// Health
-			HealthComponent health;
-			health.hp = 100.0f;
-			health.maxHp = 100.0f;
-			enemy.healths.push_back(health);
-
-			TagComponent tag;
-			tag.tag = "Enemy";
-			enemy.tags.push_back(tag);
-
-			// Script
-			ScriptComponent sc;
-			sc.scriptPath = enemyScriptPath;
-			sc.enabled = true;
-			enemy.scripts.push_back(sc);
-		} else {
-			// デフォルト (enemyScriptPath が存在する場合も含む)
-			enemy.scale = {1.0f, 1.0f, 1.0f};
-
-			if (renderer) {
-				enemy.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
-				enemy.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
-				MeshRendererComponent mr;
-				mr.modelHandle = enemy.modelHandle;
-				mr.textureHandle = enemy.textureHandle;
-				mr.color = {1.0f, 0.4f, 0.2f, 1.0f}; // Orange/Red color
-				mr.shaderName = "Toon";
-				enemy.meshRenderers.push_back(mr);
-			}
-
-			// BoxCollider, Rigidbody, Health, Tag 等を付与
-			BoxColliderComponent bc;
-			bc.size = {1.0f, 2.0f, 1.0f};
-			enemy.boxColliders.push_back(bc);
-
-			RigidbodyComponent rb;
-			rb.useGravity = true;
-			enemy.rigidbodies.push_back(rb);
-
-			HealthComponent health;
-			health.hp = 100.0f;
-			health.maxHp = 100.0f;
-			enemy.healths.push_back(health);
-
-			TagComponent tag;
-			tag.tag = "Enemy";
-			enemy.tags.push_back(tag);
-
-			// Script
-			ScriptComponent sc;
-			sc.scriptPath = enemyScriptPath;
-			sc.enabled = true;
-			enemy.scripts.push_back(sc);
+		// エネミーの基本共通設定
+		enemy.scale = {1.0f, 1.0f, 1.0f};
+		if (renderer) {
+			enemy.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
+			enemy.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
+			MeshRendererComponent mr;
+			mr.modelHandle = enemy.modelHandle;
+			mr.textureHandle = enemy.textureHandle;
+			mr.color = (enemyType == 42) ? DirectX::XMFLOAT4{1.0f, 0.2f, 0.2f, 1.0f} : DirectX::XMFLOAT4{1.0f, 0.4f, 0.2f, 1.0f};
+			mr.shaderName = "Toon";
+			enemy.meshRenderers.push_back(mr);
 		}
+
+		BoxColliderComponent bc;
+		bc.size = {1.0f, 2.0f, 1.0f};
+		enemy.boxColliders.push_back(bc);
+
+		RigidbodyComponent rb;
+		rb.useGravity = true;
+		enemy.rigidbodies.push_back(rb);
+
+		HealthComponent health;
+		health.hp = 100.0f;
+		health.maxHp = 100.0f;
+		enemy.healths.push_back(health);
+
+		TagComponent tag;
+		tag.tag = "Enemy";
+		enemy.tags.push_back(tag);
+
+		// スクリプトとパラメータの設定
+		ScriptComponent sc;
+		sc.scriptPath = enemyScriptPath;
+		sc.enabled = true;
+		sc.parameterData = enemyScriptParams; // ★ 保存されていたパラメータを渡す
+		enemy.scripts.push_back(sc);
 
 		scene->SpawnObject(enemy);
 
@@ -160,6 +122,7 @@ void EnemySpawnerScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 		currentWave_++;
 		spawnedThisWave_ = 0;
 		elapsedTime_ = 0.0f;
+		isWaitingDelay_ = true; // 次のウェーブも遅延から開始
 	}
 }
 
@@ -168,8 +131,10 @@ void EnemySpawnerScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 void EnemySpawnerScript::OnEditorUI() {
 	ImGui::SeparatorText("Enemy Spawner");
 
-	// --- 基本パラメータ (手打ち) ---
-	ImGui::DragInt("ウェーブ数", &waveCount, 0.1f, 1, 100);
+	// --- 基本パラメータ ---
+	ImGui::DragInt("ウェーブ総数", &waveCount, 0.1f, 1, 100);
+	ImGui::DragInt("開始ウェーブ", &startWave, 0.1f, 0, waveCount - 1);
+	ImGui::SliderFloat("各ウェーブ開始遅延", &waveDelay, 0.0f, 60.0f, "%.1f s");
 	
 	// エネミー種類のスクリプト選択 (ドロップダウン)
 	auto scripts = ScriptEngine::GetInstance()->GetRegisteredScriptNames();
@@ -183,8 +148,29 @@ void EnemySpawnerScript::OnEditorUI() {
 		}
 		ImGui::EndCombo();
 	}
+
+	// --- 出現敵のパラメータ調整 (さらに表示) ---
+	if (!enemyScriptPath.empty()) {
+		// キャッシュが古いか無い場合は生成
+		if (lastLoadedPath_ != enemyScriptPath || !editorScriptInstance_) {
+			editorScriptInstance_ = ScriptEngine::GetInstance()->CreateScript(enemyScriptPath);
+			if (editorScriptInstance_) {
+				editorScriptInstance_->DeserializeParameters(enemyScriptParams);
+			}
+			lastLoadedPath_ = enemyScriptPath;
+		}
+
+		if (editorScriptInstance_) {
+			if (ImGui::TreeNodeEx("出現敵スクリプトの調整", ImGuiTreeNodeFlags_DefaultOpen)) {
+				editorScriptInstance_->OnEditorUI();
+				// 変更があった場合にシリアライズして保存
+				enemyScriptParams = editorScriptInstance_->SerializeParameters();
+				ImGui::TreePop();
+			}
+		}
+	}
 	
-	ImGui::DragInt("最大出現数", &maxCount, 0.1f, 1, 200);
+	ImGui::DragInt("1ウェーブ出現数", &maxCount, 0.1f, 1, 200);
 
 	// --- 全体時間 (直感スライダー) ---
 	ImGui::Spacing();
@@ -320,8 +306,11 @@ void EnemySpawnerScript::DrawSpawnPreview(const DirectX::XMFLOAT3& worldPos) con
 std::string EnemySpawnerScript::SerializeParameters() {
 	json j;
 	j["waveCount"] = waveCount;
+	j["startWave"] = startWave;
+	j["waveDelay"] = waveDelay;
 	j["enemyType"] = enemyType;
 	j["enemyScriptPath"] = enemyScriptPath;
+	j["enemyScriptParams"] = enemyScriptParams;
 	j["spawnDuration"] = spawnDuration;
 	j["pattern"] = static_cast<int>(pattern);
 	j["patternRadius"] = patternRadius;
@@ -334,8 +323,11 @@ void EnemySpawnerScript::DeserializeParameters(const std::string& data) {
 	try {
 		json j = json::parse(data);
 		if (j.contains("waveCount")) waveCount = j["waveCount"].get<int>();
+		if (j.contains("startWave")) startWave = j["startWave"].get<int>();
+		if (j.contains("waveDelay")) waveDelay = j["waveDelay"].get<float>();
 		if (j.contains("enemyType")) enemyType = j["enemyType"].get<int>();
 		if (j.contains("enemyScriptPath")) enemyScriptPath = j["enemyScriptPath"].get<std::string>();
+		if (j.contains("enemyScriptParams")) enemyScriptParams = j["enemyScriptParams"].get<std::string>();
 		if (j.contains("spawnDuration")) spawnDuration = j["spawnDuration"].get<float>();
 		if (j.contains("pattern")) pattern = static_cast<SpawnPattern>(j["pattern"].get<int>());
 		if (j.contains("patternRadius")) patternRadius = j["patternRadius"].get<float>();

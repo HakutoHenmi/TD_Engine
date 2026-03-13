@@ -54,6 +54,10 @@ void ScriptEngine::Execute(SceneObject& obj, GameScene* scene, float dt) {
 	if (!comp.instance) {
 		comp.instance = CreateScript(comp.scriptPath);
 		if (comp.instance) {
+			// ★追加: 保持されているパラメータをデシリアライズして反映
+			if (!comp.parameterData.empty()) {
+				comp.instance->DeserializeParameters(comp.parameterData);
+			}
 			comp.instance->Start(obj, scene);
 		} else {
 			return;
