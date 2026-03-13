@@ -33,7 +33,8 @@ enum class ComponentType {
 	AudioSource, AudioListener, Hitbox, Hurtbox, Health, // ★追加: 音響 & 戦闘判定 & ステータス
 	Script, // ★追加: スクリプトコンポーネント
 	RectTransform, UIImage, UIText, UIButton, // ★追加: UIコンポーネント
-	River // ★追加: 川コンポーネント
+	River, // ★追加: 川コンポーネント
+	Variable // ★追加: 汎用変数
 };
 struct Component { 
 	ComponentType type = ComponentType::MeshRenderer; 
@@ -279,6 +280,20 @@ struct RiverComponent : public Component {
 	RiverComponent() { type = ComponentType::River; }
 };
 
+// ★追加: 汎用変数コンポーネント (スクリプト間通信用)
+struct VariableComponent : public Component {
+	std::map<std::string, float> values;
+	VariableComponent() { type = ComponentType::Variable; }
+
+	float GetValue(const std::string& key, float defaultVal = 0.0f) const {
+		auto it = values.find(key);
+		return (it != values.end()) ? it->second : defaultVal;
+	}
+	void SetValue(const std::string& key, float val) {
+		values[key] = val;
+	}
+};
+
 // ★ エディター用オブジェクト構造体
 struct SceneObject {
 	uint32_t id = 0;           // ★ 個別識別子
@@ -336,6 +351,8 @@ struct SceneObject {
 
 	// ★追加: 川コンポーネント
 	std::vector<RiverComponent> rivers;
+	// ★追加: 汎用変数
+	std::vector<VariableComponent> variables;
 
 	Engine::Transform GetTransform() const {
 		Engine::Transform t;
@@ -345,6 +362,39 @@ struct SceneObject {
 		return t;
 	}
 	bool HasMeshRenderer() const { return !meshRenderers.empty() || modelHandle != 0; }
+
+	// ★追加: 汎用変数の取得・設定ヘルパー
+	float GetVariable(const std::string& key, float defaultVal = 0.0f) const {
+		for (const auto& vc : variables) {
+			if (vc.enabled) {
+				auto it = vc.values.find(key);
+				if (it != vc.values.end()) return it->second;
+			}
+		}
+		return defaultVal;
+	}
+	void SetVariable(const std::string& key, float val) {
+		// まずは既存のキーを探して上書きする
+		for (auto& vc : const_cast<SceneObject*>(this)->variables) {
+			auto it = vc.values.find(key);
+			if (it != vc.values.end()) {
+				it->second = val;
+				return;
+			}
+		}
+		// なければ最初のコンポーネントに追加 (コンポーネントがなければ作成)
+		if (const_cast<SceneObject*>(this)->variables.empty()) {
+			VariableComponent vc;
+			vc.values[key] = val;
+			const_cast<SceneObject*>(this)->variables.push_back(vc);
+		} else {
+			const_cast<SceneObject*>(this)->variables[0].values[key] = val;
+		}
+	}
+	// ★追加: 数値を加算するヘルパー
+	void AddVariable(const std::string& key, float delta) {
+		SetVariable(key, GetVariable(key) + delta);
+	}
 };
 
 } // namespace Game
