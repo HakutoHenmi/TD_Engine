@@ -1,6 +1,7 @@
 #pragma once
 #include "IScript.h"
 
+#include "PlayerScript.h"
 namespace Game {
 
 class ExperienceOrbScript : public IScript {

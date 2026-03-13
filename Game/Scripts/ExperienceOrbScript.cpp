@@ -7,6 +7,7 @@
 
 namespace Game {
 
+/// タグを持っているかチェックするヘルパー関数
 static bool HasTag(const SceneObject& obj, const char* tagName) {
 	for (int i = 0; i < (int)obj.tags.size(); ++i) {
 		if (obj.tags[i].tag == tagName) {
@@ -18,6 +19,7 @@ static bool HasTag(const SceneObject& obj, const char* tagName) {
 
 void ExperienceOrbScript::Start(SceneObject& obj, GameScene* /*scene*/) {
 
+	// ランダムな初速を設定
 	float randomX = (float(rand()) / float(RAND_MAX)) - 0.5f;
 	float randomZ = (float(rand()) / float(RAND_MAX)) - 0.5f;
 
@@ -64,6 +66,7 @@ void ExperienceOrbScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 		float dx = playerObject->translate.x - obj.translate.x;
 		float dy = playerCenterY - obj.translate.y;
 		float dz = playerObject->translate.z - obj.translate.z;
+
 
 		float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
 
@@ -114,9 +117,6 @@ void ExperienceOrbScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 
 		obj.translate.y = (startY_ - 1.0f) + floatHeight;
 	}
-
-
-	
 }
 
 void ExperienceOrbScript::OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {}

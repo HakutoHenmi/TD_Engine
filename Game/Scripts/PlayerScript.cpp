@@ -1,10 +1,10 @@
 #include "PlayerScript.h"
+#include "../imgui/imgui.h"
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
-#include <iostream>
 #include <cmath>
-
+#include <iostream>
 namespace Game {
 
 void PlayerScript::Start(SceneObject& obj, GameScene* scene) {
@@ -22,8 +22,8 @@ void PlayerScript::Start(SceneObject& obj, GameScene* scene) {
 		// 剣がなければ生成
 		SceneObject newSword;
 		newSword.name = swordName_;
-		newSword.color = { 0.9f, 0.9f, 0.9f, 1.0f };
-		newSword.scale = { 0.1f, 0.1f, 1.6f };
+		newSword.color = {0.9f, 0.9f, 0.9f, 1.0f};
+		newSword.scale = {0.1f, 0.1f, 1.6f};
 
 		auto* renderer = scene->GetRenderer();
 		if (renderer) {
@@ -40,13 +40,13 @@ void PlayerScript::Start(SceneObject& obj, GameScene* scene) {
 		hb.isActive = false;
 		hb.damage = 25.0f;
 		hb.tag = "Sword";
-		hb.size = { 0.5f, 0.5f, 3.0f };
+		hb.size = {0.5f, 0.5f, 3.0f};
 		newSword.hitboxes.push_back(hb);
-
+		
 		scene->SpawnObject(newSword);
 	} else {
 		// 既にある場合は基本的なプロパティを維持（色はエディタの設定を優先するため上書きしない）
-		sword->scale = { 0.1f, 0.1f, 1.6f };
+		sword->scale = {0.1f, 0.1f, 1.6f};
 		if (!sword->meshRenderers.empty()) {
 			// モデル未設定なら設定
 			if (sword->modelPath == "" || sword->modelPath.empty()) {
@@ -65,16 +65,18 @@ void PlayerScript::Start(SceneObject& obj, GameScene* scene) {
 }
 
 void PlayerScript::Update(SceneObject& obj, GameScene* scene, float dt) {
-	if (!obj.healths.empty() && obj.healths[0].isDead) return;
+	if (!obj.healths.empty() && obj.healths[0].isDead)
+		return;
+
 
 	UpdateMovement(obj, scene, dt);
 	UpdateAttack(obj, scene, dt);
 	UpdateSword(obj, scene, dt);
+
+	ImGui::Begin("Debug Playerorb");
+	ImGui::Text("orb: %d", playerExperience_);
+	ImGui::End();
 }
-
-
-
-
 
 void PlayerScript::UpdateMovement(SceneObject& obj, GameScene* /*scene*/, float dt) {
 	bool keyW = (GetAsyncKeyState('W') & 0x8000) != 0;
@@ -85,23 +87,29 @@ void PlayerScript::UpdateMovement(SceneObject& obj, GameScene* /*scene*/, float 
 
 	float speedMul = isAttacking_ ? 0.3f : 1.0f;
 
-	DirectX::XMFLOAT3 move = { 0, 0, 0 };
-	if (keyW) move.z += speedMul;
-	if (keyS) move.z -= speedMul;
-	if (keyA) move.x -= speedMul;
-	if (keyD) move.x += speedMul;
+	DirectX::XMFLOAT3 move = {0, 0, 0};
+	if (keyW)
+		move.z += speedMul;
+	if (keyS)
+		move.z -= speedMul;
+	if (keyA)
+		move.x -= speedMul;
+	if (keyD)
+		move.x += speedMul;
 
 	if (!obj.playerInputs.empty()) {
 		auto& input = obj.playerInputs[0];
-		input.moveDir = { move.x, move.z };
+		input.moveDir = {move.x, move.z};
 		input.jumpRequested = keySpace;
 	}
 
 	if (std::abs(move.x) > 0.1f || std::abs(move.z) > 0.1f) {
 		float targetAngle = std::atan2(move.x, move.z);
 		float angleDiff = targetAngle - obj.rotate.y;
-		while (angleDiff >  DirectX::XM_PI) angleDiff -= DirectX::XM_2PI;
-		while (angleDiff < -DirectX::XM_PI) angleDiff += DirectX::XM_2PI;
+		while (angleDiff > DirectX::XM_PI)
+			angleDiff -= DirectX::XM_2PI;
+		while (angleDiff < -DirectX::XM_PI)
+			angleDiff += DirectX::XM_2PI;
 		obj.rotate.y += angleDiff * 10.0f * dt;
 	}
 }
@@ -196,26 +204,33 @@ void PlayerScript::UpdateSword(SceneObject& obj, GameScene* scene, float /*dt*/)
 			break;
 		}
 	}
-	if (!sword) return;
+	if (!sword)
+		return;
 
-	DirectX::XMFLOAT3 currentSwordRotRad = { 0, 0, 0 };
+	DirectX::XMFLOAT3 currentSwordRotRad = {0, 0, 0};
 	bool hitboxActive = false;
 
 	if (isAttacking_) {
 		float t = 0.0f;
 		DirectX::XMFLOAT3 swordStart = startSwordRot_;
-		DirectX::XMFLOAT3 swordEnd = { 0, 0, 0 };
-		DirectX::XMFLOAT3 bodyEnd = { 0, 0, 0 };
+		DirectX::XMFLOAT3 swordEnd = {0, 0, 0};
+		DirectX::XMFLOAT3 bodyEnd = {0, 0, 0};
 
 		if (comboCount_ == 1) { // 1段目
 			if (currentPhase_ == AttackPhase::WindUp) {
 				t = EaseOutCubic(1.0f - (attackTimer_ / 0.2f));
-				swordEnd.x = 5; swordEnd.y = 110; swordEnd.z = -20;
+				swordEnd.x = 5;
+				swordEnd.y = 110;
+				swordEnd.z = -20;
 				bodyEnd.y = DirectX::XMConvertToRadians(-25.0f);
 			} else {
 				t = EaseOutExpo(1.0f - (attackTimer_ / 0.25f));
-				swordStart.x = 5; swordStart.y = 110; swordStart.z = -20;
-				swordEnd.x = 0; swordEnd.y = -110; swordEnd.z = 20;
+				swordStart.x = 5;
+				swordStart.y = 110;
+				swordStart.z = -20;
+				swordEnd.x = 0;
+				swordEnd.y = -110;
+				swordEnd.z = 20;
 				bodyEnd.y = DirectX::XMConvertToRadians(30.0f);
 				bodyEnd.z = DirectX::XMConvertToRadians(5.0f);
 				hitboxActive = true;
@@ -223,12 +238,18 @@ void PlayerScript::UpdateSword(SceneObject& obj, GameScene* scene, float /*dt*/)
 		} else if (comboCount_ == 2) { // 2段目
 			if (currentPhase_ == AttackPhase::WindUp) {
 				t = EaseOutCubic(1.0f - (attackTimer_ / 0.2f));
-				swordEnd.x = 50; swordEnd.y = -60; swordEnd.z = 20;
+				swordEnd.x = 50;
+				swordEnd.y = -60;
+				swordEnd.z = 20;
 				bodyEnd.x = DirectX::XMConvertToRadians(10.0f);
 			} else {
 				t = EaseOutBack(1.0f - (attackTimer_ / 0.25f));
-				swordStart.x = 50; swordStart.y = -60; swordStart.z = 20;
-				swordEnd.x = -40; swordEnd.y = 50; swordEnd.z = -20;
+				swordStart.x = 50;
+				swordStart.y = -60;
+				swordStart.z = 20;
+				swordEnd.x = -40;
+				swordEnd.y = 50;
+				swordEnd.z = -20;
 				bodyEnd.x = DirectX::XMConvertToRadians(-15.0f);
 				bodyEnd.y = DirectX::XMConvertToRadians(-10.0f);
 				hitboxActive = true;
@@ -236,17 +257,24 @@ void PlayerScript::UpdateSword(SceneObject& obj, GameScene* scene, float /*dt*/)
 		} else if (comboCount_ == 3) { // 3段目
 			if (currentPhase_ == AttackPhase::WindUp) {
 				t = EaseOutCubic(1.0f - (attackTimer_ / 0.25f));
-				swordEnd.x = -130; swordEnd.y = 10; swordEnd.z = 0;
+				swordEnd.x = -130;
+				swordEnd.y = 10;
+				swordEnd.z = 0;
 				bodyEnd.x = DirectX::XMConvertToRadians(-25.0f);
 			} else if (currentPhase_ == AttackPhase::Swing) {
 				t = EaseOutQuint(1.0f - (attackTimer_ / 0.35f));
-				swordStart.x = -130; swordStart.y = 10; swordStart.z = 0;
-				swordEnd.x = 90; swordEnd.y = 0; swordEnd.z = 0;
+				swordStart.x = -130;
+				swordStart.y = 10;
+				swordStart.z = 0;
+				swordEnd.x = 90;
+				swordEnd.y = 0;
+				swordEnd.z = 0;
 				bodyEnd.x = DirectX::XMConvertToRadians(40.0f);
 				hitboxActive = true;
 			} else {
 				t = 1.0;
-				swordEnd.x = 90; bodyEnd.x = DirectX::XMConvertToRadians(35.0f);
+				swordEnd.x = 90;
+				bodyEnd.x = DirectX::XMConvertToRadians(35.0f);
 			}
 		}
 
@@ -268,8 +296,12 @@ void PlayerScript::UpdateSword(SceneObject& obj, GameScene* scene, float /*dt*/)
 		currentBodyRot_.z = startBodyRot_.z * (1.0f - t);
 	} else {
 		// 待機中
-		currentSwordRot_.x = 0; currentSwordRot_.y = 0; currentSwordRot_.z = 0;
-		currentBodyRot_.x = 0; currentBodyRot_.y = 0; currentBodyRot_.z = 0;
+		currentSwordRot_.x = 0;
+		currentSwordRot_.y = 0;
+		currentSwordRot_.z = 0;
+		currentBodyRot_.x = 0;
+		currentBodyRot_.y = 0;
+		currentBodyRot_.z = 0;
 	}
 
 	currentSwordRotRad.x = DirectX::XMConvertToRadians(currentSwordRot_.x);
@@ -283,22 +315,26 @@ void PlayerScript::UpdateSword(SceneObject& obj, GameScene* scene, float /*dt*/)
 		// 背中に背負う（斜め）
 		float s = std::sin(obj.rotate.y);
 		float c = std::cos(obj.rotate.y);
-		
-		float backX = -0.2f; float backY = 0.8f; float backZ = -0.4f;
+
+		float backX = -0.2f;
+		float backY = 0.8f;
+		float backZ = -0.4f;
 		sword->translate.x = obj.translate.x + (backX * c + backZ * s);
 		sword->translate.y = obj.translate.y + backY;
 		sword->translate.z = obj.translate.z + (-backX * s + backZ * c);
-		
+
 		sword->rotate.x = DirectX::XMConvertToRadians(45.0f);
 		sword->rotate.y = obj.rotate.y + DirectX::XMConvertToRadians(0.0f);
 		sword->rotate.z = DirectX::XMConvertToRadians(30.0f);
 	} else {
 		// 手元
-		float handX = 0.9f; float handY = 0.5f; float handZ = 1.2f;
+		float handX = 0.9f;
+		float handY = 0.5f;
+		float handZ = 1.2f;
 		float baseRotY = obj.rotate.y + currentBodyRot_.y;
 		float sy = std::sin(baseRotY);
 		float cy = std::cos(baseRotY);
-		
+
 		float pivotX = obj.translate.x + (handX * cy + handZ * sy);
 		float pivotY = obj.translate.y + handY;
 		float pivotZ = obj.translate.z + (-handX * sy + handZ * cy);
