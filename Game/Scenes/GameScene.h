@@ -36,6 +36,7 @@ public:
     bool IsPlaying() const { return isPlaying_; }
     Engine::Renderer* GetRenderer() const { return renderer_; } // ★追加
     Engine::Matrix4x4 GetWorldMatrix(int index) const; // ★追加
+	Engine::Camera& GetCamera() { return camera_; } // ★追加: カメラへのアクセス
 
 	// ★追加: 名前でオブジェクトを検索するヘルパー
 	SceneObject* FindObjectByName(const std::string& name);
