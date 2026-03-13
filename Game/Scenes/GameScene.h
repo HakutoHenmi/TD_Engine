@@ -28,6 +28,8 @@ public:
 
 	// ★ 汎用スポーン（スクリプトから呼べる）
 	void SpawnObject(const SceneObject& obj);
+	// ★追加: オブジェクトをIDで破棄保留にする
+	void DestroyObject(uint32_t id);
 
     const std::vector<SceneObject>& GetObjects() const { return objects_; }
     void SetObjects(const std::vector<SceneObject>& o) { objects_ = o; }
