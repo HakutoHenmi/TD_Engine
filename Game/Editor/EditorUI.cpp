@@ -399,6 +399,13 @@ static std::string SerializeSceneObject(const SceneObject& o) {
 			firstV = false;
 			ss << "\"" << EscapeJson(key) << "\": " << val;
 		}
+		ss << "}, \"strings\": {";
+		bool firstS = true;
+		for (auto const& [key, val] : var.strings) {
+			if (!firstS) ss << ", ";
+			firstS = false;
+			ss << "\"" << EscapeJson(key) << "\": \"" << EscapeJson(val) << "\"";
+		}
 		ss << "}}";
 	}
 	ss << "\n      ]\n";
@@ -833,6 +840,34 @@ static void ParseComponents(SceneObject& obj, const std::string& block, Engine::
 						float val = (float)std::strtod(vblock.c_str() + col + 1, &endPtr);
 						vc.values[key] = val;
 						cur = (size_t)(endPtr - vblock.c_str());
+						auto comma = vblock.find(",", cur);
+						if (comma != std::string::npos) cur = comma + 1;
+						else cur = vblock.size();
+					}
+				}
+			}
+			auto sPos = cblock.find("\"strings\"");
+			if (sPos != std::string::npos) {
+				auto s = cblock.find("{", sPos);
+				auto e = FindBlockEnd(cblock, s);
+				if (s != std::string::npos && e != std::string::npos) {
+					std::string vblock = cblock.substr(s + 1, e - s - 1);
+					size_t cur = 0;
+					while (cur < vblock.size()) {
+						auto q1 = vblock.find("\"", cur);
+						if (q1 == std::string::npos) break;
+						auto q2 = vblock.find("\"", q1 + 1);
+						if (q2 == std::string::npos) break;
+						std::string key = vblock.substr(q1 + 1, q2 - q1 - 1);
+						auto col = vblock.find(":", q2);
+						if (col == std::string::npos) break;
+						auto vq1 = vblock.find("\"", col);
+						if (vq1 == std::string::npos) break;
+						auto vq2 = vblock.find("\"", vq1 + 1);
+						if (vq2 == std::string::npos) break;
+						std::string val = vblock.substr(vq1 + 1, vq2 - vq1 - 1);
+						vc.strings[key] = val;
+						cur = vq2 + 1;
 						auto comma = vblock.find(",", cur);
 						if (comma != std::string::npos) cur = comma + 1;
 						else cur = vblock.size();
@@ -3631,15 +3666,40 @@ void EditorUI::ShowInspector(GameScene* scene) {
 						if (ImGui::Button("x")) keyToDelete = key;
 						ImGui::PopID();
 					}
-					if (!keyToDelete.empty()) vc.values.erase(keyToDelete);
+
+					for (auto& [key, val] : vc.strings) {
+						ImGui::PushID(key.c_str());
+						ImGui::Text("%s", key.c_str());
+						ImGui::SameLine(100);
+						ImGui::SetNextItemWidth(-30);
+						char buf[256];
+						strcpy_s(buf, val.c_str());
+						if (ImGui::InputText("##val", buf, sizeof(buf)))
+							val = buf;
+						ImGui::SameLine();
+						if (ImGui::Button("x")) keyToDelete = key;
+						ImGui::PopID();
+					}
+
+					if (!keyToDelete.empty()) {
+						vc.values.erase(keyToDelete);
+						vc.strings.erase(keyToDelete);
+					}
 
 					static char newVarName[64] = "";
 					ImGui::SetNextItemWidth(100);
 					ImGui::InputText("##NewVar", newVarName, sizeof(newVarName));
 					ImGui::SameLine();
-					if (ImGui::Button("Add Variable")) {
+					if (ImGui::Button("Add Num")) {
 						if (strlen(newVarName) > 0) {
 							vc.values[newVarName] = 0.0f;
+							newVarName[0] = '\0';
+						}
+					}
+					ImGui::SameLine();
+					if (ImGui::Button("Add Text")) {
+						if (strlen(newVarName) > 0) {
+							vc.strings[newVarName] = "";
 							newVarName[0] = '\0';
 						}
 					}

@@ -283,6 +283,7 @@ struct RiverComponent : public Component {
 // ★追加: 汎用変数コンポーネント (スクリプト間通信用)
 struct VariableComponent : public Component {
 	std::map<std::string, float> values;
+	std::map<std::string, std::string> strings; // ★追加: 文字列型
 	VariableComponent() { type = ComponentType::Variable; }
 
 	float GetValue(const std::string& key, float defaultVal = 0.0f) const {
@@ -292,6 +293,14 @@ struct VariableComponent : public Component {
 	void SetValue(const std::string& key, float val) {
 		values[key] = val;
 	}
+
+	std::string GetString(const std::string& key, const std::string& defaultVal = "") const {
+		auto it = strings.find(key);
+		return (it != strings.end()) ? it->second : defaultVal;
+	}
+	void SetString(const std::string& key, const std::string& val) {
+		strings[key] = val;
+	}
 };
 
 // ★ エディター用オブジェクト構造体
@@ -300,6 +309,7 @@ struct SceneObject {
 	uint32_t parentId = 0;     // ★ 親オブジェクトのID（0は親なし）
 	std::string name = "Object";
 	bool locked = false; // ★ ロック: 選択・移動・削除を防止
+	bool isPendingDestroy = false; // ★追加: 破棄フラグ
 	DirectX::XMFLOAT3 translate = {0, 0, 0};
 	DirectX::XMFLOAT3 rotate = {0, 0, 0};
 	DirectX::XMFLOAT3 scale = {1, 1, 1};
@@ -391,9 +401,39 @@ struct SceneObject {
 			const_cast<SceneObject*>(this)->variables[0].values[key] = val;
 		}
 	}
-	// ★追加: 数値を加算するヘルパー
-	void AddVariable(const std::string& key, float delta) {
-		SetVariable(key, GetVariable(key) + delta);
+	// ★追加: 文字列変数の取得・設定
+	std::string GetString(const std::string& key, const std::string& defaultVal = "") const {
+		for (const auto& vc : variables) {
+			if (vc.enabled) {
+				auto it = vc.strings.find(key);
+				if (it != vc.strings.end()) return it->second;
+			}
+		}
+		return defaultVal;
+	}
+	void SetString(const std::string& key, const std::string& val) {
+		for (auto& vc : const_cast<SceneObject*>(this)->variables) {
+			auto it = vc.strings.find(key);
+			if (it != vc.strings.end()) {
+				it->second = val;
+				return;
+			}
+		}
+		if (const_cast<SceneObject*>(this)->variables.empty()) {
+			VariableComponent vc;
+			vc.strings[key] = val;
+			const_cast<SceneObject*>(this)->variables.push_back(vc);
+		} else {
+			const_cast<SceneObject*>(this)->variables[0].strings[key] = val;
+		}
+	}
+
+	// ★追加: 特定のクラス名のスクリプトを取得
+	IScript* GetScript(const std::string& className) const {
+		for (const auto& sc : scripts) {
+			if (sc.scriptPath == className) return sc.instance.get();
+		}
+		return nullptr;
 	}
 };
 
