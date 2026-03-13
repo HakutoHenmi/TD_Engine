@@ -162,6 +162,25 @@ void EnemyBehavior::Move(SceneObject& obj, float dt) {
 		obj.translate.x = nextPos.x;
 		obj.translate.z = nextPos.z;
 	}
+
+	// type別Y座標の対応
+	//if (type_ == Fly) {
+	//	/*オブジェクトのXZ軸から地面と接してるY座標を割り出せる関数を実装してもらったらそれを元にオフセットを作成*/
+
+	//	float baseHeight = 3.0f;	// 基準とする高さ
+
+	//	// sin波を使ってふわふわさせる
+	//	static float totalTime = 0.0f;
+	//	totalTime += dt;
+
+	//	float hoverRange = 0.5f;	// 揺れ幅
+	//	float hoverSpeed = 2.0f;	// 揺れのスピード
+
+	//	// 基準の高さに揺れの高さを足す
+	//	obj.translate.y = groundHeight_ + baseHeight + (std::sin(totalTime * hoverSpeed) * hoverRange);
+	//}
+
+	// 歩行タイプは地面にいるので特別な処理はなし
 }
 
 void EnemyBehavior::ScanSurround(SceneObject& obj, GameScene* scene) {
