@@ -9,6 +9,9 @@ public:
 	void Start(SceneObject& obj, GameScene* scene) override;
 	void Update(SceneObject& obj, GameScene* scene, float dt) override;
 	void OnDestroy(SceneObject& obj, GameScene* scene) override;
+	void OnEditorUI() override;
+	std::string SerializeParameters() override;
+	void DeserializeParameters(const std::string& data) override;
 
 private:
 	float speed_ = 2.0f;

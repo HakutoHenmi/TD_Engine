@@ -317,6 +317,16 @@ void GameScene::Update() {
 // ★ 汎用スポーン
 void GameScene::SpawnObject(const SceneObject& obj) { pendingSpawns_.push_back(obj); }
 
+// ★追加: 名前でオブジェクトを検索
+SceneObject* GameScene::FindObjectByName(const std::string& name) {
+	for (auto& obj : objects_) {
+		if (obj.name == name) {
+			return &obj;
+		}
+	}
+	return nullptr;
+}
+
 Engine::Matrix4x4 GameScene::GetWorldMatrix(int index) const {
 	if (index < 0 || index >= (int)objects_.size()) return Engine::Matrix4x4::Identity();
 	const auto& obj = objects_[index];
