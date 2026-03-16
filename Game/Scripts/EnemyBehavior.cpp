@@ -40,7 +40,7 @@ void EnemyBehavior::Update(SceneObject& obj, GameScene* scene, float dt) {
 	AStar();
 
 	// 移動
-	Move(obj, dt);
+	Move(obj, scene, dt);
 
 	// デバッグ描画
 	Debug();
@@ -129,7 +129,7 @@ void EnemyBehavior::SearchTarget(SceneObject& obj, GameScene* scene) {
 	target_ = bestTarget;
 }
 
-void EnemyBehavior::Move(SceneObject& obj, float dt) {
+void EnemyBehavior::Move(SceneObject& obj, GameScene* /*scene*/, float dt) {
 	// ターゲットが存在しない、またはtargetまでのPath(ルート)がなければ止める
 	if (target_ == nullptr || path_.empty()) {
 		return;
@@ -162,6 +162,26 @@ void EnemyBehavior::Move(SceneObject& obj, float dt) {
 		obj.translate.x = nextPos.x;
 		obj.translate.z = nextPos.z;
 	}
+
+	// type別Y座標の対応
+	//if (type_ == Fly) {
+	//	/*オブジェクトのXZ軸から地面と接してるY座標を割り出せる関数を実装してもらったらそれを元にオフセットを作成*/
+	//	 // 現在のXZ座標から地面の高さを取得
+	//	groundHeight_ = scene->GetHeightAt(obj.translate.x, obj.translate.z);
+
+	//	float baseHeight = 3.0f;	// 基準とする高さ
+
+	//	// sin波を使ってふわふわさせる
+	//	totalTime_ += dt;
+
+	//	float hoverRange = 0.5f;	// 揺れ幅
+	//	float hoverSpeed = 2.0f;	// 揺れのスピード
+
+	//	// 基準の高さに揺れの高さを足す
+	//	obj.translate.y = groundHeight_ + baseHeight + (std::sin(totalTime_ * hoverSpeed) * hoverRange);
+	//}
+
+	// 歩行タイプは地面にいるので特別な処理はなし
 }
 
 void EnemyBehavior::ScanSurround(SceneObject& obj, GameScene* scene) {
@@ -387,6 +407,7 @@ void EnemyBehavior::CalculatePath(int startX, int startZ, int targetX, int targe
 void EnemyBehavior::Debug() {
 	ImGui::Begin("Enemy Infomation");
 	ImGui::Text("Target Name : %s", targetName_.c_str());
+	ImGui::Text("GroundHeight : %f", groundHeight_);
 	ImGui::Text("Local Grid Debug");
 	for (int z = GRID_SIZE - 1; z >= 0; --z) {
 		for (int x = 0; x < GRID_SIZE; ++x) {

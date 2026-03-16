@@ -61,7 +61,7 @@ private:
 	void SearchTarget(SceneObject& obj, GameScene* scene);
 
 	// オブジェクトの移動処理
-	void Move(SceneObject& obj, float dt);
+	void Move(SceneObject& obj, GameScene* scene, float dt);
 
 	// オブジェクトの周囲をチェックする関数
 	void ScanSurround(SceneObject& obj, GameScene* scene);
@@ -94,7 +94,9 @@ private: // メンバ変数
 	std::string targetName_ = "Player";	// 一旦初期値をPlayerに
 	const SceneObject* target_ = nullptr;
 	DirectX::XMFLOAT3 myPos_ = {};
+	float groundHeight_ = 0.0f;	// FlyTypeが地面の高さを取るため
 	DirectX::XMFLOAT3 targetPos_ = {}; // 移動速度
+	float totalTime_ = 0.0f;
 	float speed_ = 5.0f;
 
 	// グリッド関連
