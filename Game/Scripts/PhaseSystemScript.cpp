@@ -1,4 +1,4 @@
-#include "PahaseSystemScript.h"
+#include "PhaseSystemScript.h"
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
@@ -7,14 +7,14 @@
 
 namespace Game {
 
-	bool PahaseSystemScript::isPreparation_ = false;
+	bool PhaseSystemScript::isPreparation_ = false;
 
-void PahaseSystemScript::Start(SceneObject& obj, GameScene* scene) {
+void PhaseSystemScript::Start(SceneObject& obj, GameScene* scene) {
 	(obj);
 	(scene);
 }
 
-void PahaseSystemScript::Update(SceneObject& obj, GameScene* scene, float dt) {
+void PhaseSystemScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	(obj);
 	(scene);
 	(dt);
@@ -35,10 +35,10 @@ void PahaseSystemScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	preKeyP_ = keyP;
 }
 
-void PahaseSystemScript::Installation() {}
+void PhaseSystemScript::Installation() {}
 
-void PahaseSystemScript::OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {}
+void PhaseSystemScript::OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {}
 
-REGISTER_SCRIPT(PahaseSystemScript);
+REGISTER_SCRIPT(PhaseSystemScript);
 
 } // namespace Game

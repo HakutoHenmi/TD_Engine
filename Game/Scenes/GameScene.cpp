@@ -317,6 +317,16 @@ void GameScene::Update() {
 // ★ 汎用スポーン
 void GameScene::SpawnObject(const SceneObject& obj) { pendingSpawns_.push_back(obj); }
 
+// ★追加: IDでオブジェクトを検索し、破棄フラグを立てる
+void GameScene::DestroyObject(uint32_t id) {
+	for (auto& obj : objects_) {
+		if (obj.id == id) {
+			obj.isPendingDestroy = true;
+			return;
+		}
+	}
+}
+
 // ★追加: 名前でオブジェクトを検索
 SceneObject* GameScene::FindObjectByName(const std::string& name) {
 	for (auto& obj : objects_) {

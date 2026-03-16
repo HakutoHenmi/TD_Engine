@@ -26,11 +26,12 @@ public:
 			}
 		}
 
-		// dead除去
+		// dead または 破棄保留(isPendingDestroy) を除去
 		objects.erase(
 			std::remove_if(objects.begin(), objects.end(),
 				[](const SceneObject& o) {
 					if (o.name == "Player" || o.name == "PlayerSword") return false;
+					if (o.isPendingDestroy) return true; // ★追加
 					return !o.healths.empty() && o.healths[0].isDead && o.healths[0].enabled;
 				}),
 			objects.end());
