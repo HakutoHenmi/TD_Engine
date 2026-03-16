@@ -3410,6 +3410,187 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PopID();
 			}
 
+			// Health
+			for (size_t ci = 0; ci < obj.healths.size(); ++ci) {
+				auto& hc = obj.healths[ci];
+				ImGui::PushID(20000 + (int)ci);
+				if (ImGui::TreeNode("Health")) {
+					ImGui::Checkbox("Enabled##HC", &hc.enabled);
+					ImGui::DragFloat("HP##HC", &hc.hp, 1.0f);
+					ImGui::DragFloat("Max HP##HC", &hc.maxHp, 1.0f);
+					ImGui::DragFloat("Stamina##HC", &hc.stamina, 1.0f);
+					ImGui::DragFloat("Max Stamina##HC", &hc.maxStamina, 1.0f);
+					ImGui::DragFloat("Invincible Time##HC", &hc.invincibleTime, 0.1f);
+					ImGui::Checkbox("Is Dead##HC", &hc.isDead);
+					if (ImGui::Button("Remove##HC")) {
+						obj.healths.erase(obj.healths.begin() + ci);
+						ImGui::TreePop(); ImGui::PopID(); goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			// Hitbox
+			for (size_t ci = 0; ci < obj.hitboxes.size(); ++ci) {
+				auto& hb = obj.hitboxes[ci];
+				ImGui::PushID(21000 + (int)ci);
+				if (ImGui::TreeNode("Hitbox")) {
+					ImGui::Checkbox("Enabled##HB", &hb.enabled);
+					 ImGui::DragFloat3("Center##HB", &hb.center.x, 0.1f);
+					 ImGui::DragFloat3("Size##HB", &hb.size.x, 0.1f);
+					 ImGui::DragFloat("Damage##HB", &hb.damage, 1.0f);
+					 ImGui::Checkbox("Is Active##HB", &hb.isActive);
+					 char tagBuf[128]; strcpy_s(tagBuf, hb.tag.c_str());
+					 if (ImGui::InputText("Tag##HB", tagBuf, sizeof(tagBuf))) hb.tag = tagBuf;
+					 if (ImGui::Button("Remove##HB")) {
+						obj.hitboxes.erase(obj.hitboxes.begin() + ci);
+						ImGui::TreePop(); ImGui::PopID(); goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			// Hurtbox
+			for (size_t ci = 0; ci < obj.hurtboxes.size(); ++ci) {
+				auto& hb = obj.hurtboxes[ci];
+				ImGui::PushID(22000 + (int)ci);
+				if (ImGui::TreeNode("Hurtbox")) {
+					ImGui::Checkbox("Enabled##HTB", &hb.enabled);
+					 ImGui::DragFloat3("Center##HTB", &hb.center.x, 0.1f);
+					 ImGui::DragFloat3("Size##HTB", &hb.size.x, 0.1f);
+					 ImGui::DragFloat("Damage Mult##HTB", &hb.damageMultiplier, 0.1f);
+					 char tagBuf[128]; strcpy_s(tagBuf, hb.tag.c_str());
+					 if (ImGui::InputText("Tag##HTB", tagBuf, sizeof(tagBuf))) hb.tag = tagBuf;
+					 if (ImGui::Button("Remove##HTB")) {
+						obj.hurtboxes.erase(obj.hurtboxes.begin() + ci);
+						ImGui::TreePop(); ImGui::PopID(); goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			// Script
+			for (size_t ci = 0; ci < obj.scripts.size(); ++ci) {
+				auto& sc = obj.scripts[ci];
+				ImGui::PushID(23000 + (int)ci);
+				if (ImGui::TreeNode("Script")) {
+					ImGui::Checkbox("Enabled##SC", &sc.enabled);
+					ImGui::Text("Path: %s", sc.scriptPath.empty() ? "(none)" : sc.scriptPath.c_str());
+					if (ImGui::BeginDragDropTarget()) {
+						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
+							std::string path((const char*)pl->Data, pl->DataSize - 1);
+							if (path.find(".h") != std::string::npos || path.find(".cpp") != std::string::npos) {
+								sc.scriptPath = path;
+								sc.instance = ScriptEngine::GetInstance()->CreateScript(path);
+							}
+						}
+						ImGui::EndDragDropTarget();
+					}
+					if (sc.instance) {
+						ImGui::Separator();
+						sc.instance->OnEditorUI(); // スクリプト固有のUI
+					}
+					if (ImGui::Button("Remove##SC")) {
+						obj.scripts.erase(obj.scripts.begin() + ci);
+						ImGui::TreePop(); ImGui::PopID(); goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			// River
+			for (size_t ci = 0; ci < obj.rivers.size(); ++ci) {
+				auto& rv = obj.rivers[ci];
+				ImGui::PushID(24000 + (int)ci);
+				if (ImGui::TreeNode("River")) {
+					ImGui::Checkbox("Enabled##RV", &rv.enabled);
+					ImGui::DragFloat("Width##RV", &rv.width, 0.1f);
+					ImGui::DragFloat("Flow Speed##RV", &rv.flowSpeed, 0.1f);
+					ImGui::DragFloat("UV Scale##RV", &rv.uvScale, 0.1f);
+					ImGui::Text("Texture: %s", rv.texturePath.c_str());
+					if (ImGui::Button("Add Point")) rv.points.push_back({0,0,0});
+					for (size_t pi = 0; pi < rv.points.size(); ++pi) {
+						ImGui::PushID((int)pi);
+						ImGui::DragFloat3("Pt", &rv.points[pi].x, 0.1f);
+						ImGui::SameLine();
+						if (ImGui::SmallButton("X")) { rv.points.erase(rv.points.begin() + pi); ImGui::PopID(); break; }
+						ImGui::PopID();
+					}
+					if (ImGui::Button("Remove##RV")) {
+						obj.rivers.erase(obj.rivers.begin() + ci);
+						ImGui::TreePop(); ImGui::PopID(); goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			// UI Components
+			for (size_t ci = 0; ci < obj.rectTransforms.size(); ++ci) {
+				auto& rt = obj.rectTransforms[ci];
+				ImGui::PushID(25000 + (int)ci);
+				if (ImGui::TreeNode("RectTransform")) {
+					ImGui::Checkbox("Enabled##RT", &rt.enabled);
+					ImGui::DragFloat2("Pos##RT", &rt.pos.x, 1.0f);
+					ImGui::DragFloat2("Size##RT", &rt.size.x, 1.0f);
+					ImGui::DragFloat2("Anchor##RT", &rt.anchor.x, 0.01f, 0.0f, 1.0f);
+					ImGui::DragFloat2("Pivot##RT", &rt.pivot.x, 0.01f, 0.0f, 1.0f);
+					ImGui::DragFloat("Rotation##RT", &rt.rotation, 0.1f);
+					if (ImGui::Button("Remove##RT")) {
+						obj.rectTransforms.erase(obj.rectTransforms.begin() + ci);
+						ImGui::TreePop(); ImGui::PopID(); goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			for (size_t ci = 0; ci < obj.images.size(); ++ci) {
+				auto& img = obj.images[ci];
+				ImGui::PushID(26000 + (int)ci);
+				if (ImGui::TreeNode("UIImage")) {
+					ImGui::Checkbox("Enabled##UIIMG", &img.enabled);
+					ImGui::Text("Texture: %s", img.texturePath.c_str());
+					ImGui::ColorEdit4("Color##UIIMG", &img.color.x);
+					if (ImGui::Button("Remove##UIIMG")) {
+						obj.images.erase(obj.images.begin() + ci);
+						ImGui::TreePop(); ImGui::PopID(); goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			for (size_t ci = 0; ci < obj.texts.size(); ++ci) {
+				auto& txt = obj.texts[ci];
+				ImGui::PushID(27000 + (int)ci);
+				if (ImGui::TreeNode("UIText")) {
+					ImGui::Checkbox("Enabled##UITXT", &txt.enabled);
+					char txtBuf[1024]; strcpy_s(txtBuf, txt.text.c_str());
+					if (ImGui::InputTextMultiline("Text##UITXT", txtBuf, sizeof(txtBuf))) txt.text = txtBuf;
+					ImGui::DragFloat("Font Size##UITXT", &txt.fontSize, 1.0f, 1.0f, 200.0f);
+					ImGui::ColorEdit4("Color##UITXT", &txt.color.x);
+					if (ImGui::Button("Remove##UITXT")) {
+						obj.texts.erase(obj.texts.begin() + ci);
+						ImGui::TreePop(); ImGui::PopID(); goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
+			for (size_t ci = 0; ci < obj.buttons.size(); ++ci) {
+				auto& btn = obj.buttons[ci];
+				ImGui::PushID(28000 + (int)ci);
+				if (ImGui::TreeNode("UIButton")) {
+					ImGui::Checkbox("Enabled##UIBTN", &btn.enabled);
+					ImGui::ColorEdit4("Normal##UIBTN", &btn.normalColor.x);
+					ImGui::ColorEdit4("Hover##UIBTN", &btn.hoverColor.x);
+					ImGui::ColorEdit4("Pressed##UIBTN", &btn.pressedColor.x);
+					if (ImGui::Button("Remove##UIBTN")) {
+						obj.buttons.erase(obj.buttons.begin() + ci);
+						ImGui::TreePop(); ImGui::PopID(); goto end_comp;
+					}
+					ImGui::TreePop();
+				}
+				ImGui::PopID();
+			}
 		end_comp:
 			ImGui::Separator();
 			if (ImGui::Button("Add Component")) ImGui::OpenPopup("AddComp");
@@ -3417,13 +3598,30 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				if (ImGui::MenuItem("MeshRenderer")) obj.meshRenderers.push_back({});
 				if (ImGui::MenuItem("BoxCollider")) obj.boxColliders.push_back({});
 				if (ImGui::MenuItem("Rigidbody")) obj.rigidbodies.push_back({});
+				if (ImGui::MenuItem("Tag")) obj.tags.push_back({});
+				if (ImGui::MenuItem("Animator")) obj.animators.push_back({});
 				if (ImGui::MenuItem("ParticleEmitter")) { ParticleEmitterComponent pe; pe.emitter.Initialize(*Engine::Renderer::GetInstance(), "New"); obj.particleEmitters.push_back(pe); }
+				if (ImGui::MenuItem("GpuMeshCollider")) obj.gpuMeshColliders.push_back({});
 				if (ImGui::MenuItem("AudioSource")) obj.audioSources.push_back({});
-				if (ImGui::MenuItem("River")) obj.rivers.push_back({});
+				if (ImGui::MenuItem("AudioListener")) obj.audioListeners.push_back({});
+				if (ImGui::MenuItem("PlayerInput")) obj.playerInputs.push_back({});
+				if (ImGui::MenuItem("CharacterMovement")) obj.characterMovements.push_back({});
+				if (ImGui::MenuItem("CameraTarget")) obj.cameraTargets.push_back({});
+				if (ImGui::MenuItem("DirectionalLight")) obj.directionalLights.push_back({});
+				if (ImGui::MenuItem("PointLight")) obj.pointLights.push_back({});
+				if (ImGui::MenuItem("SpotLight")) obj.spotLights.push_back({});
 				if (ImGui::MenuItem("Health")) obj.healths.push_back({});
+				if (ImGui::MenuItem("Hitbox")) obj.hitboxes.push_back({});
+				if (ImGui::MenuItem("Hurtbox")) obj.hurtboxes.push_back({});
+				if (ImGui::MenuItem("River")) obj.rivers.push_back({});
 				if (ImGui::MenuItem("Script")) obj.scripts.push_back({});
 				if (ImGui::MenuItem("Variables")) obj.variables.push_back({});
 				if (ImGui::MenuItem("WorldSpaceUI")) obj.worldSpaceUIs.push_back({});
+				ImGui::Separator();
+				if (ImGui::MenuItem("RectTransform")) obj.rectTransforms.push_back({});
+				if (ImGui::MenuItem("UIImage")) obj.images.push_back({});
+				if (ImGui::MenuItem("UIText")) obj.texts.push_back({});
+				if (ImGui::MenuItem("UIButton")) obj.buttons.push_back({});
 				ImGui::EndPopup();
 			}
 		}
@@ -3438,61 +3636,239 @@ void EditorUI::ShowInspector(GameScene* scene) {
 }
 
 void EditorUI::ShowProject(Engine::Renderer* renderer, GameScene* scene) {
-	(void)renderer;
-	(void)scene;
 	ImGui::Begin("Project");
 
+	struct Icons {
+		Engine::Renderer::TextureHandle folder = 0;
+		Engine::Renderer::TextureHandle model = 0;
+		Engine::Renderer::TextureHandle script = 0;
+		Engine::Renderer::TextureHandle prefab = 0;
+		Engine::Renderer::TextureHandle audio = 0;
+		Engine::Renderer::TextureHandle file = 0;
+		bool loaded = false;
+	};
+	static Icons s_icons;
+	if (!s_icons.loaded) {
+		s_icons.folder = renderer->LoadTexture2D("Resources/Editor/Icons/folder.png");
+		s_icons.model = renderer->LoadTexture2D("Resources/Editor/Icons/model.png");
+		s_icons.script = renderer->LoadTexture2D("Resources/Editor/Icons/script.png");
+		s_icons.prefab = renderer->LoadTexture2D("Resources/Editor/Icons/prefab.png");
+		s_icons.audio = renderer->LoadTexture2D("Resources/Editor/Icons/audio.png");
+		s_icons.file = renderer->LoadTexture2D("Resources/Editor/Icons/file.png");
+		s_icons.loaded = true;
+	}
+
 	static std::string currentDir = "Resources";
-	static float iconSize = 80.0f;
+	static float iconSize = 85.0f;
+	static char searchBuffer[128] = "";
+	static std::string selectedPath = "";
+
 	if (!fs::exists(currentDir)) currentDir = "Resources";
 
-	// Breadcrumbs
+	// --- Toolbar ---
+	ImGui::BeginChild("Toolbar", ImVec2(0, 35), false);
 	{
-		std::istringstream iss(currentDir);
-		std::string token, accumulated;
-		bool first = true;
-		while (std::getline(iss, token, '\\')) {
-			if (!first) { ImGui::SameLine(); ImGui::Text(">"); ImGui::SameLine(); }
-			accumulated += (first ? "" : "\\") + token;
-			if (ImGui::SmallButton(token.c_str())) currentDir = accumulated;
-			first = false;
+		// Breadcrumbs
+		{
+			std::string pathStr = currentDir;
+			size_t start = 0;
+			size_t end = pathStr.find_first_of("\\/");
+			std::string accumulated = "";
+
+			while (true) {
+				std::string token = (end == std::string::npos) ? pathStr.substr(start) : pathStr.substr(start, end - start);
+				if (!token.empty()) {
+					if (!accumulated.empty()) {
+						ImGui::SameLine();
+						ImGui::TextDisabled(">");
+						ImGui::SameLine();
+						accumulated += "\\";
+					}
+					accumulated += token;
+
+					if (ImGui::SmallButton(token.c_str())) {
+						currentDir = accumulated;
+					}
+				}
+
+				if (end == std::string::npos) break;
+				start = end + 1;
+				end = pathStr.find_first_of("\\/", start);
+			}
 		}
+
+		ImGui::SameLine(ImGui::GetWindowWidth() - 250);
+		ImGui::SetNextItemWidth(200);
+		ImGui::InputTextWithHint("##Search", "Search Assets...", searchBuffer, sizeof(searchBuffer));
+		ImGui::SameLine();
+		if (ImGui::Button("Clear")) searchBuffer[0] = '\0';
 	}
+	ImGui::EndChild();
 	ImGui::Separator();
 
+	// --- Asset Grid ---
+	ImGui::BeginChild("AssetGrid");
+	
 	float panelWidth = ImGui::GetContentRegionAvail().x;
-	int columns = (int)(panelWidth / (iconSize + 10));
+	int columns = (int)(panelWidth / (iconSize + 25));
 	if (columns < 1) columns = 1;
 
 	ImGui::Columns(columns, nullptr, false);
+
+	// Back button
 	if (currentDir != "Resources") {
+		ImGui::PushID(".._back");
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 1.0f));
 		if (ImGui::Button("..", ImVec2(iconSize, iconSize))) {
 			currentDir = fs::path(currentDir).parent_path().string();
 		}
+		ImGui::PopStyleColor();
+		ImGui::TextDisabled("Back");
+		ImGui::PopID();
 		ImGui::NextColumn();
 	}
 
-	for (auto& entry : fs::directory_iterator(currentDir)) {
-		std::string name = entry.path().filename().string();
-		bool isDir = entry.is_directory();
-		if (isDir) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.1f, 1));
-		if (ImGui::Button(name.c_str(), ImVec2(iconSize, iconSize))) {
-			if (isDir) currentDir = entry.path().string();
-		}
-		if (isDir) ImGui::PopStyleColor();
+	std::string searchStr = searchBuffer;
+	std::transform(searchStr.begin(), searchStr.end(), searchStr.begin(), [](unsigned char c) { return (char)std::tolower(c); });
 
+	// Collect and sort entries (Directories first, then alphabetical)
+	std::vector<fs::directory_entry> entries;
+	for (auto& entry : fs::directory_iterator(currentDir)) {
+		entries.push_back(entry);
+	}
+
+	std::sort(entries.begin(), entries.end(), [](const fs::directory_entry& a, const fs::directory_entry& b) {
+		if (a.is_directory() != b.is_directory()) {
+			return a.is_directory(); // Directories first
+		}
+		return a.path().filename().string() < b.path().filename().string();
+	});
+
+	for (auto& entry : entries) {
+		std::string filename = entry.path().filename().string();
+		std::string ext = entry.path().extension().string();
+		std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+		
+		// Search filter
+		if (!searchStr.empty()) {
+			std::string lowerName = filename;
+			std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+			if (lowerName.find(searchStr) == std::string::npos) continue;
+		}
+
+		bool isDir = entry.is_directory();
+		std::string fullPath = entry.path().string();
+
+		ImGui::PushID(filename.c_str());
+		
+		// Decide color and icon/preview
+		ImVec4 boxColor = ImVec4(0.25f, 0.25f, 0.25f, 1.0f);
+		D3D12_GPU_DESCRIPTOR_HANDLE textureH = { 0 };
+		D3D12_GPU_DESCRIPTOR_HANDLE iconH = { 0 };
+
+		if (isDir) {
+			iconH = renderer->GetTextureSrvGpu(s_icons.folder);
+			boxColor = ImVec4(0.95f, 0.75f, 0.25f, 1.0f); // Directory: Yellow
+		} else if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".tga") {
+			// Image preview
+			Engine::Renderer::TextureHandle texHandle = renderer->LoadTexture2D(fullPath);
+			textureH = renderer->GetTextureSrvGpu(texHandle);
+			boxColor = ImVec4(0.15f, 0.15f, 0.15f, 1.0f);
+		} else if (ext == ".obj" || ext == ".fbx" || ext == ".gltf") {
+			iconH = renderer->GetTextureSrvGpu(s_icons.model);
+			boxColor = ImVec4(0.25f, 0.55f, 0.25f, 1.0f); // Model: Green
+		} else if (ext == ".prefab" || ext == ".json") {
+			iconH = renderer->GetTextureSrvGpu(s_icons.prefab);
+			boxColor = ImVec4(0.25f, 0.35f, 0.65f, 1.0f); // Scene/Prefab: Blue
+		} else if (ext == ".cpp" || ext == ".h" || ext == ".hlsl") {
+			iconH = renderer->GetTextureSrvGpu(s_icons.script);
+			boxColor = ImVec4(0.65f, 0.25f, 0.45f, 1.0f); // Code: Purple
+		} else if (ext == ".wav" || ext == ".mp3") {
+			iconH = renderer->GetTextureSrvGpu(s_icons.audio);
+			boxColor = ImVec4(0.65f, 0.45f, 0.15f, 1.0f); // Audio: Orange
+		} else {
+			// Default icon for unknown files
+			iconH = renderer->GetTextureSrvGpu(s_icons.file);
+		}
+
+		// Draw Item
+		bool selected = (selectedPath == fullPath);
+		float cursorPosX = ImGui::GetCursorPosX();
+		ImGui::SetCursorPosX(cursorPosX + (ImGui::GetColumnWidth() - iconSize) * 0.5f);
+
+		if (selected) {
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.1f, 0.5f, 1.0f, 0.6f)); // Premium highlight
+		} else {
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0)); // Transparent bg for icons
+		}
+
+		if (textureH.ptr != 0) {
+			if (ImGui::ImageButton("##thumb", (ImTextureID)textureH.ptr, ImVec2(iconSize, iconSize))) {
+				selectedPath = fullPath;
+			}
+		} else if (iconH.ptr != 0) {
+			if (ImGui::ImageButton("##icon", (ImTextureID)iconH.ptr, ImVec2(iconSize, iconSize))) {
+				selectedPath = fullPath;
+			}
+		} else {
+			if (ImGui::Button("##box", ImVec2(iconSize, iconSize))) {
+				selectedPath = fullPath;
+			}
+		}
+		ImGui::PopStyleColor();
+
+		// Selection logic & Double click to open
+		if (ImGui::IsItemHovered()) {
+			if (ImGui::IsMouseDoubleClicked(0)) {
+				if (isDir) {
+					currentDir = fullPath;
+					selectedPath = "";
+				} else if (ext == ".prefab") {
+					LoadPrefab(scene, fullPath);
+				} else if (ext == ".json") {
+					LoadScene(scene, fullPath);
+				}
+			}
+		}
+
+		// Drag & Drop
 		if (!isDir && ImGui::BeginDragDropSource()) {
-			std::string path = entry.path().string();
-			ImGui::SetDragDropPayload("RESOURCE_PATH", path.c_str(), path.size() + 1);
-			ImGui::Text("%s", name.c_str());
+			ImGui::SetDragDropPayload("RESOURCE_PATH", fullPath.c_str(), fullPath.size() + 1);
+			if (textureH.ptr != 0) {
+				ImGui::Image((ImTextureID)textureH.ptr, ImVec2(32, 32));
+				ImGui::SameLine();
+			}
+			ImGui::Text("%s", filename.c_str());
 			ImGui::EndDragDropSource();
 		}
-		ImGui::TextWrapped("%s", name.c_str());
+		
+		// Label (Centered)
+		ImGui::SetCursorPosX(cursorPosX + (ImGui::GetColumnWidth() - iconSize) * 0.5f);
+		ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + iconSize);
+		if (selected) {
+			ImGui::TextColored(ImVec4(0.3f, 0.7f, 1.0f, 1.0f), "%s", filename.c_str());
+		} else {
+			ImGui::Text("%s", filename.c_str());
+		}
+		ImGui::PopTextWrapPos();
+
+		if (ImGui::BeginPopupContextItem("AssetContext")) {
+			if (ImGui::MenuItem("Reload Asset")) { /* logic */ }
+			if (ImGui::MenuItem("Rename")) { /* logic */ }
+			if (ImGui::MenuItem("Delete", nullptr, false, false)) { /* logic */ }
+			ImGui::EndPopup();
+		}
+		
+		ImGui::PopID();
 		ImGui::NextColumn();
 	}
+
 	ImGui::Columns(1);
+	ImGui::EndChild();
+	
 	ImGui::End();
 }
+
 
 void EditorUI::DrawSelectionGizmo(Engine::Renderer* renderer, GameScene* scene) {
     if (!scene) return;
