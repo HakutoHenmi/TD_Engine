@@ -42,7 +42,7 @@ void PhaseSystemScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	preKeyP_ = keyP;
 }
 
-void PahaseSystemScript::Installation(GameScene* scene, const ImVec2& gameImageMin, float tW, float tH) {
+void PhaseSystemScript::Installation(GameScene* scene, const ImVec2& gameImageMin, float tW, float tH) {
 	static bool preKey1 = false;
 	static bool placeMode = false; // 1 押下後にクリック待ちするモード
 	(gameImageMin);
