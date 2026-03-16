@@ -129,7 +129,7 @@ void EnemyBehavior::SearchTarget(SceneObject& obj, GameScene* scene) {
 	target_ = bestTarget;
 }
 
-void EnemyBehavior::Move(SceneObject& obj, GameScene* scene, float dt) {
+void EnemyBehavior::Move(SceneObject& obj, GameScene* /*scene*/, float dt) {
 	// ターゲットが存在しない、またはtargetまでのPath(ルート)がなければ止める
 	if (target_ == nullptr || path_.empty()) {
 		return;
