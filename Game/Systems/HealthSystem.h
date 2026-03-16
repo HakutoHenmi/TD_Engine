@@ -23,6 +23,25 @@ public:
 					if (hc.invincibleTime > 0.0f) isInvincible = true;
 				}
 
+				// ダメージ検知用の簡易ロジック
+				static std::unordered_map<uint32_t, float> lastHp;
+				if (lastHp.find(obj.id) != lastHp.end()) {
+					float diff = lastHp[obj.id] - hc.hp;
+					if (diff > 0.1f) {
+						bool showDmg = true;
+						if (!obj.worldSpaceUIs.empty() && !obj.worldSpaceUIs[0].showDamageNumbers) {
+							showDmg = false;
+						}
+
+						if (showDmg) {
+							// ダメージポップアップ用の変数をセット
+							obj.SetString("damage_text", std::to_string((int)diff));
+							obj.SetVariable("damage_timer", 1.0f); // 1秒表示
+						}
+					}
+				}
+				lastHp[obj.id] = hc.hp;
+
 				if (hc.hp <= 0.0f && !hc.isDead) {
 					hc.isDead = true;
 				}

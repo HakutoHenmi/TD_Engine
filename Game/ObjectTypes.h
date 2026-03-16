@@ -34,7 +34,8 @@ enum class ComponentType {
 	Script, // ★追加: スクリプトコンポーネント
 	RectTransform, UIImage, UIText, UIButton, // ★追加: UIコンポーネント
 	River, // ★追加: 川コンポーネント
-	Variable // ★追加: 汎用変数
+	Variable, // ★追加: 汎用変数
+	WorldSpaceUI // ★追加: ワールド空間UI
 };
 struct Component { 
 	ComponentType type = ComponentType::MeshRenderer; 
@@ -280,6 +281,16 @@ struct RiverComponent : public Component {
 	RiverComponent() { type = ComponentType::River; }
 };
 
+// ★追加: ワールド空間UIコンポーネント
+struct WorldSpaceUIComponent : public Component {
+	bool showHealthBar = true;
+	bool showDamageNumbers = true;
+	DirectX::XMFLOAT3 offset = {0, 1.2f, 0};
+	float barWidth = 60.0f;
+	float barHeight = 6.0f;
+	WorldSpaceUIComponent() { type = ComponentType::WorldSpaceUI; }
+};
+
 // ★追加: 汎用変数コンポーネント (スクリプト間通信用)
 struct VariableComponent : public Component {
 	std::map<std::string, float> values;
@@ -363,6 +374,8 @@ struct SceneObject {
 	std::vector<RiverComponent> rivers;
 	// ★追加: 汎用変数
 	std::vector<VariableComponent> variables;
+	// ★追加: ワールド空間UI
+	std::vector<WorldSpaceUIComponent> worldSpaceUIs;
 
 	Engine::Transform GetTransform() const {
 		Engine::Transform t;

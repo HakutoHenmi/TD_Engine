@@ -3,7 +3,7 @@
 
 namespace Game {
 
-class PahaseSystemScript : public IScript {
+class PhaseSystemScript : public IScript {
 public:
 	void Start(SceneObject& obj, GameScene* scene) override;
 	void Update(SceneObject& obj, GameScene* scene, float dt) override;

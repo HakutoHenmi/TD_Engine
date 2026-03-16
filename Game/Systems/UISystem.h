@@ -12,8 +12,10 @@ public:
     void Draw(std::vector<SceneObject>& objects, GameContext& ctx) override;
     void Reset(std::vector<SceneObject>& objects) override;
 
-    // ★追加: 特定オブジェクトのワールドRectを計算 (EditorUIからも利用可)
     static WorldRect CalculateWorldRect(const SceneObject& obj, const std::vector<SceneObject>& allObjects, float screenW, float screenH);
+
+    // ★追加: 3Dワールド座標からスクリーン座標(0~1)に変換
+    static bool WorldToScreen(const DirectX::XMFLOAT3& worldPos, const Engine::Camera& camera, float& screenX, float& screenY);
 
 private:
     void RenderNodeWithRect(SceneObject& obj, const WorldRect& wr, GameContext& ctx);
