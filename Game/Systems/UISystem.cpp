@@ -57,6 +57,7 @@ UISystem::WorldRect UISystem::CalculateWorldRect(const SceneObject& obj, const s
 void UISystem::Draw(std::vector<SceneObject>& objects, GameContext& ctx) {
     std::unordered_map<uint32_t, WorldRect> cache;
 
+    // --- 既存のUI（Canvasベース）の描画 ---
     auto renderRecursive = [&](auto self, uint32_t parentId, WorldRect parentRect) -> void {
         for (auto& obj : objects) {
             if (obj.rectTransforms.empty()) continue;
@@ -80,6 +81,108 @@ void UISystem::Draw(std::vector<SceneObject>& objects, GameContext& ctx) {
 
     WorldRect screen = { 0, 0, (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH };
     renderRecursive(renderRecursive, 0, screen);
+
+    // --- ★追加: ワールド空間UI（HPバー、ダメージ数字）の描画 ---
+    if (ctx.isPlaying && ctx.camera) {
+        ImDrawList* drawList = ImGui::GetBackgroundDrawList();
+        if (!drawList) return;
+
+        for (auto& obj : objects) {
+            if (obj.isPendingDestroy) continue;
+
+            // WorldSpaceUIコンポーネントがあるかチェック
+            const WorldSpaceUIComponent* uiComp = obj.worldSpaceUIs.empty() ? nullptr : &obj.worldSpaceUIs[0];
+
+            // 1. HPバーの描画 (Healthコンポーネントを持ち、かつWorldSpaceUIコンポーネントで表示が許可されている場合)
+            if (!obj.healths.empty() && obj.healths[0].enabled && !obj.healths[0].isDead) {
+                auto& hc = obj.healths[0];
+                bool shouldShow = (!uiComp || uiComp->showHealthBar);
+
+                // HPが満タンでない、かつコンポーネント設定で許可されている場合に表示
+                if (shouldShow && hc.hp < hc.maxHp) {
+                    float sx, sy;
+                    DirectX::XMFLOAT3 pos = obj.translate;
+                    float barW = 60.0f;
+                    float barH = 6.0f;
+
+                    if (uiComp) {
+                        pos.x += uiComp->offset.x;
+                        pos.y += uiComp->offset.y;
+                        pos.z += uiComp->offset.z;
+                        barW = uiComp->barWidth;
+                        barH = uiComp->barHeight;
+                    } else {
+                        // コンポーネントがない場合のデフォルト位置
+                        pos.y += obj.scale.y * 1.2f + 0.5f;
+                    }
+
+                    if (WorldToScreen(pos, *ctx.camera, sx, sy)) {
+                        float curW = barW * (hc.hp / hc.maxHp);
+                        
+                        ImVec2 pMin(sx - barW * 0.5f, sy - barH * 0.5f);
+                        ImVec2 pMax(sx + barW * 0.5f, sy + barH * 0.5f);
+                        
+                        // 背景（赤）
+                        drawList->AddRectFilled(pMin, pMax, IM_COL32(200, 50, 50, 200));
+                        // 前景（緑）
+                        drawList->AddRectFilled(pMin, ImVec2(pMin.x + curW, pMax.y), IM_COL32(50, 200, 50, 255));
+                        // 枠
+                        drawList->AddRect(pMin, pMax, IM_COL32(0, 0, 0, 255));
+                    }
+                }
+            }
+
+            // 2. 汎用変数を使ったダメージ数字演出
+            bool showDmg = (!uiComp || uiComp->showDamageNumbers);
+            if (showDmg) {
+                float dmgTimer = obj.GetVariable("damage_timer", 0.0f);
+                if (dmgTimer > 0.0f) {
+                    std::string dmgStr = obj.GetString("damage_text", "");
+                    if (!dmgStr.empty()) {
+                        float sx, sy;
+                        DirectX::XMFLOAT3 pos = obj.translate;
+                        // タイマーに応じて上に浮かび上がらせる
+                        float t = 1.0f - dmgTimer; // 1秒演出想定
+                        
+                        if (uiComp) {
+                            pos.x += uiComp->offset.x;
+                            pos.y += uiComp->offset.y + t * 2.0f;
+                            pos.z += uiComp->offset.z;
+                        } else {
+                            pos.y += obj.scale.y + t * 2.0f;
+                        }
+
+                        if (WorldToScreen(pos, *ctx.camera, sx, sy)) {
+                            ImU32 col = IM_COL32(255, 255, 50, (int)(dmgTimer * 255));
+                            drawList->AddText(ImGui::GetFont(), 24.0f, ImVec2(sx, sy), col, dmgStr.c_str());
+                        }
+                        // タイマー更新
+                        obj.SetVariable("damage_timer", dmgTimer - ctx.dt);
+                    }
+                }
+            }
+        }
+    }
+}
+
+bool UISystem::WorldToScreen(const DirectX::XMFLOAT3& worldPos, const Engine::Camera& camera, float& screenX, float& screenY) {
+    DirectX::XMVECTOR p = DirectX::XMLoadFloat3(&worldPos);
+    DirectX::XMMATRIX viewProj = camera.View() * camera.Proj();
+    
+    DirectX::XMVECTOR clipPos = DirectX::XMVector3TransformCoord(p, viewProj);
+    
+    DirectX::XMFLOAT3 clip;
+    DirectX::XMStoreFloat3(&clip, clipPos);
+
+    // 画面外（カメラの後ろなど）の判定
+    if (clip.z < 0.0f || clip.z > 1.0f) return false;
+    if (clip.x < -1.1f || clip.x > 1.1f || clip.y < -1.1f || clip.y > 1.1f) return false;
+
+    // NDC (-1~1) -> Screen (0~Pixels)
+    screenX = (clip.x + 1.0f) * 0.5f * (float)Engine::WindowDX::kW;
+    screenY = (1.0f - clip.y) * 0.5f * (float)Engine::WindowDX::kH;
+    
+    return true;
 }
 
 void UISystem::Reset(std::vector<SceneObject>& /*objects*/) {

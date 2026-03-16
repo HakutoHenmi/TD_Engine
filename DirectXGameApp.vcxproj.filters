@@ -47,7 +47,7 @@
       <Filter>Scripts</Filter>
     </ClCompile>
     <ClCompile Include="Game\Scripts\PipeScript.cpp" />
-    <ClCompile Include="Game\Scripts\PahaseSystemScript.cpp" />
+    <ClCompile Include="Game\Scripts\PhaseSystemScript.cpp" />
     <ClCompile Include="Game\Scripts\PreparationCamera.cpp" />
     <ClCompile Include="Game\Scripts\EnemySpawnerScript.cpp">
       <Filter>Scripts</Filter>
@@ -135,7 +135,7 @@
       <Filter>Scripts</Filter>
     </ClInclude>
     <ClInclude Include="Game\Scripts\PipeScript.h" />
-    <ClInclude Include="Game\Scripts\PahaseSystemScript.h" />
+    <ClInclude Include="Game\Scripts\PhaseSystemScript.h" />
     <ClInclude Include="Game\Scripts\PreparationCamera.h" />
     <ClInclude Include="Game\Scripts\EnemySpawnerScript.h">
       <Filter>Scripts</Filter>

@@ -5,7 +5,7 @@
 #include <iostream>
 #include <cmath>
 
-#include "PahaseSystemScript.h"
+#include "PhaseSystemScript.h"
 
 namespace Game {
 
@@ -69,7 +69,7 @@ void PlayerScript::Start(SceneObject& obj, GameScene* scene) {
 void PlayerScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	if (!obj.healths.empty() && obj.healths[0].isDead) return;
 
-	if (PahaseSystemScript::IsPreparation()) {
+	if (PhaseSystemScript::IsPreparation()) {
 		obj.cameraTargets[0].enabled = false;
 		obj.playerInputs[0].enabled = false;
 

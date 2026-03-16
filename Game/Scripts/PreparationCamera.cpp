@@ -5,7 +5,7 @@
 #include <cmath>
 #include <iostream>
 
-#include "PahaseSystemScript.h"
+#include "PhaseSystemScript.h"
 
 namespace Game {
 
@@ -24,7 +24,7 @@ void PreparationCamera::Start(SceneObject& obj, GameScene* scene) {
 }
 
 void PreparationCamera::Update(SceneObject& obj, GameScene* scene, float dt) {
-	if (PahaseSystemScript::IsPreparation()) {
+	if (PhaseSystemScript::IsPreparation()) {
 		UpdateMovement(obj, scene, dt);
 		obj.cameraTargets[0].enabled = true;
 	} else {
