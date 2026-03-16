@@ -405,6 +405,7 @@ void EnemyBehavior::CalculatePath(int startX, int startZ, int targetX, int targe
 }
 
 void EnemyBehavior::Debug() {
+#ifndef NDEBUG
 	ImGui::Begin("Enemy Infomation");
 	ImGui::Text("Target Name : %s", targetName_.c_str());
 	ImGui::Text("GroundHeight : %f", groundHeight_);
@@ -437,6 +438,7 @@ void EnemyBehavior::Debug() {
 		ImGui::NewLine();
 	}
 	ImGui::End();
+#endif
 }
 
 // ★ スクリプト自動登録

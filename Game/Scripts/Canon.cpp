@@ -131,17 +131,7 @@ void Canon::Update(SceneObject& obj, GameScene* scene, float dt) {
 
 	bool connected = IsCanonConnectedToBulletTank(scene, obj);
 
-	const char* connectedText = "NO";
-	if (connected) {
-		connectedText = "YES";
-	}
-
-	ImGui::Begin("Debug Pipe");
-	ImGui::Text("Objects: %d", objectCount);
-	ImGui::Text("Pipes  : %d", pipeCount);
-	ImGui::Text("Enemies: %d", enemyCount);
-	ImGui::Text("Canon connected to tank: %s", connectedText);
-	ImGui::End();
+	Debug(connected);
 
 	// クールダウン
 	if (attackTimer_ > 0.0f) {
@@ -255,6 +245,23 @@ void Canon::Update(SceneObject& obj, GameScene* scene, float dt) {
 }
 
 void Canon::OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {}
+
+void Canon::Debug(bool connected) {
+	(void)connected;
+#ifndef NDEBUG
+	const char* connectedText = "NO";
+	if (connected) {
+		connectedText = "YES";
+	}
+
+	ImGui::Begin("Debug Pipe");
+	ImGui::Text("Objects: %d", objectCount);
+	ImGui::Text("Pipes  : %d", pipeCount);
+	ImGui::Text("Enemies: %d", enemyCount);
+	ImGui::Text("Canon connected to tank: %s", connectedText);
+	ImGui::End();
+#endif
+}
 
 REGISTER_SCRIPT(Canon);
 
