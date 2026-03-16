@@ -48,7 +48,17 @@ void EnemySpawnerScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 
 	while (spawnedThisWave_ < shouldHaveSpawned) {
 		// パターンに応じた出現位置を計算
-		DirectX::XMFLOAT3 spawnPos = obj.translate;
+		// ★修正: 親子関係を考慮し、スポナーのワールド座標を取得する
+		DirectX::XMFLOAT3 spawnerWorldPos = obj.translate;
+		for (int i = 0; i < (int)scene->GetObjects().size(); ++i) {
+			if (&scene->GetObjects()[i] == &obj) {
+				Engine::Matrix4x4 wm = scene->GetWorldMatrix(i);
+				spawnerWorldPos = { wm.m[3][0], wm.m[3][1], wm.m[3][2] };
+				break;
+			}
+		}
+
+		DirectX::XMFLOAT3 spawnPos = spawnerWorldPos;
 
 		float t = (maxCount <= 1) ? 0.0f : static_cast<float>(spawnedThisWave_) / static_cast<float>(maxCount - 1);
 
@@ -93,7 +103,10 @@ void EnemySpawnerScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 		enemy.boxColliders.push_back(bc);
 
 		RigidbodyComponent rb;
-		rb.useGravity = true;
+		// ★修正: Flyタイプの場合は重力を無効化する
+		// (スクリプト側でも制御するが、初期化時の挙動を安定させるため)
+		bool isFly = (enemyScriptPath == "EnemyBehavior" && enemyScriptParams.find("\"moveType\":1") != std::string::npos);
+		rb.useGravity = !isFly;
 		enemy.rigidbodies.push_back(rb);
 
 		HealthComponent health;

@@ -1919,28 +1919,13 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				if (s_riverPlaceMode && gameScene->selectedObjectIndex_ >= 0) {
 					auto& selObj = gameScene->objects_[gameScene->selectedObjectIndex_];
 					if (s_riverPlaceCompIdx < (int)selObj.rivers.size()) {
-						float closestDist = FLT_MAX;
-						DirectX::XMFLOAT3 hitPt = {0, 0, 0};
-						bool hitTerrain = false;
-						for (const auto& obj2 : gameScene->objects_) {
-							if (!obj2.gpuMeshColliders.empty()) {
-								auto* model = Engine::Renderer::GetInstance()->GetModel(obj2.gpuMeshColliders[0].meshHandle);
-								if (model) {
-									Engine::Vector3 hp;
-									float dist;
-									if (model->RayCast(rayOrig, rayDir, obj2.GetTransform().ToMatrix(), dist, hp)) {
-										if (dist < closestDist) {
-											closestDist = dist;
-											hitPt = {hp.x, hp.y, hp.z};
-											hitTerrain = true;
-										}
-									}
-								}
-							}
-						}
-						if (hitTerrain) {
-							selObj.rivers[s_riverPlaceCompIdx].points.push_back(hitPt);
-						}
+						float t = (0.0f - DirectX::XMVectorGetY(rayOrig)) / DirectX::XMVectorGetY(rayDir);
+						DirectX::XMVECTOR p = DirectX::XMVectorAdd(rayOrig, DirectX::XMVectorScale(rayDir, t));
+						float x = DirectX::XMVectorGetX(p);
+						float z = DirectX::XMVectorGetZ(p);
+						
+						float h = gameScene->GetHeightAt(x, z);
+						selObj.rivers[s_riverPlaceCompIdx].points.push_back({x, h, z});
 					}
 					goto EndClickProcessing;
 				}

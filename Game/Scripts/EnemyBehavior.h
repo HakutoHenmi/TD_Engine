@@ -13,6 +13,8 @@ struct Node {
 	float gCost = 0.0f;            // スタートからの距離
 	float hCost = 0.0f;            // ゴールまでの推定距離
 	Node* parent = nullptr; // どのマスからきたか(ルートを逆算する)
+	bool isOpen = false;    // オープンリストに入っているか
+	bool isClosed = false;  // クローズリストに入っているか
 
 	// 最短経路のコストを計算するメソッド
 	float fCost() { return gCost + hCost; }
@@ -56,6 +58,10 @@ public:
 	// ImGuiでパラメータをいじる
 	void OnEditorUI() override;
 
+	// パラメーターの個別保存・読み込み用 (エディター用)
+	std::string SerializeParameters() override;
+	void DeserializeParameters(const std::string& data) override;
+
 private:
 	// ターゲットを検索して更新する関数
 	void SearchTarget(SceneObject& obj, GameScene* scene);
@@ -98,6 +104,8 @@ private: // メンバ変数
 	DirectX::XMFLOAT3 targetPos_ = {}; // 移動速度
 	float totalTime_ = 0.0f;
 	float speed_ = 5.0f;
+	float scanTimer_ = 0.0f; // ★追加: 走査の頻度を下げるためのタイマー
+	bool showDebugGrid_ = false; // ★追加: 重いデバッグ表示を制御
 
 	// グリッド関連
 	static const int GRID_SIZE = 21; // 21*21にして自分を真ん中に置いた20メートル四方のグリッドに

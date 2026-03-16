@@ -24,9 +24,8 @@ public:
 				}
 
 				// ダメージ検知用の簡易ロジック
-				static std::unordered_map<uint32_t, float> lastHp;
-				if (lastHp.find(obj.id) != lastHp.end()) {
-					float diff = lastHp[obj.id] - hc.hp;
+				if (lastHp_.find(obj.id) != lastHp_.end()) {
+					float diff = lastHp_[obj.id] - hc.hp;
 					if (diff > 0.1f) {
 						bool showDmg = true;
 						if (!obj.worldSpaceUIs.empty() && !obj.worldSpaceUIs[0].showDamageNumbers) {
@@ -40,7 +39,7 @@ public:
 						}
 					}
 				}
-				lastHp[obj.id] = hc.hp;
+				lastHp_[obj.id] = hc.hp;
 
 				if (hc.hp <= 0.0f && !hc.isDead) {
 					hc.isDead = true;
@@ -90,11 +89,13 @@ public:
 			}
 		}
 		originalColors_.clear();
+		lastHp_.clear();
 	}
 
 private:
 	// オブジェクトIDごとに元のMeshRendererのcolorを保存
 	std::unordered_map<uint32_t, std::vector<DirectX::XMFLOAT4>> originalColors_;
+	std::unordered_map<uint32_t, float> lastHp_;
 };
 
 } // namespace Game
