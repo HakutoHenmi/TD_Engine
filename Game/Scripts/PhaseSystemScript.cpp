@@ -45,6 +45,7 @@ void PhaseSystemScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 void PahaseSystemScript::Installation(GameScene* scene, const ImVec2& gameImageMin, float tW, float tH) {
 	static bool preKey1 = false;
 	static bool placeMode = false; // 1 押下後にクリック待ちするモード
+	(gameImageMin);
 
 	bool key1 = (GetAsyncKeyState('1') & 0x8000) != 0;
 	bool mouseLeft = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
@@ -65,8 +66,8 @@ void PahaseSystemScript::Installation(GameScene* scene, const ImVec2& gameImageM
 
 	// Editor 上と同じように ImGui のゲームビュー座標からレイを飛ばす
 	ImVec2 mousePos = ImGui::GetMousePos();
-	float localX = mousePos.x - gameImageMin.x;
-	float localY = mousePos.y - gameImageMin.y;
+	float localX = mousePos.x;
+	float localY = mousePos.y;
 	bool insideImage = (localX >= 0 && localY >= 0 && localX <= tW && localY <= tH);
 
 	Engine::Vector3 hitPoint = {0, 0, 0};
