@@ -122,8 +122,10 @@ void EnemyAIScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 void EnemyAIScript::OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {}
 
 void EnemyAIScript::OnEditorUI() {
+#ifndef NDEBUG
 	ImGui::SliderFloat("移動速度", &speed_, 0.0f, 20.0f, "%.1f m/s");
 	ImGui::SliderFloat("索敵範囲", &sightRange_, 0.0f, 200.0f, "%.1f m");
+#endif
 }
 
 std::string EnemyAIScript::SerializeParameters() {

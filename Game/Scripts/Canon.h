@@ -22,6 +22,9 @@ private:
 		int objectCount = 0;
 	int pipeCount = 0;
 	int enemyCount = 0;
+
+private:
+	void Debug(bool connected);
 };
 
 } // namespace Game

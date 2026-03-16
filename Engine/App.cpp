@@ -76,10 +76,12 @@ void App::Run() {
 		renderer_.EndFrame();
 
 #ifdef USE_IMGUI
+#ifndef NDEBUG
  		Engine::IScene* currentScene = sceneManager_.Current();
  		if (currentScene) {
  			currentScene->DrawEditor();
  		}
+#endif
 
 		imgui_.Render(dx_);
 #endif
