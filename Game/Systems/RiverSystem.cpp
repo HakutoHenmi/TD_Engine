@@ -36,6 +36,23 @@ XMVECTOR RiverSystem::InterpolateSpline(const std::vector<XMFLOAT3>& points, flo
     return XMVectorCatmullRom(v0, v1, v2, v3, localT);
 }
 
+static Engine::Matrix4x4 GetWorldMatrixInternal(const std::vector<SceneObject>& objects, int index) {
+    if (index < 0 || index >= (int)objects.size()) return Engine::Matrix4x4::Identity();
+    const auto& obj = objects[index];
+    Engine::Matrix4x4 local = obj.GetTransform().ToMatrix();
+    if (obj.parentId == 0) return local;
+
+    int parentIdx = -1;
+    for (int i = 0; i < (int)objects.size(); ++i) {
+        if (objects[i].id == obj.parentId) {
+            parentIdx = i;
+            break;
+        }
+    }
+    if (parentIdx == -1) return local;
+    return Engine::Matrix4x4::Multiply(local, GetWorldMatrixInternal(objects, parentIdx));
+}
+
 void RiverSystem::BuildRiverMesh(RiverComponent& river, Engine::Renderer* renderer, const std::vector<SceneObject>& allObjects, const DirectX::XMFLOAT3& /*ownerPos*/) {
     if (!renderer || river.points.size() < 2) return;
 
@@ -72,22 +89,24 @@ void RiverSystem::BuildRiverMesh(RiverComponent& river, Engine::Renderer* render
         }
         prevPos = pos;
 
-        // --- 地形の高さを取得 (Raycast) ワールド座標で実行 ---
+        // --- 地形の高さを取得 ---
         XMVECTOR rayOrig = XMVectorAdd(pos, XMVectorSet(0, 500.0f, 0, 0));
         XMVECTOR rayDir  = XMVectorSet(0, -1.0f, 0, 0);
-        
+
         float worldX = XMVectorGetX(pos), worldZ = XMVectorGetZ(pos);
-        float worldY = XMVectorGetY(pos);
-        float closestDist = FLT_MAX;
+        float worldY = 0.0f;
         bool hitTerrain = false;
         
-        for (const auto& obj : allObjects) {
+        float closestDist = FLT_MAX;
+        for (int objIdx = 0; objIdx < (int)allObjects.size(); ++objIdx) {
+            const auto& obj = allObjects[objIdx];
             if (!obj.gpuMeshColliders.empty()) {
                 auto* model = renderer->GetModel(obj.gpuMeshColliders[0].meshHandle);
                 if (model) {
                     Engine::Vector3 hp;
                     float dist;
-                    if (model->RayCast(rayOrig, rayDir, obj.GetTransform().ToMatrix(), dist, hp)) {
+                    // ★修正: GetWorldMatrixInternal を使用
+                    if (model->RayCast(rayOrig, rayDir, GetWorldMatrixInternal(allObjects, objIdx), dist, hp)) {
                         if (dist < closestDist) {
                             closestDist = dist;
                             worldY = hp.y;
@@ -97,7 +116,6 @@ void RiverSystem::BuildRiverMesh(RiverComponent& river, Engine::Renderer* render
                 }
             }
         }
-        
         // 地形にヒットした場合は地形の高さ+オフセット、そうでなければ元の高さ
         pos = XMVectorSet(worldX, (hitTerrain ? worldY : XMVectorGetY(pos)) + 0.5f, worldZ, 1.0f);
 

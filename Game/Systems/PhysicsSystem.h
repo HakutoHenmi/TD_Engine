@@ -30,6 +30,7 @@ public:
 
 				Engine::Vector3 axes1[3], c1, e1;
 				GetObbAxes(obj, bc, axes1, c1, e1);
+				float sphereR1 = std::sqrt(e1.x * e1.x + e1.y * e1.y + e1.z * e1.z);
 
 				// 事前にCharacterMovementを取得しておく（接地判定用）
 				CharacterMovementComponent* cm = obj.characterMovements.empty() ? nullptr : &obj.characterMovements[0];
@@ -46,9 +47,14 @@ public:
 						Engine::Vector3 axes2[3], c2, e2;
 						GetObbAxes(other, obc, axes2, c2, e2);
 
-						DirectX::XMVECTOR diff = DirectX::XMVectorSubtract(
-							DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&c2)),
-							DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&c1)));
+						DirectX::XMVECTOR c1_v = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&c1));
+						DirectX::XMVECTOR c2_v = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&c2));
+						DirectX::XMVECTOR diff = DirectX::XMVectorSubtract(c2_v, c1_v);
+						
+						// --- Broad Phase: Bounding Sphere ---
+						float sphereR2 = std::sqrt(e2.x * e2.x + e2.y * e2.y + e2.z * e2.z);
+						float distSq = DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(diff));
+						if (distSq > (sphereR1 + sphereR2) * (sphereR1 + sphereR2)) continue;
 
 						float minOverlap = FLT_MAX;
 						Engine::Vector3 pushAxis = {0, 0, 0};

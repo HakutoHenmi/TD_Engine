@@ -1,5 +1,6 @@
 #include "EnemyBehavior.h"
-#include "../imgui/imgui.h"
+#include "../../Engine/ThirdParty/nlohmann/json.hpp"
+#include "../../externals/imgui/imgui.h"
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
@@ -16,9 +17,26 @@ static bool HasTag(const SceneObject& obj, const char* tagName) {
 }
 
 void EnemyBehavior::Start(SceneObject& obj, GameScene* scene) {
-	// ここに初期設定を記述
-	// 事前に決めたターゲットを検索
+	pOwner_ = &obj;
+	pCurrentScene_ = scene;
+
+	// 出現時に一度ターゲットを検索
 	SearchTarget(obj, scene);
+
+	// 出現時に地面の高さを即座に計算（初動の埋まり防止）
+	groundHeight_ = scene->GetHeightAt(obj.translate.x, obj.translate.z, obj.id);
+
+	// Flyタイプの場合は重力を無効化し、初期高度を設定
+	if (type_ == Fly) {
+		for (auto& rb : obj.rigidbodies) {
+			rb.useGravity = false;
+			rb.velocity = {0, 0, 0};
+		}
+		
+		// スポナーの高さではなく、即座に正しい浮遊高度へ移動
+		float baseHeight = 9.0f;
+		obj.translate.y = groundHeight_ + baseHeight;
+	}
 }
 
 void EnemyBehavior::Update(SceneObject& obj, GameScene* scene, float dt) {
@@ -33,11 +51,17 @@ void EnemyBehavior::Update(SceneObject& obj, GameScene* scene, float dt) {
 		SearchTarget(obj, scene);
 	}
 
-	// 周囲の情報をスキャン
-	ScanSurround(obj, scene);
+	// 周囲情報のスキャンとA*（負荷が高いため頻度を下げる）
+	scanTimer_ += dt;
+	if (scanTimer_ > 0.2f) { // 0.2秒ごとに実施
+		scanTimer_ = 0.0f;
+		
+		// 周囲の情報をスキャン
+		ScanSurround(obj, scene);
 
-	// A*(エースターアルゴリズム)でオブジェクトまでの最短ルートを探す
-	AStar();
+		// A*(エースターアルゴリズム)でオブジェクトまでの最短ルートを探す
+		AStar();
+	}
 
 	// 移動
 	Move(obj, scene, dt);
@@ -92,6 +116,8 @@ void EnemyBehavior::OnEditorUI() {
 		if (ImGui::Combo("Priority", &priorityNum, priorities, IM_ARRAYSIZE(priorities))) {
 			priority_ = static_cast<TargetPriority>(priorityNum);
 		}
+
+		ImGui::Checkbox("Show Debug Grid", &showDebugGrid_);
 	}
 }
 
@@ -129,7 +155,7 @@ void EnemyBehavior::SearchTarget(SceneObject& obj, GameScene* scene) {
 	target_ = bestTarget;
 }
 
-void EnemyBehavior::Move(SceneObject& obj, GameScene* /*scene*/, float dt) {
+void EnemyBehavior::Move(SceneObject& obj, GameScene* scene, float dt) {
 	// ターゲットが存在しない、またはtargetまでのPath(ルート)がなければ止める
 	if (target_ == nullptr || path_.empty()) {
 		return;
@@ -163,81 +189,96 @@ void EnemyBehavior::Move(SceneObject& obj, GameScene* /*scene*/, float dt) {
 		obj.translate.z = nextPos.z;
 	}
 
+	// 現在のXZ座標から地面の高さを取得 (負荷が高いため頻度を下げる)
+	// scanTimer_ が 0.0f にリセットされた直後のフレーム（0.2秒に1回）のみ実行
+	if (scanTimer_ <= dt) {
+		float newHeight = scene->GetHeightAt(obj.translate.x, obj.translate.z, obj.id);
+		// 0.0は「ヒットせず」の可能性があるため、前回の値を保持するガードを入れる
+		if (newHeight != 0.0f || groundHeight_ == 0.0f) {
+			groundHeight_ = newHeight;
+		}
+	}
+
 	// type別Y座標の対応
-	//if (type_ == Fly) {
-	//	/*オブジェクトのXZ軸から地面と接してるY座標を割り出せる関数を実装してもらったらそれを元にオフセットを作成*/
-	//	 // 現在のXZ座標から地面の高さを取得
-	//	groundHeight_ = scene->GetHeightAt(obj.translate.x, obj.translate.z);
+	if (type_ == Fly) {
+		float baseHeight = 9.0f;	// 基準とする高さ
 
-	//	float baseHeight = 3.0f;	// 基準とする高さ
+		// sin波を使ってふわふわさせる
+		totalTime_ += dt;
 
-	//	// sin波を使ってふわふわさせる
-	//	totalTime_ += dt;
+		float hoverRange = 0.5f;	// 揺れ幅
+		float hoverSpeed = 2.0f;	// 揺れのスピード
 
-	//	float hoverRange = 0.5f;	// 揺れ幅
-	//	float hoverSpeed = 2.0f;	// 揺れのスピード
+		// 基準の高さに揺れの高さを足す
+		obj.translate.y = groundHeight_ + baseHeight + (std::sin(totalTime_ * hoverSpeed) * hoverRange);
 
-	//	// 基準の高さに揺れの高さを足す
-	//	obj.translate.y = groundHeight_ + baseHeight + (std::sin(totalTime_ * hoverSpeed) * hoverRange);
-	//}
+		// Rigidbodyがある場合は、座標の強制同期を行う（物理挙動との競合防止）
+		for (auto& rb : obj.rigidbodies) {
+			rb.velocity.y = 0.0f;
+		}
+	}
 
 	// 歩行タイプは地面にいるので特別な処理はなし
 }
 
 void EnemyBehavior::ScanSurround(SceneObject& obj, GameScene* scene) {
-	myPos_.x = obj.GetTransform().translate.x;
-	myPos_.y = obj.GetTransform().translate.y;
-	myPos_.z = obj.GetTransform().translate.z;
+	myPos_ = obj.translate;
 
-	// 自分の位置をスナップ（ガタつき防止）
+	// 自分の位置をスナップ（基準座標）
 	float snappedX = std::floor(myPos_.x / cellLength_) * cellLength_;
 	float snappedZ = std::floor(myPos_.z / cellLength_) * cellLength_;
 
-	float enemyRadius = 1.0f;
-
+	// グリッドの初期化
 	for (int z = 0; z < GRID_SIZE; ++z) {
 		for (int x = 0; x < GRID_SIZE; ++x) {
-			// このマスのワールド座標
-			float worldX = snappedX + (x - GRID_SIZE / 2) * cellLength_;
-			float worldZ = snappedZ + (z - GRID_SIZE / 2) * cellLength_;
-
 			localGrid_[z][x].isWall = false;
 			localGrid_[z][x].gridX = x;
 			localGrid_[z][x].gridZ = z;
-
-			auto& objects = scene->GetObjects();
-			for (size_t i = 0; i < objects.size(); ++i) {
-				if (HasTag(objects[i], "Wall")) {
-					// 壁の座標とスケールを取得
-					DirectX::XMFLOAT3 wallPos;
-					wallPos.x = objects[i].GetTransform().translate.x;
-					wallPos.y = objects[i].GetTransform().translate.y;
-					wallPos.z = objects[i].GetTransform().translate.z;
-					DirectX::XMFLOAT3 wallScale;
-					wallScale.x = objects[i].GetTransform().scale.x;
-					wallScale.y = objects[i].GetTransform().scale.y;
-					wallScale.z = objects[i].GetTransform().scale.z;
-
-					// 壁の当たり判定の範囲（AABB）を計算
-					// 自作エンジンのスケールが「中心から端まで」ならそのまま、
-					// 「端から端（全幅）」なら 0.5f を掛けてね。
-					float minX = wallPos.x - wallScale.x - enemyRadius;
-					float maxX = wallPos.x + wallScale.x + enemyRadius;
-					float minZ = wallPos.z - wallScale.z - enemyRadius;
-					float maxZ = wallPos.z + wallScale.z + enemyRadius;
-
-					// マスの中心点が、壁の矩形の中に入っているか判定
-					if (worldX >= minX && worldX <= maxX && worldZ >= minZ && worldZ <= maxZ) {
-						localGrid_[z][x].isWall = true;
-						break; // このマスは壁確定なので次のマスへ
-					}
-				}
-			}
-
-			// 自分がいる中心マスだけは、絶対に壁にしない！
-			localGrid_[GRID_SIZE / 2][GRID_SIZE / 2].isWall = false;
 		}
 	}
+
+	float enemyRadius = 1.0f;
+	auto& objects = scene->GetObjects();
+
+	// 壁オブジェクトを事前に抽出（計算量を減らすため、二重ループを避ける）
+	struct WallInfo {
+		float minX, maxX, minZ, maxZ;
+	};
+	std::vector<WallInfo> walls;
+	for (const auto& o : objects) {
+		if (HasTag(o, "Wall")) {
+			WallInfo w;
+			w.minX = o.translate.x - o.scale.x - enemyRadius;
+			w.maxX = o.translate.x + o.scale.x + enemyRadius;
+			w.minZ = o.translate.z - o.scale.z - enemyRadius;
+			w.maxZ = o.translate.z + o.scale.z + enemyRadius;
+			walls.push_back(w);
+		}
+	}
+
+	// 抽出した壁情報をもとにグリッドを更新
+	for (const auto& wall : walls) {
+		// グリッド内での範囲を計算
+		int minXIdx = static_cast<int>((wall.minX - snappedX) / cellLength_) + (GRID_SIZE / 2);
+		int maxXIdx = static_cast<int>((wall.maxX - snappedX) / cellLength_) + (GRID_SIZE / 2);
+		int minZIdx = static_cast<int>((wall.minZ - snappedZ) / cellLength_) + (GRID_SIZE / 2);
+		int maxZIdx = static_cast<int>((wall.maxZ - snappedZ) / cellLength_) + (GRID_SIZE / 2);
+
+		// 範囲をグリッド内にクランプ
+		minXIdx = std::max(0, std::min(minXIdx, GRID_SIZE - 1));
+		maxXIdx = std::max(0, std::min(maxXIdx, GRID_SIZE - 1));
+		minZIdx = std::max(0, std::min(minZIdx, GRID_SIZE - 1));
+		maxZIdx = std::max(0, std::min(maxZIdx, GRID_SIZE - 1));
+
+		for (int z = minZIdx; z <= maxZIdx; ++z) {
+			for (int x = minXIdx; x <= maxXIdx; ++x) {
+				localGrid_[z][x].isWall = true;
+			}
+		}
+	}
+
+	// 自分がいる中心マスだけは、絶対に壁にしない！
+	localGrid_[GRID_SIZE / 2][GRID_SIZE / 2].isWall = false;
 }
 
 void EnemyBehavior::AStar() {
@@ -283,11 +324,13 @@ void EnemyBehavior::CalculatePath(int startX, int startZ, int targetX, int targe
 	closedList_.clear();
 	path_.clear();
 
-	// 全てのノードのコストを初期化(コストが低いものを探索に使うため数字を大きくして初期化)
+	// 全てのノードのコストを初期化
 	for (int z = 0; z < GRID_SIZE; ++z) {
 		for (int x = 0; x < GRID_SIZE; ++x) {
 			localGrid_[z][x].gCost = 999999.0f; // 大きい数字
 			localGrid_[z][x].parent = nullptr;
+			localGrid_[z][x].isOpen = false;
+			localGrid_[z][x].isClosed = false;
 		}
 	}
 
@@ -297,6 +340,7 @@ void EnemyBehavior::CalculatePath(int startX, int startZ, int targetX, int targe
 
 	startNode->gCost = 0;
 	startNode->hCost = static_cast<float>(std::abs(targetX - startX) + std::abs(targetZ - startZ));
+	startNode->isOpen = true; // オープンリスト入り
 	openList_.push_back(startNode);
 
 	// リストの終わりまで続ける
@@ -335,6 +379,8 @@ void EnemyBehavior::CalculatePath(int startX, int startZ, int targetX, int targe
 
 		// 現在のノードをクローズリストへ移動
 		openList_.erase(openList_.begin() + currentIndex);
+		currentNode->isOpen = false;
+		currentNode->isClosed = true;
 		closedList_.push_back(currentNode);
 
 		// 移動するための8マス(上下左右斜め)調べる
@@ -365,16 +411,8 @@ void EnemyBehavior::CalculatePath(int startX, int startZ, int targetX, int targe
 				}
 			}
 
-			// クローズドリスト(探索済み)に入っているかチェック
-			bool isClosed = false;
-			for (size_t j = 0; j < closedList_.size(); ++j) {
-				if (closedList_[j] == neighbor) {
-					isClosed = true;
-					break;
-				}
-			}
-
-			if (isClosed) {
+			// 既にクローズドリスト(探索済み)に入っているかチェック (O(1)に改善)
+			if (neighbor->isClosed) {
 				continue;
 			}
 
@@ -382,21 +420,14 @@ void EnemyBehavior::CalculatePath(int startX, int startZ, int targetX, int targe
 			float moveCost = (i < 4) ? 1.0f : 1.41f;
 			float newGCost = currentNode->gCost + moveCost;
 
-			// 既にオープン理宇とにある場合、新しいルートの方が優秀かチェック
-			bool isOpen = false;
-			for (size_t j = 0; j < openList_.size(); ++j) {
-				if (openList_[j] == neighbor) {
-					isOpen = true;
-					break;
-				}
-			}
-
-			if (!isOpen || newGCost < neighbor->gCost) {
+			// 既にオープンリストにあるかチェック (O(1)に改善)
+			if (!neighbor->isOpen || newGCost < neighbor->gCost) {
 				neighbor->gCost = newGCost;
 				neighbor->hCost = static_cast<float>(std::abs(targetX - nextX) + std::abs(targetZ - nextZ));
 				neighbor->parent = currentNode;
 
-				if (!isOpen) {
+				if (!neighbor->isOpen) {
+					neighbor->isOpen = true;
 					openList_.push_back(neighbor);
 				}
 			}
@@ -409,36 +440,58 @@ void EnemyBehavior::Debug() {
 	ImGui::Begin("Enemy Infomation");
 	ImGui::Text("Target Name : %s", targetName_.c_str());
 	ImGui::Text("GroundHeight : %f", groundHeight_);
-	ImGui::Text("Local Grid Debug");
-	for (int z = GRID_SIZE - 1; z >= 0; --z) {
-		for (int x = 0; x < GRID_SIZE; ++x) {
-			// そのマスが path_ に含まれているかチェック
-			bool isPath = false;
-			for (size_t i = 0; i < path_.size(); ++i) {
-				// ワールド座標から逆算してこのマスかどうか判定
-				int px = static_cast<int>((path_[i].x - myPos_.x) / cellLength_) + (GRID_SIZE / 2);
-				int pz = static_cast<int>((path_[i].z - myPos_.z) / cellLength_) + (GRID_SIZE / 2);
-				if (px == x && pz == z) {
-					isPath = true;
-					break;
+	ImGui::Text("Move Type : %s", (type_ == Fly ? "Fly" : "Walk"));
+	
+	if (showDebugGrid_) {
+		ImGui::Text("Local Grid Debug");
+		// 文字列を一括で構築して表示速度を稼ぐ
+		std::string gridStr;
+		gridStr.reserve(GRID_SIZE * (GRID_SIZE * 3 + 1));
+
+		for (int z = GRID_SIZE - 1; z >= 0; --z) {
+			for (int x = 0; x < GRID_SIZE; ++x) {
+				// そのマスが path_ に含まれているかチェック
+				bool isPath = false;
+				for (const auto& p : path_) {
+					int px = static_cast<int>((p.x - myPos_.x) / cellLength_) + (GRID_SIZE / 2);
+					int pz = static_cast<int>((p.z - myPos_.z) / cellLength_) + (GRID_SIZE / 2);
+					if (px == x && pz == z) {
+						isPath = true;
+						break;
+					}
 				}
+
+				if (x == GRID_SIZE / 2 && z == GRID_SIZE / 2) gridStr += "|S|";
+				else if (isPath)                   gridStr += " * ";
+				else if (localGrid_[z][x].isWall)  gridStr += " # ";
+				else                               gridStr += " . ";
 			}
-
-			if (x == GRID_SIZE / 2 && z == GRID_SIZE / 2)
-				ImGui::Text("|S|"); // Self
-			else if (isPath)
-				ImGui::Text(" * "); // ルート
-			else if (localGrid_[z][x].isWall)
-				ImGui::Text(" # "); // 壁
-			else
-				ImGui::Text(" . ");
-
-			ImGui::SameLine();
+			gridStr += "\n";
 		}
-		ImGui::NewLine();
+		ImGui::TextUnformatted(gridStr.c_str());
 	}
 	ImGui::End();
 #endif
+}
+
+std::string EnemyBehavior::SerializeParameters() {
+	nlohmann::json j;
+	j["moveType"] = (int)type_;
+	j["targetType"] = (int)targetType_;
+	j["priority"] = (int)priority_;
+	j["speed"] = speed_;
+	return j.dump();
+}
+
+void EnemyBehavior::DeserializeParameters(const std::string& data) {
+	if (data.empty()) return;
+	try {
+		auto j = nlohmann::json::parse(data);
+		if (j.contains("moveType")) type_ = (MoveType)j["moveType"].get<int>();
+		if (j.contains("targetType")) targetType_ = (TargetType)j["targetType"].get<int>();
+		if (j.contains("priority")) priority_ = (TargetPriority)j["priority"].get<int>();
+		if (j.contains("speed")) speed_ = j["speed"].get<float>();
+	} catch (...) {}
 }
 
 // ★ スクリプト自動登録

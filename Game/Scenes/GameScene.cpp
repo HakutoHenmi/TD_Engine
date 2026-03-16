@@ -337,8 +337,8 @@ SceneObject* GameScene::FindObjectByName(const std::string& name) {
 	return nullptr;
 }
 
-// ★追加: 指定座標のメッシュ表面の高さを取得
-float GameScene::GetHeightAt(float x, float z) {
+// ★追加: 指定座標のメッシュ表面的高さを取得
+float GameScene::GetHeightAt(float x, float z, uint32_t excludeId) {
 	float maxHeight = -1000.0f;
 	bool hitAny = false;
 
@@ -346,14 +346,28 @@ float GameScene::GetHeightAt(float x, float z) {
 	DirectX::XMVECTOR rayPos = DirectX::XMVectorSet(x, 1000.0f, z, 1.0f);
 	DirectX::XMVECTOR rayDir = DirectX::XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f);
 
-	for (const auto& obj : objects_) {
+	for (int i = 0; i < (int)objects_.size(); ++i) {
+		const auto& obj = objects_[i];
+		
+		// 自分自身を対象外にする
+		if (excludeId != 0 && obj.id == excludeId) continue;
+
+		// 敵や弾などは地形判定から除外する（タグによる判定）
+		bool isEnemyOrBullet = false;
+		for (const auto& tag : obj.tags) {
+			if (tag.tag == "Enemy" || tag.tag == "Bullet" || tag.tag == "Player") {
+				isEnemyOrBullet = true;
+				break;
+			}
+		}
+		if (isEnemyOrBullet) continue;
+
 		// メッシュレンダラーまたはGPUメッシュコライダーを持つオブジェクトを対象にする
 		uint32_t modelHandle = 0;
 		if (!obj.gpuMeshColliders.empty() && obj.gpuMeshColliders[0].enabled) {
 			modelHandle = obj.gpuMeshColliders[0].meshHandle;
 			if (modelHandle == 0) modelHandle = obj.modelHandle;
 		} else if (obj.modelHandle != 0) {
-			// コライダーがない場合でもモデルがあれば判定対象にする（必要に応じて調整）
 			modelHandle = obj.modelHandle;
 		}
 
@@ -364,8 +378,10 @@ float GameScene::GetHeightAt(float x, float z) {
 
 		float dist = 0.0f;
 		Engine::Vector3 hitPoint;
-		// Model::RayCast は Local Space で判定するため、内部でワールド行列を考慮している
-		if (model->RayCast(rayPos, rayDir, obj.GetTransform().ToMatrix(), dist, hitPoint)) {
+		// ★修正: GetWorldMatrix を使用
+		Engine::Matrix4x4 worldMat = GetWorldMatrix(i);
+
+		if (model->RayCast(rayPos, rayDir, worldMat, dist, hitPoint)) {
 			if (hitPoint.y > maxHeight) {
 				maxHeight = hitPoint.y;
 				hitAny = true;

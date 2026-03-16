@@ -41,7 +41,7 @@ public:
 	// ★追加: 名前でオブジェクトを検索するヘルパー
 	SceneObject* FindObjectByName(const std::string& name);
 	// ★追加: 指定座標のメッシュ表面の高さを取得
-	float GetHeightAt(float x, float z);
+	float GetHeightAt(float x, float z, uint32_t excludeId = 0);
 
 private:
     Engine::WindowDX* dx_ = nullptr;
