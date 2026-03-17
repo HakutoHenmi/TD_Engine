@@ -8,6 +8,8 @@
 #include <deque>
 #include <DirectXMath.h>
 
+struct ImVec2;
+
 namespace Game {
 
 class GameScene;
@@ -45,6 +47,7 @@ public:
 
 	// レンダリングサポート用
 	static void ScreenToWorldRay(float screenX, float screenY, float imageW, float imageH, DirectX::XMMATRIX view, DirectX::XMMATRIX proj, DirectX::XMVECTOR& outOrig, DirectX::XMVECTOR& outDir);
+	static bool GetGameViewRect(ImVec2& outMin, float& outW, float& outH);
 
 	// ★ Console API
 	static void Log(const std::string& msg);

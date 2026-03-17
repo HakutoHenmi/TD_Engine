@@ -133,6 +133,13 @@ void EditorUI::Redo() {
 	undoStack.push_back(c);
 }
 
+bool EditorUI::GetGameViewRect(ImVec2& outMin, float& outW, float& outH) {
+	outMin = gameImageMin;
+	outW = gameImageMax.x - gameImageMin.x;
+	outH = gameImageMax.y - gameImageMin.y;
+	return outW > 0.0f && outH > 0.0f;
+}
+
 // ====== Console ======
 void EditorUI::Log(const std::string& msg) {
 	consoleLog.push_back({LogLevel::Info, msg, globalTime});
