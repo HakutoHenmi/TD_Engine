@@ -1,10 +1,10 @@
 #include "ExperienceOrbScript.h"
+#include "../../externals/imgui/imgui.h"
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
 #include <cmath>
 #include <cstdlib>
-
 namespace Game {
 
 /// タグを持っているかチェックするヘルパー関数
@@ -70,9 +70,13 @@ void ExperienceOrbScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 		float dz = playerObject->translate.z - obj.translate.z;
 
 		float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+
 		if (distance < hitRange_) {
+
+
 			scene->GetEventSystem().Emit("GainGold", 1.0f);
 			scene->DestroyObject(obj.id);
+
 			return;
 		}
 

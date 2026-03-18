@@ -135,7 +135,7 @@ void ExperienceHopper::Update(SceneObject& obj, GameScene* scene, float dt) {
 		return;
 	}
 
-	if (orbCount >= 100) {
+	if (orbCount >= 10) {
 		return;
 	}
 
@@ -147,23 +147,20 @@ void ExperienceHopper::Update(SceneObject& obj, GameScene* scene, float dt) {
 	orb.name = "ExperienceOrb";
 	orb.translate = obj.translate;
 	orb.translate.y += 0.5f;
-	orb.scale = {0.2f, 0.2f, 0.2f};
+	orb.scale = {1.0f, 1.0f, 1.0f};
 	orb.rotate = {0.0f, 0.0f, 0.0f};
 
 	TagComponent tag;
 	tag.tag = "ExperienceOrb";
 	orb.tags.push_back(tag);
 
-	HealthComponent health;
-	health.hp = 1.0f;
-	health.maxHp = 1.0f;
-	orb.healths.push_back(health);
+
 
 	HitboxComponent hitbox;
 	hitbox.isActive = true;
 	hitbox.damage = 0.0f;
 	hitbox.tag = "ExperienceOrb";
-	hitbox.size = {1.0f, 1.0f, 1.0f};
+	hitbox.size = {2.0f, 2.0f, 2.0f};
 	orb.hitboxes.push_back(hitbox);
 
 	auto* renderer = scene->GetRenderer();

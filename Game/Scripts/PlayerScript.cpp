@@ -1,19 +1,15 @@
 #include "PlayerScript.h"
+#include "../../externals/imgui/imgui.h"
 #include "ObjectTypes.h"
+#include "PhaseSystemScript.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
 #include <cmath>
 #include <iostream>
-#include "../../externals/imgui/imgui.h"
-#include "PhaseSystemScript.h"
 
 namespace Game {
 
 void PlayerScript::Start(SceneObject& obj, GameScene* scene) {
-
-
-
-	scene->GetEventSystem().Subscribe("GainGold", [this](float amount) { experience_ += amount; });
 
 	// 剣がシーンに既にあるか確認
 	SceneObject* sword = nullptr;
@@ -74,6 +70,20 @@ void PlayerScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	if (!obj.healths.empty() && obj.healths[0].isDead)
 		return;
 
+	
+
+	if (!isSubscribed_) {
+		scene->GetEventSystem().Subscribe("GainGold", [this](float amount) {
+			experience_ += amount;
+
+			debugReceiveCount_ += 1;
+			debugLastValue_ = amount;
+		});
+
+		debugSubscribeCount_ += 1;
+		isSubscribed_ = true;
+	}
+
 	if (PhaseSystemScript::IsPreparation()) {
 		obj.cameraTargets[0].enabled = false;
 		obj.playerInputs[0].enabled = false;
@@ -86,11 +96,12 @@ void PlayerScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 		obj.playerInputs[0].enabled = true;
 	}
 
-	
-
-	ImGui::Begin("Player Status");
+ImGui::Begin("Player Debug");
 
 	ImGui::Text("Experience: %.1f", experience_);
+	ImGui::Text("Subscribe Count: %d", debugSubscribeCount_);
+	ImGui::Text("Receive Count: %d", debugReceiveCount_);
+	ImGui::Text("Last Value: %.2f", debugLastValue_);
 
 	ImGui::End();
 }
