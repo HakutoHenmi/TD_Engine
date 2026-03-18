@@ -34,45 +34,70 @@ void ExperienceOrbScript::Start(SceneObject& obj, GameScene* /*scene*/) {
 }
 
 void ExperienceOrbScript::Update(SceneObject& obj, GameScene* scene, float dt) {
+
 	obj.rotate.y += 1.5f * dt;
 
-	// プレイヤーを探す
-	SceneObject* playerObject = scene->FindObjectByName("Player");
-	// プレイヤーが存在し、かつ近くにいる場合は吸い寄せる
+	SceneObject* playerObject = nullptr;
+	float nearestDistance = suctionRange_;
+
+	for (int i = 0; i < (int)scene->GetObjects().size(); ++i) {
+		SceneObject& other = const_cast<SceneObject&>(scene->GetObjects()[i]);
+
+		if (!HasTag(other, "Player")) {
+			continue;
+		}
+
+		float dx = other.translate.x - obj.translate.x;
+		float dy = other.translate.y - obj.translate.y;
+		float dz = other.translate.z - obj.translate.z;
+
+		float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+
+		if (distance < nearestDistance) {
+			nearestDistance = distance;
+			playerObject = &other;
+		}
+	}
+
 	if (playerObject != nullptr) {
+
 		float playerCenterY = playerObject->translate.y + 1.0f;
 
 		float dx = playerObject->translate.x - obj.translate.x;
 		float dy = playerCenterY - obj.translate.y;
 		float dz = playerObject->translate.z - obj.translate.z;
 
+
 		float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
 
-		if (distance < suctionRange_) {
-			if (distance < hitRange_) {
-				// プレイヤーに経験値を与える
-				if ((int)obj.healths.size() > 0) {
-					obj.healths[0].hp = 0.0f;
-					playerObject->SetVariable("playerExperience_", 100);
-				}
-				return;
+		if (distance < hitRange_) {
+			if ((int)obj.healths.size() > 0) {
+				obj.healths[0].hp = 0.0f;
 			}
-
-			if (distance > 0.0001f) {
-				float directionX = dx / distance;
-				float directionY = dy / distance;
-				float directionZ = dz / distance;
-
-				obj.translate.x += directionX * suctionSpeed_ * dt;
-				obj.translate.y += directionY * suctionSpeed_ * dt;
-				obj.translate.z += directionZ * suctionSpeed_ * dt;
-			}
-
 			return;
 		}
+
+		if (distance > 0.0001f) {
+			float directionX = dx / distance;
+			float directionY = dy / distance;
+			float directionZ = dz / distance;
+
+			float moveDistance = suctionSpeed_ * dt;
+
+			if (moveDistance > distance) {
+				moveDistance = distance;
+			}
+
+			obj.translate.x += directionX * moveDistance;
+			obj.translate.y += directionY * moveDistance;
+			obj.translate.z += directionZ * moveDistance;
+		}
+
+		return;
 	}
 
 	if (isFloating_ == false) {
+
 		float gravity = -4.0f;
 		velocityY_ += gravity * dt;
 
@@ -83,9 +108,13 @@ void ExperienceOrbScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 		if (obj.translate.y < startY_ - 1.0f) {
 			isFloating_ = true;
 		}
+
 	} else {
+
 		floatTimer_ += dt;
+
 		float floatHeight = std::sin(floatTimer_ * 3.0f) * 0.2f;
+
 		obj.translate.y = (startY_ - 1.0f) + floatHeight;
 	}
 }

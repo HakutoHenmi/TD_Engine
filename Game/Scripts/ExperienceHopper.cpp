@@ -181,6 +181,11 @@ void ExperienceHopper::Update(SceneObject& obj, GameScene* scene, float dt) {
 
 	spawnTimer_ = 1.0f;
 
+
+	ImGui::Begin("ExperienceHopper Debug");
+	ImGui::Text("OrbCount: %d", CountExperienceOrbs(scene));
+	ImGui::Text("SpawnTimer: %.2f", spawnTimer_);
+	ImGui::End();
 }
 
 void Game::ExperienceHopper::OnDestroy(SceneObject& obj, GameScene* scene) {
