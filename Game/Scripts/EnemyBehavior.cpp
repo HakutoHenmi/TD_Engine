@@ -32,7 +32,7 @@ void EnemyBehavior::Start(SceneObject& obj, GameScene* scene) {
 			rb.useGravity = false;
 			rb.velocity = {0, 0, 0};
 		}
-		
+
 		// スポナーの高さではなく、即座に正しい浮遊高度へ移動
 		float baseHeight = 9.0f;
 		obj.translate.y = groundHeight_ + baseHeight;
@@ -41,11 +41,11 @@ void EnemyBehavior::Start(SceneObject& obj, GameScene* scene) {
 
 void EnemyBehavior::Update(SceneObject& obj, GameScene* scene, float dt) {
 	// ここに毎フレームの挙動を記述
-	
+
 	// 自身の情報を常に最新に
 	pOwner_ = &obj;
 	pCurrentScene_ = scene;
-	
+
 	// 既存のターゲットを失ったときなどに改めて検索
 	if (target_ == nullptr) {
 		SearchTarget(obj, scene);
@@ -53,9 +53,9 @@ void EnemyBehavior::Update(SceneObject& obj, GameScene* scene, float dt) {
 
 	// 周囲情報のスキャンとA*（負荷が高いため頻度を下げる）
 	scanTimer_ += dt;
-	if (scanTimer_ > 0.2f) { // 0.2秒ごとに実施
+	if (scanTimer_ > 0.1f) { // 0.2秒ごとに実施
 		scanTimer_ = 0.0f;
-		
+
 		// 周囲の情報をスキャン
 		ScanSurround(obj, scene);
 
@@ -78,7 +78,7 @@ void EnemyBehavior::OnEditorUI() {
 	// 敵の移動タイプ(地面や空中)
 	// ライトの種類を選べるようにする
 	int typeNum = static_cast<int>(type_);
-	const char* types[] = { "Walk", "Fly" };
+	const char* types[] = {"Walk", "Fly"};
 	if (ImGui::Combo("Enemy Type", &typeNum, types, IM_ARRAYSIZE(types))) {
 		// 選ばれた番号をそのまま enum にキャストして戻せばOK！
 		type_ = static_cast<MoveType>(typeNum);
@@ -87,7 +87,7 @@ void EnemyBehavior::OnEditorUI() {
 	// 追うオブジェクトのタグを設定
 	// ライトの種類を選べるようにする
 	int targetNum = static_cast<int>(targetType_);
-	const char* targetTypes[] = { "Player", "Core", "Defender" };
+	const char* targetTypes[] = {"Player", "Core", "Defender"};
 	if (ImGui::Combo("Target", &targetNum, targetTypes, IM_ARRAYSIZE(targetTypes))) {
 		// 選ばれた番号をそのまま enum にキャストして戻せばOK！
 		targetType_ = static_cast<TargetType>(targetNum);
@@ -95,11 +95,9 @@ void EnemyBehavior::OnEditorUI() {
 		// タグ名を更新(シーンを動かしたときにすぐに検索できるように)
 		if (targetType_ == Player) {
 			targetName_ = "Player";
-		}
-		else if (targetType_ == Core) {
+		} else if (targetType_ == Core) {
 			targetName_ = "Core";
-		}
-		else if (targetType_ == Defender) {
+		} else if (targetType_ == Defender) {
 			targetName_ = "Defender";
 		}
 
@@ -112,7 +110,7 @@ void EnemyBehavior::OnEditorUI() {
 	// 複数存在し得るオブジェクトに対して優先順位を選べるように
 	if (targetType_ >= Defender) {
 		int priorityNum = static_cast<int>(priority_);
-		const char* priorities[] = { "Near", "Far" };
+		const char* priorities[] = {"Near", "Far"};
 		if (ImGui::Combo("Priority", &priorityNum, priorities, IM_ARRAYSIZE(priorities))) {
 			priority_ = static_cast<TargetPriority>(priorityNum);
 		}
@@ -135,16 +133,15 @@ void EnemyBehavior::SearchTarget(SceneObject& obj, GameScene* scene) {
 			// 距離を計算
 			float dx = objects[i].GetTransform().translate.x - obj.GetTransform().translate.x;
 			float dz = objects[i].GetTransform().translate.z - obj.GetTransform().translate.z;
-			float distSq = dx * dx + dz * dz;	// 軽量化のために平方根は取らない
+			float distSq = dx * dx + dz * dz; // 軽量化のために平方根は取らない
 
 			// priorityごとの対応
-			if (priority_ == Near) {	// Near
+			if (priority_ == Near) { // Near
 				if (distSq < bestDistance) {
 					bestDistance = distSq;
 					bestTarget = const_cast<SceneObject*>(&objects[i]);
 				}
-			}
-			else {	// Far
+			} else { // Far
 				if (distSq > bestDistance) {
 					bestDistance = distSq;
 					bestTarget = const_cast<SceneObject*>(&objects[i]);
@@ -176,17 +173,53 @@ void EnemyBehavior::Move(SceneObject& obj, GameScene* scene, float dt) {
 	float diffZ = nextPos.z - myPos_.z;
 	float distance = std::sqrt(diffX * diffX + diffZ * diffZ);
 
+	float dirX = 0.0f;
+	float dirZ = 0.0f;
 	if (distance > 0.1f) {
-		float dirX = diffX / distance;
-		float dirZ = diffZ / distance;
+		dirX = diffX / distance;
+		dirZ = diffZ / distance;
 
 		obj.translate.x += dirX * speed_ * dt;
 		obj.translate.z += dirZ * speed_ * dt;
-	}
-	else if (path_.size() > 1) {
+	} else if (path_.size() > 1) {
 		// 目的地にほぼ着いたら、座標をマスの中心に強制セットしてズレをリセット
 		obj.translate.x = nextPos.x;
 		obj.translate.z = nextPos.z;
+	}
+
+	// 他の敵と重ならないための処理
+	float separationX = 0.0f;
+	float separationZ = 0.0f;
+	auto& allObjects = scene->GetObjects();
+
+	for (size_t i = 0; i < allObjects.size(); ++i) {
+		// 自分自身、または「Enemy」タグを持っていないものは無視 
+		if (&allObjects[i].id == &obj.id || HasTag(allObjects[i], "Enemy")) {
+			continue;
+		}
+
+		// 他の敵との距離を計算
+		float vx = obj.translate.x - allObjects[i].translate.x;
+		float vz = obj.translate.z - allObjects[i].translate.z;
+		float distSq = vx * vx + vz * vz;
+
+		// 一定範囲内にいたら、離れる方向の力を蓄積
+		if (distSq < separationRadius_ * separationRadius_ && distSq > 0.0001f) {
+			float d = std::sqrt(distSq);
+			separationX += (vx / d) * (separationRadius_ - d); // 近いほど強く押し戻す
+			separationZ += (vz / d) * (separationRadius_ - d);
+		}
+	}
+
+	// 最終的な移動方向に合成
+	float finalDirX = dirX + separationX * separationWeight_;
+	float finalDirZ = dirZ + separationZ * separationWeight_;
+
+	// 正規化(斜め移動が速くならないように)
+	float finalLength = std::sqrt(finalDirX * finalDirX + finalDirZ * finalDirZ);
+	if (finalLength > 0.01f) {
+		obj.translate.x += (finalDirX / finalLength) * speed_ * dt;
+		obj.translate.z += (finalDirZ / finalLength) * speed_ * dt;
 	}
 
 	// 現在のXZ座標から地面の高さを取得 (負荷が高いため頻度を下げる)
@@ -201,16 +234,21 @@ void EnemyBehavior::Move(SceneObject& obj, GameScene* scene, float dt) {
 
 	// type別Y座標の対応
 	if (type_ == Fly) {
-		float baseHeight = 9.0f;	// 基準とする高さ
+		float baseHeight = 9.0f;                    // 基準とする高さ
+		float targetY = groundHeight_ + baseHeight; // 本来あるべき高さの目標値
+
+		// 補間用の値
+		float interpolationSpeed = 5.0f;
+		obj.translate.y += (targetY - obj.translate.y) * interpolationSpeed * dt;
 
 		// sin波を使ってふわふわさせる
 		totalTime_ += dt;
 
-		float hoverRange = 0.5f;	// 揺れ幅
-		float hoverSpeed = 2.0f;	// 揺れのスピード
+		float hoverRange = 0.5f; // 揺れ幅
+		float hoverSpeed = 2.0f; // 揺れのスピード
 
 		// 基準の高さに揺れの高さを足す
-		obj.translate.y = groundHeight_ + baseHeight + (std::sin(totalTime_ * hoverSpeed) * hoverRange);
+		obj.translate.y += (std::sin(totalTime_ * hoverSpeed) * hoverRange) * dt * 10.0f;
 
 		// Rigidbodyがある場合は、座標の強制同期を行う（物理挙動との競合防止）
 		for (auto& rb : obj.rigidbodies) {
@@ -384,8 +422,8 @@ void EnemyBehavior::CalculatePath(int startX, int startZ, int targetX, int targe
 		closedList_.push_back(currentNode);
 
 		// 移動するための8マス(上下左右斜め)調べる
-		int dx[] = { 0, 0, 1, -1, 1, 1, -1, -1 };
-		int dz[] = { 1, -1, 0, 0, 1, -1, 1, -1 };
+		int dx[] = {0, 0, 1, -1, 1, 1, -1, -1};
+		int dz[] = {1, -1, 0, 0, 1, -1, 1, -1};
 
 		for (int i = 0; i < 8; ++i) {
 			int nextX = currentNode->gridX + dx[i];
@@ -405,8 +443,7 @@ void EnemyBehavior::CalculatePath(int startX, int startZ, int targetX, int targe
 
 			if (i >= 4) { // 斜め移動の場合
 				// 例えば「右」と「上」が壁なら、「右斜め上」は通れないようにする
-				if (localGrid_[currentNode->gridZ][nextX].isWall ||
-					localGrid_[nextZ][currentNode->gridX].isWall) {
+				if (localGrid_[currentNode->gridZ][nextX].isWall || localGrid_[nextZ][currentNode->gridX].isWall) {
 					continue;
 				}
 			}
@@ -441,7 +478,7 @@ void EnemyBehavior::Debug() {
 	ImGui::Text("Target Name : %s", targetName_.c_str());
 	ImGui::Text("GroundHeight : %f", groundHeight_);
 	ImGui::Text("Move Type : %s", (type_ == Fly ? "Fly" : "Walk"));
-	
+
 	if (showDebugGrid_) {
 		ImGui::Text("Local Grid Debug");
 		// 文字列を一括で構築して表示速度を稼ぐ
@@ -461,10 +498,14 @@ void EnemyBehavior::Debug() {
 					}
 				}
 
-				if (x == GRID_SIZE / 2 && z == GRID_SIZE / 2) gridStr += "|S|";
-				else if (isPath)                   gridStr += " * ";
-				else if (localGrid_[z][x].isWall)  gridStr += " # ";
-				else                               gridStr += " . ";
+				if (x == GRID_SIZE / 2 && z == GRID_SIZE / 2)
+					gridStr += "|S|";
+				else if (isPath)
+					gridStr += " * ";
+				else if (localGrid_[z][x].isWall)
+					gridStr += " # ";
+				else
+					gridStr += " . ";
 			}
 			gridStr += "\n";
 		}
@@ -484,14 +525,20 @@ std::string EnemyBehavior::SerializeParameters() {
 }
 
 void EnemyBehavior::DeserializeParameters(const std::string& data) {
-	if (data.empty()) return;
+	if (data.empty())
+		return;
 	try {
 		auto j = nlohmann::json::parse(data);
-		if (j.contains("moveType")) type_ = (MoveType)j["moveType"].get<int>();
-		if (j.contains("targetType")) targetType_ = (TargetType)j["targetType"].get<int>();
-		if (j.contains("priority")) priority_ = (TargetPriority)j["priority"].get<int>();
-		if (j.contains("speed")) speed_ = j["speed"].get<float>();
-	} catch (...) {}
+		if (j.contains("moveType"))
+			type_ = (MoveType)j["moveType"].get<int>();
+		if (j.contains("targetType"))
+			targetType_ = (TargetType)j["targetType"].get<int>();
+		if (j.contains("priority"))
+			priority_ = (TargetPriority)j["priority"].get<int>();
+		if (j.contains("speed"))
+			speed_ = j["speed"].get<float>();
+	} catch (...) {
+	}
 }
 
 // ★ スクリプト自動登録
