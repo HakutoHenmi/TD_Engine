@@ -17,7 +17,7 @@ static bool HasTag(const SceneObject& obj, const char* tagName) {
 	return false;
 }
 
-void ExperienceOrbScript::Start(SceneObject& obj, GameScene* /*scene*/) {
+void ExperienceOrbScript::Start(SceneObject& obj, GameScene* /*scene*/ ) {
 
 	// ランダムな初速を設定
 	float randomX = (float(rand()) / float(RAND_MAX)) - 0.5f;
@@ -31,6 +31,8 @@ void ExperienceOrbScript::Start(SceneObject& obj, GameScene* /*scene*/) {
 
 	floatTimer_ = 0.0f;
 	isFloating_ = false;
+
+	///auto& events = scene->GetEventSystem();
 }
 
 void ExperienceOrbScript::Update(SceneObject& obj, GameScene* scene, float dt) {
@@ -71,9 +73,10 @@ void ExperienceOrbScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 		float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
 
 		if (distance < hitRange_) {
-			if ((int)obj.healths.size() > 0) {
+			
 				obj.healths[0].hp = 0.0f;
-			}
+				scene->GetEventSystem().Emit("GainGold", 100.0f);
+			
 			return;
 		}
 

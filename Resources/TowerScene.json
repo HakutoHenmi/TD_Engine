@@ -24,7 +24,7 @@
       "components": [
         {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources\\sword.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
         {"type": "Tag", "enabled": true, "tag": "Base"},
-        {"type": "Script", "enabled": true, "scriptPath": "BaseScript"}
+        {"type": "Script", "enabled": true, "scriptPath": "BaseScript", "paramData": "rotationSpeed=1;attackInterval=1;damage=10;attackRange=30;"}
       ]
     },
     {
@@ -62,7 +62,7 @@
         {"type": "Tag", "enabled": true, "tag": "Untagged"},
         {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [1,1,1], "damage": 10, "isActive": false, "tag": "Default"},
         {"type": "Health", "enabled": true, "hp": 100, "maxHp": 100, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
-        {"type": "Script", "enabled": true, "scriptPath": "Canon"}
+        {"type": "Script", "enabled": true, "scriptPath": "Canon", "paramData": ""}
       ]
     },
     {
@@ -100,7 +100,7 @@
         {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
         {"type": "Tag", "enabled": true, "tag": "Enemy"},
         {"type": "Health", "enabled": true, "hp": 30, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
-        {"type": "Script", "enabled": true, "scriptPath": "EnemyAIScript"}
+        {"type": "Script", "enabled": true, "scriptPath": "EnemyAIScript", "paramData": "{\"sightRange\":100.0,\"speed\":2.0}"}
       ]
     },
     {
@@ -121,7 +121,7 @@
         {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
         {"type": "Tag", "enabled": true, "tag": "Enemy"},
         {"type": "Health", "enabled": true, "hp": 30, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
-        {"type": "Script", "enabled": true, "scriptPath": "EnemyAIScript"}
+        {"type": "Script", "enabled": true, "scriptPath": "EnemyAIScript", "paramData": "{\"sightRange\":100.0,\"speed\":2.0}"}
       ]
     },
     {
@@ -142,7 +142,7 @@
         {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
         {"type": "Tag", "enabled": true, "tag": "Enemy"},
         {"type": "Health", "enabled": true, "hp": 30, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
-        {"type": "Script", "enabled": true, "scriptPath": "EnemyAIScript"}
+        {"type": "Script", "enabled": true, "scriptPath": "EnemyAIScript", "paramData": "{\"sightRange\":100.0,\"speed\":2.0}"}
       ]
     },
     {
@@ -163,7 +163,7 @@
         {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
         {"type": "Tag", "enabled": true, "tag": "Enemy"},
         {"type": "Health", "enabled": true, "hp": 30, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
-        {"type": "Script", "enabled": true, "scriptPath": "EnemyAIScript"}
+        {"type": "Script", "enabled": true, "scriptPath": "EnemyAIScript", "paramData": "{\"sightRange\":100.0,\"speed\":2.0}"}
       ]
     },
     {
@@ -183,7 +183,7 @@
         {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources\\suzanne.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
         {"type": "Tag", "enabled": true, "tag": "ExperienceHopper"},
         {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [1,1,1], "damage": 10, "isActive": false, "tag": "Default"},
-        {"type": "Script", "enabled": true, "scriptPath": "ExperienceHopper"}
+        {"type": "Script", "enabled": true, "scriptPath": "ExperienceHopper", "paramData": ""}
       ]
     },
     {
@@ -202,7 +202,7 @@
       "components": [
         {"type": "Tag", "enabled": true, "tag": "ExperienceMiner"},
         {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "damage": 10, "isActive": false, "tag": "Default"},
-        {"type": "Script", "enabled": true, "scriptPath": "ExperienceMiner"}
+        {"type": "Script", "enabled": true, "scriptPath": "ExperienceMiner", "paramData": ""}
       ]
     },
     {
@@ -240,7 +240,7 @@
         {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
         {"type": "Tag", "enabled": true, "tag": "Pipe"},
         {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "damage": 10, "isActive": false, "tag": "Default"},
-        {"type": "Script", "enabled": true, "scriptPath": "PipeScript"}
+        {"type": "Script", "enabled": true, "scriptPath": "PipeScript", "paramData": ""}
       ]
     },
     {
@@ -260,7 +260,7 @@
         {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
         {"type": "Tag", "enabled": true, "tag": "Pipe"},
         {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "damage": 10, "isActive": false, "tag": "Default"},
-        {"type": "Script", "enabled": true, "scriptPath": "PipeScript"}
+        {"type": "Script", "enabled": true, "scriptPath": "PipeScript", "paramData": ""}
       ]
     },
     {
@@ -280,7 +280,7 @@
         {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
         {"type": "Tag", "enabled": true, "tag": "Pipe"},
         {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "damage": 10, "isActive": false, "tag": "Default"},
-        {"type": "Script", "enabled": true, "scriptPath": "PipeScript"}
+        {"type": "Script", "enabled": true, "scriptPath": "PipeScript", "paramData": ""}
       ]
     },
     {
@@ -300,7 +300,7 @@
         {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
         {"type": "Tag", "enabled": true, "tag": "Pipe"},
         {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "damage": 10, "isActive": false, "tag": "Default"},
-        {"type": "Script", "enabled": true, "scriptPath": "PipeScript"}
+        {"type": "Script", "enabled": true, "scriptPath": "PipeScript", "paramData": ""}
       ]
     },
     {
@@ -320,11 +320,12 @@
         {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
         {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [2,2,2], "isTrigger": false},
         {"type": "Tag", "enabled": true, "tag": "Player"},
-        {"type": "Rigidbody", "enabled": true, "velocity": [0,0,0], "useGravity": true, "isKinematic": false},
+        {"type": "Rigidbody", "enabled": true, "velocity": [0,0,0], "useGravity": false, "isKinematic": false},
         {"type": "PlayerInput", "enabled": true},
         {"type": "CharacterMovement", "enabled": true, "speed": 5, "jumpPower": 6, "gravity": 9.8},
+        {"type": "CameraTarget", "enabled": true, "distance": 10, "height": 3, "smoothSpeed": 5},
         {"type": "Health", "enabled": true, "hp": 100, "maxHp": 100, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
-        {"type": "Script", "enabled": true, "scriptPath": "PlayerScript"}
+        {"type": "Script", "enabled": true, "scriptPath": "PlayerScript", "paramData": ""}
       ]
     },
     {

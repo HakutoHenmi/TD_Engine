@@ -59,6 +59,9 @@ private:
 	void UpdateMovement(SceneObject& obj, GameScene* /*scene*/, float dt);
 	void UpdateAttack(SceneObject& /*obj*/, GameScene* /*scene*/, float dt);
 	void UpdateSword(SceneObject& obj, GameScene* scene, float dt);
+
+
+	float experience_ = 0.0f; 
 };
 
 } // namespace Game
