@@ -1,5 +1,6 @@
-#define NOMINMAX
 #include "Model.h"
+#include "Renderer.h"
+#include "WindowDX.h"
 
 #include <algorithm>
 #include <cassert>
@@ -175,7 +176,13 @@ ComPtr<ID3D12Resource> Model::CreateBufferResource(ID3D12Device* device, size_t 
                D3D12_TEXTURE_LAYOUT_ROW_MAJOR, D3D12_RESOURCE_FLAG_NONE
     };
 	ComPtr<ID3D12Resource> res;
-	device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&res));
+	// 引数のdeviceがnullptrの場合はシステム全体で共有されているRendererのデバイスを借りる（簡易実装）
+	ID3D12Device* pDev = device;
+	if (!pDev && Renderer::GetInstance()) pDev = Renderer::GetInstance()->GetDevice(); 
+	
+	if (pDev) {
+		pDev->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&res));
+	}
 	return res;
 }
 
@@ -398,13 +405,30 @@ void Model::BuildBVH() {
 	for (uint32_t i = 0; i < numTriangles; ++i) data_.bvhIndices.push_back(i);
 
 	// Root node
-	BVHNode root;
+	BVHNode root{};
 	root.firstTriangle = 0;
 	root.triangleCount = numTriangles;
 	data_.bvhNodes.push_back(root);
 
 	UpdateNodeBounds(0);
 	SubdivideBVH(0);
+
+	// ★追加: GPU用バッファの構築と転送
+	if (!data_.bvhNodes.empty()) {
+		// ※本来は専用のUPLOAD→DEFAULT遷移が必要だが、このエンジンのCreateBufferResourceは
+		// UPLOADヒープで作られているため、そのままMapしてコピーする。
+		vbBvhNodes_ = CreateBufferResource(nullptr, data_.bvhNodes.size() * sizeof(BVHNode));
+		void* nodePtr = nullptr;
+		vbBvhNodes_->Map(0, nullptr, &nodePtr);
+		std::memcpy(nodePtr, data_.bvhNodes.data(), data_.bvhNodes.size() * sizeof(BVHNode));
+		vbBvhNodes_->Unmap(0, nullptr);
+
+		vbBvhIndices_ = CreateBufferResource(nullptr, data_.bvhIndices.size() * sizeof(uint32_t));
+		void* indexPtr = nullptr;
+		vbBvhIndices_->Map(0, nullptr, &indexPtr);
+		std::memcpy(indexPtr, data_.bvhIndices.data(), data_.bvhIndices.size() * sizeof(uint32_t));
+		vbBvhIndices_->Unmap(0, nullptr);
+	}
 }
 
 void Model::UpdateNodeBounds(uint32_t nodeIdx) {
@@ -416,12 +440,12 @@ void Model::UpdateNodeBounds(uint32_t nodeIdx) {
 		uint32_t triIdx = data_.bvhIndices[node.firstTriangle + i];
 		for (int v = 0; v < 3; ++v) {
 			const auto& pos = data_.vertices[data_.indices[triIdx * 3 + v]].position;
-			node.min.x = std::min(node.min.x, pos.x);
-			node.min.y = std::min(node.min.y, pos.y);
-			node.min.z = std::min(node.min.z, pos.z);
-			node.max.x = std::max(node.max.x, pos.x);
-			node.max.y = std::max(node.max.y, pos.y);
-			node.max.z = std::max(node.max.z, pos.z);
+			node.min.x = (std::min)(node.min.x, pos.x);
+			node.min.y = (std::min)(node.min.y, pos.y);
+			node.min.z = (std::min)(node.min.z, pos.z);
+			node.max.x = (std::max)(node.max.x, pos.x);
+			node.max.y = (std::max)(node.max.y, pos.y);
+			node.max.z = (std::max)(node.max.z, pos.z);
 		}
 	}
 }
@@ -464,13 +488,13 @@ void Model::SubdivideBVH(uint32_t nodeIdx) {
 
 	// 子ノードを作成
 	int leftIdx = (int)data_.bvhNodes.size();
-	BVHNode left;
+	BVHNode left{};
 	left.firstTriangle = firstTri;
 	left.triangleCount = leftCount;
 	data_.bvhNodes.push_back(left);
 
 	int rightIdx = (int)data_.bvhNodes.size();
-	BVHNode right;
+	BVHNode right{};
 	right.firstTriangle = i;
 	right.triangleCount = triCount - leftCount;
 	data_.bvhNodes.push_back(right);

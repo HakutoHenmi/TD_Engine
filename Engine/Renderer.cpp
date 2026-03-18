@@ -1,6 +1,6 @@
-// Engine/Renderer.cpp
 #include "Renderer.h"
 #include "Model.h"
+#include "../Game/ObjectTypes.h"
 
 #include <algorithm>
 #include <cassert>
@@ -175,7 +175,7 @@ bool Renderer::Initialize(WindowDX* window) {
 		dev_->CreateCommittedResource(&heapProp, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &clearVal, IID_PPV_ARGS(&shadowMap_));
 
 		D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc{};
-		dsvHeapDesc.NumDescriptors = 1;
+		dsvHeapDesc.NumDescriptors = 16; // ★修正: カスタムレンダーターゲット用に増やす
 		dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 		dev_->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&shadowDsvHeap_));
 
@@ -202,6 +202,11 @@ bool Renderer::Initialize(WindowDX* window) {
 		return false;
 
 	ppEnabled_ = true;
+
+	// ★追加: コリジョン同期用のコマンドリスト作成
+	if (FAILED(dev_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&collisionAlloc_)))) return false;
+	if (FAILED(dev_->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, collisionAlloc_.Get(), nullptr, IID_PPV_ARGS(&collisionList_)))) return false;
+	collisionList_->Close(); // 最初は閉じておく
 
 	return true;
 }
@@ -246,6 +251,8 @@ void Renderer::Shutdown() {
 	}
 	collisionResultBuffer_.Reset();
 	collisionReadbackBuffer_.Reset();
+	collisionAlloc_.Reset();
+	collisionList_.Reset();
 
 	ppEnabled_ = true;
 	ppParams_ = PostProcessParams{};
@@ -1119,13 +1126,14 @@ bool Renderer::InitPipelines() {
 
 	// ★追加: コンピュート RootSignature
 	{
-		CD3DX12_ROOT_PARAMETER computeParams[6]{};
-		computeParams[0].InitAsConstantBufferView(0); // b0: Constants
-		computeParams[1].InitAsShaderResourceView(0); // t0: MeshA Vertices
-		computeParams[2].InitAsShaderResourceView(1); // t1: MeshA Indices
-		computeParams[3].InitAsShaderResourceView(2); // t2: MeshB Vertices
-		computeParams[4].InitAsShaderResourceView(3); // t3: MeshB Indices
-		computeParams[5].InitAsUnorderedAccessView(0); // u0: Result
+		CD3DX12_ROOT_PARAMETER computeParams[7]{};
+		computeParams[0].InitAsConstants(1, 0);       // b0: { numRequests }
+		computeParams[1].InitAsShaderResourceView(0); // t0: Requests
+		computeParams[2].InitAsShaderResourceView(1); // t1: BvhNodes
+		computeParams[3].InitAsShaderResourceView(2); // t2: BvhIndices
+		computeParams[4].InitAsUnorderedAccessView(0); // u0: Results
+		computeParams[5].InitAsShaderResourceView(3); // t3: ModelVertices
+		computeParams[6].InitAsShaderResourceView(4); // t4: ModelIndices
 
 		CD3DX12_ROOT_SIGNATURE_DESC rsDescCompute;
 		rsDescCompute.Init(_countof(computeParams), computeParams, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_NONE);
@@ -2268,7 +2276,7 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 
 		D3D12_DESCRIPTOR_HEAP_DESC hd{};
 		hd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-		hd.NumDescriptors = 1;
+		hd.NumDescriptors = 16; // ★修正: カスタムレンダーターゲット用に増やす
 		dev_->CreateDescriptorHeap(&hd, IID_PPV_ARGS(&finalRtvHeap_));
 		finalRtv_ = finalRtvHeap_->GetCPUDescriptorHandleForHeapStart();
 		dev_->CreateRenderTargetView(finalSceneColor_.Get(), nullptr, finalRtv_);
@@ -2321,46 +2329,37 @@ Renderer::CustomRenderTarget Renderer::CreateRenderTarget(uint32_t width, uint32
 
 	D3D12_CLEAR_VALUE cv{};
 	cv.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	std::memcpy(cv.Color, kCustomTargetClearColor, sizeof(float) * 4);
+	static const float kClearColor[] = {0.1f, 0.1f, 0.1f, 1.0f};
+	std::memcpy(cv.Color, kClearColor, sizeof(float) * 4);
 
 	CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_DEFAULT);
 	dev_->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &cv, IID_PPV_ARGS(&target.texture));
 
-	// Texture (DSV用)
-	D3D12_RESOURCE_DESC descDepth{};
-	descDepth.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	descDepth.Width = width;
-	descDepth.Height = height;
-	descDepth.DepthOrArraySize = 1;
-	descDepth.MipLevels = 1;
-	descDepth.Format = DXGI_FORMAT_D32_FLOAT;
-	descDepth.SampleDesc.Count = 1;
-	descDepth.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+	// Depth (DSV用)
+	rd.Format = DXGI_FORMAT_D32_FLOAT;
+	rd.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+	D3D12_CLEAR_VALUE dcv{};
+	dcv.Format = DXGI_FORMAT_D32_FLOAT;
+	dcv.DepthStencil.Depth = 1.0f;
+	dev_->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_DEPTH_WRITE, &dcv, IID_PPV_ARGS(&target.depth));
 
-	D3D12_CLEAR_VALUE depthClear{};
-	depthClear.Format = DXGI_FORMAT_D32_FLOAT;
-	depthClear.DepthStencil.Depth = 1.0f;
-	depthClear.DepthStencil.Stencil = 0;
-
-	dev_->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &descDepth, D3D12_RESOURCE_STATE_DEPTH_WRITE, &depthClear, IID_PPV_ARGS(&target.depth));
-
-	// RTV作成 (外部用ヒープ)
-	target.rtv = window_->RTV_CPU(rtvCursor_++);
+	// Descriptors
+	uint32_t rtvIdx = rtvCursor_++;
+	target.rtv = CD3DX12_CPU_DESCRIPTOR_HANDLE(finalRtvHeap_->GetCPUDescriptorHandleForHeapStart(), rtvIdx, dev_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV));
 	dev_->CreateRenderTargetView(target.texture.Get(), nullptr, target.rtv);
 
-	// DSV作成 (外部用ヒープ)
-	target.dsv = window_->DSV_CPU(dsvCursor_++);
+	uint32_t dsvIdx = dsvCursor_++;
+	target.dsv = CD3DX12_CPU_DESCRIPTOR_HANDLE(shadowDsvHeap_->GetCPUDescriptorHandleForHeapStart(), dsvIdx, dev_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
 	dev_->CreateDepthStencilView(target.depth.Get(), nullptr, target.dsv);
 
-	// SRV作成 (ImGui等で表示するため)
-	const uint32_t sIdx = AllocateSrvIndex();
-	D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
-	srv.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-	srv.Texture2D.MipLevels = 1;
-	srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	dev_->CreateShaderResourceView(target.texture.Get(), &srv, window_->SRV_CPU(sIdx));
-	target.srvGpu = window_->SRV_GPU(sIdx);
+	uint32_t srvIdx = AllocateSrvIndex();
+	target.srvGpu = CD3DX12_GPU_DESCRIPTOR_HANDLE(srvHeap_->GetGPUDescriptorHandleForHeapStart(), srvIdx, srvInc_);
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Texture2D.MipLevels = 1;
+	dev_->CreateShaderResourceView(target.texture.Get(), &srvDesc, CD3DX12_CPU_DESCRIPTOR_HANDLE(srvHeap_->GetCPUDescriptorHandleForHeapStart(), srvIdx, srvInc_));
 
 	return target;
 }
@@ -2368,21 +2367,18 @@ Renderer::CustomRenderTarget Renderer::CreateRenderTarget(uint32_t width, uint32
 void Renderer::BeginCustomRenderTarget(const CustomRenderTarget& target) {
 	currentCustomTarget_ = &target;
 
-	CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-		target.texture.Get(),
-		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-		D3D12_RESOURCE_STATE_RENDER_TARGET);
+	auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(target.texture.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	list_->ResourceBarrier(1, &barrier);
 
-	list_->ClearRenderTargetView(target.rtv, kCustomTargetClearColor, 0, nullptr);
+	list_->OMSetRenderTargets(1, &target.rtv, FALSE, &target.dsv);
+	
+	static const float kClearColor[] = {0.1f, 0.1f, 0.1f, 1.0f};
+	list_->ClearRenderTargetView(target.rtv, kClearColor, 0, nullptr);
 	list_->ClearDepthStencilView(target.dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-	list_->OMSetRenderTargets(1, &target.rtv, FALSE, &target.dsv);
-
 	D3D12_VIEWPORT vp{};
-	vp.Width = static_cast<float>(target.width);
-	vp.Height = static_cast<float>(target.height);
-	vp.MinDepth = 0.0f;
+	vp.Width = (float)target.width;
+	vp.Height = (float)target.height;
 	vp.MaxDepth = 1.0f;
 
 	D3D12_RECT sc{};
@@ -2404,119 +2400,225 @@ void Renderer::EndCustomRenderTarget() {
 
 	currentCustomTarget_ = nullptr;
 
-	// ★追加: ImGuiなどのために元のBackBuffer(スワップチェーン)にRender Targetを戻す
 	auto rtvBack = window_->GetCurrentRTV();
 	list_->OMSetRenderTargets(1, &rtvBack, FALSE, nullptr);
 
-	// Viewportも戻す
 	ResetGameViewport();
 	list_->RSSetViewports(1, &viewport_);
 	list_->RSSetScissorRects(1, &scissor_);
 }
 
 void Renderer::BeginCollisionCheck(uint32_t maxPairs) {
+	collisionRequests_.clear();
+
 	if (collisionMaxPairs_ != maxPairs) {
+		// Cleanup old resources
 		if (collisionReadbackBuffer_ && collisionReadbackMapped_) {
 			collisionReadbackBuffer_->Unmap(0, nullptr);
 			collisionReadbackMapped_ = nullptr;
 		}
 		collisionResultBuffer_.Reset();
 		collisionReadbackBuffer_.Reset();
-		collisionMaxPairs_ = maxPairs;
+		collisionRequestBuffer_.Reset();
+		collisionMaxPairs_ = 0; // 一旦クリア
 
 		if (maxPairs > 0) {
-			uint32_t bufferSize = maxPairs * sizeof(uint32_t);
+			uint32_t bufferSize = maxPairs * sizeof(Game::ContactInfo);
+			uint32_t requestBufferSize = maxPairs * sizeof(CollisionRequest);
 			
-			D3D12_HEAP_PROPERTIES defaultHeap = {D3D12_HEAP_TYPE_DEFAULT};
-			D3D12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-			dev_->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &resDesc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&collisionResultBuffer_));
+			CD3DX12_HEAP_PROPERTIES defaultHeap(D3D12_HEAP_TYPE_DEFAULT);
+			CD3DX12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+			if (FAILED(dev_->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &resDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&collisionResultBuffer_)))) {
+				return;
+			}
 			
-			auto initBarrier = CD3DX12_RESOURCE_BARRIER::Transition(collisionResultBuffer_.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			list_->ResourceBarrier(1, &initBarrier);
+			CD3DX12_HEAP_PROPERTIES readbackHeap(D3D12_HEAP_TYPE_READBACK);
+			CD3DX12_RESOURCE_DESC readbackDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize);
+			if (FAILED(dev_->CreateCommittedResource(&readbackHeap, D3D12_HEAP_FLAG_NONE, &readbackDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&collisionReadbackBuffer_)))) {
+				return;
+			}
+			
+			CD3DX12_RESOURCE_DESC reqDesc = CD3DX12_RESOURCE_DESC::Buffer(requestBufferSize);
+			if (FAILED(dev_->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &reqDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&collisionRequestBuffer_)))) {
+				return;
+			}
 
-			D3D12_HEAP_PROPERTIES readbackHeap = {D3D12_HEAP_TYPE_READBACK};
-			D3D12_RESOURCE_DESC readbackDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize);
-			dev_->CreateCommittedResource(&readbackHeap, D3D12_HEAP_FLAG_NONE, &readbackDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&collisionReadbackBuffer_));
+			if (FAILED(collisionReadbackBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&collisionReadbackMapped_)))) {
+				collisionReadbackMapped_ = nullptr;
+				return;
+			}
 			
-			collisionReadbackBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&collisionReadbackMapped_));
+			collisionMaxPairs_ = maxPairs; // 成功した時のみ更新
 		}
 	}
 
-	if (collisionResultBuffer_ && maxPairs > 0) {
-		uint32_t bufferSize = maxPairs * sizeof(uint32_t);
-		const uint32_t fi = window_->FrameIndex();
-		uint32_t off = upload_[fi].Allocate(bufferSize, 256);
-		if (off != UINT32_MAX) {
-			std::memset(upload_[fi].mapped + off, 0, bufferSize);
-			auto b1 = CD3DX12_RESOURCE_BARRIER::Transition(collisionResultBuffer_.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
-			list_->ResourceBarrier(1, &b1);
-			list_->CopyBufferRegion(collisionResultBuffer_.Get(), 0, upload_[fi].buffer.Get(), off, bufferSize);
-			auto b2 = CD3DX12_RESOURCE_BARRIER::Transition(collisionResultBuffer_.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-			list_->ResourceBarrier(1, &b2);
-		}
-	}
+	// 以前のクリア処理は EndCollisionCheck へ統合
+}
+
+void Renderer::DispatchCollision(MeshHandle /*meshA*/, uint32_t meshBHandle, const Transform& trA, const Game::BoxColliderComponent& bcA, const Transform& trB, uint32_t resultIndex) {
+	if (!psoCollision_ || !rootSigCompute_ || !collisionResultBuffer_) return;
+	auto* modelB = GetModel(meshBHandle);
+	if (!modelB) return;
+
+	CollisionRequest req{};
+	req.worldA = trA.ToMatrix();
+	req.worldB = trB.ToMatrix();
+	req.resultIndex = resultIndex;
+
+	// --- 座標空間の変換 (重要: BVHはメッシュのモデル空間にあるため、OBBもそれに合わせる) ---
+	XMMATRIX worldA = M4ToXM(req.worldA);
+	XMMATRIX worldB = M4ToXM(req.worldB);
+	XMMATRIX invWorldB = XMMatrixInverse(nullptr, worldB);
+
+	// OBBの中心を B のモデル空間へ
+	XMVECTOR cOrig = XMLoadFloat3(&bcA.center);
+	XMVECTOR cWorld = XMVector3TransformCoord(cOrig, worldA);
+	XMVECTOR cModelB = XMVector3TransformCoord(cWorld, invWorldB);
+	XMStoreFloat3(reinterpret_cast<XMFLOAT3*>(&req.obbCenter), cModelB);
+
+	// OBBの各軸（サイズ込み）を B のモデル空間へ
+	float ex = bcA.size.x * 0.5f * std::abs(trA.scale.x);
+	float ey = bcA.size.y * 0.5f * std::abs(trA.scale.y);
+	float ez = bcA.size.z * 0.5f * std::abs(trA.scale.z);
+
+	XMVECTOR scaledAxisX = XMVectorScale(XMVector3Normalize(worldA.r[0]), ex);
+	XMVECTOR scaledAxisY = XMVectorScale(XMVector3Normalize(worldA.r[1]), ey);
+	XMVECTOR scaledAxisZ = XMVectorScale(XMVector3Normalize(worldA.r[2]), ez);
+
+	XMVECTOR axisXModelB = XMVector3TransformNormal(scaledAxisX, invWorldB);
+	XMVECTOR axisYModelB = XMVector3TransformNormal(scaledAxisY, invWorldB);
+	XMVECTOR axisZModelB = XMVector3TransformNormal(scaledAxisZ, invWorldB);
+
+	// モデル空間での新しいサイズ（Extents）を取得
+	req.obbExtents.x = XMVectorGetX(XMVector3Length(axisXModelB));
+	req.obbExtents.y = XMVectorGetX(XMVector3Length(axisYModelB));
+	req.obbExtents.z = XMVectorGetX(XMVector3Length(axisZModelB));
+
+	// 正規化した軸を保存
+	XMStoreFloat3(reinterpret_cast<XMFLOAT3*>(&req.obbAxisX), XMVector3Normalize(axisXModelB));
+	XMStoreFloat3(reinterpret_cast<XMFLOAT3*>(&req.obbAxisY), XMVector3Normalize(axisYModelB));
+	XMStoreFloat3(reinterpret_cast<XMFLOAT3*>(&req.obbAxisZ), XMVector3Normalize(axisZModelB));
+
+	req.numBvhNodes = modelB->GetBvhNodeCount();
+	req.meshB = meshBHandle;
+
+	collisionRequests_.push_back(req);
+}
+
+void Renderer::DispatchCollision(MeshHandle meshA, const Transform& trA, const Game::BoxColliderComponent& bcA, uint32_t resultIndex) {
+	DispatchCollision(meshA, 0, trA, bcA, Transform(), resultIndex);
 }
 
 void Renderer::DispatchCollision(MeshHandle meshA, const Transform& trA, MeshHandle meshB, const Transform& trB, uint32_t resultIndex) {
-	if (!psoCollision_ || !rootSigCompute_ || !collisionResultBuffer_) return;
+	// For backward compatibility: Treat MeshA's AABB as an OBB
+	Game::BoxColliderComponent bcA;
 	auto* modelA = GetModel(meshA);
-	auto* modelB = GetModel(meshB);
-	if (!modelA || !modelB) return;
-
-	list_->SetPipelineState(psoCollision_.Get());
-	list_->SetComputeRootSignature(rootSigCompute_.Get());
-
-	struct CBCollision {
-		Matrix4x4 worldA;
-		Matrix4x4 worldB;
-		uint32_t numTrianglesA;
-		uint32_t numTrianglesB;
-		uint32_t resultIndex;
-		uint32_t pad1;
-	};
-	CBCollision cb{};
-	cb.worldA = trA.ToMatrix();
-	cb.worldB = trB.ToMatrix();
-	cb.numTrianglesA = modelA->GetIBV().SizeInBytes / sizeof(uint32_t) / 3;
-	cb.numTrianglesB = modelB->GetIBV().SizeInBytes / sizeof(uint32_t) / 3;
-	cb.resultIndex = resultIndex;
-
-	const uint32_t fi = window_->FrameIndex();
-	uint32_t off = upload_[fi].Allocate(sizeof(CBCollision), 256);
-	if (off == UINT32_MAX) return;
-	std::memcpy(upload_[fi].mapped + off, &cb, sizeof(CBCollision));
-	D3D12_GPU_VIRTUAL_ADDRESS cbAddr = upload_[fi].buffer->GetGPUVirtualAddress() + off;
-
-	list_->SetComputeRootConstantBufferView(0, cbAddr);
-	list_->SetComputeRootShaderResourceView(1, modelA->GetVBV().BufferLocation);
-	list_->SetComputeRootShaderResourceView(2, modelA->GetIBV().BufferLocation);
-	list_->SetComputeRootShaderResourceView(3, modelB->GetVBV().BufferLocation);
-	list_->SetComputeRootShaderResourceView(4, modelB->GetIBV().BufferLocation);
-	list_->SetComputeRootUnorderedAccessView(5, collisionResultBuffer_->GetGPUVirtualAddress());
-
-	uint32_t dispatchX = (cb.numTrianglesA + 7) / 8;
-	uint32_t dispatchY = (cb.numTrianglesB + 7) / 8;
-	if (dispatchX == 0 || dispatchY == 0) return;
-	list_->Dispatch(dispatchX, dispatchY, 1);
+	if (modelA) {
+		const auto& data = modelA->GetData();
+		bcA.center = {(data.min.x + data.max.x) * 0.5f, (data.min.y + data.max.y) * 0.5f, (data.min.z + data.max.z) * 0.5f};
+		bcA.size = {data.max.x - data.min.x, data.max.y - data.min.y, data.max.z - data.min.z};
+	}
+	DispatchCollision(meshA, meshB, trA, bcA, trB, resultIndex);
 }
 
 void Renderer::EndCollisionCheck() {
 	if (!collisionResultBuffer_ || !collisionReadbackBuffer_ || collisionMaxPairs_ == 0) return;
-	
-	auto b1 = CD3DX12_RESOURCE_BARRIER::Transition(collisionResultBuffer_.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-	list_->ResourceBarrier(1, &b1);
-	
-	list_->CopyBufferRegion(collisionReadbackBuffer_.Get(), 0, collisionResultBuffer_.Get(), 0, collisionMaxPairs_ * sizeof(uint32_t));
-	
-	auto b2 = CD3DX12_RESOURCE_BARRIER::Transition(collisionResultBuffer_.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-	list_->ResourceBarrier(1, &b2);
+	if (collisionRequests_.empty()) return;
+
+	// 1. ターゲットメッシュ(meshB)ごとに並び替え（グルーピングのため、効率向上のため）
+	std::sort(collisionRequests_.begin(), collisionRequests_.end(), [](const CollisionRequest& a, const CollisionRequest& b) {
+		return a.meshB < b.meshB;
+	});
+
+	const uint32_t fi = window_->FrameIndex();
+
+	// 1. 専用コマンドリストのリセット
+	collisionAlloc_->Reset();
+	collisionList_->Reset(collisionAlloc_.Get(), nullptr);
+
+	// 2. 結果バッファのクリア
+	uint32_t bufferSize = collisionMaxPairs_ * sizeof(Game::ContactInfo);
+	uint32_t clearOff = upload_[fi].Allocate(bufferSize, 256);
+	if (clearOff != UINT32_MAX) {
+		std::memset(upload_[fi].mapped + clearOff, 0, bufferSize);
+		auto b1 = CD3DX12_RESOURCE_BARRIER::Transition(collisionResultBuffer_.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
+		collisionList_->ResourceBarrier(1, &b1);
+		collisionList_->CopyBufferRegion(collisionResultBuffer_.Get(), 0, upload_[fi].buffer.Get(), clearOff, bufferSize);
+		auto b2 = CD3DX12_RESOURCE_BARRIER::Transition(collisionResultBuffer_.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		collisionList_->ResourceBarrier(1, &b2);
+	}
+
+	// 3. 全リクエストデータをGPUに転送
+	uint32_t reqSize = (uint32_t)(collisionRequests_.size() * sizeof(CollisionRequest));
+	uint32_t reqOff = upload_[fi].Allocate(reqSize, 256);
+	if (reqOff != UINT32_MAX) {
+		std::memcpy(upload_[fi].mapped + reqOff, collisionRequests_.data(), reqSize);
+		auto barrierReq = CD3DX12_RESOURCE_BARRIER::Transition(collisionRequestBuffer_.Get(), D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_DEST);
+		collisionList_->ResourceBarrier(1, &barrierReq);
+		collisionList_->CopyBufferRegion(collisionRequestBuffer_.Get(), 0, upload_[fi].buffer.Get(), reqOff, reqSize);
+		auto barrierReq2 = CD3DX12_RESOURCE_BARRIER::Transition(collisionRequestBuffer_.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ);
+		collisionList_->ResourceBarrier(1, &barrierReq2);
+	} else {
+		collisionList_->Close();
+		return;
+	}
+
+	// 4. パイプラインとルートシグネチャの設定
+	ID3D12DescriptorHeap* heaps[] = {srvHeap_};
+	collisionList_->SetDescriptorHeaps(1, heaps);
+	collisionList_->SetPipelineState(psoCollision_.Get());
+	collisionList_->SetComputeRootSignature(rootSigCompute_.Get());
+	collisionList_->SetComputeRootUnorderedAccessView(4, collisionResultBuffer_->GetGPUVirtualAddress());
+
+	// 5. メッシュごとにグループ化して Dispatch
+	uint32_t currentStart = 0;
+	while (currentStart < (uint32_t)collisionRequests_.size()) {
+		uint32_t meshHandle = collisionRequests_[currentStart].meshB;
+		uint32_t count = 0;
+		while (currentStart + count < (uint32_t)collisionRequests_.size() && collisionRequests_[currentStart + count].meshB == meshHandle) {
+			count++;
+		}
+		auto* model = GetModel(meshHandle);
+		if (model && model->GetBvhNodeCount() > 0 && model->GetBvhNodeBufferAddr() != 0) {
+			collisionList_->SetComputeRoot32BitConstant(0, count, 0);
+			collisionList_->SetComputeRootShaderResourceView(1, collisionRequestBuffer_->GetGPUVirtualAddress() + currentStart * sizeof(CollisionRequest));
+			collisionList_->SetComputeRootShaderResourceView(2, model->GetBvhNodeBufferAddr());
+			collisionList_->SetComputeRootShaderResourceView(3, model->GetBvhIndexBufferAddr());
+			collisionList_->SetComputeRootShaderResourceView(5, model->GetVertexBufferAddr());
+			collisionList_->SetComputeRootShaderResourceView(6, model->GetIndexBufferAddr());
+			collisionList_->Dispatch((count + 63) / 64, 1, 1);
+		}
+		currentStart += count;
+	}
+
+	// 6. 結果を読み戻し用バッファにコピー
+	auto bCopy = CD3DX12_RESOURCE_BARRIER::Transition(collisionResultBuffer_.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+	collisionList_->ResourceBarrier(1, &bCopy);
+	collisionList_->CopyBufferRegion(collisionReadbackBuffer_.Get(), 0, collisionResultBuffer_.Get(), 0, collisionMaxPairs_ * sizeof(Game::ContactInfo));
+	auto bBack = CD3DX12_RESOURCE_BARRIER::Transition(collisionResultBuffer_.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	collisionList_->ResourceBarrier(1, &bBack);
+
+	// 7. 命令発行とGPU完了待ち (これによって PhysicsSystem がこの直後に安全に結果を読める)
+	collisionList_->Close();
+	ID3D12CommandList* ppLists[] = {collisionList_.Get()};
+	queue_->ExecuteCommandLists(1, ppLists);
+	WaitGPU();
+
+	// 8. リクエストリストをクリア (重要: 漏れると毎フレーム蓄積する)
+	collisionRequests_.clear();
+}
+
+bool Renderer::GetCollisionResult(uint32_t resultIndex, Game::ContactInfo& outInfo) const {
+	if (resultIndex < collisionMaxPairs_ && collisionReadbackMapped_) {
+		outInfo = collisionReadbackMapped_[resultIndex];
+		return outInfo.intersected > 0;
+	}
+	return false;
 }
 
 bool Renderer::GetCollisionResult(uint32_t resultIndex) const {
-	if (resultIndex < collisionMaxPairs_ && collisionReadbackMapped_) {
-		return collisionReadbackMapped_[resultIndex] > 0;
-	}
-	return false;
+	Game::ContactInfo ci;
+	return GetCollisionResult(resultIndex, ci);
 }
 
 Renderer::MeshHandle Renderer::CreateDynamicMesh(const std::vector<VertexData>& vertices, const std::vector<uint32_t>& indices) {

@@ -18,6 +18,11 @@
 // Modelクラスを利用するためインクルード
 #include "Model.h"
 
+namespace Game {
+	struct BoxColliderComponent;
+	struct ContactInfo;
+}
+
 namespace Engine {
 
 class Renderer final {
@@ -33,6 +38,25 @@ public:
 		float rotationRad = 0.0f;
 		Vector4 color{1, 1, 1, 1};
 		Vector4 uvScaleOffset{1.0f, 1.0f, 0.0f, 0.0f}; // ★追加: UVスケール・オフセット
+	};
+
+	struct CollisionRequest {
+		Matrix4x4 worldA;
+		Matrix4x4 worldB;
+		Vector3 obbCenter;
+		float _pad0;
+		Vector3 obbExtents;
+		float _pad1;
+		Vector3 obbAxisX;
+		float _pad2;
+		Vector3 obbAxisY;
+		float _pad3;
+		Vector3 obbAxisZ;
+		float _pad4;
+		uint32_t resultIndex;
+		uint32_t numBvhNodes;
+		uint32_t meshB; // グルーピング用
+		uint32_t _pad5;
 	};
 
 	// --- ライト構造体 ---
@@ -133,6 +157,7 @@ public:
 	bool Initialize(WindowDX* window);
 	void Shutdown();
 
+	ID3D12Device* GetDevice() const { return dev_; }
 	static Renderer* GetInstance() { return instance_; }
 
 	void BeginFrame(const float clearColorRGBA[4]);
@@ -241,8 +266,31 @@ public:
 
 	// ★追加: コンピュートシェーダーで衝突判定を実行
 	void BeginCollisionCheck(uint32_t maxPairs = 1024);
-	void DispatchCollision(MeshHandle meshA, const Transform& trA, MeshHandle meshB, const Transform& trB, uint32_t resultIndex);
+	void DispatchCollision(
+		MeshHandle meshA, // Mesh (Target)
+		uint32_t meshBHandle, // Mesh (Source/Terrain)
+		const Transform& trA, // Transform of Object A
+		const Game::BoxColliderComponent& bcA, // Box Collider of Object A
+		const Transform& trB, // Transform of Mesh B
+		uint32_t resultIndex);
+
+	// Backward Compatibility: Box vs Mesh (trB=Identity)
+	void DispatchCollision(
+		MeshHandle meshA, 
+		const Transform& trA, 
+		const Game::BoxColliderComponent& bcA, 
+		uint32_t resultIndex);
+
+	// Backward Compatibility: Mesh vs Mesh
+	void DispatchCollision(
+		MeshHandle meshA, 
+		const Transform& trA, 
+		MeshHandle meshB, 
+		const Transform& trB, 
+		uint32_t resultIndex);
+
 	void EndCollisionCheck();
+	bool GetCollisionResult(uint32_t resultIndex, Game::ContactInfo& outInfo) const;
 	bool GetCollisionResult(uint32_t resultIndex) const;
 
 	bool CreateShaderPipeline(const std::string& shaderName, const std::wstring& vsPath, const std::wstring& psPath);
@@ -285,13 +333,13 @@ private:
 
 	struct InstanceData {
 		Matrix4x4 world;
-		Vector4 color;
-		Vector4 uvScaleOffset; // ★追加: UVスケール・オフセット用
+		Vector4 color = {1, 1, 1, 1};
+		Vector4 uvScaleOffset = {1, 1, 0, 0}; // ★追加: UVスケール・オフセット用
 	};
 
 	struct InstancedDrawCall {
-		MeshHandle mesh;
-		TextureHandle tex;
+		MeshHandle mesh = 0;
+		TextureHandle tex = 0;
 		std::vector<TextureHandle> extraTex; // ★追加
 		std::string shaderName;
 		std::vector<InstanceData> instances;
@@ -345,8 +393,8 @@ private:
 	static constexpr uint32_t kSrvHeapTotal = 2048;
 	
 	// ★追加: RTV割り当て用
-	uint32_t rtvCursor_ = WindowDX::kBackBufferCount; // スワップチェーンの分をスキップ
-	uint32_t dsvCursor_ = 1; // メイン深度バッファの分をスキップ
+	uint32_t rtvCursor_ = 1; // 0番目は finalSceneColor_ 用
+	uint32_t dsvCursor_ = 1; // 0番目は shadowMap_ 用
 
 	static constexpr uint32_t kFrameCount = 2;
 	UploadRing upload_[kFrameCount]{};
@@ -359,8 +407,10 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoCollision_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> collisionResultBuffer_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> collisionReadbackBuffer_;
-	uint32_t* collisionReadbackMapped_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> collisionRequestBuffer_; // ★追加: リクエスト転送用
+	Game::ContactInfo* collisionReadbackMapped_ = nullptr;
 	uint32_t collisionMaxPairs_ = 0;
+	std::vector<CollisionRequest> collisionRequests_; // ★追加: バッチ用
 
 	std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D12PipelineState>> pipelines_;
 	std::vector<std::string> shaderNames_;
@@ -452,6 +502,10 @@ private:
 
 	std::unordered_map<std::string, TextureHandle> textureCache_;
 	std::unordered_map<std::string, MeshHandle> meshCache_;
+
+	// ★追加: コリジョン同期用
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> collisionAlloc_;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> collisionList_;
 };
 
 } // namespace Engine

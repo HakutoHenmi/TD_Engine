@@ -25,6 +25,14 @@ struct CollisionMeshData {
 	std::vector<int> indices;
 };
 
+// ★追加: 衝突情報（GPU読み戻し用）
+struct ContactInfo {
+	DirectX::XMFLOAT3 normal; // 押し出し方向
+	float depth;              // めり込み量
+	uint32_t intersected;     // 衝突フラグ (0 or 1)
+	uint32_t pad[3];          // アライメント用
+};
+
 // コンポーネント
 enum class ComponentType { 
 	MeshRenderer, BoxCollider, Tag, Animator, Rigidbody, ParticleEmitter, 
