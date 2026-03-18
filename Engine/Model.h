@@ -67,6 +67,7 @@ struct BVHNode {
 	int rightChild = -1;
 	uint32_t firstTriangle = 0;
 	uint32_t triangleCount = 0;
+	float _pad[2]; // 16バイトアライメント用 (計48バイト)
 };
 
 // アニメーション全体
@@ -126,6 +127,13 @@ public:
 	const D3D12_INDEX_BUFFER_VIEW& GetIBV() const { return ibv_; } // 追加
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvGpu() const { return srvGpu_; }
 
+	// ★追加: GPU用BVH・メッシュバッファ
+	D3D12_GPU_VIRTUAL_ADDRESS GetBvhNodeBufferAddr() const { return vbBvhNodes_ ? vbBvhNodes_->GetGPUVirtualAddress() : 0; }
+	D3D12_GPU_VIRTUAL_ADDRESS GetBvhIndexBufferAddr() const { return vbBvhIndices_ ? vbBvhIndices_->GetGPUVirtualAddress() : 0; }
+	D3D12_GPU_VIRTUAL_ADDRESS GetVertexBufferAddr() const { return vb_ ? vb_->GetGPUVirtualAddress() : 0; }
+	D3D12_GPU_VIRTUAL_ADDRESS GetIndexBufferAddr() const { return ib_ ? ib_->GetGPUVirtualAddress() : 0; }
+	uint32_t GetBvhNodeCount() const { return (uint32_t)data_.bvhNodes.size(); }
+
 	// アニメーション適用時の行列計算関数
 	// node: 現在処理中のノード
 	// parentTransform: 親ノードのワールド変換行列
@@ -159,6 +167,10 @@ private:
 	D3D12_VERTEX_BUFFER_VIEW vbv_{};
 	D3D12_INDEX_BUFFER_VIEW ibv_{}; // 追加
 	uint32_t indexCount_ = 0;       // 追加
+
+	// ★追加: GPU用BVHバッファ
+	Microsoft::WRL::ComPtr<ID3D12Resource> vbBvhNodes_;
+	Microsoft::WRL::ComPtr<ID3D12Resource> vbBvhIndices_;
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> tex_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> upload_; // 中間バッファ保持
