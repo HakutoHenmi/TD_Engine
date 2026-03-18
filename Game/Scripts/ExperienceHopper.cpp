@@ -123,14 +123,19 @@ void ExperienceHopper::Update(SceneObject& obj, GameScene* scene, float dt) {
 	}
 
 	bool connected = IsExperienceHopperConnectedToExperienceMiner(scene, obj);
+	int orbCount = CountExperienceOrbs(scene);
+
+	ImGui::Begin("ExperienceHopper Debug");
+	ImGui::Text("Connected: %s", connected ? "true" : "false");
+	ImGui::Text("OrbCount: %d", orbCount);
+	ImGui::Text("SpawnTimer: %.2f", spawnTimer_);
+	ImGui::End();
 
 	if (!connected) {
 		return;
 	}
 
-	int orbCount = CountExperienceOrbs(scene);
-
-	if (orbCount >= 10) {
+	if (orbCount >= 100) {
 		return;
 	}
 
@@ -140,29 +145,27 @@ void ExperienceHopper::Update(SceneObject& obj, GameScene* scene, float dt) {
 
 	SceneObject orb;
 	orb.name = "ExperienceOrb";
-
 	orb.translate = obj.translate;
 	orb.translate.y += 0.5f;
 	orb.scale = {0.2f, 0.2f, 0.2f};
 	orb.rotate = {0.0f, 0.0f, 0.0f};
 
-	//
 	TagComponent tag;
 	tag.tag = "ExperienceOrb";
 	orb.tags.push_back(tag);
-	// 体力
+
 	HealthComponent health;
 	health.hp = 1.0f;
 	health.maxHp = 1.0f;
 	orb.healths.push_back(health);
-	// 当たり判定
+
 	HitboxComponent hitbox;
 	hitbox.isActive = true;
 	hitbox.damage = 0.0f;
 	hitbox.tag = "ExperienceOrb";
 	hitbox.size = {1.0f, 1.0f, 1.0f};
-
 	orb.hitboxes.push_back(hitbox);
+
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
 		orb.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
@@ -173,6 +176,7 @@ void ExperienceHopper::Update(SceneObject& obj, GameScene* scene, float dt) {
 		meshRenderer.textureHandle = orb.textureHandle;
 		orb.meshRenderers.push_back(meshRenderer);
 	}
+
 	ScriptComponent script;
 	script.scriptPath = "ExperienceOrbScript";
 	orb.scripts.push_back(script);
@@ -180,12 +184,6 @@ void ExperienceHopper::Update(SceneObject& obj, GameScene* scene, float dt) {
 	scene->SpawnObject(orb);
 
 	spawnTimer_ = 1.0f;
-
-
-	ImGui::Begin("ExperienceHopper Debug");
-	ImGui::Text("OrbCount: %d", CountExperienceOrbs(scene));
-	ImGui::Text("SpawnTimer: %.2f", spawnTimer_);
-	ImGui::End();
 }
 
 void Game::ExperienceHopper::OnDestroy(SceneObject& obj, GameScene* scene) {

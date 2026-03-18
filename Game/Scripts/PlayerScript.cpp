@@ -11,6 +11,10 @@ namespace Game {
 
 void PlayerScript::Start(SceneObject& obj, GameScene* scene) {
 
+
+
+	scene->GetEventSystem().Subscribe("GainGold", [this](float amount) { experience_ += amount; });
+
 	// 剣がシーンに既にあるか確認
 	SceneObject* sword = nullptr;
 	auto& objects = const_cast<std::vector<SceneObject>&>(scene->GetObjects());
@@ -20,7 +24,6 @@ void PlayerScript::Start(SceneObject& obj, GameScene* scene) {
 			break;
 		}
 	}
-	scene->GetEventSystem().Subscribe("GainGold", [this](float amount) { experience_ += amount; });
 	if (!sword) {
 		// 剣がなければ生成
 		SceneObject newSword;
