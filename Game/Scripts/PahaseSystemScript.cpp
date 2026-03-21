@@ -60,10 +60,11 @@ void PahaseSystemScript::Installation(GameScene* scene, const std::string& objPa
 	auto* input = Engine::Input::GetInstance();
 	Engine::Vector3 hitPoint{};
 	if (!TryGetTerrainHitPoint(scene, hitPoint)) return;
+	const bool canPlace = !IsPlacementBlocked(scene, hitPoint);
 
-  DrawPlacementPreview(scene, hitPoint, objPath);
+   DrawPlacementPreview(scene, hitPoint, objPath, canPlace);
 
-	if (input->IsMouseTrigger(0)) {
+ if (input->IsMouseTrigger(0) && canPlace) {
        SpawnPlacedObject(scene, hitPoint, objPath);
 		isPlacementMode_ = false;
 	}
@@ -125,7 +126,7 @@ bool PahaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3
 	return hitTerrain;
 }
 
-void PahaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vector3& hitPoint, const std::string& objPath) {
+void PahaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vector3& hitPoint, const std::string& objPath, bool canPlace) {
 	auto* renderer = scene->GetRenderer();
 	if (!renderer) return;
 
@@ -140,7 +141,28 @@ void PahaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Ve
 	Engine::Transform tr;
 	tr.translate = {hitPoint.x, hitPoint.y + 0.5f, hitPoint.z};
 	tr.scale = {1.0f, 1.0f, 1.0f};
-	renderer->DrawMesh(previewModelHandle_, previewTextureHandle_, tr, {0.6f, 1.0f, 0.6f, 0.6f}, "Toon");
+   const Engine::Vector4 previewColor = canPlace ? Engine::Vector4{0.6f, 1.0f, 0.6f, 0.6f} : Engine::Vector4{1.0f, 0.3f, 0.3f, 0.6f};
+	renderer->DrawMesh(previewModelHandle_, previewTextureHandle_, tr, previewColor, "Toon");
+}
+
+bool PahaseSystemScript::IsPlacementBlocked(GameScene* scene, const Engine::Vector3& hitPoint) const {
+	constexpr float kBlockRadius = 1.0f;
+	constexpr float kBlockRadiusSq = kBlockRadius * kBlockRadius;
+
+	const auto& objects = scene->GetObjects();
+	for (const auto& obj : objects) {
+		const bool isTerrain = (obj.name.find("Terrain") != std::string::npos) || (obj.name.find("Floor") != std::string::npos);
+		if (isTerrain) continue;
+
+		const float dx = obj.translate.x - hitPoint.x;
+		const float dz = obj.translate.z - hitPoint.z;
+		const float distSq = dx * dx + dz * dz;
+		if (distSq < kBlockRadiusSq) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 void PahaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector3& hitPoint, const std::string& objPath) {

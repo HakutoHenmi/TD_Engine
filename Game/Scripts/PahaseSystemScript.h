@@ -18,8 +18,9 @@ public:
 
     void Installation(GameScene* scene, const std::string& objPath);
 	bool TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3& outHitPoint) const;
-   void DrawPlacementPreview(GameScene* scene, const Engine::Vector3& hitPoint, const std::string& objPath);
+    void DrawPlacementPreview(GameScene* scene, const Engine::Vector3& hitPoint, const std::string& objPath, bool canPlace);
 	void SpawnPlacedObject(GameScene* scene, const Engine::Vector3& hitPoint, const std::string& objPath);
+	bool IsPlacementBlocked(GameScene* scene, const Engine::Vector3& hitPoint) const;
 
 	static bool IsPreparation() { return isPreparation_; };
 
