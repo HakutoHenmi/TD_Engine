@@ -3,6 +3,7 @@
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
+#include <cfloat>
 #include <cmath>
 #include <imgui.h>
 #include <iostream>
@@ -22,13 +23,8 @@ void PahaseSystemScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	(dt);
 	bool keyP = (GetAsyncKeyState('P') & 0x8000) != 0;
 
-	// ゲームビューの矩形情報を Editor 側から取得する想定で、ここでは 0,0/1280x720 を仮で渡す
-	ImVec2 gameImageMin = ImVec2(0.0f, 0.0f);
-	float tW = 1280.0f;
-	float tH = 720.0f;
-
 	if (isPreparation_) {
-		Installation(scene, gameImageMin, tW, tH);
+		Installation(scene);
 
 		if (keyP && !preKeyP_) {
 			isPreparation_ = false;
@@ -42,70 +38,85 @@ void PahaseSystemScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	preKeyP_ = keyP;
 }
 
-void PahaseSystemScript::Installation(GameScene* scene, const ImVec2& gameImageMin, float tW, float tH) {
-	(gameImageMin);
-	(tW);
-	(tH);
-
+void PahaseSystemScript::Installation(GameScene* scene) {
 	auto* input = Engine::Input::GetInstance();
 
+	// 左クリックが押された瞬間
 	if (input->IsMouseTrigger(0)) {
-		float mx, my;
-		input->GetMousePos(mx, my);
+       ImVec2 mousePos = ImGui::GetMousePos();
+		ImVec2 gameMin = EditorUI::GetGameImageMin();
+		ImVec2 gameMax = EditorUI::GetGameImageMax();
+		float tW = gameMax.x - gameMin.x;
+		float tH = gameMax.y - gameMin.y;
+		if (tW <= 0.0f || tH <= 0.0f) return;
 
-		// 1. カメラ情報の取得
-		auto& camera = scene->GetCamera();
+		float localX = mousePos.x - gameMin.x;
+		float localY = mousePos.y - gameMin.y;
+		bool insideImage = (localX >= 0.0f && localY >= 0.0f && localX <= tW && localY <= tH);
+		if (!insideImage) return;
+
+      auto& camera = scene->GetCamera();
 		DirectX::XMMATRIX view = camera.View();
 		DirectX::XMMATRIX proj = camera.Proj();
 
-		// View-Projectionの逆行列を計算
-		DirectX::XMMATRIX invVP = DirectX::XMMatrixInverse(nullptr, view * proj);
+		DirectX::XMVECTOR rayOrig, rayDir;
+      EditorUI::ScreenToWorldRay(localX, localY, tW, tH, view, proj, rayOrig, rayDir);
 
-		// 2. スクリーン座標を NDC (Normalized Device Coordinates) に変換 (-1.0 ～ 1.0)
-		float nx = (mx / (float)Engine::WindowDX::kW) * 2.0f - 1.0f;
-		float ny = 1.0f - (my / (float)Engine::WindowDX::kH) * 2.0f;
+		auto* renderer = scene->GetRenderer();
+		if (!renderer) return;
 
-		// 3. レイの始点（近クリップ面）と終点（遠クリップ面）をワールド座標で求める
-		DirectX::XMVECTOR nearPointNDC = DirectX::XMVectorSet(nx, ny, 0.0f, 1.0f);
-		DirectX::XMVECTOR farPointNDC = DirectX::XMVectorSet(nx, ny, 1.0f, 1.0f);
+		float bestDist = FLT_MAX;
+		Engine::Vector3 hitPoint = {0, 0, 0};
+		bool hitTerrain = false;
 
-		DirectX::XMVECTOR posNear = DirectX::XMVector3TransformCoord(nearPointNDC, invVP);
-		DirectX::XMVECTOR posFar = DirectX::XMVector3TransformCoord(farPointNDC, invVP);
-		DirectX::XMVECTOR rayDir = DirectX::XMVector3Normalize(posFar - posNear);
+		const auto& objects = scene->GetObjects();
+		for (const auto& obj : objects) {
+			bool isTerrain = (obj.name.find("Terrain") != std::string::npos) || (obj.name.find("Floor") != std::string::npos);
+			if (!isTerrain) continue;
 
-		// 4. 地面 (y=0 の平面) との交差判定
-		DirectX::XMFLOAT3 pNear, d;
-		DirectX::XMStoreFloat3(&pNear, posNear);
-		DirectX::XMStoreFloat3(&d, rayDir);
+			Engine::Model* model = nullptr;
+			if (!obj.gpuMeshColliders.empty() && obj.gpuMeshColliders[0].meshHandle != 0) {
+				model = renderer->GetModel(obj.gpuMeshColliders[0].meshHandle);
+			}
+			if (!model && obj.modelHandle != 0) {
+				model = renderer->GetModel(obj.modelHandle);
+			}
+			if (!model && !obj.meshRenderers.empty() && obj.meshRenderers[0].modelHandle != 0) {
+				model = renderer->GetModel(obj.meshRenderers[0].modelHandle);
+			}
 
-		// レイが下を向いている場合のみ判定（平行な場合は除外）
-		if (std::abs(d.y) > 0.0001f) {
-			// pNear.y + d.y * t = 0  =>  t = -pNear.y / d.y
-			float t = -pNear.y / d.y;
+			if (!model) continue;
 
-			if (t > 0) { // カメラより前方にある場合
-				DirectX::XMFLOAT3 hitPos;
-				hitPos.x = pNear.x + d.x * t;
-				hitPos.y = pNear.y + d.y * t;
-				hitPos.z = pNear.z + d.z * t;
-
-				// 5. オブジェクトの生成
-				SceneObject newObj;
-				newObj.name = "PlacedObject";
-				newObj.translate = hitPos;
-				newObj.scale = {1.0f, 1.0f, 1.0f};
-				newObj.color = {1.0f, 1.0f, 1.0f, 1.0f};
-
-				// モデルやテクスチャを設定する場合の例
-				auto* renderer = scene->GetRenderer();
-				if (renderer) {
-					newObj.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
-					newObj.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
-				}
-
-				scene->SpawnObject(newObj);
+			float d;
+			Engine::Vector3 hp;
+			if (model->RayCast(rayOrig, rayDir, obj.GetTransform().ToMatrix(), d, hp) && d < bestDist) {
+				bestDist = d;
+				hitPoint = hp;
+				hitTerrain = true;
 			}
 		}
+
+		if (!hitTerrain) return;
+
+		SceneObject newObj;
+		newObj.name = "PlacedCube";
+		newObj.translate = {hitPoint.x, hitPoint.y + 0.5f, hitPoint.z};
+		newObj.scale = {1.0f, 1.0f, 1.0f};
+		newObj.color = {1.0f, 1.0f, 1.0f, 1.0f};
+		newObj.modelPath = "Resources/cube/cube.obj";
+		newObj.texturePath = "Resources/white1x1.png";
+		newObj.modelHandle = renderer->LoadObjMesh(newObj.modelPath);
+		newObj.textureHandle = renderer->LoadTexture2D(newObj.texturePath);
+
+		MeshRendererComponent mr;
+		mr.modelHandle = newObj.modelHandle;
+		mr.textureHandle = newObj.textureHandle;
+		mr.modelPath = newObj.modelPath;
+		mr.texturePath = newObj.texturePath;
+		mr.shaderName = "Toon";
+		newObj.meshRenderers.push_back(mr);
+
+		scene->SpawnObject(newObj);
 	}
 }
 
