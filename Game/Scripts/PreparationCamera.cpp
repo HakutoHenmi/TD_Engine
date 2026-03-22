@@ -26,8 +26,10 @@ void PreparationCamera::Start(SceneObject& obj, GameScene* scene) {
 void PreparationCamera::Update(SceneObject& obj, GameScene* scene, float dt) {
 	if (PhaseSystemScript::IsPreparation()) {
 		UpdateMovement(obj, scene, dt);
+		obj.playerInputs[0].enabled = true;
 		obj.cameraTargets[0].enabled = true;
 	} else {
+		obj.playerInputs[0].enabled = false;
 		obj.cameraTargets[0].enabled = false;
 	}
 }
