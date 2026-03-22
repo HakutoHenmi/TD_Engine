@@ -21,6 +21,7 @@ void PahaseSystemScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	(obj);
 	(scene);
 	(dt);
+	auto* input = Engine::Input::GetInstance();
 	bool keyP = (GetAsyncKeyState('P') & 0x8000) != 0;
 	bool key1 = (GetAsyncKeyState('1') & 0x8000) != 0;
 	bool key2 = (GetAsyncKeyState('2') & 0x8000) != 0;
@@ -34,6 +35,9 @@ void PahaseSystemScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 		if (key2 && !preKey2_) {
 			selectedObjPath_ = "Resources/Cylinder/cylinder.obj";
 			isPlacementMode_ = true;
+		}
+		if (input->IsMouseTrigger(1) && isPlacementMode_) {
+			isPlacementMode_ = false;
 		}
 
         Installation(scene, selectedObjPath_);
