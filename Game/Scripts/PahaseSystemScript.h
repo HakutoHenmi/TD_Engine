@@ -21,6 +21,8 @@ public:
     void DrawPlacementPreview(GameScene* scene, const Engine::Vector3& hitPoint, const std::string& objPath, bool canPlace);
 	void SpawnPlacedObject(GameScene* scene, const Engine::Vector3& hitPoint, const std::string& objPath);
 	bool IsPlacementBlocked(GameScene* scene, const Engine::Vector3& hitPoint) const;
+	bool IsPrefabPath(const std::string& path) const;
+	bool ExtractPrefabRenderPaths(const std::string& prefabPath, std::string& outModelPath, std::string& outTexturePath) const;
 
 	static bool IsPreparation() { return isPreparation_; };
 
@@ -30,6 +32,7 @@ private:
 	bool preKeyP_ = false; // 初期化しておく
     bool preKey1_ = false;
 	bool preKey2_ = false;
+  bool preKey3_ = false;
 	bool isPlacementMode_ = false;
    std::string selectedObjPath_ = "Resources/cube/cube.obj";
 	std::string previewObjPath_;

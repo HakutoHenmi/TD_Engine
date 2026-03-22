@@ -5,6 +5,7 @@
 #include "ScriptEngine.h"
 #include <cfloat>
 #include <cmath>
+#include <fstream>
 #include <imgui.h>
 #include <iostream>
 
@@ -25,15 +26,21 @@ void PahaseSystemScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	bool keyP = (GetAsyncKeyState('P') & 0x8000) != 0;
 	bool key1 = (GetAsyncKeyState('1') & 0x8000) != 0;
 	bool key2 = (GetAsyncKeyState('2') & 0x8000) != 0;
+	bool key3 = (GetAsyncKeyState('3') & 0x8000) != 0;
 
 	if (isPreparation_) {
         if (key1 && !preKey1_) {
-			selectedObjPath_ = "Resources/cube/cube.obj";
+			selectedObjPath_ = "Resources/BulletTank.prefab";
 			isPlacementMode_ = true;
 		}
 
 		if (key2 && !preKey2_) {
-			selectedObjPath_ = "Resources/Cylinder/cylinder.obj";
+			selectedObjPath_ = "Resources/Pipe.prefab";
+			isPlacementMode_ = true;
+		}
+
+		if (key3 && !preKey3_) {
+			selectedObjPath_ = "Resources/Canon.prefab";
 			isPlacementMode_ = true;
 		}
 		if (input->IsMouseTrigger(1) && isPlacementMode_) {
@@ -56,6 +63,7 @@ void PahaseSystemScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	preKeyP_ = keyP;
  preKey1_ = key1;
 	preKey2_ = key2;
+   preKey3_ = key3;
 }
 
 void PahaseSystemScript::Installation(GameScene* scene, const std::string& objPath) {
@@ -134,12 +142,19 @@ void PahaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Ve
 	auto* renderer = scene->GetRenderer();
 	if (!renderer) return;
 
- if (previewModelHandle_ == 0 || previewObjPath_ != objPath) {
-		previewModelHandle_ = renderer->LoadObjMesh(objPath);
-		previewObjPath_ = objPath;
+  std::string previewModelPath = objPath;
+	std::string previewTexturePath = "Resources/white1x1.png";
+	if (IsPrefabPath(objPath)) {
+		ExtractPrefabRenderPaths(objPath, previewModelPath, previewTexturePath);
+	}
+
+ if (previewModelHandle_ == 0 || previewObjPath_ != previewModelPath) {
+		previewModelHandle_ = renderer->LoadObjMesh(previewModelPath);
+		previewObjPath_ = previewModelPath;
+		previewTextureHandle_ = 0;
 	}
 	if (previewTextureHandle_ == 0) {
-		previewTextureHandle_ = renderer->LoadTexture2D("Resources/white1x1.png");
+      previewTextureHandle_ = renderer->LoadTexture2D(previewTexturePath);
 	}
 
 	Engine::Transform tr;
@@ -147,6 +162,36 @@ void PahaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Ve
 	tr.scale = {1.0f, 1.0f, 1.0f};
    const Engine::Vector4 previewColor = canPlace ? Engine::Vector4{0.6f, 1.0f, 0.6f, 0.6f} : Engine::Vector4{1.0f, 0.3f, 0.3f, 0.6f};
 	renderer->DrawMesh(previewModelHandle_, previewTextureHandle_, tr, previewColor, "Toon");
+}
+
+bool PahaseSystemScript::IsPrefabPath(const std::string& path) const {
+	if (path.size() < 7) return false;
+	return path.compare(path.size() - 7, 7, ".prefab") == 0;
+}
+
+bool PahaseSystemScript::ExtractPrefabRenderPaths(const std::string& prefabPath, std::string& outModelPath, std::string& outTexturePath) const {
+	std::ifstream f(prefabPath);
+	if (!f.is_open()) return false;
+
+	std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+	f.close();
+
+	auto extractValue = [&](const char* key, std::string& outValue) {
+		size_t keyPos = content.find(key);
+		if (keyPos == std::string::npos) return;
+		size_t colonPos = content.find(':', keyPos);
+		if (colonPos == std::string::npos) return;
+		size_t firstQuote = content.find('"', colonPos);
+		if (firstQuote == std::string::npos) return;
+		size_t secondQuote = content.find('"', firstQuote + 1);
+		if (secondQuote == std::string::npos) return;
+		outValue = content.substr(firstQuote + 1, secondQuote - firstQuote - 1);
+	};
+
+	extractValue("\"modelPath\"", outModelPath);
+	extractValue("\"texturePath\"", outTexturePath);
+
+	return !outModelPath.empty();
 }
 
 bool PahaseSystemScript::IsPlacementBlocked(GameScene* scene, const Engine::Vector3& hitPoint) const {
@@ -172,6 +217,19 @@ bool PahaseSystemScript::IsPlacementBlocked(GameScene* scene, const Engine::Vect
 void PahaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector3& hitPoint, const std::string& objPath) {
 	auto* renderer = scene->GetRenderer();
 	if (!renderer) return;
+
+	if (IsPrefabPath(objPath)) {
+		const size_t beforeCount = scene->GetObjects().size();
+		EditorUI::LoadPrefab(scene, objPath);
+
+		auto objects = scene->GetObjects();
+		if (objects.size() > beforeCount) {
+			auto& newObj = objects.back();
+			newObj.translate = {hitPoint.x, hitPoint.y + 0.5f, hitPoint.z};
+			scene->SetObjects(objects);
+		}
+		return;
+	}
 
  if (previewModelHandle_ == 0 || previewObjPath_ != objPath) {
 		previewModelHandle_ = renderer->LoadObjMesh(objPath);
