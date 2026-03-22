@@ -20,8 +20,8 @@ private:
 
 	bool isFloating_ = false;
 
-	float suctionRange_ = 4.0f;
-	float suctionSpeed_ = 6.0f;
+	float suctionRange_ = 6.0f;
+	float suctionSpeed_ = 8.0f;
 	float hitRange_ = 0.8f;
 };
 

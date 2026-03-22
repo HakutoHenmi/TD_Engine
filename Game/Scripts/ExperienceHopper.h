@@ -12,6 +12,6 @@ class ExperienceHopper : public IScript {
 private:
 	float spawnTimer_ = 0.0f;
 	
-	float spawnInterval_ = 0.5f;
+	//float spawnInterval_ = 0.1f;
 };
 } // namespace Game

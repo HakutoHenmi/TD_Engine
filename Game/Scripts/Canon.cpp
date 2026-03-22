@@ -7,7 +7,6 @@
 
 #include "../imgui/imgui.h"
 
-
 namespace Game {
 
 // タグ走査
@@ -46,7 +45,7 @@ static bool IsAlreadyVisited(const std::vector<const SceneObject*>& visitedObjec
 }
 
 static bool IsPipeConnectedToBulletTankRecursive(GameScene* scene, const SceneObject& currentPipe, std::vector<const SceneObject*>& visitedObjects, float connectRange) {
-	
+
 	visitedObjects.push_back(&currentPipe);
 
 	for (const SceneObject& other : scene->GetObjects()) {
@@ -82,7 +81,7 @@ static bool IsPipeConnectedToBulletTankRecursive(GameScene* scene, const SceneOb
 
 static bool IsCanonConnectedToBulletTank(GameScene* scene, const SceneObject& canonObj) {
 	const float connectRange = 2.5f;
-	
+
 	for (const SceneObject& other : scene->GetObjects()) {
 
 		if (!HasTag(other, "Pipe")) {
@@ -154,8 +153,9 @@ void Canon::Update(SceneObject& obj, GameScene* scene, float dt) {
 		}
 
 		float dx = other.translate.x - obj.translate.x;
+		float dy = other.translate.y - obj.translate.y;
 		float dz = other.translate.z - obj.translate.z;
-		float distance = std::sqrt(dx * dx + dz * dz);
+		float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
 
 		if (distance < bestDistance) {
 			bestDistance = distance;
@@ -168,17 +168,25 @@ void Canon::Update(SceneObject& obj, GameScene* scene, float dt) {
 		return;
 	}
 
-	// 敵方向（XZ）
+	// 敵方向（XYZ）
 	float toX = target->translate.x - obj.translate.x;
+	float toY = target->translate.y - obj.translate.y;
 	float toZ = target->translate.z - obj.translate.z;
 
-	if (std::fabs(toX) < 0.0001f && std::fabs(toZ) < 0.0001f) {
+	if (std::fabs(toX) < 0.0001f && std::fabs(toY) < 0.0001f && std::fabs(toZ) < 0.0001f) {
 		return;
 	}
 
-	// 大砲を敵の方向へ向ける（毎フレーム）
+	// 左右角度
 	float desiredYaw = std::atan2(toX, toZ);
+
+	// 上下角度
+	float horizontalDistance = std::sqrt(toX * toX + toZ * toZ);
+	float desiredPitch = std::atan2(toY, horizontalDistance);
+
+	// 大砲を敵の方向へ向ける
 	obj.rotate.y = desiredYaw;
+	obj.rotate.x = -desiredPitch;
 
 	// クールダウン中なら撃たない（向くだけ）
 	if (attackTimer_ > 0.0f) {
@@ -194,17 +202,25 @@ void Canon::Update(SceneObject& obj, GameScene* scene, float dt) {
 	bullet.translate = obj.translate;
 	bullet.translate.y += 2.0f;
 
+	// 前方向ベクトル（上下込み）
+	float forwardX = std::sin(desiredYaw) * std::cos(desiredPitch);
+	float forwardY = std::sin(desiredPitch);
+	float forwardZ = std::cos(desiredYaw) * std::cos(desiredPitch);
+
 	// 砲口を前に出す
 	float muzzleOffset = 2.0f;
-	bullet.translate.x += std::sin(desiredYaw) * muzzleOffset;
-	bullet.translate.z += std::cos(desiredYaw) * muzzleOffset;
+	bullet.translate.x += forwardX * muzzleOffset;
+	bullet.translate.y += forwardY * muzzleOffset;
+	bullet.translate.z += forwardZ * muzzleOffset;
 
 	bullet.rotate = obj.rotate;
+	bullet.rotate.x = -desiredPitch;
+	bullet.rotate.y = desiredYaw;
 	bullet.scale = {0.3f, 0.3f, 0.3f};
 
 	// 見た目
 	auto* renderer = scene->GetRenderer();
-	if (renderer) {
+	if (renderer != nullptr) {
 		bullet.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
 		bullet.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
 
