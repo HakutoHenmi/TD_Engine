@@ -67,7 +67,7 @@ void ExperienceOrbScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 
 		float dx = playerObject->translate.x - obj.translate.x;
 		float dy = playerCenterY - obj.translate.y;
-		float dz = playerObject->translate.z - obj.translate.z;
+		float dz = playerObject->translate.z - obj.translate.z; 
 
 		float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
 
