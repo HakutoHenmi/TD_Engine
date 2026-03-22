@@ -284,7 +284,7 @@ void EnemyBehavior::ScanSurround(SceneObject& obj, GameScene* scene) {
 	};
 	std::vector<WallInfo> walls;
 	for (const auto& o : objects) {
-		if (HasTag(o, "Wall")) {
+		if (HasTag(o, "Wall") || HasTag(o, "Canon") || HasTag(o, "Pipe") || HasTag(o, "BulletTank")) {
 			WallInfo w;
 			w.minX = o.translate.x - o.scale.x - enemyRadius;
 			w.maxX = o.translate.x + o.scale.x + enemyRadius;
