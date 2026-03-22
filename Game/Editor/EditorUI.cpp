@@ -1447,7 +1447,10 @@ void EditorUI::ScreenToWorldRay(float screenX, float screenY, float imageW, floa
 	outDir = XMVector3Normalize(XMVectorSubtract(farPoint, nearPoint));
 }
 
-// 笘・繧ｮ繧ｺ繝｢霆ｸ縺ｮRay繝偵ャ繝亥愛螳夲ｼ医Ο繝ｼ繧ｫ繝ｫ遨ｺ髢薙↓螟画鋤縺励※蛻､螳夲ｼ・
+ImVec2 EditorUI::GetGameImageMin() { return gameImageMin; }
+ImVec2 EditorUI::GetGameImageMax() { return gameImageMax; }
+
+// ★ ギズモ軸のRayヒット判定（ローカル空間に変換して判定）
 static int HitTestGizmoAxis(DirectX::XMVECTOR rayOrig, DirectX::XMVECTOR rayDir, const Engine::Transform& objTransform, float axisLen, GizmoMode mode) {
 	Engine::Matrix4x4 mat = objTransform.ToMatrix();
 	DirectX::XMMATRIX worldMat = DirectX::XMLoadFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&mat));
