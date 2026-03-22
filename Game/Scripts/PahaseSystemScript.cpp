@@ -74,12 +74,17 @@ void PahaseSystemScript::Installation(GameScene* scene, const std::string& objPa
 	Engine::Vector3 hitPoint{};
 	if (!TryGetTerrainHitPoint(scene, hitPoint))
 		return;
-	const bool canPlace = !IsPlacementBlocked(scene, hitPoint);
 
-	DrawPlacementPreview(scene, hitPoint, objPath, canPlace);
+	Engine::Vector3 snappedHitPoint = hitPoint;
+	snappedHitPoint.x = std::floor(snappedHitPoint.x);
+	snappedHitPoint.z = std::floor(snappedHitPoint.z);
+
+	const bool canPlace = !IsPlacementBlocked(scene, snappedHitPoint);
+
+   DrawPlacementPreview(scene, snappedHitPoint, objPath, canPlace);
 
 	if (input->IsMouseTrigger(0) && canPlace) {
-		SpawnPlacedObject(scene, hitPoint, objPath);
+        SpawnPlacedObject(scene, snappedHitPoint, objPath);
 		isPlacementMode_ = false;
 	}
 }
