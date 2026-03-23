@@ -1,15 +1,15 @@
 {
   "prefab":
     {
-      "id": 2097158,
-      "parentId": 0,
+      "id": 2097163,
+      "parentId": 4294967295,
       "name": "EnemySpawner1",
       "locked": false,
-      "translate": [-3.51774, -0.00189073, 2.3747],
+      "translate": [-50, 5, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": true, "scriptPath": "EnemySpawnerScript", "parameterData": "{\"enemyScriptParams\":\"{\\\"sightRange\\\":100.0,\\\"speed\\\":2.0}\",\"enemyScriptPath\":\"EnemyAIScript\",\"enemyType\":0,\"maxCount\":5,\"pattern\":0,\"patternRadius\":3.0,\"spawnDuration\":10.0,\"startWave\":0,\"waveCount\":1,\"waveDelay\":5.5}"}
+        {"type": "Script", "enabled": true, "scripts": [{"path": "EnemySpawnerScript", "param": "{\"enemyScriptParams\":\"{\\\"moveType\\\":0,\\\"priority\\\":0,\\\"speed\\\":2.0,\\\"targetType\\\":0}\",\"enemyScriptPath\":\"EnemyBehavior\",\"enemyType\":0,\"maxCount\":5,\"pattern\":0,\"patternRadius\":3.0,\"spawnDuration\":10.0,\"startWave\":0,\"waveCount\":1,\"waveDelay\":5.5}"}]}
       ]
     }
 }
