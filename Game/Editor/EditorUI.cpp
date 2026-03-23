@@ -836,8 +836,8 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	// Project to Scene Drop
 	if (ImGui::BeginDragDropTarget()) {
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROJECT_ASSET")) {
-			const char* path = (const char*)payload->Data;
-			std::string sPath = path;
+			std::string sPath = (const char*)payload->Data;
+			std::replace(sPath.begin(), sPath.end(), '\\', '/'); // 正規化
 			if (sPath.find(".obj") != std::string::npos || sPath.find(".fbx") != std::string::npos) {
 				auto e = gameScene->CreateEntity(fs::path(sPath).stem().string());
 				auto& mr = gameScene->GetRegistry().emplace<MeshRendererComponent>(e);
@@ -997,6 +997,11 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 					if (!m) continue;
 
 					float d; Engine::Vector3 p;
+					// ロックされているオブジェクトはピッキング（クリック選択）させない
+					if (auto* esc = gameScene->GetRegistry().try_get<EditorStateComponent>(e)) {
+						if (esc->locked) continue;
+					}
+
 					if (m->RayCast(rayOrig, rayDir, gameScene->GetWorldMatrix(static_cast<int>(e)), d, p)) {
 						if (d < minD) { minD = d; hitE = e; }
 					}
@@ -1027,11 +1032,10 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 			ImGui::PushID((int)entity);
 			
 			// Icons
-			bool locked = false;
-			if (auto* esc = registry.try_get<EditorStateComponent>(entity)) locked = esc->locked;
-			
-			if (locked) ImGui::TextColored(ImVec4(1, 0.2f, 0.2f, 1), "L");
-			else ImGui::TextDisabled("U"); // Unlocked or Placeholder
+			auto& esc = registry.get_or_emplace<EditorStateComponent>(entity);
+			if (ImGui::SmallButton(esc.locked ? "L" : "U")) {
+				esc.locked = !esc.locked;
+			}
 			ImGui::SameLine();
 
 			bool isUI = registry.any_of<UIImageComponent, UITextComponent, UIButtonComponent, WorldSpaceUIComponent>(entity);
@@ -1122,8 +1126,11 @@ void EditorUI::ShowInspector(GameScene* scene) {
 
 		if (auto* nc = registry.try_get<NameComponent>(entity)) {
 			char buf[256]; strcpy_s(buf, nc->name.c_str());
-			ImGui::SetNextItemWidth(-1);
+			ImGui::SetNextItemWidth(-130);
 			if (ImGui::InputText("##Name", buf, sizeof(buf))) nc->name = buf;
+			ImGui::SameLine();
+			auto& esc = registry.get_or_emplace<EditorStateComponent>(entity);
+			ImGui::Checkbox("Locked", &esc.locked);
 		}
 		ImGui::TextDisabled("ID: %d", (uint32_t)entity);
 		ImGui::SameLine();
@@ -1158,8 +1165,9 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					}
 					if (ImGui::BeginDragDropTarget()) {
 						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROJECT_ASSET")) {
-							const char* path = (const char*)payload->Data;
-							if (std::string(path).find(".obj") != std::string::npos || std::string(path).find(".fbx") != std::string::npos || std::string(path).find(".gltf") != std::string::npos) {
+							std::string path = (const char*)payload->Data;
+							std::replace(path.begin(), path.end(), '\\', '/'); // 正規化
+							if (path.find(".obj") != std::string::npos || path.find(".fbx") != std::string::npos || path.find(".gltf") != std::string::npos) {
 								cp->modelPath = path;
 								cp->modelHandle = Engine::Renderer::GetInstance()->LoadObjMesh(cp->modelPath);
 							}
@@ -1174,8 +1182,9 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					}
 					if (ImGui::BeginDragDropTarget()) {
 						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROJECT_ASSET")) {
-							const char* path = (const char*)payload->Data;
-							if (std::string(path).find(".png") != std::string::npos || std::string(path).find(".jpg") != std::string::npos) {
+							std::string path = (const char*)payload->Data;
+							std::replace(path.begin(), path.end(), '\\', '/'); // 正規化
+							if (path.find(".png") != std::string::npos || path.find(".jpg") != std::string::npos) {
 								cp->texturePath = path;
 								cp->textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(cp->texturePath);
 							}
@@ -1201,6 +1210,17 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				if (ImGui::CollapsingHeader("GpuMeshCollider", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##GMC", &gmc->enabled);
 					ImGui::Text("Mesh Path: %s", gmc->meshPath.c_str());
+					if (ImGui::BeginDragDropTarget()) {
+						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROJECT_ASSET")) {
+							std::string path = (const char*)payload->Data;
+							std::replace(path.begin(), path.end(), '\\', '/'); // 正規化
+							if (path.find(".obj") != std::string::npos || path.find(".fbx") != std::string::npos) {
+								gmc->meshPath = path;
+								gmc->meshHandle = Engine::Renderer::GetInstance()->LoadObjMesh(gmc->meshPath);
+							}
+						}
+						ImGui::EndDragDropTarget();
+					}
 					ImGui::Checkbox("Is Trigger", &gmc->isTrigger);
 					if (ImGui::Button("Remove##GMC")) registry.remove<GpuMeshColliderComponent>(entity);
 				}
@@ -1552,6 +1572,7 @@ void EditorUI::ShowProject([[maybe_unused]] Engine::Renderer* renderer, [[maybe_
 
 		if (ImGui::BeginDragDropSource()) {
 			std::string path = entry.path().string();
+			std::replace(path.begin(), path.end(), '\\', '/'); // パスを正規化
 			ImGui::SetDragDropPayload("PROJECT_ASSET", path.c_str(), path.size() + 1);
 			ImGui::Text("%s", name.c_str());
 			ImGui::EndDragDropSource();
