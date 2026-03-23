@@ -29,8 +29,12 @@ void EnemyBehavior::Start(entt::entity entity, GameScene* scene) {
 	SearchTarget(entity, scene);
 
 	// 出現時に地面の高さを即座に計算（初動の埋まり防止）
-	// 現在の高さ付近 (y+1.0f) から下にある地面を探すように制限 (上昇バグ防止)
-	groundHeight_ = scene->GetHeightAt(tc.translate.x, tc.translate.z, tc.translate.y + 1.0f, static_cast<uint32_t>(entity));
+	float h = scene->GetHeightAt(tc.translate.x, tc.translate.z, tc.translate.y + 1.0f, static_cast<uint32_t>(entity));
+	if (h > -9999.0f) {
+		groundHeight_ = h;
+	} else {
+		groundHeight_ = tc.translate.y - 1.0f; // 地面が見つからない場合は現在の位置を基準にする
+	}
 
 	// Flyタイプの場合は重力を無効化し、初期高度を設定
 	if (type_ == Fly) {
@@ -276,10 +280,9 @@ void EnemyBehavior::Move(entt::entity entity, GameScene* scene, float dt) {
 	}
 
 	// 現在のXZ座標から地面の高さを取得 (負荷軽減のため頻度を制限)
-	// 現在の高さ付近 (y+1.0f) から下にある地面を探すように制限 (上昇バグ防止)
 	if (scanTimer_ <= dt) {
 		float newHeight = scene->GetHeightAt(tc.translate.x, tc.translate.z, tc.translate.y + 1.0f, static_cast<uint32_t>(entity));
-		if (newHeight != 0.0f || groundHeight_ == 0.0f) {
+		if (newHeight > -9999.0f) {
 			groundHeight_ = newHeight;
 		}
 	}
