@@ -56,7 +56,17 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			currentPhase_++;
 
 			std::string enemyPrefabPath = "Resources/EnemySpow" + std::to_string(currentPhase_) + ".prefab";
-			EditorUI::LoadPrefab(scene, enemyPrefabPath);
+			std::vector<entt::entity> spawnedEnemies = EditorUI::LoadPrefab(scene, enemyPrefabPath);
+
+			auto& registry = scene->GetRegistry();
+			for (auto spawnedEntity : spawnedEnemies) {
+				if (registry.all_of<TransformComponent>(spawnedEntity)) {
+					auto& tc = registry.get<TransformComponent>(spawnedEntity);
+					if (!registry.all_of<HierarchyComponent>(spawnedEntity) || registry.get<HierarchyComponent>(spawnedEntity).parentId == entt::null) {
+						tc.translate = {-50.0f, 0.0f, 0.0f};
+					}
+				}
+			}
 		}
 
 	} else {
