@@ -31,6 +31,7 @@ private:
 	int currentPhase_ = 0;
 
 	bool preKeyP_ = false; // 初期化しておく
+	bool prekeySpace_ = false;
 	bool preKey1_ = false;
 	bool preKey2_ = false;
 	bool preKey3_ = false;

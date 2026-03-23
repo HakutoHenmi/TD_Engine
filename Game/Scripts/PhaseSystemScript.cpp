@@ -25,6 +25,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	(void)dt;
 	auto* input = Engine::Input::GetInstance();
 	bool keyP = (GetAsyncKeyState('P') & 0x8000) != 0;
+	bool keySpace = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
 	bool key1 = (GetAsyncKeyState('1') & 0x8000) != 0;
 	bool key2 = (GetAsyncKeyState('2') & 0x8000) != 0;
 	bool key3 = (GetAsyncKeyState('3') & 0x8000) != 0;
@@ -50,12 +51,12 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		Installation(scene, selectedObjPath_);
 
-		if (keyP && !preKeyP_) {
+		if (keySpace && !prekeySpace_) {
 			isPreparation_ = false;
 			isPlacementMode_ = false;
 			currentPhase_++;
 
-			std::string enemyPrefabPath = "Resources/EnemySpow" + std::to_string(currentPhase_) + ".prefab";
+			std::string enemyPrefabPath = "Resources/EnemySpawner" + std::to_string(currentPhase_) + ".prefab";
 			std::vector<entt::entity> spawnedEnemies = EditorUI::LoadPrefab(scene, enemyPrefabPath);
 
 			auto& registry = scene->GetRegistry();
@@ -63,17 +64,21 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				if (registry.all_of<TransformComponent>(spawnedEntity)) {
 					auto& tc = registry.get<TransformComponent>(spawnedEntity);
 					if (!registry.all_of<HierarchyComponent>(spawnedEntity) || registry.get<HierarchyComponent>(spawnedEntity).parentId == entt::null) {
-						tc.translate = {-50.0f, 0.0f, 0.0f};
+						tc.translate = {-50.0f, 5.0f, 0.0f};
 					}
 				}
 			}
 		}
 
 	} else {
+		if (keyP && !preKeyP_) {
+			isPreparation_ = true;
+		}
 		isPlacementMode_ = false;
 		
 	}
 	preKeyP_ = keyP;
+	prekeySpace_ = keySpace;
 	preKey1_ = key1;
 	preKey2_ = key2;
 	preKey3_ = key3;
