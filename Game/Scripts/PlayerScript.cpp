@@ -1,5 +1,7 @@
 #include "PlayerScript.h"
+#ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
+#endif
 #include "ObjectTypes.h"
 #include "PhaseSystemScript.h"
 #include "Scenes/GameScene.h"
@@ -104,6 +106,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))  scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = true;
 	}
 
+#if defined(USE_IMGUI) && !defined(NDEBUG)
 ImGui::Begin("Player Debug");
 
 	ImGui::Text("Experience: %.1f", experience_);
@@ -112,6 +115,7 @@ ImGui::Begin("Player Debug");
 	ImGui::Text("Last Value: %.2f", debugLastValue_);
 
 	ImGui::End();
+#endif
 }
 
 void PlayerScript::UpdateMovement(entt::entity entity, GameScene* scene, float /*dt*/) {

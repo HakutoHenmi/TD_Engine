@@ -102,9 +102,12 @@ void ExperienceHopper::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
-		auto& oMesh = registry.emplace<GpuMeshColliderComponent>(orb);
-		oMesh.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
-		oMesh.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
+		auto& oMr = registry.emplace<MeshRendererComponent>(orb);
+		oMr.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
+		oMr.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
+		
+		auto& oGmc = registry.emplace<GpuMeshColliderComponent>(orb);
+		oGmc.meshHandle = oMr.modelHandle;
 	}
 
 	auto& oScript = registry.emplace<ScriptComponent>(orb);

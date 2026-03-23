@@ -40,7 +40,7 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 	if (std::filesystem::exists(scenePath)) {
 		OutputDebugStringA(("[GameScene] " + scenePath + " found. Loading...\n").c_str());
 		EditorUI::LoadScene(this, scenePath);
-		isPlaying_ = false; // ★変更: 起動時はエディタ状態から開始する
+		isPlaying_ = true; // リリース/起動時はプレイ状態から開始する
 		loaded = true;
 	} else {
 		OutputDebugStringA(("[GameScene] " + scenePath + " NOT found.\n").c_str());
@@ -474,7 +474,9 @@ void GameScene::Draw() {
 
 	renderer_->SetCamera(camera_);
 #ifdef USE_IMGUI
-	DrawEditorGizmos();
+	if (!isPlaying_) {
+		DrawEditorGizmos();
+	}
 #endif
 
 	// ★追加: プレイヤーの位置を Renderer に同期（草のインタラクション用）

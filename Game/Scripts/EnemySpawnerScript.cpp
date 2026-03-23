@@ -2,7 +2,9 @@
 #include "ScriptEngine.h"
 #include "../Scenes/GameScene.h"
 #include "../../Engine/Renderer.h"
+#ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
+#endif
 #include "../../Engine/ThirdParty/nlohmann/json.hpp"
 #include <cmath>
 
@@ -133,6 +135,7 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 // ========== エディターUI ==========
 
 void EnemySpawnerScript::OnEditorUI() {
+#if defined(USE_IMGUI) && !defined(NDEBUG)
 	ImGui::SeparatorText("Enemy Spawner");
 
 	// --- 基本パラメータ ---
@@ -229,6 +232,7 @@ void EnemySpawnerScript::OnEditorUI() {
 	}
 
 	ImGui::TextDisabled("※ シーンビューにプレビューが表示されます");
+#endif
 }
 
 // ========== 3Dプレビュー描画 ==========

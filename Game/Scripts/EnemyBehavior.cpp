@@ -1,6 +1,8 @@
 #include "EnemyBehavior.h"
 #include "../../Engine/ThirdParty/nlohmann/json.hpp"
+#ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
+#endif
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
@@ -96,6 +98,7 @@ void EnemyBehavior::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
 }
 
 void EnemyBehavior::OnEditorUI() {
+#if defined(USE_IMGUI) && !defined(NDEBUG)
 	// 敵の移動タイプ(地面や空中)
 	// ライトの種類を選べるようにする
 	int typeNum = static_cast<int>(type_);
@@ -143,6 +146,7 @@ void EnemyBehavior::OnEditorUI() {
 
 		ImGui::Checkbox("Show Debug Grid", &showDebugGrid_);
 	}
+#endif
 }
 
 void EnemyBehavior::SearchTarget(entt::entity entity, GameScene* scene) {
@@ -504,7 +508,10 @@ void EnemyBehavior::CalculatePath(int startX, int startZ, int targetX, int targe
 void EnemyBehavior::Debug() {
 /*
 #ifndef NDEBUG
+#ifdef USE_IMGUI
 	ImGui::Begin("Enemy Debug");
+	ImGui::Text("Health: %.1f", health.health);
+	ImGui::Text("Is Dead: %s", (health.isDead ? "Yes" : "No"));
 	ImGui::Text("State: %d", (int)state_);
 	if (target_) ImGui::Text("Target: %s", target_->GetName().c_str());
 	ImGui::Text("GroundHeight : %f", groundHeight_);

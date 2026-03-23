@@ -5,7 +5,9 @@
 #include <cmath>
 #include <vector>
 
-#include "../imgui/imgui.h"
+#ifdef USE_IMGUI
+#include "../../externals/imgui/imgui.h"
+#endif
 
 namespace Game {
 
@@ -114,6 +116,7 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 
 		auto& otherTc = enemyView.get<TransformComponent>(other);
 		float dx = otherTc.translate.x - canonTc.translate.x;
+		float dy = otherTc.translate.y - canonTc.translate.y;
 		float dz = otherTc.translate.z - canonTc.translate.z;
 		float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
 
@@ -133,8 +136,12 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	// 大砲を敵の方向へ向ける
 	float desiredYaw = std::atan2(toX, toZ);
+	float toY = targetTc.translate.y - canonTc.translate.y;
+	float distXZ = std::sqrt(toX * toX + toZ * toZ);
+	float desiredPitch = std::atan2(toY, distXZ);
+	
 	canonTc.rotate.y = desiredYaw;
-	obj.rotate.x = -desiredPitch;
+	canonTc.rotate.x = -desiredPitch;
 
 	// クールダウン中なら撃たない（向くだけ）
 	if (attackTimer_ > 0.0f) {
@@ -192,6 +199,18 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 
 void Canon::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
+void Canon::OnEditorUI() {
+#if defined(USE_IMGUI) && !defined(NDEBUG)
+	ImGui::DragFloat("Rotate Speed", &rotationSpeed_, 0.01f, 0.1f, 10.0f);
+	ImGui::DragFloat("Attack Range", &attackRange_, 0.1f, 1.0f, 100.0f);
+	ImGui::DragFloat("Attack Interval", &attackInterval_, 0.01f, 0.1f, 10.0f);
+	
+	ImGui::Separator();
+	ImGui::Text("Status (Debug)");
+	ImGui::Text("Rotation: %.2f", rotationSpeed_);
+#endif
+}
+
 void Canon::Debug(bool connected) {
 	(void)connected;
 #ifndef NDEBUG
@@ -200,14 +219,14 @@ void Canon::Debug(bool connected) {
 		connectedText = "YES";
 	}
 
-/*
-	ImGui::Begin("Debug Pipe");
+#ifdef USE_IMGUI
+	ImGui::Begin("Canon Debug");
 	ImGui::Text("Objects: %d", objectCount);
 	ImGui::Text("Pipes  : %d", pipeCount);
 	ImGui::Text("Enemies: %d", enemyCount);
 	ImGui::Text("Canon connected to tank: %s", connectedText);
 	ImGui::End();
-*/
+#endif
 #endif
 }
 

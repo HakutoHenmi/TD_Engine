@@ -52,6 +52,9 @@ public:
 	static void Log(const std::string& msg);
 	static void LogWarning(const std::string& msg);
 	static void LogError(const std::string& msg);
+	
+	static ImVec2 GetGameImageMin();
+	static ImVec2 GetGameImageMax();
 
 	// ★ シーン保存/読み込み
 	static std::string currentScenePath;

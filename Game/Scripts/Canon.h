@@ -11,6 +11,7 @@ public:
 	void Start(entt::entity entity, GameScene* scene) override;
 	void Update(entt::entity entity, GameScene* scene, float dt) override;
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
+	void OnEditorUI() override;
 
 private:
 	// 大砲性能

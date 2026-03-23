@@ -59,6 +59,12 @@ private:
 	void UpdateMovement(entt::entity entity, GameScene* /*scene*/, float dt);
 	void UpdateAttack(entt::entity /*entity*/, GameScene* /*scene*/, float dt);
 	void UpdateSword(entt::entity entity, GameScene* scene, float dt);
+
+	float experience_ = 0.0f;
+	bool isSubscribed_ = false;
+	int debugSubscribeCount_ = 0;
+	int debugReceiveCount_ = 0;
+	float debugLastValue_ = 0.0f;
 };
 
 } // namespace Game

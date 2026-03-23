@@ -6,22 +6,22 @@
 #include <cfloat>
 #include <cmath>
 #include <fstream>
+#ifdef USE_IMGUI
 #include <imgui.h>
+#endif
 #include <iostream>
 
 namespace Game {
 
-bool PhaseSystemScript::isPreparation_ = false;
-
-void PhaseSystemScript::Start(SceneObject& obj, GameScene* scene) {
-	(obj);
-	(scene);
+void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
+	(void)entity;
+	(void)scene;
 }
 
-void PhaseSystemScript::Update(SceneObject& obj, GameScene* scene, float dt) {
-	(obj);
-	(scene);
-	(dt);
+void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) {
+	(void)entity;
+	(void)scene;
+	(void)dt;
 	auto* input = Engine::Input::GetInstance();
 	bool keyP = (GetAsyncKeyState('P') & 0x8000) != 0;
 	bool key1 = (GetAsyncKeyState('1') & 0x8000) != 0;
@@ -90,19 +90,28 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 }
 
 bool PhaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3& outHitPoint) const {
+	float localX = 0, localY = 0;
+	float tW = 0, tH = 0;
+
+#ifdef USE_IMGUI
 	ImVec2 mousePos = ImGui::GetMousePos();
 	ImVec2 gameMin = EditorUI::GetGameImageMin();
 	ImVec2 gameMax = EditorUI::GetGameImageMax();
-	float tW = gameMax.x - gameMin.x;
-	float tH = gameMax.y - gameMin.y;
+	tW = gameMax.x - gameMin.x;
+	tH = gameMax.y - gameMin.y;
 	if (tW <= 0.0f || tH <= 0.0f)
 		return false;
 
-	float localX = mousePos.x - gameMin.x;
-	float localY = mousePos.y - gameMin.y;
+	localX = mousePos.x - gameMin.x;
+	localY = mousePos.y - gameMin.y;
 	bool insideImage = (localX >= 0.0f && localY >= 0.0f && localX <= tW && localY <= tH);
 	if (!insideImage)
 		return false;
+#else
+    // リリース時は画面中央や、ネイティブなマウス座標を使う必要があるが、
+    // 基本的にプレイ中にこの配置モードに入らない想定なら false を返す
+    return false;
+#endif
 
 	auto& camera = scene->GetCamera();
 	DirectX::XMMATRIX view = camera.View();
@@ -118,21 +127,31 @@ bool PhaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3&
 	float bestDist = FLT_MAX;
 	bool hitTerrain = false;
 
-	const auto& objects = scene->GetObjects();
-	for (const auto& obj : objects) {
-		bool isTerrain = (obj.name.find("Terrain") != std::string::npos) || (obj.name.find("Floor") != std::string::npos);
+	auto& registry = scene->GetRegistry();
+	auto terrainView = registry.view<NameComponent, TransformComponent>();
+	
+	for (auto entity : terrainView) {
+		const auto& nc = terrainView.get<NameComponent>(entity);
+		const auto& tc = terrainView.get<TransformComponent>(entity);
+
+		bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || (nc.name.find("Floor") != std::string::npos);
 		if (!isTerrain)
 			continue;
 
 		Engine::Model* model = nullptr;
-		if (!obj.gpuMeshColliders.empty() && obj.gpuMeshColliders[0].meshHandle != 0) {
-			model = renderer->GetModel(obj.gpuMeshColliders[0].meshHandle);
+		// GpuMeshCollider か MeshRenderer からモデルを取得
+		if (registry.all_of<GpuMeshColliderComponent>(entity)) {
+			auto& gmc = registry.get<GpuMeshColliderComponent>(entity);
+			if (gmc.meshHandle != 0) {
+				model = renderer->GetModel(gmc.meshHandle);
+			}
 		}
-		if (!model && obj.modelHandle != 0) {
-			model = renderer->GetModel(obj.modelHandle);
-		}
-		if (!model && !obj.meshRenderers.empty() && obj.meshRenderers[0].modelHandle != 0) {
-			model = renderer->GetModel(obj.meshRenderers[0].modelHandle);
+		
+		if (!model && registry.all_of<MeshRendererComponent>(entity)) {
+			auto& mr = registry.get<MeshRendererComponent>(entity);
+			if (mr.modelHandle != 0) {
+				model = renderer->GetModel(mr.modelHandle);
+			}
 		}
 
 		if (!model)
@@ -140,7 +159,7 @@ bool PhaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3&
 
 		float d;
 		Engine::Vector3 hp;
-		if (model->RayCast(rayOrig, rayDir, obj.GetTransform().ToMatrix(), d, hp) && d < bestDist) {
+		if (model->RayCast(rayOrig, rayDir, tc.ToMatrix(), d, hp) && d < bestDist) {
 			bestDist = d;
 			outHitPoint = hp;
 			hitTerrain = true;
@@ -217,14 +236,21 @@ bool PhaseSystemScript::IsPlacementBlocked(GameScene* scene, const Engine::Vecto
 	constexpr float kBlockRadius = 1.0f;
 	constexpr float kBlockRadiusSq = kBlockRadius * kBlockRadius;
 
-	const auto& objects = scene->GetObjects();
-	for (const auto& obj : objects) {
-		const bool isTerrain = (obj.name.find("Terrain") != std::string::npos) || (obj.name.find("Floor") != std::string::npos);
-		if (isTerrain)
-			continue;
+	auto& registry = scene->GetRegistry();
+	auto view = registry.view<TransformComponent>();
+	for (auto entity : view) {
+		// Terrain や Floor は除外したいが、TransformComponent だけでは判定できない
+		// 名前が必要
+		if (registry.all_of<NameComponent>(entity)) {
+			const auto& nc = registry.get<NameComponent>(entity);
+			const bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || (nc.name.find("Floor") != std::string::npos);
+			if (isTerrain)
+				continue;
+		}
 
-		const float dx = obj.translate.x - hitPoint.x;
-		const float dz = obj.translate.z - hitPoint.z;
+		const auto& tc = view.get<TransformComponent>(entity);
+		const float dx = tc.translate.x - hitPoint.x;
+		const float dz = tc.translate.z - hitPoint.z;
 		const float distSq = dx * dx + dz * dz;
 		if (distSq < kBlockRadiusSq) {
 			return true;
@@ -239,16 +265,30 @@ void PhaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector
 	if (!renderer)
 		return;
 
+	auto& registry = scene->GetRegistry();
+
 	if (IsPrefabPath(objPath)) {
-		const size_t beforeCount = scene->GetObjects().size();
+		// 現在のエンティティ一覧を記録
+		std::vector<entt::entity> beforeEntities;
+		registry.each([&](auto entity) { beforeEntities.push_back(entity); });
+
 		EditorUI::LoadPrefab(scene, objPath);
 
-		auto objects = scene->GetObjects();
-		if (objects.size() > beforeCount) {
-			auto& newObj = objects.back();
-			newObj.translate = {hitPoint.x, hitPoint.y + 0.5f, hitPoint.z};
-			scene->SetObjects(objects);
-		}
+		// 新しく追加されたエンティティを見つける
+		registry.each([&](auto entity) {
+			bool found = false;
+			for(auto b : beforeEntities) { if(b == entity) { found = true; break; } }
+			if (!found) {
+				// 新しいエンティティの座標をセット
+				if (registry.all_of<TransformComponent>(entity)) {
+					auto& tc = registry.get<TransformComponent>(entity);
+					// 親がいない（ルート）のエンティティのみ座標を更新
+					if (!registry.all_of<HierarchyComponent>(entity) || registry.get<HierarchyComponent>(entity).parentId == entt::null) {
+						tc.translate = {hitPoint.x, hitPoint.y + 0.5f, hitPoint.z};
+					}
+				}
+			}
+		});
 		return;
 	}
 
@@ -260,28 +300,21 @@ void PhaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector
 		previewTextureHandle_ = renderer->LoadTexture2D("Resources/white1x1.png");
 	}
 
-	SceneObject newObj;
-	newObj.name = (objPath.find("cylinder") != std::string::npos || objPath.find("Cylinder") != std::string::npos) ? "PlacedCylinder" : "PlacedCube";
-	newObj.translate = {hitPoint.x, hitPoint.y + 0.5f, hitPoint.z};
-	newObj.scale = {1.0f, 1.0f, 1.0f};
-	newObj.color = {1.0f, 1.0f, 1.0f, 1.0f};
-	newObj.modelPath = objPath;
-	newObj.texturePath = "Resources/white1x1.png";
-	newObj.modelHandle = previewModelHandle_;
-	newObj.textureHandle = previewTextureHandle_;
+	entt::entity newEntity = scene->CreateEntity((objPath.find("cylinder") != std::string::npos || objPath.find("Cylinder") != std::string::npos) ? "PlacedCylinder" : "PlacedCube");
+	
+	auto& tc = registry.get<TransformComponent>(newEntity);
+	tc.translate = {hitPoint.x, hitPoint.y + 0.5f, hitPoint.z};
+	tc.scale = {1.0f, 1.0f, 1.0f};
 
-	MeshRendererComponent mr;
-	mr.modelHandle = newObj.modelHandle;
-	mr.textureHandle = newObj.textureHandle;
-	mr.modelPath = newObj.modelPath;
-	mr.texturePath = newObj.texturePath;
+	auto& mr = registry.emplace<MeshRendererComponent>(newEntity);
+	mr.modelHandle = previewModelHandle_;
+	mr.textureHandle = previewTextureHandle_;
+	mr.modelPath = objPath;
+	mr.texturePath = "Resources/white1x1.png";
 	mr.shaderName = "Toon";
-	newObj.meshRenderers.push_back(mr);
-
-	scene->SpawnObject(newObj);
 }
 
-void PhaseSystemScript::OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {}
+void PhaseSystemScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 REGISTER_SCRIPT(PhaseSystemScript);
 

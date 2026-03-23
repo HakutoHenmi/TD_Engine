@@ -303,6 +303,9 @@ void EditorUI::LogError(const std::string& msg) {
 	if (consoleLog.size() > kMaxConsoleLines) consoleLog.pop_front();
 }
 
+ImVec2 EditorUI::GetGameImageMin() { return gameImageMin; }
+ImVec2 EditorUI::GetGameImageMax() { return gameImageMax; }
+
 // ====== JSON Serialization ======
 static std::string EscapeJson(const std::string& s) {
 	std::string o;

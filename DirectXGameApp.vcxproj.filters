@@ -60,7 +60,6 @@
     <ClCompile Include="Game\Scripts\ExperienceOrbScript.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
-    <ClCompile Include="Game\Scripts\PahaseSystemScript.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
