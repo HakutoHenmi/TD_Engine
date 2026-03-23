@@ -3,6 +3,7 @@
 #include "../../Engine/Camera.h"
 #include "../../Engine/Renderer.h"
 #include "../../Engine/Input.h"
+#include "../../Engine/EventSystem.h" // ★追加: イベントシステム
 #include <vector>
 
 namespace Game {
@@ -14,6 +15,7 @@ struct GameContext {
 	Engine::Renderer* renderer = nullptr;
 	class GameScene* scene = nullptr; // ★追加
 	Engine::Input* input = nullptr;
+	Engine::EventSystem* eventSystem = nullptr; // ★追加: スクリプト間通信用
 	bool isPlaying = false;
 	std::vector<SceneObject>* pendingSpawns = nullptr; // SpawnObject等の遅延追加用
 

@@ -2777,6 +2777,33 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 			scene->selectedIndices_.clear();
 			scene->selectedObjectIndex_ = -1;
 		}
+
+		// ★追加: Hierarchyウィンドウへのリソースドラッグ＆ドロップ
+		if (ImGui::BeginDragDropTarget()) {
+			if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
+				std::string path((const char*)pl->Data, pl->DataSize - 1);
+				if (path.find(".prefab") != std::string::npos) {
+					LoadPrefab(scene, path);
+				} else if (path.find(".obj") != std::string::npos || path.find(".gltf") != std::string::npos || path.find(".fbx") != std::string::npos) {
+					auto* r = Engine::Renderer::GetInstance();
+					SceneObject o;
+					o.name = fs::path(path).stem().string();
+					o.modelPath = path;
+					o.modelHandle = r->LoadObjMesh(path);
+					MeshRendererComponent mr;
+					mr.modelHandle = o.modelHandle;
+					mr.modelPath = o.modelPath;
+					o.meshRenderers.push_back(mr);
+					o.id = GenerateId();
+					scene->objects_.push_back(o);
+					int idx = (int)scene->objects_.size() - 1;
+					scene->selectedIndices_ = {idx};
+					scene->selectedObjectIndex_ = idx;
+					Log("Created from drop: " + o.name);
+				}
+			}
+			ImGui::EndDragDropTarget();
+		}
 	} else {
 		ImGui::Text("No Active Scene");
 	}
@@ -3460,13 +3487,39 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				ImGui::PushID(23000 + (int)ci);
 				if (ImGui::TreeNode("Script")) {
 					ImGui::Checkbox("Enabled##SC", &sc.enabled);
+					// ★追加: スクリプト選択ドロップダウン
+					{
+						auto scriptNames = ScriptEngine::GetInstance()->GetRegisteredScriptNames();
+						const char* currentName = sc.scriptPath.empty() ? "(none)" : sc.scriptPath.c_str();
+						if (ImGui::BeginCombo("Script##SCCombo", currentName)) {
+							// (none) 選択肢
+							if (ImGui::Selectable("(none)", sc.scriptPath.empty())) {
+								sc.scriptPath.clear();
+								sc.instance = nullptr;
+							}
+							for (const auto& sName : scriptNames) {
+								bool isSelected = (sc.scriptPath == sName);
+								if (ImGui::Selectable(sName.c_str(), isSelected)) {
+									if (sc.scriptPath != sName) {
+										sc.scriptPath = sName;
+										sc.instance = ScriptEngine::GetInstance()->CreateScript(sName);
+									}
+								}
+								if (isSelected) ImGui::SetItemDefaultFocus();
+							}
+							ImGui::EndCombo();
+						}
+					}
+					// ★ドラッグ＆ドロップ（ファイル名からクラス名を抽出）
 					ImGui::Text("Path: %s", sc.scriptPath.empty() ? "(none)" : sc.scriptPath.c_str());
 					if (ImGui::BeginDragDropTarget()) {
 						if (const ImGuiPayload* pl = ImGui::AcceptDragDropPayload("RESOURCE_PATH")) {
 							std::string path((const char*)pl->Data, pl->DataSize - 1);
 							if (path.find(".h") != std::string::npos || path.find(".cpp") != std::string::npos) {
-								sc.scriptPath = path;
-								sc.instance = ScriptEngine::GetInstance()->CreateScript(path);
+								// ファイル名から拡張子を除去してクラス名として使用
+								std::string className = fs::path(path).stem().string();
+								sc.scriptPath = className;
+								sc.instance = ScriptEngine::GetInstance()->CreateScript(className);
 							}
 						}
 						ImGui::EndDragDropTarget();

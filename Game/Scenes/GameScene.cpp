@@ -26,6 +26,7 @@ namespace Game {
 void GameScene::Initialize(Engine::WindowDX* dx) {
 	dx_ = dx;
 	renderer_ = Engine::Renderer::GetInstance();
+	eventSystem_.Clear(); // ★追加: イベントリスナーをクリア
 	camera_.Initialize();
 	// ★追加: 明示的にプロジェクションを設定 (1920x1080のアスペクト比)
 	camera_.SetProjection(0.7854f, (float)Engine::WindowDX::kW / (float)Engine::WindowDX::kH, 0.1f, 1000.0f);
@@ -137,6 +138,7 @@ void GameScene::Update() {
 	ctx_.input = Engine::Input::GetInstance();
 	ctx_.isPlaying = isPlaying_;
 	ctx_.scene = this; // ★追加
+	ctx_.eventSystem = &eventSystem_; // ★追加: イベントシステム
 	ctx_.pendingSpawns = &pendingSpawns_;
 
 	// GPU Collision Dispatch（エンジン固有処理のため残留）

@@ -5,6 +5,7 @@
 #include "Model.h"
 #include "Transform.h"
 #include "WindowDX.h"
+#include "EventSystem.h" // ★追加: イベントシステム
 #include "../ObjectTypes.h"
 #include "../Systems/ISystem.h"
 #include <vector>
@@ -37,6 +38,7 @@ public:
     Engine::Renderer* GetRenderer() const { return renderer_; } // ★追加
     Engine::Matrix4x4 GetWorldMatrix(int index) const; // ★追加
 	Engine::Camera& GetCamera() { return camera_; } // ★追加: カメラへのアクセス
+	Engine::EventSystem& GetEventSystem() { return eventSystem_; } // ★追加: イベントシステムへのアクセス
 
 	// ★追加: 名前でオブジェクトを検索するヘルパー
 	SceneObject* FindObjectByName(const std::string& name);
@@ -47,6 +49,7 @@ private:
     Engine::WindowDX* dx_ = nullptr;
     Engine::Renderer* renderer_ = nullptr;
     Engine::Camera camera_;
+    Engine::EventSystem eventSystem_; // ★追加: スクリプト間通信用
     std::vector<SceneObject> objects_;
     std::set<int> selectedIndices_;
     int selectedObjectIndex_ = -1;
