@@ -6,6 +6,7 @@
 #include <cfloat>
 #include <cmath>
 #include <fstream>
+#include <string.h>
 #ifdef USE_IMGUI
 #include <imgui.h>
 #endif
