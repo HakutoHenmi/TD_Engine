@@ -21,14 +21,14 @@ float EnemySpawnerScript::CalcInterval() const {
 	return spawnDuration / static_cast<float>(maxCount - 1);
 }
 
-void EnemySpawnerScript::Start(SceneObject& /*obj*/, GameScene* /*scene*/) {
+void EnemySpawnerScript::Start(entt::entity /*entity*/, GameScene* /*scene*/) {
 	currentWave_ = startWave;
 	spawnedThisWave_ = 0;
 	elapsedTime_ = 0.0f;
 	isWaitingDelay_ = true;
 }
 
-void EnemySpawnerScript::Update(SceneObject& obj, GameScene* scene, float dt) {
+void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, float dt) {
 	if (currentWave_ >= waveCount) return;
 
 	elapsedTime_ += dt;
@@ -49,14 +49,9 @@ void EnemySpawnerScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	while (spawnedThisWave_ < shouldHaveSpawned) {
 		// パターンに応じた出現位置を計算
 		// ★修正: 親子関係を考慮し、スポナーのワールド座標を取得する
-		DirectX::XMFLOAT3 spawnerWorldPos = obj.translate;
-		for (int i = 0; i < (int)scene->GetObjects().size(); ++i) {
-			if (&scene->GetObjects()[i] == &obj) {
-				Engine::Matrix4x4 wm = scene->GetWorldMatrix(i);
-				spawnerWorldPos = { wm.m[3][0], wm.m[3][1], wm.m[3][2] };
-				break;
-			}
-		}
+		DirectX::XMFLOAT3 spawnerWorldPos = scene->GetRegistry().get<TransformComponent>(spawnerEntity).translate;
+		Engine::Matrix4x4 wm = scene->GetWorldMatrix(static_cast<int>(spawnerEntity));
+		spawnerWorldPos = { wm.m[3][0], wm.m[3][1], wm.m[3][2] };
 
 		DirectX::XMFLOAT3 spawnPos = spawnerWorldPos;
 
@@ -79,53 +74,49 @@ void EnemySpawnerScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 			break;
 		}
 
-		SceneObject enemy;
-		enemy.name = "SpawnedEnemy_W" + std::to_string(currentWave_) + "_" + std::to_string(spawnedThisWave_);
-		enemy.translate = spawnPos;
+		entt::entity enemy = scene->GetRegistry().create();
+
+		auto& nc = scene->GetRegistry().emplace<NameComponent>(enemy);
+		nc.name = "SpawnedEnemy_W" + std::to_string(currentWave_) + "_" + std::to_string(spawnedThisWave_);
+		
+		auto& tc = scene->GetRegistry().emplace<TransformComponent>(enemy);
+		tc.translate = spawnPos;
+		tc.scale = {1.0f, 1.0f, 1.0f};
 
 		auto* renderer = Engine::Renderer::GetInstance();
-
-		// エネミーの基本共通設定
-		enemy.scale = {1.0f, 1.0f, 1.0f};
 		if (renderer) {
-			enemy.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
-			enemy.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
-			MeshRendererComponent mr;
-			mr.modelHandle = enemy.modelHandle;
-			mr.textureHandle = enemy.textureHandle;
+			auto& mr = scene->GetRegistry().emplace<MeshRendererComponent>(enemy);
+			mr.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
+			mr.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
 			mr.color = (enemyType == 42) ? DirectX::XMFLOAT4{1.0f, 0.2f, 0.2f, 1.0f} : DirectX::XMFLOAT4{1.0f, 0.4f, 0.2f, 1.0f};
 			mr.shaderName = "Toon";
-			enemy.meshRenderers.push_back(mr);
+			mr.enabled = true;
 		}
 
-		BoxColliderComponent bc;
-		bc.size = {1.0f, 2.0f, 1.0f};
-		enemy.boxColliders.push_back(bc);
+		auto& bcComponent = scene->GetRegistry().emplace<BoxColliderComponent>(enemy);
+		bcComponent.size = {1.0f, 2.0f, 1.0f};
+		bcComponent.enabled = true;
 
-		RigidbodyComponent rb;
-		// ★修正: Flyタイプの場合は重力を無効化する
-		// (スクリプト側でも制御するが、初期化時の挙動を安定させるため)
+		auto& rbComponent = scene->GetRegistry().emplace<RigidbodyComponent>(enemy);
 		bool isFly = (enemyScriptPath == "EnemyBehavior" && enemyScriptParams.find("\"moveType\":1") != std::string::npos);
-		rb.useGravity = !isFly;
-		enemy.rigidbodies.push_back(rb);
+		rbComponent.useGravity = !isFly;
 
-		HealthComponent health;
-		health.hp = 100.0f;
-		health.maxHp = 100.0f;
-		enemy.healths.push_back(health);
+		auto& hComponent = scene->GetRegistry().emplace<HealthComponent>(enemy);
+		hComponent.hp = 100.0f;
+		hComponent.maxHp = 100.0f;
 
-		TagComponent tag;
-		tag.tag = "Enemy";
-		enemy.tags.push_back(tag);
+		auto& tagComponent = scene->GetRegistry().emplace<TagComponent>(enemy);
+		tagComponent.tag = "Enemy";
 
 		// スクリプトとパラメータの設定
-		ScriptComponent sc;
-		sc.scriptPath = enemyScriptPath;
-		sc.enabled = true;
-		sc.parameterData = enemyScriptParams; // ★ 保存されていたパラメータを渡す
-		enemy.scripts.push_back(sc);
+		auto& scComponent = scene->GetRegistry().emplace<ScriptComponent>(enemy);
+		scComponent.scriptPath = enemyScriptPath;
+		scComponent.enabled = true;
+		scComponent.parameterData = enemyScriptParams; // ★ 保存されていたパラメータを渡す
 
-		scene->SpawnObject(enemy);
+		// 初期化完了後はGameScene側のキュー等に入れる必要はなく即座に生成されるが
+		// Start処理などを呼ぶために pendingSpawns のような仕組みが必要か、
+		// SceneObjectでないため直接初期化はScriptSystem等が受け持つ。
 
 		spawnedThisWave_++;
 	}

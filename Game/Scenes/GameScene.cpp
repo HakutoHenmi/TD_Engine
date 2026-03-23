@@ -40,30 +40,33 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 	if (std::filesystem::exists(scenePath)) {
 		OutputDebugStringA(("[GameScene] " + scenePath + " found. Loading...\n").c_str());
 		EditorUI::LoadScene(this, scenePath);
-		isPlaying_ = true; // ロード直後からプレイ状態にする
+		isPlaying_ = false; // ★変更: 起動時はエディタ状態から開始する
 		loaded = true;
 	} else {
 		OutputDebugStringA(("[GameScene] " + scenePath + " NOT found.\n").c_str());
 	}
 
 	// 既にオブジェクトが存在する場合（リスタート時）やロード失敗時は最低限の内容を作成
-	if (objects_.empty() || !loaded) {
-		SceneObject sun;
-		sun.name = "Sun";
-		sun.translate = {0, 10, 0};
-		sun.rotate = {DirectX::XMConvertToRadians(45.0f), DirectX::XMConvertToRadians(30.0f), 0};
-		sun.directionalLights.push_back(DirectionalLightComponent());
-		objects_.push_back(sun);
+	if (registry_.storage<entt::entity>().empty() || !loaded) {
+		auto sun = registry_.create();
+		registry_.emplace<NameComponent>(sun, "Sun");
+		registry_.emplace<TransformComponent>(sun, DirectX::XMFLOAT3{0, 10, 0}, DirectX::XMFLOAT3{DirectX::XMConvertToRadians(45.0f), DirectX::XMConvertToRadians(30.0f), 0}, DirectX::XMFLOAT3{1, 1, 1});
+		registry_.emplace<DirectionalLightComponent>(sun);
 
-		SceneObject plane;
-		plane.name = "Plane";
-		plane.modelHandle = renderer_->LoadObjMesh("Resources/plane.obj");
-		plane.textureHandle = renderer_->LoadTexture2D("Resources/white1x1.png");
-		plane.modelPath = "Resources/plane.obj";
-		plane.texturePath = "Resources/white1x1.png";
-		plane.scale = {20, 1, 20};
-		objects_.push_back(plane);
+		auto plane = registry_.create();
+		registry_.emplace<NameComponent>(plane, "Plane");
+		
+		auto& mesh = registry_.emplace<MeshRendererComponent>(plane);
+		mesh.modelHandle = renderer_->LoadObjMesh("Resources/plane.obj");
+		mesh.textureHandle = renderer_->LoadTexture2D("Resources/white1x1.png");
+		mesh.modelPath = "Resources/plane.obj";
+		mesh.texturePath = "Resources/white1x1.png";
+		
+		registry_.emplace<TransformComponent>(plane, DirectX::XMFLOAT3{0, 0, 0}, DirectX::XMFLOAT3{0, 0, 0}, DirectX::XMFLOAT3{20, 1, 20});
 	}
+
+	// エディターUIの初期化
+	EditorUI::Initialize(renderer_);
 
 	// パーティクルエディターの初期化
 	particleEditor_.Initialize();
@@ -88,31 +91,35 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 	systems_.push_back(std::make_unique<UISystem>());
 	systems_.push_back(std::make_unique<CleanupSystem>());
 
+	// ★追加: 起動直後の状態を初期スナップショットとして保存
+	initialSceneSnapshot_ = EditorUI::SaveToMemory(this);
+
 	// 前回プレイで動的に生成されたオブジェクトの削除
-	objects_.erase(
-	    std::remove_if(
-	        objects_.begin(), objects_.end(),
-	        [](const SceneObject& o) {
-		        bool isBullet = false;
-		        for (const auto& t : o.tags) {
-			        if (t.tag == "Bullet")
-				        isBullet = true;
-		        }
-		        return isBullet || o.name == "Bullet";
-	        }),
-	    objects_.end());
+	auto bulletView = registry_.view<TagComponent>();
+	for (auto entity : bulletView) {
+		if (bulletView.get<TagComponent>(entity).tag == "Bullet") {
+			registry_.destroy(entity);
+		}
+	}
+	auto nameView = registry_.view<NameComponent>();
+	for (auto entity : nameView) {
+		if (nameView.get<NameComponent>(entity).name == "Bullet" && registry_.valid(entity)) {
+			registry_.destroy(entity);
+		}
+	}
 
 	// 各Systemのリセット
 	for (auto& sys : systems_) {
-		sys->Reset(objects_);
+		sys->Reset(registry_);
 	}
 
 	// ★追加: 川の初期メッシュ生成
-	for (auto& obj : objects_) {
-		for (auto& rv : obj.rivers) {
-			if (rv.enabled && rv.meshHandle == 0) {
-				RiverSystem::BuildRiverMesh(rv, renderer_, objects_);
-			}
+	auto riverView = registry_.view<RiverComponent, TransformComponent>();
+	for (auto entity : riverView) {
+		auto& rv = riverView.get<RiverComponent>(entity);
+		if (rv.enabled && rv.meshHandle == 0) {
+			auto& tc = riverView.get<TransformComponent>(entity);
+			RiverSystem::BuildRiverMesh(rv, renderer_, registry_, tc.translate);
 		}
 	}
 }
@@ -141,78 +148,21 @@ void GameScene::Update() {
 	ctx_.eventSystem = &eventSystem_; // ★追加: イベントシステム
 	ctx_.pendingSpawns = &pendingSpawns_;
 
-	// GPU Collision Dispatch（エンジン固有処理のため残留）
-	if (renderer_) {
-		uint32_t pairIndex = 0;
-		for (size_t i = 0; i < objects_.size(); ++i) {
-			auto& objA = objects_[i];
-			for (auto& mc : objA.gpuMeshColliders)
-				mc.isIntersecting = false;
-		}
-
-		for (size_t i = 0; i < objects_.size(); ++i) {
-			auto& objA = objects_[i];
-			if (objA.gpuMeshColliders.empty() || !objA.gpuMeshColliders[0].enabled)
-				continue;
-
-			for (size_t j = i + 1; j < objects_.size(); ++j) {
-				auto& objB = objects_[j];
-				if (objB.gpuMeshColliders.empty() || !objB.gpuMeshColliders[0].enabled)
-					continue;
-
-				if (renderer_->GetCollisionResult(pairIndex)) {
-					objA.gpuMeshColliders[0].isIntersecting = true;
-					objB.gpuMeshColliders[0].isIntersecting = true;
-				}
-				pairIndex++;
-			}
-		}
-
-		uint32_t numPairs = 0;
-		for (size_t i = 0; i < objects_.size(); ++i) {
-			if (!objects_[i].gpuMeshColliders.empty() && objects_[i].gpuMeshColliders[0].enabled) {
-				for (size_t j = i + 1; j < objects_.size(); ++j) {
-					if (!objects_[j].gpuMeshColliders.empty() && objects_[j].gpuMeshColliders[0].enabled)
-						numPairs++;
-				}
-			}
-		}
-
-		renderer_->BeginCollisionCheck(numPairs);
-		pairIndex = 0;
-		for (size_t i = 0; i < objects_.size(); ++i) {
-			auto& objA = objects_[i];
-			if (objA.gpuMeshColliders.empty() || !objA.gpuMeshColliders[0].enabled)
-				continue;
-
-			for (size_t j = i + 1; j < objects_.size(); ++j) {
-				auto& objB = objects_[j];
-				if (objB.gpuMeshColliders.empty() || !objB.gpuMeshColliders[0].enabled)
-					continue;
-
-				uint32_t meshA = objA.gpuMeshColliders[0].meshHandle;
-				uint32_t meshB = objB.gpuMeshColliders[0].meshHandle;
-
-				if (meshA == 0)
-					meshA = objA.modelHandle;
-				if (meshB == 0)
-					meshB = objB.modelHandle;
-
-				if (meshA != 0 && meshB != 0) {
-					renderer_->DispatchCollision(meshA, objA.GetTransform(), meshB, objB.GetTransform(), pairIndex);
-				}
-				pairIndex++;
-			}
-		}
-		renderer_->EndCollisionCheck();
-	}
+	// GPU Collision Dispatch（エンジンの汎用 PhysicsSystem.h に移行したため、ここでは何もしない）
+	// Animation（エンジン固有処理のため残留）
 
 	// Animation（エンジン固有処理のため残留）
-	for (auto& obj : objects_) {
-		for (auto& anim : obj.animators) {
+	auto animView = registry_.view<AnimatorComponent, MeshRendererComponent>();
+	if (animView.begin() != animView.end()) {
+		std::vector<entt::entity> animEntities(animView.begin(), animView.end());
+		Engine::JobSystem::Dispatch((uint32_t)animEntities.size(), 64, [&](uint32_t i) {
+			auto entity = animEntities[i];
+			auto& anim = animView.get<AnimatorComponent>(entity);
+			auto& meshWrapper = animView.get<MeshRendererComponent>(entity);
+
 			if (anim.enabled && anim.isPlaying) {
 				anim.time += dt * 60.0f * anim.speed;
-				auto* m = renderer_->GetModel(obj.modelHandle);
+				auto* m = renderer_->GetModel(meshWrapper.modelHandle);
 				if (m) {
 					const auto& data = m->GetData();
 					for (const auto& a : data.animations) {
@@ -230,7 +180,8 @@ void GameScene::Update() {
 					}
 				}
 			}
-		}
+		});
+		Engine::JobSystem::Wait();
 	}
 
 	// パーティクルエディター
@@ -238,13 +189,32 @@ void GameScene::Update() {
 
 	// ★ 全Systemを順に実行
 	for (auto& system : systems_) {
-		system->Update(objects_, ctx_);
+		system->Update(registry_, ctx_);
 	}
 
-	// ★ ペンディングオブジェクト（弾など）をflush
-	if (!pendingSpawns_.empty()) {
-		objects_.insert(objects_.end(), pendingSpawns_.begin(), pendingSpawns_.end());
-		pendingSpawns_.clear();
+	// ★ 追加: 停止中のみデバッグカメラを有効化
+	if (!isPlaying_) {
+		camera_.Update(*Engine::Input::GetInstance());
+	}
+	camera_.Tick(dt);
+
+	// ★ ペンディングオブジェクト（弾など）をflushし、破棄要求を処理
+	{
+		std::lock_guard<std::mutex> lock(spawnMutex_);
+
+		if (!pendingSpawns_.storage<entt::entity>().empty()) {
+			// 一旦、pendingSpawns_ をダミーとして運用するか、直接 `registry_.create()` するのでここは実質空になる
+			pendingSpawns_.clear();
+		}
+
+		if (!pendingDestroys_.empty()) {
+			for(auto id: pendingDestroys_) {
+				if(registry_.valid(id)) {
+					registry_.destroy(id);
+				}
+			}
+			pendingDestroys_.clear();
+		}
 	}
 
 	// Light System（レンダリング設定のため残留）
@@ -253,37 +223,40 @@ void GameScene::Update() {
 		int slCount = 0;
 		bool hasDirLight = false;
 
-		for (const auto& obj : objects_) {
-			for (const auto& dl : obj.directionalLights) {
-				if (dl.enabled && !hasDirLight) {
-					Engine::Matrix4x4 mat = obj.GetTransform().ToMatrix();
-					Engine::Vector3 dir = {mat.m[2][0], mat.m[2][1], mat.m[2][2]};
-					Engine::Vector3 color = {dl.color.x * dl.intensity, dl.color.y * dl.intensity, dl.color.z * dl.intensity};
-					renderer_->SetDirectionalLight(dir, color, true);
-					hasDirLight = true;
-				}
+		auto dirLightView = registry_.view<DirectionalLightComponent, TransformComponent>();
+		dirLightView.each([&](auto, const DirectionalLightComponent& dl, const TransformComponent& tc) {
+			if (dl.enabled && !hasDirLight) {
+				Engine::Matrix4x4 mat = tc.GetTransform().ToMatrix();
+				Engine::Vector3 dir = {mat.m[2][0], mat.m[2][1], mat.m[2][2]};
+				Engine::Vector3 color = {dl.color.x * dl.intensity, dl.color.y * dl.intensity, dl.color.z * dl.intensity};
+				renderer_->SetDirectionalLight(dir, color, true);
+				hasDirLight = true;
 			}
-			for (const auto& pl : obj.pointLights) {
-				if (pl.enabled && plCount < Engine::Renderer::kMaxPointLights) {
-					Engine::Vector3 pos = {obj.translate.x, obj.translate.y, obj.translate.z};
-					Engine::Vector3 color = {pl.color.x * pl.intensity, pl.color.y * pl.intensity, pl.color.z * pl.intensity};
-					Engine::Vector3 atten = {pl.atten.x, pl.atten.y, pl.atten.z};
-					renderer_->SetPointLight(plCount, pos, color, pl.range, atten, true);
-					plCount++;
-				}
+		});
+
+		auto plView = registry_.view<PointLightComponent, TransformComponent>();
+		plView.each([&](auto, const PointLightComponent& pl, const TransformComponent& tc) {
+			if (pl.enabled && plCount < Engine::Renderer::kMaxPointLights) {
+				Engine::Vector3 pos = {tc.translate.x, tc.translate.y, tc.translate.z};
+				Engine::Vector3 color = {pl.color.x * pl.intensity, pl.color.y * pl.intensity, pl.color.z * pl.intensity};
+				Engine::Vector3 atten = {pl.atten.x, pl.atten.y, pl.atten.z};
+				renderer_->SetPointLight(plCount, pos, color, pl.range, atten, true);
+				plCount++;
 			}
-			for (const auto& sl : obj.spotLights) {
-				if (sl.enabled && slCount < Engine::Renderer::kMaxSpotLights) {
-					Engine::Matrix4x4 mat = obj.GetTransform().ToMatrix();
-					Engine::Vector3 dir = {mat.m[2][0], mat.m[2][1], mat.m[2][2]};
-					Engine::Vector3 pos = {obj.translate.x, obj.translate.y, obj.translate.z};
-					Engine::Vector3 color = {sl.color.x * sl.intensity, sl.color.y * sl.intensity, sl.color.z * sl.intensity};
-					Engine::Vector3 atten = {sl.atten.x, sl.atten.y, sl.atten.z};
-					renderer_->SetSpotLight(slCount, pos, dir, color, sl.range, sl.innerCos, sl.outerCos, atten, true);
-					slCount++;
-				}
+		});
+
+		auto slView = registry_.view<SpotLightComponent, TransformComponent>();
+		slView.each([&](auto, const SpotLightComponent& sl, const TransformComponent& tc) {
+			if (sl.enabled && slCount < Engine::Renderer::kMaxSpotLights) {
+				Engine::Matrix4x4 mat = tc.GetTransform().ToMatrix();
+				Engine::Vector3 dir = {mat.m[2][0], mat.m[2][1], mat.m[2][2]};
+				Engine::Vector3 pos = {tc.translate.x, tc.translate.y, tc.translate.z};
+				Engine::Vector3 color = {sl.color.x * sl.intensity, sl.color.y * sl.intensity, sl.color.z * sl.intensity};
+				Engine::Vector3 atten = {sl.atten.x, sl.atten.y, sl.atten.z};
+				renderer_->SetSpotLight(slCount, pos, dir, color, sl.range, sl.innerCos, sl.outerCos, atten, true);
+				slCount++;
 			}
-		}
+		});
 
 		if (!hasDirLight) {
 			renderer_->SetDirectionalLight({0, -1, 0}, {0, 0, 0}, false);
@@ -297,80 +270,80 @@ void GameScene::Update() {
 	}
 
 	// パーティクルエミッターコンポーネント
-	for (auto& obj : objects_) {
-		for (auto& emitterComp : obj.particleEmitters) {
-			if (!emitterComp.enabled)
-				continue;
+	auto peView = registry_.view<ParticleEmitterComponent, TransformComponent, NameComponent>();
+	peView.each([&](auto, ParticleEmitterComponent& pe, const TransformComponent& tc, const NameComponent& nc) {
+		if (!pe.enabled) return;
 
-			if (!emitterComp.isInitialized && renderer_) {
-				emitterComp.emitter.Initialize(*renderer_, obj.name + "_Emitter");
-				if (!emitterComp.assetPath.empty()) {
-					emitterComp.emitter.LoadFromJson(emitterComp.assetPath);
-				}
-				emitterComp.isInitialized = true;
+		if (!pe.isInitialized && renderer_) {
+			pe.emitter.Initialize(*renderer_, nc.name + "_Emitter");
+			if (!pe.assetPath.empty()) {
+				pe.emitter.LoadFromJson(pe.assetPath);
 			}
-
-			emitterComp.emitter.params.position = {obj.translate.x, obj.translate.y, obj.translate.z};
-			emitterComp.emitter.Update(dt);
+			pe.isInitialized = true;
 		}
-	}
+
+		pe.emitter.params.position = {tc.translate.x, tc.translate.y, tc.translate.z};
+		pe.emitter.Update(dt);
+	});
 }
 
 // ★ 汎用スポーン
-void GameScene::SpawnObject(const SceneObject& obj) { pendingSpawns_.push_back(obj); }
+entt::entity GameScene::CreateEntity(const std::string& name) {
+	std::lock_guard<std::mutex> lock(spawnMutex_);
+	auto entity = registry_.create();
+	registry_.emplace<NameComponent>(entity, name);
+	registry_.emplace<TransformComponent>(entity);
+	return entity;
+}
 
 // ★追加: IDでオブジェクトを検索し、破棄フラグを立てる
 void GameScene::DestroyObject(uint32_t id) {
-	for (auto& obj : objects_) {
-		if (obj.id == id) {
-			obj.isPendingDestroy = true;
-			return;
-		}
-	}
+	std::lock_guard<std::mutex> lock(spawnMutex_);
+	// IDをそのままentt::entityとして扱う（ダウンキャスト）
+	pendingDestroys_.push_back(static_cast<entt::entity>(id));
 }
 
 // ★追加: 名前でオブジェクトを検索
-SceneObject* GameScene::FindObjectByName(const std::string& name) {
-	for (auto& obj : objects_) {
-		if (obj.name == name) {
-			return &obj;
+entt::entity GameScene::FindObjectByName(const std::string& name) {
+	auto view = registry_.view<NameComponent>();
+	for (auto entity : view) {
+		if (view.get<NameComponent>(entity).name == name) {
+			return entity;
 		}
 	}
-	return nullptr;
+	return entt::null;
 }
 
 // ★追加: 指定座標のメッシュ表面的高さを取得
-float GameScene::GetHeightAt(float x, float z, uint32_t excludeId) {
+float GameScene::GetHeightAt(float x, float z, float startY, uint32_t excludeId) {
 	float maxHeight = -1000.0f;
 	bool hitAny = false;
 
-	// レイの開始位置（十分に高い位置）と方向（真下）
-	DirectX::XMVECTOR rayPos = DirectX::XMVectorSet(x, 1000.0f, z, 1.0f);
+	// 指定された startY (またはデフォルト 1000) から下向きにレイを飛ばす
+	DirectX::XMVECTOR rayPos = DirectX::XMVectorSet(x, startY, z, 1.0f);
 	DirectX::XMVECTOR rayDir = DirectX::XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f);
 
-	for (int i = 0; i < (int)objects_.size(); ++i) {
-		const auto& obj = objects_[i];
-		
-		// 自分自身を対象外にする
-		if (excludeId != 0 && obj.id == excludeId) continue;
+	auto view = registry_.view<TransformComponent>();
+	for (auto entity : view) {
+		if (excludeId != 0 && static_cast<uint32_t>(entity) == excludeId) continue;
 
-		// 敵や弾などは地形判定から除外する（タグによる判定）
 		bool isEnemyOrBullet = false;
-		for (const auto& tag : obj.tags) {
-			if (tag.tag == "Enemy" || tag.tag == "Bullet" || tag.tag == "Player") {
+		if (registry_.all_of<TagComponent>(entity)) {
+			const auto& tag = registry_.get<TagComponent>(entity).tag;
+			if (tag == "Enemy" || tag == "Bullet" || tag == "Player") {
 				isEnemyOrBullet = true;
-				break;
 			}
 		}
 		if (isEnemyOrBullet) continue;
 
-		// メッシュレンダラーまたはGPUメッシュコライダーを持つオブジェクトを対象にする
 		uint32_t modelHandle = 0;
-		if (!obj.gpuMeshColliders.empty() && obj.gpuMeshColliders[0].enabled) {
-			modelHandle = obj.gpuMeshColliders[0].meshHandle;
-			if (modelHandle == 0) modelHandle = obj.modelHandle;
-		} else if (obj.modelHandle != 0) {
-			modelHandle = obj.modelHandle;
+		if (registry_.all_of<GpuMeshColliderComponent>(entity)) {
+			auto& mc = registry_.get<GpuMeshColliderComponent>(entity);
+			if (mc.enabled) modelHandle = mc.meshHandle;
+		}
+		if (modelHandle == 0 && registry_.all_of<MeshRendererComponent>(entity)) {
+			auto& mr = registry_.get<MeshRendererComponent>(entity);
+			if (mr.enabled) modelHandle = mr.modelHandle;
 		}
 
 		if (modelHandle == 0) continue;
@@ -380,8 +353,7 @@ float GameScene::GetHeightAt(float x, float z, uint32_t excludeId) {
 
 		float dist = 0.0f;
 		Engine::Vector3 hitPoint;
-		// ★修正: GetWorldMatrix を使用
-		Engine::Matrix4x4 worldMat = GetWorldMatrix(i);
+		Engine::Matrix4x4 worldMat = this->GetWorldMatrix(static_cast<int>(entity));
 
 		if (model->RayCast(rayPos, rayDir, worldMat, dist, hitPoint)) {
 			if (hitPoint.y > maxHeight) {
@@ -394,47 +366,145 @@ float GameScene::GetHeightAt(float x, float z, uint32_t excludeId) {
 	return hitAny ? maxHeight : 0.0f;
 }
 
-Engine::Matrix4x4 GameScene::GetWorldMatrix(int index) const {
-	if (index < 0 || index >= (int)objects_.size()) return Engine::Matrix4x4::Identity();
-	const auto& obj = objects_[index];
-	Engine::Matrix4x4 local = obj.GetTransform().ToMatrix();
-	if (obj.parentId == 0) return local;
+bool GameScene::RayCast(const Engine::Vector3& origin, const Engine::Vector3& direction, float maxDist, uint32_t excludeId, float& outDist) {
+	bool hitAny = false;
+	float minDist = maxDist;
 
-	int parentIdx = -1;
-	for (int i = 0; i < (int)objects_.size(); ++i) {
-		if (objects_[i].id == obj.parentId) {
-			parentIdx = i;
-			break;
+	DirectX::XMVECTOR rayPos = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&origin));
+	DirectX::XMVECTOR rayDir = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&direction));
+
+	auto view = registry_.view<TransformComponent>();
+	for (auto entity : view) {
+		if (excludeId != 0 && static_cast<uint32_t>(entity) == excludeId) continue;
+
+		// タグによるフィルタリング
+		if (registry_.all_of<TagComponent>(entity)) {
+			const auto& tag = registry_.get<TagComponent>(entity).tag;
+			if (tag == "Enemy" || tag == "Bullet" || tag == "Player") continue;
+		}
+
+		uint32_t modelHandle = 0;
+		if (registry_.all_of<GpuMeshColliderComponent>(entity)) {
+			auto& mc = registry_.get<GpuMeshColliderComponent>(entity);
+			if (mc.enabled) modelHandle = mc.meshHandle;
+		}
+		if (modelHandle == 0 && registry_.all_of<MeshRendererComponent>(entity)) {
+			auto& mr = registry_.get<MeshRendererComponent>(entity);
+			if (mr.enabled) modelHandle = mr.modelHandle;
+		}
+		if (modelHandle == 0) continue;
+
+		auto* model = renderer_->GetModel(modelHandle);
+		if (!model) continue;
+
+		float dist = 0.0f;
+		Engine::Vector3 hitPoint;
+		Engine::Matrix4x4 worldMat = GetWorldMatrix(static_cast<int>(entity));
+
+		if (model->RayCast(rayPos, rayDir, worldMat, dist, hitPoint)) {
+			if (dist < minDist) {
+				minDist = dist;
+				hitAny = true;
+			}
 		}
 	}
-	if (parentIdx == -1) return local;
-	return Engine::Matrix4x4::Multiply(local, GetWorldMatrix(parentIdx));
+
+	if (hitAny) {
+		outDist = minDist;
+		return true;
+	}
+	return false;
+}
+
+Engine::Matrix4x4 GameScene::GetWorldMatrix(int entityId) const {
+	entt::entity e = static_cast<entt::entity>(entityId);
+	if (!registry_.valid(e) || !registry_.all_of<TransformComponent>(e)) return Engine::Matrix4x4::Identity();
+	
+	const auto& tc = registry_.get<TransformComponent>(e);
+	Engine::Matrix4x4 local = tc.GetTransform().ToMatrix();
+	
+	if (!registry_.all_of<HierarchyComponent>(e)) return local;
+	const auto& hc = registry_.get<HierarchyComponent>(e);
+	if (hc.parentId == entt::null || !registry_.valid(hc.parentId)) return local;
+
+	return Engine::Matrix4x4::Multiply(local, GetWorldMatrix(static_cast<int>(hc.parentId)));
 }
 
 void GameScene::Draw() {
 	if (!renderer_)
 		return;
+
+	// ★★★ GPU負荷テスト: Hキーで大量オブジェクト生成 ★★★
+	{
+		static int stressTestGridSize = 0;
+		static bool prevH = false;
+		bool currH = (GetAsyncKeyState('H') & 0x8000) != 0;
+		if (currH && !prevH) {
+			stressTestGridSize += 32; // add 32x32 = 1024 objects each press
+			std::string msg = "[StressTest] Triggered! Grid size: " + std::to_string(stressTestGridSize) + "x" + std::to_string(stressTestGridSize) + " (" + std::to_string(stressTestGridSize * stressTestGridSize) + " objects)\n";
+			OutputDebugStringA(msg.c_str());
+		}
+		prevH = currH;
+
+		if (stressTestGridSize > 0) {
+			uint32_t cubeModel = renderer_->LoadObjMesh("Resources/cube/cube.obj");
+			uint32_t whiteTex = renderer_->LoadTexture2D("Resources/white1x1.png");
+
+			float spacing = 2.0f;
+			float startOffset = -(stressTestGridSize / 2.0f) * spacing;
+
+			for (int z = 0; z < stressTestGridSize; ++z) {
+				for (int x = 0; x < stressTestGridSize; ++x) {
+					Engine::Transform t;
+					t.translate = { startOffset + x * spacing, 10.0f, startOffset + z * spacing };
+					t.rotate = { 0, 0, 0 };
+					t.scale = { 0.5f, 0.5f, 0.5f };
+					Engine::Vector4 color = {
+						0.3f + (x % 5) * 0.15f,
+						0.3f + (z % 5) * 0.15f,
+						0.5f + ((x + z) % 3) * 0.2f,
+						1.0f
+					};
+					renderer_->DrawMeshInstanced(cubeModel, whiteTex, t, color, "Default");
+				}
+			}
+		}
+	}
+	// ★★★ GPU負荷テスト ここまで ★★★
+
 	renderer_->SetCamera(camera_);
 #ifdef USE_IMGUI
 	DrawEditorGizmos();
 #endif
 
 	// ★追加: プレイヤーの位置を Renderer に同期（草のインタラクション用）
-	for (const auto& obj : objects_) {
-		if (obj.name == "Player") {
-			renderer_->SetPlayerPos(Engine::Vector3{obj.translate.x, obj.translate.y, obj.translate.z});
+	auto nameView = registry_.view<NameComponent, TransformComponent>();
+	for (auto entity : nameView) {
+		if (nameView.get<NameComponent>(entity).name == "Player") {
+			auto& tc = nameView.get<TransformComponent>(entity);
+			renderer_->SetPlayerPos(Engine::Vector3{tc.translate.x, tc.translate.y, tc.translate.z});
 			break;
 		}
 	}
 
-	for (const auto& obj : objects_) {
+	auto renderView = registry_.view<TransformComponent>();
+	for (auto entity : renderView) {
+		Engine::Vector4 color = {1, 1, 1, 1};
+		if (registry_.all_of<ColorComponent>(entity)) {
+			const auto& cc = registry_.get<ColorComponent>(entity);
+			color = {cc.color.x, cc.color.y, cc.color.z, cc.color.w};
+		}
+		
 		bool hasMeshRenderer = false;
-		for (const auto& mr : obj.meshRenderers) {
+		if (registry_.all_of<MeshRendererComponent>(entity)) {
+			const auto& mr = registry_.get<MeshRendererComponent>(entity);
 			if (mr.enabled && mr.modelHandle != 0) {
 				hasMeshRenderer = true;
 				bool hasAnim = false;
 				std::vector<Engine::Matrix4x4> bonePalette;
-				for (const auto& anim : obj.animators) {
+
+				if (registry_.all_of<AnimatorComponent>(entity)) {
+					const auto& anim = registry_.get<AnimatorComponent>(entity);
 					if (anim.enabled && !anim.currentAnimation.empty()) {
 						auto* m = renderer_->GetModel(mr.modelHandle);
 						if (m) {
@@ -452,84 +522,42 @@ void GameScene::Draw() {
 									b = Engine::Matrix4x4::Identity();
 								m->UpdateSkeleton(data.rootNode, Engine::Matrix4x4::Identity(), *currAnim, anim.time, bonePalette);
 								hasAnim = true;
-								break;
 							}
 						}
 					}
 				}
 
+				Engine::Matrix4x4 world = this->GetWorldMatrix(static_cast<int>(entity));
 				if (hasAnim) {
 					renderer_->DrawSkinnedMesh(
-					    mr.modelHandle, mr.textureHandle, obj.GetTransform(), bonePalette, {obj.color.x * mr.color.x, obj.color.y * mr.color.y, obj.color.z * mr.color.z, obj.color.w * mr.color.w});
+					    mr.modelHandle, mr.textureHandle, world, bonePalette, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w});
 				} else {
-					// ★変更: Toon系シェーダーの場合は非インスタンス描画を使用（アウトライン2パス処理のため）
-					Engine::Matrix4x4 world = GetWorldMatrix((int)(&obj - &objects_[0]));
-					Engine::Transform worldTr;
-					DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&worldTr.translate), DirectX::XMLoadFloat4x4(reinterpret_cast<const DirectX::XMFLOAT4X4*>(&world)).r[3]);
-					// 注意: 行列からの正確なTRS分解が必要だが、ここでは簡易化。本来はRendererがMatrix4x4を直接受け取るべき。
-					// 現状のRenderer::DrawMeshがTransformを受け取る設計のため、Matrix->Transformへの簡易変換を行う。
 					if (mr.shaderName == "Toon" || mr.shaderName == "ToonSkinning") {
-						renderer_->DrawMesh(mr.modelHandle, mr.textureHandle, obj.GetTransform(), {obj.color.x * mr.color.x, obj.color.y * mr.color.y, obj.color.z * mr.color.z, obj.color.w * mr.color.w}, mr.shaderName);
+						renderer_->DrawMesh(mr.modelHandle, mr.textureHandle, world, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w}, mr.shaderName);
 					} else {
 						renderer_->DrawMeshInstanced(
-							mr.modelHandle, mr.textureHandle, obj.GetTransform(), {obj.color.x * mr.color.x, obj.color.y * mr.color.y, obj.color.z * mr.color.z, obj.color.w * mr.color.w}, mr.shaderName,
+							mr.modelHandle, mr.textureHandle, world, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w}, mr.shaderName,
 							mr.extraTextureHandles);
 					}
 				}
 			}
 		}
 
-		if (!hasMeshRenderer && obj.modelHandle != 0) {
-			bool hasAnim = false;
-			std::vector<Engine::Matrix4x4> bonePalette;
-			for (const auto& anim : obj.animators) {
-				if (anim.enabled && !anim.currentAnimation.empty()) {
-					auto* m = renderer_->GetModel(obj.modelHandle);
-					if (m) {
-						const auto& data = m->GetData();
-						const Engine::Animation* currAnim = nullptr;
-						for (const auto& a : data.animations) {
-							if (a.name == anim.currentAnimation) {
-								currAnim = &a;
-								break;
-							}
-						}
-						if (currAnim) {
-							bonePalette.resize(data.bones.size());
-							for (auto& b : bonePalette)
-								b = Engine::Matrix4x4::Identity();
-							m->UpdateSkeleton(data.rootNode, Engine::Matrix4x4::Identity(), *currAnim, anim.time, bonePalette);
-							hasAnim = true;
-							break;
-						}
-					}
-				}
-			}
-
-			if (hasAnim) {
-				renderer_->DrawSkinnedMesh(obj.modelHandle, obj.textureHandle, obj.GetTransform(), bonePalette, {obj.color.x, obj.color.y, obj.color.z, obj.color.w});
-			} else {
-				// ★変更: Toon系シェーダーの場合は非インスタンス描画を使用
-				if (obj.shaderName == "Toon" || obj.shaderName == "ToonSkinning") {
-					renderer_->DrawMesh(obj.modelHandle, obj.textureHandle, obj.GetTransform(), {obj.color.x, obj.color.y, obj.color.z, obj.color.w}, obj.shaderName);
-				} else {
-					std::vector<uint32_t> extraHandles;
-					for (const auto& p : obj.extraTexturePaths)
-						extraHandles.push_back(renderer_->LoadTexture2D(p));
-					renderer_->DrawMeshInstanced(obj.modelHandle, obj.textureHandle, obj.GetTransform(), {obj.color.x, obj.color.y, obj.color.z, obj.color.w}, obj.shaderName, extraHandles);
-				}
-			}
-		}
+		// 旧SceneObjectの互換用 (もし MeshRenderer コンポーネントがなく自身の modelHandle 等があった場合)
+		// Registry化で基本的には MeshRendererComponent に統合するのが望ましいが、一旦残留
+		/*
+		if (!hasMeshRenderer && obj.modelHandle != 0) { ... }
+		*/
 
 		// ★追加: 川コンポーネントの描画 (メッシュはワールド座標で生成済みなのでIdentity変換)
-		for (const auto& rv : obj.rivers) {
+		if (registry_.all_of<RiverComponent>(entity)) {
+			const auto& rv = registry_.get<RiverComponent>(entity);
 			if (rv.enabled && rv.meshHandle != 0) {
 				auto tex = renderer_->LoadTexture2D(rv.texturePath);
 				Engine::Transform identity;
 				identity.translate = {0,0,0};
 				identity.rotate = {0,0,0};
 				identity.scale = {1,1,1};
-				// gColorとして {flowSpeed, uvScale, 0, 0} を渡す
 				renderer_->DrawMesh(rv.meshHandle, tex, identity, {rv.flowSpeed, rv.uvScale, 0.0f, 0.0f}, "River");
 			}
 		}
@@ -538,17 +566,16 @@ void GameScene::Draw() {
 	DrawSelectionHighlight();
 	DrawLightGizmos();
 #endif
-	for (auto& obj : objects_) {
-		for (auto& emitterComp : obj.particleEmitters) {
-			if (emitterComp.enabled) {
-				emitterComp.emitter.Draw(camera_);
-			}
+	auto peView = registry_.view<ParticleEmitterComponent>();
+	peView.each([&](auto, ParticleEmitterComponent& pe) {
+		if (pe.enabled) {
+			pe.emitter.Draw(camera_);
 		}
-	}
+	});
 
 	// ★ 各Systemの描画処理を呼び出す（UISystem等）
 	for (auto& system : systems_) {
-		system->Draw(objects_, ctx_);
+		system->Draw(registry_, ctx_);
 	}
 }
 
@@ -560,13 +587,14 @@ void GameScene::DrawSelectionHighlight() {
 	if (!renderer_)
 		return;
 
-	for (int idx : selectedIndices_) {
-		if (idx < 0 || idx >= (int)objects_.size())
+	for (auto entity : selectedEntities_) {
+		if (!registry_.valid(entity) || !registry_.all_of<TransformComponent>(entity))
 			continue;
-		auto& obj = objects_[idx];
-		Engine::Vector3 pos = {obj.translate.x, obj.translate.y, obj.translate.z};
+		
+		auto& tc = registry_.get<TransformComponent>(entity);
+		Engine::Vector3 pos = {tc.translate.x, tc.translate.y, tc.translate.z};
 
-		Engine::Matrix4x4 mat = GetWorldMatrix(idx);
+		Engine::Matrix4x4 mat = this->GetWorldMatrix(static_cast<int>(entity));
 		DirectX::XMMATRIX worldMat = DirectX::XMLoadFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&mat));
 
 		Engine::Vector4 hlColor = {1.0f, 0.85f, 0.0f, 1.0f};
@@ -602,102 +630,93 @@ void GameScene::DrawSelectionHighlight() {
 		for (auto& eg : edges)
 			renderer_->DrawLine3D(v[eg[0]], v[eg[1]], hlColor, true);
 
-		for (const auto& bc : obj.boxColliders) {
-			if (!bc.enabled)
-				continue;
-			float hx = bc.size.x * 0.5f, hy = bc.size.y * 0.5f, hz = bc.size.z * 0.5f;
-			Engine::Vector3 cp = {bc.center.x, bc.center.y, bc.center.z};
-			Engine::Vector4 colColor = {0.2f, 1.0f, 0.2f, 0.8f};
-			Engine::Vector3 cv[8] = {
-			    {cp.x - hx, cp.y - hy, cp.z - hz},
-                {cp.x + hx, cp.y - hy, cp.z - hz},
-                {cp.x + hx, cp.y + hy, cp.z - hz},
-                {cp.x - hx, cp.y + hy, cp.z - hz},
-			    {cp.x - hx, cp.y - hy, cp.z + hz},
-                {cp.x + hx, cp.y - hy, cp.z + hz},
-                {cp.x + hx, cp.y + hy, cp.z + hz},
-                {cp.x - hx, cp.y + hy, cp.z + hz},
-			};
-			for (int i = 0; i < 8; ++i) {
-				DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(cv[i].x, cv[i].y, cv[i].z, 1.0f), worldMat);
-				DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&cv[i]), p);
+		if (registry_.all_of<BoxColliderComponent>(entity)) {
+			const auto& bc = registry_.get<BoxColliderComponent>(entity);
+			if (bc.enabled) {
+				float hx = bc.size.x * 0.5f, hy = bc.size.y * 0.5f, hz = bc.size.z * 0.5f;
+				// ... Draw lines ...
+				Engine::Vector3 cp = {bc.center.x, bc.center.y, bc.center.z};
+				Engine::Vector4 colColor = {0.2f, 1.0f, 0.2f, 0.8f};
+				Engine::Vector3 cv[8] = {
+					{cp.x - hx, cp.y - hy, cp.z - hz},
+					{cp.x + hx, cp.y - hy, cp.z - hz},
+					{cp.x + hx, cp.y + hy, cp.z - hz},
+					{cp.x - hx, cp.y + hy, cp.z - hz},
+					{cp.x - hx, cp.y - hy, cp.z + hz},
+					{cp.x + hx, cp.y - hy, cp.z + hz},
+					{cp.x + hx, cp.y + hy, cp.z + hz},
+					{cp.x - hx, cp.y + hy, cp.z + hz},
+				};
+				for (int i = 0; i < 8; ++i) {
+					DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(cv[i].x, cv[i].y, cv[i].z, 1.0f), worldMat);
+					DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&cv[i]), p);
+				}
+				for (auto& eg : edges)
+					renderer_->DrawLine3D(cv[eg[0]], cv[eg[1]], colColor, true);
 			}
-			for (auto& eg : edges)
-				renderer_->DrawLine3D(cv[eg[0]], cv[eg[1]], colColor, true);
 		}
 
-		for (const auto& gmc : obj.gpuMeshColliders) {
-			if (!gmc.enabled)
-				continue;
-			Engine::Vector4 gColor = gmc.isIntersecting ? Engine::Vector4{1.0f, 0.2f, 0.2f, 0.8f} : Engine::Vector4{0.2f, 0.2f, 1.0f, 0.8f};
-			float hs = 1.0f;
-			Engine::Vector3 cv[8] = {
-			    {-hs, -hs, -hs},
-                {hs,  -hs, -hs},
-                {hs,  hs,  -hs},
-                {-hs, hs,  -hs},
-                {-hs, -hs, hs },
-                {hs,  -hs, hs },
-                {hs,  hs,  hs },
-                {-hs, hs,  hs }
-            };
-			for (int i = 0; i < 8; ++i) {
-				DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(cv[i].x, cv[i].y, cv[i].z, 1.0f), worldMat);
-				DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&cv[i]), p);
+		if (registry_.all_of<GpuMeshColliderComponent>(entity)) {
+			const auto& gmc = registry_.get<GpuMeshColliderComponent>(entity);
+			if (gmc.enabled) {
+				Engine::Vector4 gColor = gmc.isIntersecting ? Engine::Vector4{1.0f, 0.2f, 0.2f, 0.8f} : Engine::Vector4{0.2f, 0.2f, 1.0f, 0.8f};
+				float hs = 1.0f;
+				Engine::Vector3 cv[8] = {
+					{-hs, -hs, -hs}, {hs,  -hs, -hs}, {hs,  hs,  -hs}, {-hs, hs,  -hs},
+					{-hs, -hs, hs }, {hs,  -hs, hs }, {hs,  hs,  hs }, {-hs, hs,  hs }
+				};
+				for (int i = 0; i < 8; ++i) {
+					DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(cv[i].x, cv[i].y, cv[i].z, 1.0f), worldMat);
+					DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&cv[i]), p);
+				}
+				for (auto& eg : edges)
+					renderer_->DrawLine3D(cv[eg[0]], cv[eg[1]], gColor, true);
 			}
-			for (auto& eg : edges)
-				renderer_->DrawLine3D(cv[eg[0]], cv[eg[1]], gColor, true);
 		}
 
-		for (const auto& hb : obj.hitboxes) {
-			if (!hb.enabled)
-				continue;
-			float hx = hb.size.x * 0.5f, hy = hb.size.y * 0.5f, hz = hb.size.z * 0.5f;
-			Engine::Vector3 cp = {hb.center.x, hb.center.y, hb.center.z};
-			Engine::Vector4 hbColor = hb.isActive ? Engine::Vector4{1.0f, 0.2f, 0.2f, 1.0f} : Engine::Vector4{1.0f, 0.2f, 0.2f, 0.3f};
-			Engine::Vector3 hv[8] = {
-			    {cp.x - hx, cp.y - hy, cp.z - hz},
-                {cp.x + hx, cp.y - hy, cp.z - hz},
-                {cp.x + hx, cp.y + hy, cp.z - hz},
-                {cp.x - hx, cp.y + hy, cp.z - hz},
-			    {cp.x - hx, cp.y - hy, cp.z + hz},
-                {cp.x + hx, cp.y - hy, cp.z + hz},
-                {cp.x + hx, cp.y + hy, cp.z + hz},
-                {cp.x - hx, cp.y + hy, cp.z + hz},
-			};
-			for (int i = 0; i < 8; ++i) {
-				DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(hv[i].x, hv[i].y, hv[i].z, 1.0f), worldMat);
-				DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&hv[i]), p);
+		if (registry_.all_of<HitboxComponent>(entity)) {
+			const auto& hb = registry_.get<HitboxComponent>(entity);
+			if (hb.enabled) {
+				float hx = hb.size.x * 0.5f, hy = hb.size.y * 0.5f, hz = hb.size.z * 0.5f;
+				Engine::Vector3 cp = {hb.center.x, hb.center.y, hb.center.z};
+				Engine::Vector4 hbColor = hb.isActive ? Engine::Vector4{1.0f, 0.2f, 0.2f, 1.0f} : Engine::Vector4{1.0f, 0.2f, 0.2f, 0.3f};
+				Engine::Vector3 hv[8] = {
+					{cp.x - hx, cp.y - hy, cp.z - hz}, {cp.x + hx, cp.y - hy, cp.z - hz},
+					{cp.x + hx, cp.y + hy, cp.z - hz}, {cp.x - hx, cp.y + hy, cp.z - hz},
+					{cp.x - hx, cp.y - hy, cp.z + hz}, {cp.x + hx, cp.y - hy, cp.z + hz},
+					{cp.x + hx, cp.y + hy, cp.z + hz}, {cp.x - hx, cp.y + hy, cp.z + hz},
+				};
+				for (int i = 0; i < 8; ++i) {
+					DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(hv[i].x, hv[i].y, hv[i].z, 1.0f), worldMat);
+					DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&hv[i]), p);
+				}
+				for (auto& eg : edges)
+					renderer_->DrawLine3D(hv[eg[0]], hv[eg[1]], hbColor, true);
 			}
-			for (auto& eg : edges)
-				renderer_->DrawLine3D(hv[eg[0]], hv[eg[1]], hbColor, true);
 		}
 
-		for (const auto& hb : obj.hurtboxes) {
-			if (!hb.enabled)
-				continue;
-			float hx = hb.size.x * 0.5f, hy = hb.size.y * 0.5f, hz = hb.size.z * 0.5f;
-			Engine::Vector3 cp = {hb.center.x, hb.center.y, hb.center.z};
-			Engine::Vector4 hbColor = {0.2f, 1.0f, 0.5f, 0.6f};
-			Engine::Vector3 hv[8] = {
-			    {cp.x - hx, cp.y - hy, cp.z - hz},
-                {cp.x + hx, cp.y - hy, cp.z - hz},
-                {cp.x + hx, cp.y + hy, cp.z - hz},
-                {cp.x - hx, cp.y + hy, cp.z - hz},
-			    {cp.x - hx, cp.y - hy, cp.z + hz},
-                {cp.x + hx, cp.y - hy, cp.z + hz},
-                {cp.x + hx, cp.y + hy, cp.z + hz},
-                {cp.x - hx, cp.y + hy, cp.z + hz},
-			};
-			for (int i = 0; i < 8; ++i) {
-				DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(hv[i].x, hv[i].y, hv[i].z, 1.0f), worldMat);
-				DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&hv[i]), p);
+		if (registry_.all_of<HurtboxComponent>(entity)) {
+			const auto& hb = registry_.get<HurtboxComponent>(entity);
+			if (hb.enabled) {
+				float hx = hb.size.x * 0.5f, hy = hb.size.y * 0.5f, hz = hb.size.z * 0.5f;
+				Engine::Vector3 cp = {hb.center.x, hb.center.y, hb.center.z};
+				Engine::Vector4 hbColor = {0.2f, 1.0f, 0.5f, 0.6f};
+				Engine::Vector3 hv[8] = {
+					{cp.x - hx, cp.y - hy, cp.z - hz}, {cp.x + hx, cp.y - hy, cp.z - hz},
+					{cp.x + hx, cp.y + hy, cp.z - hz}, {cp.x - hx, cp.y + hy, cp.z - hz},
+					{cp.x - hx, cp.y - hy, cp.z + hz}, {cp.x + hx, cp.y - hy, cp.z + hz},
+					{cp.x + hx, cp.y + hy, cp.z + hz}, {cp.x - hx, cp.y + hy, cp.z + hz},
+				};
+				for (int i = 0; i < 8; ++i) {
+					DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(hv[i].x, hv[i].y, hv[i].z, 1.0f), worldMat);
+					DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&hv[i]), p);
+				}
+				for (auto& eg : edges)
+					renderer_->DrawLine3D(hv[eg[0]], hv[eg[1]], hbColor, true);
 			}
-			for (auto& eg : edges)
-				renderer_->DrawLine3D(hv[eg[0]], hv[eg[1]], hbColor, true);
 		}
 
-		DirectX::XMMATRIX gizmoMat = DirectX::XMMatrixRotationRollPitchYaw(obj.rotate.x, obj.rotate.y, obj.rotate.z) * DirectX::XMMatrixTranslation(obj.translate.x, obj.translate.y, obj.translate.z);
+		DirectX::XMMATRIX gizmoMat = DirectX::XMMatrixRotationRollPitchYaw(tc.rotate.x, tc.rotate.y, tc.rotate.z) * DirectX::XMMatrixTranslation(tc.translate.x, tc.translate.y, tc.translate.z);
 		auto drawLocalLine = [&](const Engine::Vector3& localP0, const Engine::Vector3& localP1, const Engine::Vector4& col) {
 			DirectX::XMVECTOR p0 = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(localP0.x, localP0.y, localP0.z, 1.0f), gizmoMat);
 			DirectX::XMVECTOR p1 = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(localP1.x, localP1.y, localP1.z, 1.0f), gizmoMat);
@@ -708,7 +727,7 @@ void GameScene::DrawSelectionHighlight() {
 		};
 
 		const float al = 2.0f, ar = 0.3f;
-		int dAxis = (gizmoDragging && idx == selectedObjectIndex_) ? gizmoDragAxis : -1;
+		int dAxis = (gizmoDragging && entity == selectedEntity_) ? gizmoDragAxis : -1;
 		auto axCol = [](int axis, int drag) -> Engine::Vector4 {
 			bool a = (drag == axis);
 			switch (axis) {
@@ -781,48 +800,89 @@ void GameScene::DrawEditorGizmos() {
 void GameScene::DrawEditor() {
 #ifdef USE_IMGUI
 	EditorUI::Show(renderer_, this);
-	particleEditor_.DrawUI();
 #endif
 }
 
 void GameScene::DrawLightGizmos() {
 	if (!renderer_)
 		return;
-	for (size_t i = 0; i < objects_.size(); ++i) {
-		auto& obj = objects_[i];
-		Engine::Vector3 pos = {obj.translate.x, obj.translate.y, obj.translate.z};
-		Engine::Matrix4x4 mat = obj.GetTransform().ToMatrix();
+	auto dlView = registry_.view<DirectionalLightComponent, TransformComponent>();
+	dlView.each([&](auto entity, const DirectionalLightComponent& dl, const TransformComponent& tc) {
+		if (!dl.enabled) return;
+		Engine::Vector3 pos = {tc.translate.x, tc.translate.y, tc.translate.z};
+		Engine::Matrix4x4 mat = tc.GetTransform().ToMatrix();
 		Engine::Vector3 fwd = {mat.m[2][0], mat.m[2][1], mat.m[2][2]};
-		bool isSelected = (selectedIndices_.find((int)i) != selectedIndices_.end());
+		bool isSelected = (selectedEntities_.find(entity) != selectedEntities_.end());
 		float alpha = isSelected ? 1.0f : 0.4f;
 
-		for (const auto& dl : obj.directionalLights) {
-			if (!dl.enabled)
-				continue;
-			Engine::Vector4 col = {1.0f, 0.9f, 0.2f, alpha};
-			renderer_->DrawLine3D(pos, {pos.x + fwd.x * 5.0f, pos.y + fwd.y * 5.0f, pos.z + fwd.z * 5.0f}, col, true);
-			float s = 0.5f;
-			renderer_->DrawLine3D({pos.x - s, pos.y, pos.z}, {pos.x + s, pos.y, pos.z}, col, true);
-			renderer_->DrawLine3D({pos.x, pos.y - s, pos.z}, {pos.x, pos.y + s, pos.z}, col, true);
+		Engine::Vector4 col = {1.0f, 0.9f, 0.2f, alpha};
+		renderer_->DrawLine3D(pos, {pos.x + fwd.x * 5.0f, pos.y + fwd.y * 5.0f, pos.z + fwd.z * 5.0f}, col, true);
+		float s = 0.5f;
+		renderer_->DrawLine3D({pos.x - s, pos.y, pos.z}, {pos.x + s, pos.y, pos.z}, col, true);
+		renderer_->DrawLine3D({pos.x, pos.y - s, pos.z}, {pos.x, pos.y + s, pos.z}, col, true);
+	});
+
+	auto plView = registry_.view<PointLightComponent, TransformComponent>();
+	plView.each([&](auto entity, const PointLightComponent& pl, const TransformComponent& tc) {
+		if (!pl.enabled) return;
+		Engine::Vector3 pos = {tc.translate.x, tc.translate.y, tc.translate.z};
+		bool isSelected = (selectedEntities_.find(entity) != selectedEntities_.end());
+		float alpha = isSelected ? 1.0f : 0.4f;
+
+		Engine::Vector4 col = {0.2f, 0.9f, 0.2f, alpha};
+		float s = 0.5f;
+		renderer_->DrawLine3D({pos.x - s, pos.y, pos.z}, {pos.x + s, pos.y, pos.z}, col, true);
+		renderer_->DrawLine3D({pos.x, pos.y - s, pos.z}, {pos.x, pos.y + s, pos.z}, col, true);
+		renderer_->DrawLine3D({pos.x, pos.y, pos.z - s}, {pos.x, pos.y, pos.z + s}, col, true);
+	});
+
+	auto slView = registry_.view<SpotLightComponent, TransformComponent>();
+	slView.each([&](auto entity, const SpotLightComponent& sl, const TransformComponent& tc) {
+		if (!sl.enabled) return;
+		Engine::Vector3 pos = {tc.translate.x, tc.translate.y, tc.translate.z};
+		Engine::Matrix4x4 mat = tc.GetTransform().ToMatrix();
+		Engine::Vector3 fwd = {mat.m[2][0], mat.m[2][1], mat.m[2][2]};
+		bool isSelected = (selectedEntities_.find(entity) != selectedEntities_.end());
+		float alpha = isSelected ? 1.0f : 0.4f;
+
+		Engine::Vector4 col = {0.2f, 0.8f, 1.0f, alpha};
+		renderer_->DrawLine3D(pos, {pos.x + fwd.x * 5.0f, pos.y + fwd.y * 5.0f, pos.z + fwd.z * 5.0f}, col, true);
+		float s = 0.5f;
+		renderer_->DrawLine3D({pos.x - s, pos.y, pos.z}, {pos.x + s, pos.y, pos.z}, col, true);
+		renderer_->DrawLine3D({pos.x, pos.y - s, pos.z}, {pos.x, pos.y + s, pos.z}, col, true);
+	});
+}
+
+void GameScene::SetIsPlaying(bool play) {
+	if (isPlaying_ == play) return;
+
+	if (play) {
+		// プレイ開始時: スクリプトの現在の設定（インスペクターでの変更）をコンポーネントに確実に反映 (Flush)
+		auto scView = registry_.view<ScriptComponent>();
+		for (auto entity : scView) {
+			auto& sc = scView.get<ScriptComponent>(entity);
+			if (sc.instance) {
+				sc.parameterData = sc.instance->SerializeParameters();
+			}
 		}
-		for (const auto& pl : obj.pointLights) {
-			if (!pl.enabled)
-				continue;
-			Engine::Vector4 col = {0.2f, 0.9f, 0.2f, alpha};
-			float s = 0.5f;
-			renderer_->DrawLine3D({pos.x - s, pos.y, pos.z}, {pos.x + s, pos.y, pos.z}, col, true);
-			renderer_->DrawLine3D({pos.x, pos.y - s, pos.z}, {pos.x, pos.y + s, pos.z}, col, true);
-			renderer_->DrawLine3D({pos.x, pos.y, pos.z - s}, {pos.x, pos.y, pos.z + s}, col, true);
+
+		// 現在のエディタ状態をスナップショット保存（Stop時に戻すため）
+		sceneSnapshot_ = EditorUI::SaveToMemory(this);
+
+		// 各Systemのリセット（スクリプトの再初期化など）を実行
+		for (auto& sys : systems_) {
+			sys->Reset(registry_);
 		}
-		for (const auto& sl : obj.spotLights) {
-			if (!sl.enabled)
-				continue;
-			Engine::Vector4 col = {0.2f, 0.8f, 1.0f, alpha};
-			renderer_->DrawLine3D(pos, {pos.x + fwd.x * 5.0f, pos.y + fwd.y * 5.0f, pos.z + fwd.z * 5.0f}, col, true);
-			float s = 0.5f;
-			renderer_->DrawLine3D({pos.x - s, pos.y, pos.z}, {pos.x + s, pos.y, pos.z}, col, true);
-			renderer_->DrawLine3D({pos.x, pos.y - s, pos.z}, {pos.x, pos.y + s, pos.z}, col, true);
+
+		isPlaying_ = true;
+	} else {
+		// プレイ停止時: Play ボタンを押した直前の状態 (`sceneSnapshot_`) に戻す
+		// これにより、Play中に生成された一時オブジェクトが破棄され、綺麗な初期状態に戻ります
+		isPlaying_ = false;
+		if (!sceneSnapshot_.empty()) {
+			EditorUI::LoadFromMemory(this, sceneSnapshot_);
 		}
+		sceneSnapshot_ = "";
 	}
 }
 

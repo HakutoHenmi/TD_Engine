@@ -6,8 +6,9 @@
 namespace Game {
 
 // ====== DefaultPipeBehavior ======
-void DefaultPipeBehavior::OnGeneratePipe(SceneObject& outPipe, const Engine::Vector3& start, const Engine::Vector3& end, float length, Engine::Renderer* renderer) {
-    outPipe.name = "PipeSegment";
+void DefaultPipeBehavior::OnGeneratePipe(entt::registry& registry, entt::entity outPipe, const Engine::Vector3& start, const Engine::Vector3& end, float length, Engine::Renderer* renderer) {
+    registry.emplace_or_replace<NameComponent>(outPipe).name = "PipeSegment";
+    auto& tc = registry.emplace_or_replace<TransformComponent>(outPipe);
     
     Engine::Vector3 diff = end - start;
     Engine::Vector3 dir = Engine::Normalize(diff);
@@ -18,35 +19,28 @@ void DefaultPipeBehavior::OnGeneratePipe(SceneObject& outPipe, const Engine::Vec
 
     // 中間地点に設置
     Engine::Vector3 center = start + diff * 0.5f;
-    outPipe.translate = {center.x, center.y, center.z};
-    outPipe.scale = {0.35f, cyLen, 0.35f};
+    tc.translate = {center.x, center.y, center.z};
+    tc.scale = {0.35f, cyLen, 0.35f};
 
     auto euler = Engine::LookRotation(dir);
-    outPipe.rotate = {euler.x - 3.14159265f * 0.5f, euler.y, euler.z}; // シリンダーを倒すためにPitchから90度減算
+    tc.rotate = {euler.x - 3.14159265f * 0.5f, euler.y, euler.z}; // シリンダーを倒すためにPitchから90度減算
 
-    outPipe.modelPath = "Resources/Cylinder/cylinder.obj";
-    if (renderer) outPipe.modelHandle = renderer->LoadObjMesh(outPipe.modelPath);
-    
-    MeshRendererComponent mr;
-    mr.modelHandle = outPipe.modelHandle;
-    mr.modelPath = outPipe.modelPath;
+    auto& mr = registry.emplace_or_replace<MeshRendererComponent>(outPipe);
+    mr.modelPath = "Resources/Cylinder/cylinder.obj";
+    if (renderer) mr.modelHandle = renderer->LoadObjMesh(mr.modelPath);
     mr.shaderName = "Toon"; 
-    outPipe.meshRenderers.push_back(mr);
 }
 
-void DefaultPipeBehavior::OnGenerateJoint(SceneObject& outJoint, const Engine::Vector3& position, Engine::Renderer* renderer) {
-    outJoint.name = "PipeJoint";
-    outJoint.translate = { position.x, position.y, position.z };
-    outJoint.scale = { 1.0f, 1.0f, 1.0f };
-    outJoint.modelPath = "Resources/player_ball/ball.obj";
+void DefaultPipeBehavior::OnGenerateJoint(entt::registry& registry, entt::entity outJoint, const Engine::Vector3& position, Engine::Renderer* renderer) {
+    registry.emplace_or_replace<NameComponent>(outJoint).name = "PipeJoint";
+    auto& tc = registry.emplace_or_replace<TransformComponent>(outJoint);
+    tc.translate = { position.x, position.y, position.z };
+    tc.scale = { 1.0f, 1.0f, 1.0f };
     
-    if (renderer) outJoint.modelHandle = renderer->LoadObjMesh(outJoint.modelPath);
-    
-    MeshRendererComponent mr;
-    mr.modelHandle = outJoint.modelHandle;
-    mr.modelPath = outJoint.modelPath;
+    auto& mr = registry.emplace_or_replace<MeshRendererComponent>(outJoint);
+    mr.modelPath = "Resources/player_ball/ball.obj";
+    if (renderer) mr.modelHandle = renderer->LoadObjMesh(mr.modelPath);
     mr.shaderName = "Toon"; 
-    outJoint.meshRenderers.push_back(mr);
 }
 
 void DefaultPipeBehavior::OnPlacementComplete(GameScene* /*scene*/, const Engine::Vector3& start, const Engine::Vector3& end) {
@@ -59,24 +53,12 @@ PipeEditor::PipeEditor() {
     behavior_ = std::make_shared<DefaultPipeBehavior>();
 }
 
-uint32_t PipeEditor::GenerateId(GameScene* scene) const {
-    uint32_t maxId = 0;
-    for (const auto& obj : scene->GetObjects()) {
-        if (obj.id > maxId) maxId = obj.id;
-    }
-    return maxId + 1;
-}
-
 void PipeEditor::ClearPreview(GameScene* scene) {
-    auto objects = scene->GetObjects();
-    for (int i = (int)objects.size() - 1; i >= 0; --i) {
-        if ((int)objects[i].id == previewPipeId_ || (int)objects[i].id == previewJointId_) {
-            objects.erase(objects.begin() + i);
-        }
-    }
-    scene->SetObjects(objects);
-    previewPipeId_ = -1;
-    previewJointId_ = -1;
+    auto& registry = scene->GetRegistry();
+    if (registry.valid(previewPipeId_)) registry.destroy(previewPipeId_);
+    if (registry.valid(previewJointId_)) registry.destroy(previewJointId_);
+    previewPipeId_ = entt::null;
+    previewJointId_ = entt::null;
 }
 
 void PipeEditor::DrawUI() {
@@ -106,7 +88,7 @@ void PipeEditor::DrawUI() {
 
 void PipeEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* renderer, const ImVec2& gameImageMin, const ImVec2& /*gameImageMax*/, float tW, float tH) {
     if (!scene || scene->IsPlaying() || !pipeMode_ || !behavior_) {
-        if (previewJointId_ != -1 || previewPipeId_ != -1) ClearPreview(scene);
+        if (previewJointId_ != entt::null || previewPipeId_ != entt::null) ClearPreview(scene);
         return;
     }
 
@@ -125,24 +107,24 @@ void PipeEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* renderer, con
         Engine::Vector3 hitPoint = {0, 0, 0};
         bool hitTerrain = false;
 
-        auto objects = scene->GetObjects();
-        for (auto& obj : objects) {
-            bool isTerrain = (obj.name.find("Terrain") != std::string::npos) || (obj.name.find("Floor") != std::string::npos);
+        auto& registry = scene->GetRegistry();
+        auto view = registry.view<NameComponent, TransformComponent>();
+        for (auto e : view) {
+            auto& nameC = view.get<NameComponent>(e);
+            bool isTerrain = (nameC.name.find("Terrain") != std::string::npos) || (nameC.name.find("Floor") != std::string::npos);
             if (!isTerrain) continue;
 
             Engine::Model* model = nullptr;
-            if (!obj.gpuMeshColliders.empty()) {
-                model = renderer->GetModel(obj.gpuMeshColliders[0].meshHandle);
+            if (registry.all_of<GpuMeshColliderComponent>(e)) {
+                model = renderer->GetModel(registry.get<GpuMeshColliderComponent>(e).meshHandle);
             }
-            if (!model && obj.modelHandle != 0) {
-                model = renderer->GetModel(obj.modelHandle);
-            }
-            if (!model && !obj.meshRenderers.empty() && obj.meshRenderers[0].modelHandle != 0) {
-                model = renderer->GetModel(obj.meshRenderers[0].modelHandle);
+            if (!model && registry.all_of<MeshRendererComponent>(e)) {
+                auto& mr = registry.get<MeshRendererComponent>(e);
+                if (mr.modelHandle != 0) model = renderer->GetModel(mr.modelHandle);
             }
             if (model) {
                 float d; Engine::Vector3 hp;
-                if (model->RayCast(rayOrig, rayDir, obj.GetTransform().ToMatrix(), d, hp)) {
+                if (model->RayCast(rayOrig, rayDir, view.get<TransformComponent>(e).GetTransform().ToMatrix(), d, hp)) {
                     if (d < bestDist) {
                         bestDist = d;
                         hitPoint = hp;
@@ -192,12 +174,14 @@ void PipeEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* renderer, con
                 float bestZDist = nodeSnapThreshold_;
                 float snapX = endNode.x;
                 float snapZ = endNode.z;
-                for (const auto& obj : objects) {
-                    if (obj.name == "PipeJoint" || obj.name == "_PreviewJoint") {
-                        float distX = std::abs(obj.translate.x - endNode.x);
-                        float distZ = std::abs(obj.translate.z - endNode.z);
-                        if (distX < bestXDist) { bestXDist = distX; snapX = obj.translate.x; }
-                        if (distZ < bestZDist) { bestZDist = distZ; snapZ = obj.translate.z; }
+                for (auto e : view) {
+                    auto& nameC = view.get<NameComponent>(e);
+                    if (nameC.name == "PipeJoint" || nameC.name == "_PreviewJoint") {
+                        auto& tc = view.get<TransformComponent>(e);
+                        float distX = std::abs(tc.translate.x - endNode.x);
+                        float distZ = std::abs(tc.translate.z - endNode.z);
+                        if (distX < bestXDist) { bestXDist = distX; snapX = tc.translate.x; }
+                        if (distZ < bestZDist) { bestZDist = distZ; snapZ = tc.translate.z; }
                     }
                 }
                 endNode.x = snapX;
@@ -214,46 +198,36 @@ void PipeEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* renderer, con
                 float length = std::sqrt(dx*dx + dy*dy + dz*dz);
 
                 ClearPreview(scene);
-                auto currentObjects = scene->GetObjects();
 
-                SceneObject previewJoint;
-                behavior_->OnGenerateJoint(previewJoint, endNode, renderer);
-                previewJoint.name = "_PreviewJoint";
-                previewJoint.id = GenerateId(scene);
-                previewJointId_ = previewJoint.id;
-                for (auto& mr : previewJoint.meshRenderers) {
+                entt::entity previewJoint = registry.create();
+                behavior_->OnGenerateJoint(registry, previewJoint, endNode, renderer);
+                registry.get<NameComponent>(previewJoint).name = "_PreviewJoint";
+                previewJointId_ = previewJoint;
+                if (registry.all_of<MeshRendererComponent>(previewJoint)) {
+                    auto& mr = registry.get<MeshRendererComponent>(previewJoint);
                     mr.color = {0.8f, 0.8f, 1.0f, 0.6f};
                     mr.shaderName = "SolidColor";
                 }
-                currentObjects.push_back(previewJoint);
 
-                SceneObject previewPipe;
-                behavior_->OnGeneratePipe(previewPipe, startPos, endNode, length, renderer);
-                previewPipe.name = "_PreviewPipe";
-                previewPipe.id = GenerateId(scene) + 1;
-                previewPipeId_ = previewPipe.id;
-                for (auto& mr : previewPipe.meshRenderers) {
+                entt::entity previewPipe = registry.create();
+                behavior_->OnGeneratePipe(registry, previewPipe, startPos, endNode, length, renderer);
+                registry.get<NameComponent>(previewPipe).name = "_PreviewPipe";
+                previewPipeId_ = previewPipe;
+                if (registry.all_of<MeshRendererComponent>(previewPipe)) {
+                    auto& mr = registry.get<MeshRendererComponent>(previewPipe);
                     mr.color = {0.8f, 1.0f, 0.8f, 0.6f};
                     mr.shaderName = "SolidColor";
                 }
-                currentObjects.push_back(previewPipe);
-                scene->SetObjects(currentObjects);
 
                 if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
                     ClearPreview(scene);
-                    auto finalObjects = scene->GetObjects();
                     
-                    SceneObject finalJoint;
-                    behavior_->OnGenerateJoint(finalJoint, endNode, renderer);
-                    finalJoint.id = GenerateId(scene);
-                    finalObjects.push_back(finalJoint);
+                    entt::entity finalJoint = registry.create();
+                    behavior_->OnGenerateJoint(registry, finalJoint, endNode, renderer);
 
-                    SceneObject finalPipe;
-                    behavior_->OnGeneratePipe(finalPipe, startPos, endNode, length, renderer);
-                    finalPipe.id = GenerateId(scene) + 1;
-                    finalObjects.push_back(finalPipe);
+                    entt::entity finalPipe = registry.create();
+                    behavior_->OnGeneratePipe(registry, finalPipe, startPos, endNode, length, renderer);
                     
-                    scene->SetObjects(finalObjects);
                     behavior_->OnPlacementComplete(scene, startPos, endNode);
                     pipeStartNode_ = {endNode.x, endNode.y - 0.5f, endNode.z};
                 }
@@ -263,12 +237,8 @@ void PipeEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* renderer, con
                     pipeStartNode_ = hitPoint;
                     hasPipeStart_ = true;
 
-                    auto firstObjects = scene->GetObjects();
-                    SceneObject joint;
-                    behavior_->OnGenerateJoint(joint, {hitPoint.x, hitPoint.y + 0.5f, hitPoint.z}, renderer);
-                    joint.id = GenerateId(scene);
-                    firstObjects.push_back(joint);
-                    scene->SetObjects(firstObjects);
+                    entt::entity joint = registry.create();
+                    behavior_->OnGenerateJoint(registry, joint, {hitPoint.x, hitPoint.y + 0.5f, hitPoint.z}, renderer);
                     EditorUI::Log("Pipe start placed.");
                 }
             }

@@ -225,9 +225,12 @@ public:
 
 	// 通常メッシュ描画
 	void DrawMesh(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, const std::string& shaderName = "Default");
+	void DrawMesh(MeshHandle mesh, TextureHandle texture, const Matrix4x4& worldMatrix, const Vector4& mulColor, const std::string& shaderName = "Default");
 
 	// インスタンス描画の予約
 	void DrawMeshInstanced(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, 
+						   const std::string& shaderName = "Default", const std::vector<TextureHandle>& extraTex = {});
+	void DrawMeshInstanced(MeshHandle mesh, TextureHandle texture, const Matrix4x4& worldMatrix, const Vector4& mulColor, 
 						   const std::string& shaderName = "Default", const std::vector<TextureHandle>& extraTex = {});
 
 	// ★追加: パーティクル インスタンス描画
@@ -237,9 +240,13 @@ public:
 	void DrawParticle(MeshHandle mesh, TextureHandle texture, const Transform& transform, 
 					  const Vector4& mulColor, const Vector4& uvScaleOffset, 
 					  const std::string& shaderName = "Particle");
+	void DrawParticle(MeshHandle mesh, TextureHandle texture, const Matrix4x4& worldMatrix, 
+					  const Vector4& mulColor, const Vector4& uvScaleOffset, 
+					  const std::string& shaderName = "Particle");
 
 	// ★スキニングメッシュ描画
 	void DrawSkinnedMesh(MeshHandle mesh, TextureHandle texture, const Transform& transform, const std::vector<Matrix4x4>& bones, const Vector4& mulColor = {1, 1, 1, 1});
+	void DrawSkinnedMesh(MeshHandle mesh, TextureHandle texture, const Matrix4x4& worldMatrix, const std::vector<Matrix4x4>& bones, const Vector4& mulColor = {1, 1, 1, 1});
 
 	// スプライト描画
 	struct SpriteDrawCall {
@@ -322,7 +329,7 @@ private:
 		MeshHandle mesh;
 		TextureHandle tex;
 		std::vector<TextureHandle> extraTex; // ★追加: 地形用の追加テクスチャ
-		Transform tr;
+		Matrix4x4 worldMatrix;
 		Vector4 color;
 		std::string shaderName;
 		bool isSkinned = false;
@@ -464,6 +471,7 @@ private:
 	D3D12_GPU_DESCRIPTOR_HANDLE shadowSrv_{};
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> shadowPso_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> shadowSkinPso_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> shadowInstancedPso_;
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -492,6 +500,8 @@ private:
 	bool backBufferBarrierState_ = false;
 
 	std::vector<DrawCall> drawCalls_; // ★追加: ドローコールバッファ
+	// Cache for optimization
+	int lastIDCIndex_ = -1;
 	std::vector<InstancedDrawCall> instancedDrawCalls_; // ★追加: インスタンスドローコール
 	std::vector<InstancedDrawCall> instancedParticleDrawCalls_; // ★追加: パーティクル用
 	std::vector<SpriteDrawCall> spriteDrawCalls_; // ★追加: スプライト用

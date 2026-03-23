@@ -1,25 +1,21 @@
 #include "ExperienceMiner.h"
 #include "ScriptEngine.h"
+#include "Scenes/GameScene.h"
+#include "ObjectTypes.h"
 
 namespace Game {
 
-void Game::ExperienceMiner::Start(SceneObject& obj, GameScene* scene) {
-	(void)obj;
-	(void)scene;
+void ExperienceMiner::Start(entt::entity /*entity*/, GameScene* /*scene*/) {
 }
 
-void Game::ExperienceMiner::Update(SceneObject& obj, GameScene* scene, float dt) {
-
-	(void)obj;
-	(void)scene;
-	obj.rotate.y += 0.5f * dt;
-
-	
+void ExperienceMiner::Update(entt::entity entity, GameScene* scene, float dt) {
+	if (!scene || !scene->GetRegistry().valid(entity)) return;
+	auto& registry = scene->GetRegistry();
+	if (!registry.all_of<TransformComponent>(entity)) return;
+	registry.get<TransformComponent>(entity).rotate.y += 0.5f * dt;
 }
 
-void Game::ExperienceMiner::OnDestroy(SceneObject& obj, GameScene* scene) {
-	(void)obj;
-	(void)scene;
+void ExperienceMiner::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
 }
 
 REGISTER_SCRIPT(ExperienceMiner);

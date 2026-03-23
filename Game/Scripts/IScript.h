@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
 
+#include "../../externals/entt/entt.hpp"
+
 namespace Game {
 
 struct SceneObject;
@@ -11,16 +13,16 @@ public:
 	virtual ~IScript() = default;
 
 	// スクリプトの初期化（アタッチ時やシーン開始時に1回呼ばれる）
-	virtual void Start(SceneObject& /*obj*/, GameScene* /*scene*/) {}
+	virtual void Start(entt::entity /*entity*/, GameScene* /*scene*/) {}
 	
 	// 毎フレーム呼ばれる更新処理
-	virtual void Update(SceneObject& /*obj*/, GameScene* /*scene*/, float /*dt*/) {}
+	virtual void Update(entt::entity /*entity*/, GameScene* /*scene*/, float /*dt*/) {}
 	
 	// UIクリック時に呼ばれる
-	virtual void OnClick(SceneObject& /*obj*/, GameScene* /*scene*/, const std::string& /*callbackName*/) {}
+	virtual void OnClick(entt::entity /*entity*/, GameScene* /*scene*/, const std::string& /*callbackName*/) {}
 	
 	// オブジェクト破棄時やスクリプトが外れた時に呼ばれる
-	virtual void OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {}
+	virtual void OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 	// エディターUI描画用
 	virtual void OnEditorUI() {}

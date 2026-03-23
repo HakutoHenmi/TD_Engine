@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include "../../externals/entt/entt.hpp"
 
 namespace Game {
 
@@ -19,8 +20,8 @@ enum class SpawnPattern : int {
 // ウェーブ数、種類、配列、全体時間(Duration)、最大出現数を管理する
 class EnemySpawnerScript : public IScript {
 public:
-	void Start(SceneObject& obj, GameScene* scene) override;
-	void Update(SceneObject& obj, GameScene* scene, float dt) override;
+	void Start(entt::entity entity, GameScene* scene) override;
+	void Update(entt::entity entity, GameScene* scene, float dt) override;
 	void OnEditorUI() override;
 	std::string SerializeParameters() override;
 	void DeserializeParameters(const std::string& data) override;

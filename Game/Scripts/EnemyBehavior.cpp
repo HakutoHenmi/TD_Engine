@@ -7,70 +7,91 @@
 
 namespace Game {
 
-static bool HasTag(const SceneObject& obj, const char* tagName) {
-	for (int i = 0; i < (int)obj.tags.size(); ++i) { // タグ配列を最初から最後までループして、指定されたタグがあるか確認
-		if (obj.tags[i].tag == tagName) {            // タグが見つかったらtrueを返す
-			return true;
-		}
-	}
-	return false; // タグが見つからなかったらfalseを返す
+static bool HasTag(entt::registry& registry, entt::entity entity, const char* tagName) {
+	if (!registry.valid(entity) || !registry.all_of<TagComponent>(entity)) return false;
+	return registry.get<TagComponent>(entity).tag == tagName;
 }
 
-void EnemyBehavior::Start(SceneObject& obj, GameScene* scene) {
-	pOwner_ = &obj;
+void EnemyBehavior::Start(entt::entity entity, GameScene* scene) {
+	ownerId_ = static_cast<uint32_t>(entity);
 	pCurrentScene_ = scene;
+	auto& registry = scene->GetRegistry();
+	auto& tc = registry.get<TransformComponent>(entity);
+
+	// ★追加: 物理演算から切り離し、マニュアル制御にする
+	if (registry.all_of<RigidbodyComponent>(entity)) {
+		registry.get<RigidbodyComponent>(entity).isKinematic = true;
+	}
 
 	// 出現時に一度ターゲットを検索
-	SearchTarget(obj, scene);
+	SearchTarget(entity, scene);
 
 	// 出現時に地面の高さを即座に計算（初動の埋まり防止）
-	groundHeight_ = scene->GetHeightAt(obj.translate.x, obj.translate.z, obj.id);
+	// 現在の高さ付近 (y+1.0f) から下にある地面を探すように制限 (上昇バグ防止)
+	groundHeight_ = scene->GetHeightAt(tc.translate.x, tc.translate.z, tc.translate.y + 1.0f, static_cast<uint32_t>(entity));
 
 	// Flyタイプの場合は重力を無効化し、初期高度を設定
 	if (type_ == Fly) {
-		for (auto& rb : obj.rigidbodies) {
+		if (registry.all_of<RigidbodyComponent>(entity)) {
+			auto& rb = registry.get<RigidbodyComponent>(entity);
 			rb.useGravity = false;
 			rb.velocity = {0, 0, 0};
 		}
 		
-		// スポナーの高さではなく、即座に正しい浮遊高度へ移動
 		float baseHeight = 9.0f;
-		obj.translate.y = groundHeight_ + baseHeight;
+		tc.translate.y = groundHeight_ + baseHeight;
+	} else {
+		// Walkタイプも埋まり防止のためにオフセットを乗せる
+		tc.translate.y = groundHeight_ + 1.0f;
 	}
 }
 
-void EnemyBehavior::Update(SceneObject& obj, GameScene* scene, float dt) {
-	// ここに毎フレームの挙動を記述
-	
-	// 自身の情報を常に最新に
-	pOwner_ = &obj;
+void EnemyBehavior::Update(entt::entity entity, GameScene* scene, float dt) {
+	if (!scene || !scene->GetRegistry().valid(entity)) return;
+	auto& registry = scene->GetRegistry();
+	if (!registry.all_of<TransformComponent>(entity)) return;
+
+	ownerId_ = static_cast<uint32_t>(entity);
 	pCurrentScene_ = scene;
 	
-	// 既存のターゲットを失ったときなどに改めて検索
-	if (target_ == nullptr) {
-		SearchTarget(obj, scene);
+	// ★追加: Kinematic を毎フレーム保証 (物理システムによる干渉を完全に防ぐ)
+	if (registry.all_of<RigidbodyComponent>(entity)) {
+		auto& rb = registry.get<RigidbodyComponent>(entity);
+		if (!rb.isKinematic) rb.isKinematic = true;
 	}
 
-	// 周囲情報のスキャンとA*（負荷が高いため頻度を下げる）
-	scanTimer_ += dt;
-	if (scanTimer_ > 0.2f) { // 0.2秒ごとに実施
-		scanTimer_ = 0.0f;
-		
-		// 周囲の情報をスキャン
-		ScanSurround(obj, scene);
-
-		// A*(エースターアルゴリズム)でオブジェクトまでの最短ルートを探す
-		AStar();
+	// ターゲットが実在するか確認
+	bool targetExists = false;
+	if (targetId_ != 0) {
+		entt::entity targetEntity = static_cast<entt::entity>(targetId_);
+		if (registry.valid(targetEntity)) {
+			targetExists = true;
+		}
+	}
+	if (!targetExists) {
+		targetId_ = 0;
+		SearchTarget(entity, scene);
 	}
 
-	// 移動
-	Move(obj, scene, dt);
+	bool isHit = false;
+	if (registry.all_of<HealthComponent>(entity)) {
+		if (registry.get<HealthComponent>(entity).invincibleTime > 0.0f) isHit = true;
+	}
 
-	// デバッグ描画
-	Debug();
+	if (!isHit) {
+		scanTimer_ += dt;
+		if (scanTimer_ > 0.2f) {
+			scanTimer_ = 0.0f;
+			ScanSurround(entity, scene);
+			AStar();
+		}
+
+		Move(entity, scene, dt);
+	}
+	// Debug(); // Removed redundant debug UI
 }
 
-void EnemyBehavior::OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {
+void EnemyBehavior::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
 	// 終了時のクリーンアップなどを記述
 }
 
@@ -104,8 +125,11 @@ void EnemyBehavior::OnEditorUI() {
 		}
 
 		// 追尾するタグが変わったら新たに検索
-		if (pOwner_ && pCurrentScene_) {
-			SearchTarget(*pOwner_, pCurrentScene_);
+		if (ownerId_ != 0 && pCurrentScene_) {
+			entt::entity ownerEntity = static_cast<entt::entity>(ownerId_);
+			if (pCurrentScene_->GetRegistry().valid(ownerEntity)) {
+				SearchTarget(ownerEntity, pCurrentScene_);
+			}
 		}
 	}
 
@@ -121,43 +145,50 @@ void EnemyBehavior::OnEditorUI() {
 	}
 }
 
-void EnemyBehavior::SearchTarget(SceneObject& obj, GameScene* scene) {
+void EnemyBehavior::SearchTarget(entt::entity entity, GameScene* scene) {
 	if (scene == nullptr) {
 		return;
 	}
 
-	auto& objects = scene->GetObjects();
-	SceneObject* bestTarget = nullptr;
-	float bestDistance = (priority_ == Near) ? FLT_MAX : -1.0f;
+	entt::entity bestTarget = entt::null;
+	float bestDistance = (priority_ == TargetPriority::Near) ? FLT_MAX : -1.0f;
 
-	for (size_t i = 0; i < objects.size(); ++i) {
-		if (HasTag(objects[i], targetName_.c_str())) {
+	auto view = scene->GetRegistry().view<TagComponent, TransformComponent>();
+	auto& myTc = scene->GetRegistry().get<TransformComponent>(entity);
+
+	for (auto e : view) {
+		if (view.get<TagComponent>(e).tag == targetName_) {
 			// 距離を計算
-			float dx = objects[i].GetTransform().translate.x - obj.GetTransform().translate.x;
-			float dz = objects[i].GetTransform().translate.z - obj.GetTransform().translate.z;
+			auto& targetTc = view.get<TransformComponent>(e);
+			float dx = targetTc.translate.x - myTc.translate.x;
+			float dz = targetTc.translate.z - myTc.translate.z;
 			float distSq = dx * dx + dz * dz;	// 軽量化のために平方根は取らない
 
 			// priorityごとの対応
-			if (priority_ == Near) {	// Near
+			if (priority_ == TargetPriority::Near) {	// Near
 				if (distSq < bestDistance) {
 					bestDistance = distSq;
-					bestTarget = const_cast<SceneObject*>(&objects[i]);
+					bestTarget = e;
 				}
 			}
 			else {	// Far
 				if (distSq > bestDistance) {
 					bestDistance = distSq;
-					bestTarget = const_cast<SceneObject*>(&objects[i]);
+					bestTarget = e;
 				}
 			}
 		}
 	}
-	target_ = bestTarget;
+	targetId_ = bestTarget != entt::null ? static_cast<uint32_t>(bestTarget) : 0;
 }
 
-void EnemyBehavior::Move(SceneObject& obj, GameScene* scene, float dt) {
+void EnemyBehavior::Move(entt::entity entity, GameScene* scene, float dt) {
 	// ターゲットが存在しない、またはtargetまでのPath(ルート)がなければ止める
-	if (target_ == nullptr || path_.empty()) {
+	if (targetId_ == 0 || path_.empty()) {
+		if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
+			auto& rb = scene->GetRegistry().get<RigidbodyComponent>(entity);
+			rb.velocity.x = 0; rb.velocity.z = 0;
+		}
 		return;
 	}
 
@@ -166,63 +197,92 @@ void EnemyBehavior::Move(SceneObject& obj, GameScene* scene, float dt) {
 	int index = (path_.size() > 1) ? 1 : 0;
 	DirectX::XMFLOAT3 nextPos = path_[index];
 
+	auto& tc = scene->GetRegistry().get<TransformComponent>(entity);
+	
 	// 自分の位置を取得
-	myPos_.x = obj.GetTransform().translate.x;
-	myPos_.y = obj.GetTransform().translate.y;
-	myPos_.z = obj.GetTransform().translate.z;
+	myPos_ = tc.translate;
 
 	// 次のポイントへの方向
 	float diffX = nextPos.x - myPos_.x;
 	float diffZ = nextPos.z - myPos_.z;
 	float distance = std::sqrt(diffX * diffX + diffZ * diffZ);
 
+	// 移動方向の計算
+	float vx = 0, vz = 0;
 	if (distance > 0.1f) {
 		float dirX = diffX / distance;
 		float dirZ = diffZ / distance;
-
-		obj.translate.x += dirX * speed_ * dt;
-		obj.translate.z += dirZ * speed_ * dt;
-	}
-	else if (path_.size() > 1) {
-		// 目的地にほぼ着いたら、座標をマスの中心に強制セットしてズレをリセット
-		obj.translate.x = nextPos.x;
-		obj.translate.z = nextPos.z;
+		vx = dirX * speed_;
+		vz = dirZ * speed_;
+		// 向きを合わせる
+		tc.rotate.y = std::atan2(dirX, dirZ);
 	}
 
-	// 現在のXZ座標から地面の高さを取得 (負荷が高いため頻度を下げる)
-	// scanTimer_ が 0.0f にリセットされた直後のフレーム（0.2秒に1回）のみ実行
+	// 1. 水平移動の更新 (段差制限による壁判定を追加)
+	float nextX = tc.translate.x + vx * dt;
+	float nextZ = tc.translate.z + vz * dt;
+	
+	// 移動先の地面高さを先読み
+	float currentFeetY = tc.translate.y - 1.0f; // 1.0f は埋まり防止オフセット
+	float futureGround = scene->GetHeightAt(nextX, nextZ, tc.translate.y + 1.0f, static_cast<uint32_t>(entity));
+	
+	// 移動先が 0.4m 以上高いなら壁とみなして進ませない
+	if (futureGround > currentFeetY + 0.4f) {
+		vx = 0;
+		vz = 0;
+	} else {
+		tc.translate.x = nextX;
+		tc.translate.z = nextZ;
+	}
+
+	// 2. 垂直移動と重力の計算
+	if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
+		auto& rb = scene->GetRegistry().get<RigidbodyComponent>(entity);
+		
+		if (type_ == Walk) {
+			// 重力を適用
+			rb.velocity.y -= 9.8f * dt;
+			tc.translate.y += rb.velocity.y * dt;
+
+			// 地面スナップ (埋まり防止オフセット 1.0f)
+			float floorY = groundHeight_ + 1.0f;
+			if (tc.translate.y <= floorY + 0.05f) {
+				tc.translate.y = floorY;
+				rb.velocity.y = 0.0f;
+			}
+		} else if (type_ == Fly) {
+			// Flyタイプはふわふわさせる
+			float baseHeight = 9.0f;
+			totalTime_ += dt;
+			float hoverRange = 0.5f;
+			float hoverSpeed = 2.0f;
+			tc.translate.y = groundHeight_ + baseHeight + (std::sin(totalTime_ * hoverSpeed) * hoverRange);
+			rb.velocity.y = 0.0f;
+		}
+		
+		// 外部参照用に速度を保存しておく（実体移動はtcで行うが、他システムが見る可能性があるため）
+		rb.velocity.x = vx;
+		rb.velocity.z = vz;
+	}
+
+	// 目標地点に十分近い場合の補正
+	if (distance <= 0.1f && path_.size() > 1) {
+		tc.translate.x = nextPos.x;
+		tc.translate.z = nextPos.z;
+	}
+
+	// 現在のXZ座標から地面の高さを取得 (負荷軽減のため頻度を制限)
+	// 現在の高さ付近 (y+1.0f) から下にある地面を探すように制限 (上昇バグ防止)
 	if (scanTimer_ <= dt) {
-		float newHeight = scene->GetHeightAt(obj.translate.x, obj.translate.z, obj.id);
-		// 0.0は「ヒットせず」の可能性があるため、前回の値を保持するガードを入れる
+		float newHeight = scene->GetHeightAt(tc.translate.x, tc.translate.z, tc.translate.y + 1.0f, static_cast<uint32_t>(entity));
 		if (newHeight != 0.0f || groundHeight_ == 0.0f) {
 			groundHeight_ = newHeight;
 		}
 	}
-
-	// type別Y座標の対応
-	if (type_ == Fly) {
-		float baseHeight = 9.0f;	// 基準とする高さ
-
-		// sin波を使ってふわふわさせる
-		totalTime_ += dt;
-
-		float hoverRange = 0.5f;	// 揺れ幅
-		float hoverSpeed = 2.0f;	// 揺れのスピード
-
-		// 基準の高さに揺れの高さを足す
-		obj.translate.y = groundHeight_ + baseHeight + (std::sin(totalTime_ * hoverSpeed) * hoverRange);
-
-		// Rigidbodyがある場合は、座標の強制同期を行う（物理挙動との競合防止）
-		for (auto& rb : obj.rigidbodies) {
-			rb.velocity.y = 0.0f;
-		}
-	}
-
-	// 歩行タイプは地面にいるので特別な処理はなし
 }
 
-void EnemyBehavior::ScanSurround(SceneObject& obj, GameScene* scene) {
-	myPos_ = obj.translate;
+void EnemyBehavior::ScanSurround(entt::entity entity, GameScene* scene) {
+	myPos_ = scene->GetRegistry().get<TransformComponent>(entity).translate;
 
 	// 自分の位置をスナップ（基準座標）
 	float snappedX = std::floor(myPos_.x / cellLength_) * cellLength_;
@@ -238,20 +298,23 @@ void EnemyBehavior::ScanSurround(SceneObject& obj, GameScene* scene) {
 	}
 
 	float enemyRadius = 1.0f;
-	auto& objects = scene->GetObjects();
+	auto objectView = scene->GetRegistry().view<TransformComponent>();
 
 	// 壁オブジェクトを事前に抽出（計算量を減らすため、二重ループを避ける）
 	struct WallInfo {
 		float minX, maxX, minZ, maxZ;
 	};
 	std::vector<WallInfo> walls;
-	for (const auto& o : objects) {
-		if (HasTag(o, "Wall")) {
+	
+	auto wallView = scene->GetRegistry().view<TagComponent, TransformComponent>();
+	for (auto e : wallView) {
+		if (wallView.get<TagComponent>(e).tag == "Wall") {
+			auto& tc = wallView.get<TransformComponent>(e);
 			WallInfo w;
-			w.minX = o.translate.x - o.scale.x - enemyRadius;
-			w.maxX = o.translate.x + o.scale.x + enemyRadius;
-			w.minZ = o.translate.z - o.scale.z - enemyRadius;
-			w.maxZ = o.translate.z + o.scale.z + enemyRadius;
+			w.minX = tc.translate.x - tc.scale.x - enemyRadius;
+			w.maxX = tc.translate.x + tc.scale.x + enemyRadius;
+			w.minZ = tc.translate.z - tc.scale.z - enemyRadius;
+			w.maxZ = tc.translate.z + tc.scale.z + enemyRadius;
 			walls.push_back(w);
 		}
 	}
@@ -283,11 +346,15 @@ void EnemyBehavior::ScanSurround(SceneObject& obj, GameScene* scene) {
 
 void EnemyBehavior::AStar() {
 	// ターゲットがいればA*を実行
-	if (target_ != nullptr) {
+	if (targetId_ != 0) {
+		entt::entity targetEntity = static_cast<entt::entity>(targetId_);
+		if (!pCurrentScene_->GetRegistry().valid(targetEntity) || !pCurrentScene_->GetRegistry().all_of<TransformComponent>(targetEntity)) return;
+
+		auto& targetTc = pCurrentScene_->GetRegistry().get<TransformComponent>(targetEntity);
 		// targetの位置を最新の状態に
-		targetPos_.x = target_->GetTransform().translate.x;
-		targetPos_.y = target_->GetTransform().translate.y;
-		targetPos_.z = target_->GetTransform().translate.z;
+		targetPos_.x = targetTc.translate.x;
+		targetPos_.y = targetTc.translate.y;
+		targetPos_.z = targetTc.translate.z;
 
 		// ScanSurroundと同じスナップ座標を作る
 		float snappedX = std::floor(myPos_.x / cellLength_) * cellLength_;
@@ -434,11 +501,12 @@ void EnemyBehavior::CalculatePath(int startX, int startZ, int targetX, int targe
 		}
 	}
 }
-
 void EnemyBehavior::Debug() {
+/*
 #ifndef NDEBUG
-	ImGui::Begin("Enemy Infomation");
-	ImGui::Text("Target Name : %s", targetName_.c_str());
+	ImGui::Begin("Enemy Debug");
+	ImGui::Text("State: %d", (int)state_);
+	if (target_) ImGui::Text("Target: %s", target_->GetName().c_str());
 	ImGui::Text("GroundHeight : %f", groundHeight_);
 	ImGui::Text("Move Type : %s", (type_ == Fly ? "Fly" : "Walk"));
 	
@@ -472,6 +540,7 @@ void EnemyBehavior::Debug() {
 	}
 	ImGui::End();
 #endif
+*/
 }
 
 std::string EnemyBehavior::SerializeParameters() {

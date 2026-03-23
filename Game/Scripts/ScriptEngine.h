@@ -2,6 +2,7 @@
 #include "../Engine/Input.h"
 #include "IScript.h"
 #include "ObjectTypes.h"
+#include "../../externals/entt/entt.hpp"
 #include <functional>
 #include <map>
 #include <memory>
@@ -19,7 +20,7 @@ public:
 	void Initialize();
 	void Shutdown();
 
-	void Execute(SceneObject& obj, GameScene* scene, float dt);
+	void Execute(entt::entity entity, GameScene* scene, float dt);
 
 	using ScriptCreator = std::function<std::shared_ptr<IScript>()>;
 	void RegisterScript(const std::string& className, ScriptCreator creator);

@@ -7,19 +7,20 @@
 
 namespace Game {
 
-static bool HasTag(const SceneObject& obj, const char* tagName) {
-	for (int i = 0; i < (int)obj.tags.size(); ++i) {
-		if (obj.tags[i].tag == tagName) {
-			return true;
-		}
-	}
-	return false;
+static bool HasTag(GameScene* scene, entt::entity entity, const char* tagName) {
+	if (!scene->GetRegistry().all_of<TagComponent>(entity)) return false;
+	return scene->GetRegistry().get<TagComponent>(entity).tag == tagName;
 }
 
-static bool IsConnectedSphere(const SceneObject& a, const SceneObject& b, float connectRange) {
-	float dx = b.translate.x - a.translate.x;
-	float dy = b.translate.y - a.translate.y;
-	float dz = b.translate.z - a.translate.z;
+static bool IsConnectedSphere(GameScene* scene, entt::entity a, entt::entity b, float connectRange) {
+	if (!scene->GetRegistry().all_of<TransformComponent>(a) || !scene->GetRegistry().all_of<TransformComponent>(b)) return false;
+	
+	auto& aTc = scene->GetRegistry().get<TransformComponent>(a);
+	auto& bTc = scene->GetRegistry().get<TransformComponent>(b);
+
+	float dx = bTc.translate.x - aTc.translate.x;
+	float dy = bTc.translate.y - aTc.translate.y;
+	float dz = bTc.translate.z - aTc.translate.z;
 
 	float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
 
@@ -30,35 +31,36 @@ static bool IsConnectedSphere(const SceneObject& a, const SceneObject& b, float 
 	return true;
 }
 
-static bool IsAlreadyVisited(const std::vector<const SceneObject*>& visitedObjects, const SceneObject& obj) {
-	for (int i = 0; i < (int)visitedObjects.size(); ++i) {
-		if (visitedObjects[i] == &obj) {
+static bool IsAlreadyVisited(const std::vector<entt::entity>& visitedObjects, entt::entity obj) {
+	for (size_t i = 0; i < visitedObjects.size(); ++i) {
+		if (visitedObjects[i] == obj) {
 			return true;
 		}
 	}
 	return false;
 }
 
-static bool IsConnectedToBulletTankRecursive(GameScene* scene, const SceneObject& currentPipe, std::vector<const SceneObject*>& visitedObjects, float connectRange) {
-	visitedObjects.push_back(&currentPipe);
+static bool IsConnectedToBulletTankRecursive(GameScene* scene, entt::entity currentPipe, std::vector<entt::entity>& visitedObjects, float connectRange) {
+	visitedObjects.push_back(currentPipe);
 
-	for (const SceneObject& other : scene->GetObjects()) {
+	auto view = scene->GetRegistry().view<TransformComponent>();
+	for (auto other : view) {
 
-		if (&other == &currentPipe) {
+		if (other == currentPipe) {
 			continue;
 		}
 
-		if (!IsConnectedSphere(currentPipe, other, connectRange)) {
+		if (!IsConnectedSphere(scene, currentPipe, other, connectRange)) {
 			continue;
 		}
 
 		// 隣に弾倉があれば到達成功
-		if (HasTag(other, "BulletTank")) {
+		if (HasTag(scene, other, "BulletTank")) {
 			return true;
 		}
 
 		// 隣がパイプならさらに先を調べる
-		if (HasTag(other, "Pipe")) {
+		if (HasTag(scene, other, "Pipe")) {
 
 			if (IsAlreadyVisited(visitedObjects, other)) {
 				continue;
@@ -75,20 +77,20 @@ static bool IsConnectedToBulletTankRecursive(GameScene* scene, const SceneObject
 	return false;
 }
 
-static bool IsConnectedToBulletTank(GameScene* scene, const SceneObject& selfObj) {
+static bool IsConnectedToBulletTank(GameScene* scene, entt::entity selfObj) {
 	const float connectRange = 2.5f;
 
-	std::vector<const SceneObject*> visitedObjects;
+	std::vector<entt::entity> visitedObjects;
 
 	return IsConnectedToBulletTankRecursive(scene, selfObj, visitedObjects, connectRange);
 }
 
-void PipeScript::Start(SceneObject& obj, GameScene* scene) {
+void PipeScript::Start(entt::entity obj, GameScene* scene) {
 	(void)obj;
 	(void)scene;
 }
 
-void PipeScript::Update(SceneObject& obj, GameScene* scene, float dt) {
+void PipeScript::Update(entt::entity obj, GameScene* scene, float dt) {
 	// bool connectedToTank = IsConnectedToBulletTank(scene, obj);
 	(void)scene;
 	float speed = rotationSpeed_;
@@ -97,10 +99,12 @@ void PipeScript::Update(SceneObject& obj, GameScene* scene, float dt) {
 	// speed = rotationSpeed_ * 3.0f;
 	//}
 
-	obj.rotate.z += speed * dt;
+	if (scene->GetRegistry().all_of<TransformComponent>(obj)) {
+		scene->GetRegistry().get<TransformComponent>(obj).rotate.z += speed * dt;
+	}
 }
 
-void PipeScript::OnDestroy(SceneObject& obj, GameScene* scene) {
+void PipeScript::OnDestroy(entt::entity obj, GameScene* scene) {
 	(void)obj;
 	(void)scene;
 }

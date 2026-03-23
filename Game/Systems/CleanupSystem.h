@@ -7,34 +7,44 @@ namespace Game {
 
 class CleanupSystem : public ISystem {
 public:
-	void Update(std::vector<SceneObject>& objects, GameContext& ctx) override {
+	void Update(entt::registry& registry, GameContext& ctx) override {
 		if (!ctx.isPlaying) return;
 
 		// 射程外の弾消去
-		for (auto& obj : objects) {
-			bool isBullet = false;
-			for (const auto& t : obj.tags) {
-				if (t.tag == "Bullet") isBullet = true;
-			}
-			if (isBullet && !obj.healths.empty()) {
-				float distSq = obj.translate.x * obj.translate.x +
-				               obj.translate.y * obj.translate.y +
-				               obj.translate.z * obj.translate.z;
-				if (distSq > 10000.0f) {
-					obj.healths[0].isDead = true;
-				}
+		auto bulletView = registry.view<TagComponent, TransformComponent, HealthComponent>();
+		for (auto entity : bulletView) {
+			auto& tag = bulletView.get<TagComponent>(entity);
+			if (tag.tag != "Bullet") continue;
+
+			auto& tc = bulletView.get<TransformComponent>(entity);
+			float distSq = tc.translate.x * tc.translate.x +
+			               tc.translate.y * tc.translate.y +
+			               tc.translate.z * tc.translate.z;
+			if (distSq > 10000.0f) {
+				auto& hc = bulletView.get<HealthComponent>(entity);
+				hc.isDead = true;
 			}
 		}
 
-		// dead または 破棄保留(isPendingDestroy) を除去
-		objects.erase(
-			std::remove_if(objects.begin(), objects.end(),
-				[](const SceneObject& o) {
-					if (o.name == "Player" || o.name == "PlayerSword") return false;
-					if (o.isPendingDestroy) return true; // ★追加
-					return !o.healths.empty() && o.healths[0].isDead && o.healths[0].enabled;
-				}),
-			objects.end());
+		// dead のエンティティを破棄
+		std::vector<entt::entity> toDestroy;
+		auto healthView = registry.view<HealthComponent>();
+		for (auto entity : healthView) {
+			auto& hc = registry.get<HealthComponent>(entity);
+			if (hc.isDead && hc.enabled) {
+				// Player は破棄しない
+				if (registry.all_of<TagComponent>(entity)) {
+					auto& tag = registry.get<TagComponent>(entity);
+					if (tag.tag == "Player" || tag.tag == "PlayerSword") continue;
+				}
+				toDestroy.push_back(entity);
+			}
+		}
+		for (auto e : toDestroy) {
+			if (registry.valid(e)) {
+				registry.destroy(e);
+			}
+		}
 	}
 };
 

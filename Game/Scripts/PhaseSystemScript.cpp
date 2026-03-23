@@ -11,13 +11,13 @@ namespace Game {
 
 	bool PhaseSystemScript::isPreparation_ = false;
 
-void PhaseSystemScript::Start(SceneObject& obj, GameScene* scene) {
-	(obj);
+void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
+	(entity);
 	(scene);
 }
 
-void PhaseSystemScript::Update(SceneObject& obj, GameScene* scene, float dt) {
-	(obj);
+void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) {
+	(entity);
 	(scene);
 	(dt);
 	bool keyP = (GetAsyncKeyState('P') & 0x8000) != 0;
@@ -82,24 +82,22 @@ void PhaseSystemScript::Installation(GameScene* scene, const ImVec2& gameImageMi
 
 		float bestDist = FLT_MAX;
 
-		auto objects = scene->GetObjects();
-		for (auto& obj : objects) {
-			bool isTerrain = (obj.name.find("Terrain") != std::string::npos) || (obj.name.find("Floor") != std::string::npos);
+		auto view = scene->GetRegistry().view<NameComponent, TransformComponent>();
+		for (auto e : view) {
+			const std::string& name = scene->GetRegistry().get<NameComponent>(e).name;
+			bool isTerrain = (name.find("Terrain") != std::string::npos) || (name.find("Floor") != std::string::npos);
 			if (!isTerrain) continue;
 
 			Engine::Model* model = nullptr;
-			if (!obj.gpuMeshColliders.empty()) {
-				model = renderer->GetModel(obj.gpuMeshColliders[0].meshHandle);
+			if (scene->GetRegistry().all_of<GpuMeshColliderComponent>(e)) {
+				model = renderer->GetModel(scene->GetRegistry().get<GpuMeshColliderComponent>(e).meshHandle);
 			}
-			if (!model && obj.modelHandle != 0) {
-				model = renderer->GetModel(obj.modelHandle);
-			}
-			if (!model && !obj.meshRenderers.empty() && obj.meshRenderers[0].modelHandle != 0) {
-				model = renderer->GetModel(obj.meshRenderers[0].modelHandle);
+			if (!model && scene->GetRegistry().all_of<MeshRendererComponent>(e)) {
+				model = renderer->GetModel(scene->GetRegistry().get<MeshRendererComponent>(e).modelHandle);
 			}
 			if (model) {
 				float d; Engine::Vector3 hp;
-				if (model->RayCast(rayOrig, rayDir, obj.GetTransform().ToMatrix(), d, hp)) {
+				if (model->RayCast(rayOrig, rayDir, scene->GetRegistry().get<TransformComponent>(e).ToMatrix(), d, hp)) {
 					if (d < bestDist) {
 						bestDist = d;
 						hitPoint = hp;
@@ -112,25 +110,22 @@ void PhaseSystemScript::Installation(GameScene* scene, const ImVec2& gameImageMi
 
 	// placeMode 中に、左クリックの立ち上がり かつ 地面ヒット で設置
 	if (placeMode && hitTerrain && mouseLeft && !prevMouseLeft) {
-		SceneObject obj;
-		obj.name = "New Object";
-		obj.modelPath = "Resources/cube/cube.obj";
-		obj.texturePath = "Resources/white1x1.png";
-		obj.translate = { hitPoint.x, hitPoint.y + 0.5f, hitPoint.z };
+		entt::entity newObj = scene->GetRegistry().create();
+		
+		scene->GetRegistry().emplace<NameComponent>(newObj).name = "New Object";
+		auto& tc = scene->GetRegistry().emplace<TransformComponent>(newObj);
+		tc.translate = { hitPoint.x, hitPoint.y + 0.5f, hitPoint.z };
 
-		HealthComponent health;
+		auto& health = scene->GetRegistry().emplace<HealthComponent>(newObj);
 		health.hp = 100.0f;
 		health.maxHp = 100.0f;
-		obj.healths.push_back(health);
 
-		MeshRendererComponent mr;
-		mr.modelPath = obj.modelPath;
-		mr.texturePath = obj.texturePath;
-		mr.modelHandle = renderer->LoadObjMesh(mr.modelPath);
-		mr.textureHandle = renderer->LoadTexture2D(mr.texturePath);
-		obj.meshRenderers.push_back(mr);
+		auto& mr = scene->GetRegistry().emplace<MeshRendererComponent>(newObj);
+		mr.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
+		mr.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
+		mr.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
-		scene->SpawnObject(obj);
+		// TODO: obj.modelPath, obj.texturePath properties were used before... maybe consider string components if necessary.
 
 		// 一度設置したらモード解除
 		placeMode = false;
@@ -140,7 +135,7 @@ void PhaseSystemScript::Installation(GameScene* scene, const ImVec2& gameImageMi
 	prevMouseLeft = mouseLeft;
 }
 
-void PhaseSystemScript::OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {}
+void PhaseSystemScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 REGISTER_SCRIPT(PhaseSystemScript);
 

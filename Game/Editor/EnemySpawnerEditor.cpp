@@ -25,19 +25,21 @@ void EnemySpawnerEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* rende
     if (!scene || scene->IsPlaying()) return;
 
     // ========== 全スポナープレビュー描画 (ゲーム停止中は常に表示) ==========
-    for (auto& obj : scene->objects_) {
-        for (auto& sc : obj.scripts) {
-            if (!sc.instance && !sc.scriptPath.empty() && !scene->IsPlaying()) {
-                sc.instance = ScriptEngine::GetInstance()->CreateScript(sc.scriptPath);
-                if (sc.instance) {
-                    sc.instance->Start(obj, scene);
-                }
-            }
+    auto& registry = scene->GetRegistry();
+    auto spawnerView = registry.view<ScriptComponent, TransformComponent>();
+	for (auto entity : spawnerView) {
+        auto& sc = spawnerView.get<ScriptComponent>(entity);
+        auto& tc = spawnerView.get<TransformComponent>(entity);
+        if (!sc.instance && !sc.scriptPath.empty() && !scene->IsPlaying()) {
+            sc.instance = ScriptEngine::GetInstance()->CreateScript(sc.scriptPath);
             if (sc.instance) {
-                auto* spawner = dynamic_cast<EnemySpawnerScript*>(sc.instance.get());
-                if (spawner) {
-                    spawner->DrawSpawnPreview(obj.translate);
-                }
+                sc.instance->Start(entity, scene);
+            }
+        }
+        if (sc.instance) {
+            auto* spawner = dynamic_cast<EnemySpawnerScript*>(sc.instance.get());
+            if (spawner) {
+                spawner->DrawSpawnPreview(tc.translate);
             }
         }
     }
@@ -66,38 +68,23 @@ void EnemySpawnerEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* rende
         Engine::Vector3 hitPoint = {0, 0, 0};
         bool hitTerrain = false;
 
-        for (const auto& obj : scene->objects_) {
-            // gpuMeshColliders があるオブジェクトすべてを対象にする
-            if (!obj.gpuMeshColliders.empty()) {
-                auto* model = renderer->GetModel(obj.gpuMeshColliders[0].meshHandle);
-                if (model) {
-                    Engine::Vector3 hp;
-                    float dist;
-                    if (model->RayCast(rayOrig, rayDir, obj.GetTransform().ToMatrix(), dist, hp)) {
-                        if (dist < bestDist) {
-                            bestDist = dist;
-                            hitPoint = hp;
-                            hitTerrain = true;
-                        }
-                    }
-                }
+        auto view = scene->GetRegistry().view<NameComponent, TransformComponent>();
+        for (auto e : view) {
+            Engine::Model* model = nullptr;
+            if (scene->GetRegistry().all_of<GpuMeshColliderComponent>(e)) {
+                model = renderer->GetModel(scene->GetRegistry().get<GpuMeshColliderComponent>(e).meshHandle);
             }
-            // meshRenderers のモデルも対象にする (地面メッシュ)
-            if (!obj.meshRenderers.empty()) {
-                for (const auto& mr : obj.meshRenderers) {
-                    if (mr.modelHandle != 0) {
-                        auto* model = renderer->GetModel(mr.modelHandle);
-                        if (model) {
-                            Engine::Vector3 hp;
-                            float dist;
-                            if (model->RayCast(rayOrig, rayDir, obj.GetTransform().ToMatrix(), dist, hp)) {
-                                if (dist < bestDist) {
-                                    bestDist = dist;
-                                    hitPoint = hp;
-                                    hitTerrain = true;
-                                }
-                            }
-                        }
+            if (!model && scene->GetRegistry().all_of<MeshRendererComponent>(e)) {
+                auto& mr = scene->GetRegistry().get<MeshRendererComponent>(e);
+                if (mr.modelHandle != 0) model = renderer->GetModel(mr.modelHandle);
+            }
+            if (model) {
+                float dist; Engine::Vector3 hp;
+                if (model->RayCast(rayOrig, rayDir, view.get<TransformComponent>(e).GetTransform().ToMatrix(), dist, hp)) {
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        hitPoint = hp;
+                        hitTerrain = true;
                     }
                 }
             }
@@ -105,30 +92,20 @@ void EnemySpawnerEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* rende
 
         if (hitTerrain) {
             // ヒットした位置にスポナーオブジェクトを生成
-            SceneObject spawnerObj;
-            spawnerObj.name = "EnemySpawner";
-            spawnerObj.translate = {hitPoint.x, hitPoint.y, hitPoint.z};
-            spawnerObj.scale = {1.0f, 1.0f, 1.0f};
-
-            // ID を生成
-            uint32_t maxId = 0;
-            for (const auto& o : scene->objects_) {
-                if (o.id > maxId) maxId = o.id;
-            }
-            spawnerObj.id = maxId + 1;
+            // ヒットした位置にスポナーオブジェクトを生成
+            entt::entity spawnerObj = scene->GetRegistry().create();
+            scene->GetRegistry().emplace<NameComponent>(spawnerObj).name = "EnemySpawner";
+            auto& tc = scene->GetRegistry().emplace<TransformComponent>(spawnerObj);
+            tc.translate = {hitPoint.x, hitPoint.y, hitPoint.z};
+            tc.scale = {1.0f, 1.0f, 1.0f};
 
             // EnemySpawnerScript をアタッチ
-            ScriptComponent sc;
+            auto& sc = scene->GetRegistry().emplace<ScriptComponent>(spawnerObj);
             sc.scriptPath = "EnemySpawnerScript";
             sc.instance = ScriptEngine::GetInstance()->CreateScript("EnemySpawnerScript");
-            spawnerObj.scripts.push_back(sc);
-
-            scene->objects_.push_back(spawnerObj);
 
             // 新しく配置したスポナーを選択状態にする
-            int newIdx = static_cast<int>(scene->objects_.size()) - 1;
-            scene->selectedIndices_ = {newIdx};
-            scene->selectedObjectIndex_ = newIdx;
+            scene->SetSelectedEntity(spawnerObj);
 
             EditorUI::Log("Spawner placed at (" +
                           std::to_string(hitPoint.x) + ", " +

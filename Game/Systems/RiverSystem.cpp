@@ -36,24 +36,22 @@ XMVECTOR RiverSystem::InterpolateSpline(const std::vector<XMFLOAT3>& points, flo
     return XMVectorCatmullRom(v0, v1, v2, v3, localT);
 }
 
-static Engine::Matrix4x4 GetWorldMatrixInternal(const std::vector<SceneObject>& objects, int index) {
-    if (index < 0 || index >= (int)objects.size()) return Engine::Matrix4x4::Identity();
-    const auto& obj = objects[index];
-    Engine::Matrix4x4 local = obj.GetTransform().ToMatrix();
-    if (obj.parentId == 0) return local;
-
-    int parentIdx = -1;
-    for (int i = 0; i < (int)objects.size(); ++i) {
-        if (objects[i].id == obj.parentId) {
-            parentIdx = i;
-            break;
+static Engine::Matrix4x4 GetWorldMatrixInternal(entt::registry& registry, entt::entity entity) {
+    if (!registry.valid(entity) || !registry.all_of<TransformComponent>(entity)) return Engine::Matrix4x4::Identity();
+    
+    Engine::Matrix4x4 local = registry.get<TransformComponent>(entity).ToMatrix();
+    
+    if (registry.all_of<HierarchyComponent>(entity)) {
+        entt::entity parentId = registry.get<HierarchyComponent>(entity).parentId;
+        if (parentId != entt::null) {
+            return Engine::Matrix4x4::Multiply(local, GetWorldMatrixInternal(registry, parentId));
         }
     }
-    if (parentIdx == -1) return local;
-    return Engine::Matrix4x4::Multiply(local, GetWorldMatrixInternal(objects, parentIdx));
+    
+    return local;
 }
 
-void RiverSystem::BuildRiverMesh(RiverComponent& river, Engine::Renderer* renderer, const std::vector<SceneObject>& allObjects, const DirectX::XMFLOAT3& /*ownerPos*/) {
+void RiverSystem::BuildRiverMesh(RiverComponent& river, Engine::Renderer* renderer, entt::registry& registry, const DirectX::XMFLOAT3& /*ownerPos*/) {
     if (!renderer || river.points.size() < 2) return;
 
     std::vector<Engine::VertexData> vertices;
@@ -98,20 +96,19 @@ void RiverSystem::BuildRiverMesh(RiverComponent& river, Engine::Renderer* render
         bool hitTerrain = false;
         
         float closestDist = FLT_MAX;
-        for (int objIdx = 0; objIdx < (int)allObjects.size(); ++objIdx) {
-            const auto& obj = allObjects[objIdx];
-            if (!obj.gpuMeshColliders.empty()) {
-                auto* model = renderer->GetModel(obj.gpuMeshColliders[0].meshHandle);
-                if (model) {
-                    Engine::Vector3 hp;
-                    float dist;
-                    // ★修正: GetWorldMatrixInternal を使用
-                    if (model->RayCast(rayOrig, rayDir, GetWorldMatrixInternal(allObjects, objIdx), dist, hp)) {
-                        if (dist < closestDist) {
-                            closestDist = dist;
-                            worldY = hp.y;
-                            hitTerrain = true;
-                        }
+        auto view = registry.view<GpuMeshColliderComponent>();
+        for (auto e : view) {
+            auto& gmc = view.get<GpuMeshColliderComponent>(e);
+            auto* model = renderer->GetModel(gmc.meshHandle);
+            if (model) {
+                Engine::Vector3 hp;
+                float dist;
+                // ★修正: GetWorldMatrixInternal を使用
+                if (model->RayCast(rayOrig, rayDir, GetWorldMatrixInternal(registry, e), dist, hp)) {
+                    if (dist < closestDist) {
+                        closestDist = dist;
+                        worldY = hp.y;
+                        hitTerrain = true;
                     }
                 }
             }

@@ -1,4 +1,10 @@
 #pragma once
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <type_traits>
+#include <cmath>
+#include <algorithm>
 #include "Transform.h"
 #include <DirectXMath.h>
 #include <cstdint>
@@ -6,7 +12,9 @@
 #include <string>
 #include "../Engine/ParticleEmitter.h"
 #include <map>
-#include <memory> // ★追加
+#include <memory> 
+
+#include "../../externals/entt/entt.hpp"
 
 namespace Game {
 
@@ -27,10 +35,10 @@ struct CollisionMeshData {
 
 // ★追加: 衝突情報（GPU読み戻し用）
 struct ContactInfo {
-	DirectX::XMFLOAT3 normal; // 押し出し方向
-	float depth;              // めり込み量
-	uint32_t intersected;     // 衝突フラグ (0 or 1)
-	uint32_t pad[3];          // アライメント用
+	DirectX::XMFLOAT3 normal;   // offset 0
+	float depth;                // offset 12
+	DirectX::XMFLOAT3 position; // offset 16
+	uint32_t intersected;     // offset 28
 };
 
 // コンポーネント
@@ -50,6 +58,52 @@ struct Component {
 	bool enabled = true; 
 	Component() = default;
 	Component(ComponentType t) : type(t), enabled(true) {}
+};
+
+struct NameComponent {
+	std::string name = "Object";
+	NameComponent() = default;
+	NameComponent(const std::string& n) : name(n) {}
+};
+
+struct HierarchyComponent {
+	entt::entity parentId = entt::null;
+};
+
+struct TransformComponent : public Component {
+	DirectX::XMFLOAT3 translate = {0, 0, 0};
+	DirectX::XMFLOAT3 rotate = {0, 0, 0};
+	DirectX::XMFLOAT3 scale = {1, 1, 1};
+	
+	TransformComponent() { type = ComponentType::RectTransform; }
+	TransformComponent(const DirectX::XMFLOAT3& t, const DirectX::XMFLOAT3& r, const DirectX::XMFLOAT3& s)
+		: translate(t), rotate(r), scale(s) { type = ComponentType::RectTransform; }
+
+	Engine::Transform GetTransform() const {
+		Engine::Transform t;
+		t.translate = {translate.x, translate.y, translate.z};
+		t.rotate = {rotate.x, rotate.y, rotate.z};
+		t.scale = {scale.x, scale.y, scale.z};
+		return t;
+	}
+	Engine::Matrix4x4 ToMatrix() const {
+		using namespace DirectX;
+		XMMATRIX S = XMMatrixScaling(scale.x, scale.y, scale.z);
+		XMMATRIX R = XMMatrixRotationRollPitchYaw(rotate.x, rotate.y, rotate.z);
+		XMMATRIX T = XMMatrixTranslation(translate.x, translate.y, translate.z);
+		Engine::Matrix4x4 out;
+		XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&out), S * R * T);
+		return out;
+	}
+};
+
+struct ColorComponent {
+	DirectX::XMFLOAT4 color = {1, 1, 1, 1};
+};
+
+struct EditorStateComponent {
+	bool locked = false;
+	bool isPendingDestroy = false;
 };
 
 struct MeshRendererComponent : public Component {
@@ -121,10 +175,12 @@ struct PlayerInputComponent : public Component {
 // ★追加: キャラクター移動 (能力)
 struct CharacterMovementComponent : public Component {
 	float speed = 5.0f;
-	float jumpPower = 6.0f;
+	float jumpPower = 12.0f;
 	float gravity = 9.8f;
 	float velocityY = 0.0f;
+	float heightOffset = 1.0f; // ★追加: 地面からの高度オフセット
 	bool isGrounded = false;
+	bool enabled = true;
 	CharacterMovementComponent() { type = ComponentType::CharacterMovement; }
 };
 
@@ -322,140 +378,10 @@ struct VariableComponent : public Component {
 	}
 };
 
-// ★ エディター用オブジェクト構造体
-struct SceneObject {
-	uint32_t id = 0;           // ★ 個別識別子
-	uint32_t parentId = 0;     // ★ 親オブジェクトのID（0は親なし）
-	std::string name = "Object";
-	bool locked = false; // ★ ロック: 選択・移動・削除を防止
-	bool isPendingDestroy = false; // ★追加: 破棄フラグ
-	DirectX::XMFLOAT3 translate = {0, 0, 0};
-	DirectX::XMFLOAT3 rotate = {0, 0, 0};
-	DirectX::XMFLOAT3 scale = {1, 1, 1};
-	DirectX::XMFLOAT4 color = {1, 1, 1, 1}; // ★追加: オブジェクトカラー
+// ★ エディター・共通システム用：Entity情報の構成要素としてのコンポーネント化
 
-	uint32_t modelHandle = 0;
-	uint32_t textureHandle = 0;
-	std::string modelPath;   // ★追加: 保存/復元用パス
-	std::string texturePath;  // ★追加: 保存/復元用パス
-	std::vector<std::string> extraTexturePaths; // ★追加
-	std::string shaderName = "Default"; // ★追加
+// ★ EntityのIDそのものをラップする構造体（またはそのまま entt::entity を使う）
+using Entity = entt::entity;
 
-	// コンポーネント
-	std::vector<MeshRendererComponent> meshRenderers;
-	std::vector<BoxColliderComponent> boxColliders;
-	std::vector<TagComponent> tags;
-	std::vector<AnimatorComponent> animators;
-	std::vector<RigidbodyComponent> rigidbodies;
-	std::vector<ParticleEmitterComponent> particleEmitters; // ★追加: パーティクルエミッター
-	std::vector<GpuMeshColliderComponent> gpuMeshColliders; // ★追加: GPUメッシュコライダー
-	std::vector<PlayerInputComponent> playerInputs;
-	std::vector<CharacterMovementComponent> characterMovements;
-	std::vector<CameraTargetComponent> cameraTargets;
-
-	// ★追加: ライトコンポーネント
-	std::vector<DirectionalLightComponent> directionalLights;
-	std::vector<PointLightComponent> pointLights;
-	std::vector<SpotLightComponent> spotLights;
-
-	// ★追加: 音響コンポーネント
-	std::vector<AudioSourceComponent> audioSources;
-	std::vector<AudioListenerComponent> audioListeners;
-
-	// ★追加: 戦闘判定コンポーネント
-	std::vector<HitboxComponent> hitboxes;
-	std::vector<HurtboxComponent> hurtboxes;
-
-	// ★追加: ステータス管理コンポーネント
-	std::vector<HealthComponent> healths;
-
-	// ★追加: スクリプトコンポーネント
-	std::vector<ScriptComponent> scripts;
-
-	// ★追加: UIコンポーネント
-	std::vector<RectTransformComponent> rectTransforms;
-	std::vector<UIImageComponent> images;
-	std::vector<UITextComponent> texts;
-	std::vector<UIButtonComponent> buttons;
-
-	// ★追加: 川コンポーネント
-	std::vector<RiverComponent> rivers;
-	// ★追加: 汎用変数
-	std::vector<VariableComponent> variables;
-	// ★追加: ワールド空間UI
-	std::vector<WorldSpaceUIComponent> worldSpaceUIs;
-
-	Engine::Transform GetTransform() const {
-		Engine::Transform t;
-		t.translate = {translate.x, translate.y, translate.z};
-		t.rotate = {rotate.x, rotate.y, rotate.z};
-		t.scale = {scale.x, scale.y, scale.z};
-		return t;
-	}
-	bool HasMeshRenderer() const { return !meshRenderers.empty() || modelHandle != 0; }
-
-	// ★追加: 汎用変数の取得・設定ヘルパー
-	float GetVariable(const std::string& key, float defaultVal = 0.0f) const {
-		for (const auto& vc : variables) {
-			if (vc.enabled) {
-				auto it = vc.values.find(key);
-				if (it != vc.values.end()) return it->second;
-			}
-		}
-		return defaultVal;
-	}
-	void SetVariable(const std::string& key, float val) {
-		// まずは既存のキーを探して上書きする
-		for (auto& vc : const_cast<SceneObject*>(this)->variables) {
-			auto it = vc.values.find(key);
-			if (it != vc.values.end()) {
-				it->second = val;
-				return;
-			}
-		}
-		// なければ最初のコンポーネントに追加 (コンポーネントがなければ作成)
-		if (const_cast<SceneObject*>(this)->variables.empty()) {
-			VariableComponent vc;
-			vc.values[key] = val;
-			const_cast<SceneObject*>(this)->variables.push_back(vc);
-		} else {
-			const_cast<SceneObject*>(this)->variables[0].values[key] = val;
-		}
-	}
-	// ★追加: 文字列変数の取得・設定
-	std::string GetString(const std::string& key, const std::string& defaultVal = "") const {
-		for (const auto& vc : variables) {
-			if (vc.enabled) {
-				auto it = vc.strings.find(key);
-				if (it != vc.strings.end()) return it->second;
-			}
-		}
-		return defaultVal;
-	}
-	void SetString(const std::string& key, const std::string& val) {
-		for (auto& vc : const_cast<SceneObject*>(this)->variables) {
-			auto it = vc.strings.find(key);
-			if (it != vc.strings.end()) {
-				it->second = val;
-				return;
-			}
-		}
-		if (const_cast<SceneObject*>(this)->variables.empty()) {
-			VariableComponent vc;
-			vc.strings[key] = val;
-			const_cast<SceneObject*>(this)->variables.push_back(vc);
-		} else {
-			const_cast<SceneObject*>(this)->variables[0].strings[key] = val;
-		}
-	}
-
-	// ★追加: 特定のクラス名のスクリプトを取得
-	IScript* GetScript(const std::string& className) const {
-		for (const auto& sc : scripts) {
-			if (sc.scriptPath == className) return sc.instance.get();
-		}
-		return nullptr;
-	}
-};
 
 } // namespace Game

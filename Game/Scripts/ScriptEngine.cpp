@@ -44,12 +44,13 @@ std::shared_ptr<IScript> ScriptEngine::CreateScript(const std::string& className
 	return nullptr;
 }
 
-void ScriptEngine::Execute(SceneObject& obj, GameScene* scene, float dt) {
-	if (obj.scripts.empty() || !obj.scripts[0].enabled || obj.scripts[0].scriptPath.empty()) {
-		return;
-	}
+void ScriptEngine::Execute(entt::entity entity, GameScene* scene, float dt) {
+	if (!scene) return;
+	auto& registry = scene->GetRegistry();
+	if (!registry.valid(entity) || !registry.all_of<ScriptComponent>(entity)) return;
 
-	auto& comp = obj.scripts[0];
+	auto& comp = registry.get<ScriptComponent>(entity);
+	if (!comp.enabled || comp.scriptPath.empty()) return;
 
 	if (!comp.instance) {
 		comp.instance = CreateScript(comp.scriptPath);
@@ -58,14 +59,14 @@ void ScriptEngine::Execute(SceneObject& obj, GameScene* scene, float dt) {
 			if (!comp.parameterData.empty()) {
 				comp.instance->DeserializeParameters(comp.parameterData);
 			}
-			comp.instance->Start(obj, scene);
+			comp.instance->Start(entity, scene);
 		} else {
 			return;
 		}
 	}
 
 	if (comp.instance) {
-		comp.instance->Update(obj, scene, dt);
+		comp.instance->Update(entity, scene, dt);
 	}
 }
 

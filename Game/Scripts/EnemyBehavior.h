@@ -47,13 +47,13 @@ namespace Game {
 class EnemyBehavior : public IScript {
 public:
 	// 初期化処理（シーン開始時に1回呼ばれる）
-	void Start(SceneObject& obj, GameScene* scene) override;
+	void Start(entt::entity entity, GameScene* scene) override;
 
 	// 毎フレーム処理
-	void Update(SceneObject& obj, GameScene* scene, float dt) override;
+	void Update(entt::entity entity, GameScene* scene, float dt) override;
 
 	// オブジェクト破棄時の処理
-	void OnDestroy(SceneObject& obj, GameScene* scene) override;
+	void OnDestroy(entt::entity entity, GameScene* scene) override;
 
 	// ImGuiでパラメータをいじる
 	void OnEditorUI() override;
@@ -64,13 +64,13 @@ public:
 
 private:
 	// ターゲットを検索して更新する関数
-	void SearchTarget(SceneObject& obj, GameScene* scene);
+	void SearchTarget(entt::entity entity, GameScene* scene);
 
 	// オブジェクトの移動処理
-	void Move(SceneObject& obj, GameScene* scene, float dt);
+	void Move(entt::entity entity, GameScene* scene, float dt);
 
 	// オブジェクトの周囲をチェックする関数
-	void ScanSurround(SceneObject& obj, GameScene* scene);
+	void ScanSurround(entt::entity entity, GameScene* scene);
 
 	// targetの方向をグリッドに直してA*アルゴリズムを実行する
 	void AStar();
@@ -83,7 +83,7 @@ private:
 
 private: // メンバ変数
 	// 自身の情報を持たせておく
-	SceneObject* pOwner_ = nullptr; // 自分のオブジェクトへのポインタ
+	uint32_t ownerId_ = 0; // 自分のオブジェクトのID
 	GameScene* pCurrentScene_ = nullptr; // 現在のシーンへのポインタ
 
 	// 動きのタイプ
@@ -98,7 +98,7 @@ private: // メンバ変数
 	// 参照するObjectのポインタと位置
 	// 初期値はPlayer
 	std::string targetName_ = "Player";	// 一旦初期値をPlayerに
-	const SceneObject* target_ = nullptr;
+	uint32_t targetId_ = 0;
 	DirectX::XMFLOAT3 myPos_ = {};
 	float groundHeight_ = 0.0f;	// FlyTypeが地面の高さを取るため
 	DirectX::XMFLOAT3 targetPos_ = {}; // 移動速度
