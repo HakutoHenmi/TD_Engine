@@ -47,11 +47,20 @@
       <Filter>Scripts</Filter>
     </ClCompile>
     <ClCompile Include="Game\Scripts\PipeScript.cpp" />
-    <ClCompile Include="Game\Scripts\PhaseSystemScript.cpp" />
     <ClCompile Include="Game\Scripts\PreparationCamera.cpp" />
     <ClCompile Include="Game\Scripts\EnemySpawnerScript.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Scripts\ExperienceHopper.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Scripts\ExperienceMiner.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Scripts\ExperienceOrbScript.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Scripts\PahaseSystemScript.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
@@ -138,6 +147,15 @@
     <ClInclude Include="Game\Scripts\PhaseSystemScript.h" />
     <ClInclude Include="Game\Scripts\PreparationCamera.h" />
     <ClInclude Include="Game\Scripts\EnemySpawnerScript.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Scripts\ExperienceHopper.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Scripts\ExperienceMiner.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Scripts\ExperienceOrbScript.h">
       <Filter>Scripts</Filter>
     </ClInclude>
   </ItemGroup>

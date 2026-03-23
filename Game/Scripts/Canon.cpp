@@ -7,7 +7,6 @@
 
 #include "../imgui/imgui.h"
 
-
 namespace Game {
 
 // タグ走査
@@ -116,7 +115,7 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 		auto& otherTc = enemyView.get<TransformComponent>(other);
 		float dx = otherTc.translate.x - canonTc.translate.x;
 		float dz = otherTc.translate.z - canonTc.translate.z;
-		float distance = std::sqrt(dx * dx + dz * dz);
+		float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
 
 		if (distance < bestDistance) {
 			bestDistance = distance;
@@ -135,6 +134,7 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	// 大砲を敵の方向へ向ける
 	float desiredYaw = std::atan2(toX, toZ);
 	canonTc.rotate.y = desiredYaw;
+	obj.rotate.x = -desiredPitch;
 
 	// クールダウン中なら撃たない（向くだけ）
 	if (attackTimer_ > 0.0f) {

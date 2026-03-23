@@ -191,8 +191,11 @@ exit /b 0
     <ClCompile Include="Game\Scripts\BulletScript.cpp" />
     <ClCompile Include="Game\Scripts\Canon.cpp" />
     <ClCompile Include="Game\Scripts\EnemyAIScript.cpp" />
+    <ClCompile Include="Game\Scripts\ExperienceHopper.cpp" />
+    <ClCompile Include="Game\Scripts\ExperienceMiner.cpp" />
+    <ClCompile Include="Game\Scripts\ExperienceOrbScript.cpp" />
     <ClCompile Include="Game\Scripts\KamikazeEnemyScript.cpp" />
-    <ClCompile Include="Game\Scripts\PhaseSystemScript.cpp" />
+    <ClCompile Include="Game\Scripts\PahaseSystemScript.cpp" />
     <ClCompile Include="Game\Scripts\PipeScript.cpp" />
     <ClCompile Include="Game\Scripts\PlayerScript.cpp" />
     <ClCompile Include="Game\Scripts\PreparationCamera.cpp" />
@@ -215,6 +218,9 @@ exit /b 0
     <ClInclude Include="Game\Scripts\BulletScript.h" />
     <ClInclude Include="Game\Scripts\Canon.h" />
     <ClInclude Include="Game\Scripts\EnemyAIScript.h" />
+    <ClInclude Include="Game\Scripts\ExperienceHopper.h" />
+    <ClInclude Include="Game\Scripts\ExperienceMiner.h" />
+    <ClInclude Include="Game\Scripts\ExperienceOrbScript.h" />
     <ClInclude Include="Game\Scripts\IScript.h" />
     <ClInclude Include="Game\Scripts\KamikazeEnemyScript.h" />
     <ClInclude Include="Game\Scripts\PhaseSystemScript.h" />

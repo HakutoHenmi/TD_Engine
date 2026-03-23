@@ -169,11 +169,11 @@
     {
       "id": 69,
       "parentId": 0,
-      "name": "ExperienceHopper_1",
+      "name": "ExperienceHopper",
       "locked": false,
       "modelPath": "Resources\\suzanne.obj",
       "texturePath": "",
-      "translate": [-2.95883, 0.2942, -5.45936],
+      "translate": [-2.89887, 0.2942, -5.46827],
       "rotate": [0, 3.15, 0],
       "scale": [1, 1, 1],
       "color": [1, 1, 1, 1],
@@ -183,10 +183,7 @@
         {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources\\suzanne.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
         {"type": "Tag", "enabled": true, "tag": "ExperienceHopper"},
         {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [1,1,1], "damage": 10, "isActive": false, "tag": "Default"},
-        {"type": "Script", "enabled": true, "scriptPath": "ExperienceHopper"},
-        {"type": "Script", "enabled": true, "scriptPath": ""},
-        {"type": "Script", "enabled": true, "scriptPath": ""},
-        {"type": "Script", "enabled": true, "scriptPath": ""}
+        {"type": "Script", "enabled": true, "scriptPath": "ExperienceHopper", "paramData": ""}
       ]
     },
     {
@@ -205,7 +202,7 @@
       "components": [
         {"type": "Tag", "enabled": true, "tag": "ExperienceMiner"},
         {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "damage": 10, "isActive": false, "tag": "Default"},
-        {"type": "Script", "enabled": true, "scriptPath": "ExperienceMiner"}
+        {"type": "Script", "enabled": true, "scriptPath": "ExperienceMiner", "paramData": ""}
       ]
     },
     {
@@ -304,6 +301,31 @@
         {"type": "Tag", "enabled": true, "tag": "Pipe"},
         {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "damage": 10, "isActive": false, "tag": "Default"},
         {"type": "Script", "enabled": true, "scriptPath": "PipeScript", "paramData": ""}
+      ]
+    },
+    {
+      "id": 70,
+      "parentId": 0,
+      "name": "Player",
+      "locked": false,
+      "modelPath": "Resources/cube/cube.obj",
+      "texturePath": "Resources/white1x1.png",
+      "translate": [-8.44451, 1.45497, -9.94725],
+      "rotate": [0, 0, 0],
+      "scale": [1, 2, 1.01],
+      "color": [0.157876, 0.0673514, 0.969112, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [2,2,2], "isTrigger": false},
+        {"type": "Tag", "enabled": true, "tag": "Player"},
+        {"type": "Rigidbody", "enabled": true, "velocity": [0,0,0], "useGravity": false, "isKinematic": false},
+        {"type": "PlayerInput", "enabled": true},
+        {"type": "CharacterMovement", "enabled": true, "speed": 5, "jumpPower": 6, "gravity": 9.8},
+        {"type": "CameraTarget", "enabled": true, "distance": 10, "height": 3, "smoothSpeed": 5},
+        {"type": "Health", "enabled": true, "hp": 100, "maxHp": 100, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
+        {"type": "Script", "enabled": true, "scriptPath": "PlayerScript", "paramData": ""}
       ]
     },
     {

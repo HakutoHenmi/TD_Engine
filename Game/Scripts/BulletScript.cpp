@@ -21,9 +21,6 @@ void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	tc.translate.x += moveX;
 	tc.translate.z += moveZ;
-
-	// 衝突時の死亡フラグは Hitbox と Hurtbox の処理で GameScene.cpp 側がやっているため、
-	// ここは移動のみ。寿命による消滅も GameScene.cpp が担っている。
 }
 
 void BulletScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {

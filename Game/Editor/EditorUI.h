@@ -8,6 +8,8 @@
 #include <deque>
 #include <DirectXMath.h>
 
+struct ImVec2;
+
 namespace Game {
 
 class GameScene;

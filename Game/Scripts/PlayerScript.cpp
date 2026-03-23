@@ -1,11 +1,11 @@
 #include "PlayerScript.h"
+#include "../../externals/imgui/imgui.h"
 #include "ObjectTypes.h"
+#include "PhaseSystemScript.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
-#include <iostream>
 #include <cmath>
-
-#include "PhaseSystemScript.h"
+#include <iostream>
 
 namespace Game {
 
@@ -79,6 +79,20 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		if (scene->GetRegistry().get<HealthComponent>(entity).isDead) return;
 	}
 
+	
+
+	if (!isSubscribed_) {
+		scene->GetEventSystem().Subscribe("GainGold", [this](float amount) {
+			experience_ += amount;
+
+			debugReceiveCount_ += 1;
+			debugLastValue_ = amount;
+		});
+
+		debugSubscribeCount_ += 1;
+		isSubscribed_ = true;
+	}
+
 	if (PhaseSystemScript::IsPreparation()) {
 		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) scene->GetRegistry().get<CameraTargetComponent>(entity).enabled = false;
 		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))  scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = false;
@@ -89,7 +103,15 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) scene->GetRegistry().get<CameraTargetComponent>(entity).enabled = true;
 		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))  scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = true;
 	}
-	
+
+ImGui::Begin("Player Debug");
+
+	ImGui::Text("Experience: %.1f", experience_);
+	ImGui::Text("Subscribe Count: %d", debugSubscribeCount_);
+	ImGui::Text("Receive Count: %d", debugReceiveCount_);
+	ImGui::Text("Last Value: %.2f", debugLastValue_);
+
+	ImGui::End();
 }
 
 void PlayerScript::UpdateMovement(entt::entity entity, GameScene* scene, float /*dt*/) {
@@ -204,24 +226,30 @@ void PlayerScript::UpdateSword(entt::entity entity, GameScene* scene, float /*dt
 	}
 	if (sword == entt::null) return;
 
-	DirectX::XMFLOAT3 currentSwordRotRad = { 0, 0, 0 };
+	DirectX::XMFLOAT3 currentSwordRotRad = {0, 0, 0};
 	bool hitboxActive = false;
 
 	if (isAttacking_) {
 		float t = 0.0f;
 		DirectX::XMFLOAT3 swordStart = startSwordRot_;
-		DirectX::XMFLOAT3 swordEnd = { 0, 0, 0 };
-		DirectX::XMFLOAT3 bodyEnd = { 0, 0, 0 };
+		DirectX::XMFLOAT3 swordEnd = {0, 0, 0};
+		DirectX::XMFLOAT3 bodyEnd = {0, 0, 0};
 
 		if (comboCount_ == 1) { // 1段目
 			if (currentPhase_ == AttackPhase::WindUp) {
 				t = EaseOutCubic(1.0f - (attackTimer_ / 0.2f));
-				swordEnd.x = 5; swordEnd.y = 110; swordEnd.z = -20;
+				swordEnd.x = 5;
+				swordEnd.y = 110;
+				swordEnd.z = -20;
 				bodyEnd.y = DirectX::XMConvertToRadians(-25.0f);
 			} else {
 				t = EaseOutExpo(1.0f - (attackTimer_ / 0.25f));
-				swordStart.x = 5; swordStart.y = 110; swordStart.z = -20;
-				swordEnd.x = 0; swordEnd.y = -110; swordEnd.z = 20;
+				swordStart.x = 5;
+				swordStart.y = 110;
+				swordStart.z = -20;
+				swordEnd.x = 0;
+				swordEnd.y = -110;
+				swordEnd.z = 20;
 				bodyEnd.y = DirectX::XMConvertToRadians(30.0f);
 				bodyEnd.z = DirectX::XMConvertToRadians(5.0f);
 				hitboxActive = true;
@@ -229,12 +257,18 @@ void PlayerScript::UpdateSword(entt::entity entity, GameScene* scene, float /*dt
 		} else if (comboCount_ == 2) { // 2段目
 			if (currentPhase_ == AttackPhase::WindUp) {
 				t = EaseOutCubic(1.0f - (attackTimer_ / 0.2f));
-				swordEnd.x = 50; swordEnd.y = -60; swordEnd.z = 20;
+				swordEnd.x = 50;
+				swordEnd.y = -60;
+				swordEnd.z = 20;
 				bodyEnd.x = DirectX::XMConvertToRadians(10.0f);
 			} else {
 				t = EaseOutBack(1.0f - (attackTimer_ / 0.25f));
-				swordStart.x = 50; swordStart.y = -60; swordStart.z = 20;
-				swordEnd.x = -40; swordEnd.y = 50; swordEnd.z = -20;
+				swordStart.x = 50;
+				swordStart.y = -60;
+				swordStart.z = 20;
+				swordEnd.x = -40;
+				swordEnd.y = 50;
+				swordEnd.z = -20;
 				bodyEnd.x = DirectX::XMConvertToRadians(-15.0f);
 				bodyEnd.y = DirectX::XMConvertToRadians(-10.0f);
 				hitboxActive = true;
@@ -242,17 +276,24 @@ void PlayerScript::UpdateSword(entt::entity entity, GameScene* scene, float /*dt
 		} else if (comboCount_ == 3) { // 3段目
 			if (currentPhase_ == AttackPhase::WindUp) {
 				t = EaseOutCubic(1.0f - (attackTimer_ / 0.25f));
-				swordEnd.x = -130; swordEnd.y = 10; swordEnd.z = 0;
+				swordEnd.x = -130;
+				swordEnd.y = 10;
+				swordEnd.z = 0;
 				bodyEnd.x = DirectX::XMConvertToRadians(-25.0f);
 			} else if (currentPhase_ == AttackPhase::Swing) {
 				t = EaseOutQuint(1.0f - (attackTimer_ / 0.35f));
-				swordStart.x = -130; swordStart.y = 10; swordStart.z = 0;
-				swordEnd.x = 90; swordEnd.y = 0; swordEnd.z = 0;
+				swordStart.x = -130;
+				swordStart.y = 10;
+				swordStart.z = 0;
+				swordEnd.x = 90;
+				swordEnd.y = 0;
+				swordEnd.z = 0;
 				bodyEnd.x = DirectX::XMConvertToRadians(40.0f);
 				hitboxActive = true;
 			} else {
 				t = 1.0;
-				swordEnd.x = 90; bodyEnd.x = DirectX::XMConvertToRadians(35.0f);
+				swordEnd.x = 90;
+				bodyEnd.x = DirectX::XMConvertToRadians(35.0f);
 			}
 		}
 
@@ -274,8 +315,12 @@ void PlayerScript::UpdateSword(entt::entity entity, GameScene* scene, float /*dt
 		currentBodyRot_.z = startBodyRot_.z * (1.0f - t);
 	} else {
 		// 待機中
-		currentSwordRot_.x = 0; currentSwordRot_.y = 0; currentSwordRot_.z = 0;
-		currentBodyRot_.x = 0; currentBodyRot_.y = 0; currentBodyRot_.z = 0;
+		currentSwordRot_.x = 0;
+		currentSwordRot_.y = 0;
+		currentSwordRot_.z = 0;
+		currentBodyRot_.x = 0;
+		currentBodyRot_.y = 0;
+		currentBodyRot_.z = 0;
 	}
 
 	currentSwordRotRad.x = DirectX::XMConvertToRadians(currentSwordRot_.x);
