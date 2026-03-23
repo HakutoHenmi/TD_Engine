@@ -7,7 +7,7 @@
   },
   "objects": [
     {
-      "id": 11534342,
+      "id": 2097158,
       "parentId": 4294967295,
       "name": "Base",
       "locked": false,
@@ -20,7 +20,7 @@
       ]
     },
     {
-      "id": 11534341,
+      "id": 2097157,
       "parentId": 4294967295,
       "name": "PlayerSword",
       "locked": true,
@@ -32,20 +32,21 @@
       ]
     },
     {
-      "id": 11534340,
+      "id": 2097156,
       "parentId": 4294967295,
-      "name": "plane",
+      "name": "Floor",
       "locked": true,
       "translate": [0, 0, 0],
       "rotate": [-1.57, 0, 0],
       "scale": [100, 100, 100],
       "components": [
         {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/plane.obj", "texturePath": "Resources/white1x1.png", "shaderName": "Default", "color": [0.698842,0.307598,0.307598,1], "uvTiling": [1,1], "uvOffset": [0,0]},
-        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,1,1], "isTrigger": false}
+        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,1,1], "isTrigger": false},
+        {"type": "Tag", "enabled": true, "tag": "Floor"}
       ]
     },
     {
-      "id": 11534339,
+      "id": 2097155,
       "parentId": 4294967295,
       "name": "Camera",
       "locked": false,
@@ -62,7 +63,7 @@
       ]
     },
     {
-      "id": 11534338,
+      "id": 2097154,
       "parentId": 4294967295,
       "name": "Player",
       "locked": true,
@@ -83,7 +84,7 @@
       ]
     },
     {
-      "id": 11534337,
+      "id": 2097153,
       "parentId": 4294967295,
       "name": "Sun",
       "locked": true,
@@ -95,7 +96,7 @@
       ]
     },
     {
-      "id": 11534336,
+      "id": 2097152,
       "parentId": 4294967295,
       "name": "UI",
       "locked": true,
