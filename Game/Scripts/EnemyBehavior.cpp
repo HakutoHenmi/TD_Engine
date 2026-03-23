@@ -266,12 +266,43 @@ void EnemyBehavior::ScanSurround(SceneObject& obj, GameScene* scene) {
 	float snappedX = std::floor(myPos_.x / cellLength_) * cellLength_;
 	float snappedZ = std::floor(myPos_.z / cellLength_) * cellLength_;
 
+	// 自分が立っている場所の地面の高さを基準にする
+	float currentGroundHeight = scene->GetHeightAt(myPos_.x, myPos_.z, obj.id);
+
 	// グリッドの初期化
 	for (int z = 0; z < GRID_SIZE; ++z) {
 		for (int x = 0; x < GRID_SIZE; ++x) {
 			localGrid_[z][x].isWall = false;
 			localGrid_[z][x].gridX = x;
 			localGrid_[z][x].gridZ = z;
+
+			// 急な坂を壁として判定する処理
+			if(type_ == Walk) {
+				// 各セルの中心座標を計算
+				float cellWorldX = snappedX + (x - GRID_SIZE / 2) * cellLength_;
+				float cellWorldZ = snappedZ + (z - GRID_SIZE / 2) * cellLength_;
+
+				// その場所の地面の高さを取得
+				float cellHeight = scene->GetHeightAt(cellWorldX, cellWorldZ, obj.id);
+
+				// 自分の位置からそのマスまでの距離を計算する
+				float dx = (float)(x - GRID_SIZE / 2);
+				float dz = (float)(z - GRID_SIZE / 2);
+				float dist = std::sqrt(dx * dx + dz * dz);
+
+				// 坂の許容範囲
+				float maxSlope = 1.0f; // 45度の坂を許容する（調整可能）
+				float heightDiff = std::abs(cellHeight - currentGroundHeight);
+
+				if (heightDiff > (dist * cellLength_ * maxSlope)) {
+					localGrid_[z][x].isWall = true;
+				}
+
+				// あまりにも高い段差（垂直な壁）は距離に関わらずブロック
+				if (heightDiff > 3.0f) {
+					localGrid_[z][x].isWall = true;
+				}
+			}
 		}
 	}
 
