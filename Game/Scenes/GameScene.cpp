@@ -363,7 +363,7 @@ float GameScene::GetHeightAt(float x, float z, float startY, uint32_t excludeId)
 		}
 	}
 
-	return hitAny ? maxHeight : 0.0f;
+	return hitAny ? maxHeight : -10000.0f;
 }
 
 bool GameScene::RayCast(const Engine::Vector3& origin, const Engine::Vector3& direction, float maxDist, uint32_t excludeId, float& outDist) {
