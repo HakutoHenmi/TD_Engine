@@ -91,14 +91,26 @@ public:
 				if (!registry.valid(defenderEntity)) continue;
 				if (registry.all_of<HurtboxComponent>(defenderEntity)) continue; // Hurtbox持ちは既に処理済み
 
+				// プレイヤーと自身の剣の間での当たり判定をスキップ
+				bool skipSelfDamage = false;
+				if (registry.all_of<TagComponent>(attackerEntity) && registry.all_of<TagComponent>(defenderEntity)) {
+					auto& aTag = registry.get<TagComponent>(attackerEntity).tag;
+					auto& dTag = registry.get<TagComponent>(defenderEntity).tag;
+					if ((aTag == "Player" && dTag == "PlayerSword") ||
+						(aTag == "PlayerSword" && dTag == "Player")) {
+						skipSelfDamage = true;
+					}
+				}
+				if (skipSelfDamage) continue;
+
 				auto& bc = registry.get<BoxColliderComponent>(defenderEntity);
 				auto& dTc = registry.get<TransformComponent>(defenderEntity);
 				if (!bc.enabled) continue;
 
 				DirectX::XMFLOAT3 hBPos = {
-					dTc.translate.x + bc.center.x,
-					dTc.translate.y + bc.center.y,
-					dTc.translate.z + bc.center.z
+					dTc.translate.x + bc.center.x * std::abs(dTc.scale.x),
+					dTc.translate.y + bc.center.y * std::abs(dTc.scale.y),
+					dTc.translate.z + bc.center.z * std::abs(dTc.scale.z)
 				};
 				DirectX::XMFLOAT3 defSize = {
 					bc.size.x * std::abs(dTc.scale.x),
@@ -112,6 +124,7 @@ public:
 						if (hc.invincibleTime <= 0.0f) {
 							hc.hp -= hitbox.damage;
 							hc.invincibleTime = 0.5f;
+							ApplyKnockback(registry, attackerEntity, defenderEntity);
 						}
 					}
 
