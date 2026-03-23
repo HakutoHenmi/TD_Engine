@@ -66,7 +66,7 @@ public:
 	// ★追加: 実行ファイルの場所に関わらず必ずTD_Engineプロジェクトを指す絶対パスを取得
 	static std::string GetUnifiedProjectPath(const std::string& path);
 	static void AddScene(GameScene* scene, const std::string& path);
-	static void LoadPrefab(GameScene* scene, const std::string& path);
+	static std::vector<entt::entity> LoadPrefab(GameScene* scene, const std::string& path);
 
 	// ★追加: 初期化（アイコンのロードなど）
 	static void Initialize(Engine::Renderer* renderer);
