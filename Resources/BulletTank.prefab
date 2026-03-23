@@ -14,7 +14,8 @@
       "extraTexturePaths": [],
       "shaderName": "Default",
       "components": [
-        {"type": "Tag", "enabled": true, "tag": "BulletTank"}
+        {"type": "Tag", "enabled": true, "tag": "BulletTank"},
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
       ]
     }
 }

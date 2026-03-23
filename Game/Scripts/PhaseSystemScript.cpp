@@ -135,7 +135,7 @@ bool PhaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3&
 		const auto& nc = terrainView.get<NameComponent>(entity);
 		const auto& tc = terrainView.get<TransformComponent>(entity);
 
-		bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || (nc.name.find("Floor") != std::string::npos);
+		bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || (nc.name.find("Floor") != std::string::npos) || (nc.name.find("Ground") != std::string::npos) || (nc.name.find("Stage") != std::string::npos);
 		if (!isTerrain)
 			continue;
 
@@ -240,11 +240,14 @@ bool PhaseSystemScript::IsPlacementBlocked(GameScene* scene, const Engine::Vecto
 	auto& registry = scene->GetRegistry();
 	auto view = registry.view<TransformComponent>();
 	for (auto entity : view) {
-		// Terrain や Floor は除外したいが、TransformComponent だけでは判定できない
-		// 名前が必要
+		// MeshRenderer, BoxCollider, GpuMeshCollider のいずれも持たないエンティティ（不可視のシステムオブジェクトなど）は無視する
+		if (!registry.any_of<MeshRendererComponent, BoxColliderComponent, GpuMeshColliderComponent>(entity)) {
+			continue;
+		}
+
 		if (registry.all_of<NameComponent>(entity)) {
 			const auto& nc = registry.get<NameComponent>(entity);
-			const bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || (nc.name.find("Floor") != std::string::npos);
+			const bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || (nc.name.find("Floor") != std::string::npos) || (nc.name.find("Ground") != std::string::npos) || (nc.name.find("Stage") != std::string::npos);
 			if (isTerrain)
 				continue;
 		}
@@ -269,29 +272,27 @@ void PhaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector
 	auto& registry = scene->GetRegistry();
 
 	if (IsPrefabPath(objPath)) {
-		// 現在のエンティティ一覧を記録
-		std::vector<entt::entity> beforeEntities;
-		for (auto entity : registry.storage<entt::entity>()) {
-			beforeEntities.push_back(entity);
+		EditorUI::Log("Spawning prefab: " + objPath);
+		std::vector<entt::entity> createdEntities = EditorUI::LoadPrefab(scene, objPath);
+
+		if (createdEntities.empty()) {
+			EditorUI::LogError("SpawnPlacedObject: LoadPrefab returned 0 entities for " + objPath);
+			return;
 		}
 
-		EditorUI::LoadPrefab(scene, objPath);
-
-		// 新しく追加されたエンティティを見つける
-		for (auto entity : registry.storage<entt::entity>()) {
-			bool found = false;
-			for(auto b : beforeEntities) { if(b == entity) { found = true; break; } }
-			if (!found) {
-				// 新しいエンティティの座標をセット
-				if (registry.all_of<TransformComponent>(entity)) {
-					auto& tc = registry.get<TransformComponent>(entity);
-					// 親がいない（ルート）のエンティティのみ座標を更新
-					if (!registry.all_of<HierarchyComponent>(entity) || registry.get<HierarchyComponent>(entity).parentId == entt::null) {
-						tc.translate = {hitPoint.x, hitPoint.y + 0.5f, hitPoint.z};
-					}
+		// 新しく追加されたエンティティの座標をセット
+		int movedCount = 0;
+		for (auto entity : createdEntities) {
+			if (registry.all_of<TransformComponent>(entity)) {
+				auto& tc = registry.get<TransformComponent>(entity);
+				// 親がいない（ルート）のエンティティのみ座標を更新
+				if (!registry.all_of<HierarchyComponent>(entity) || registry.get<HierarchyComponent>(entity).parentId == entt::null) {
+					tc.translate = {hitPoint.x, hitPoint.y + 0.5f, hitPoint.z};
+					movedCount++;
 				}
 			}
 		}
+		EditorUI::Log("Prefab spawned and positioned. Root entities moved: " + std::to_string(movedCount));
 		return;
 	}
 

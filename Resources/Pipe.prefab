@@ -14,7 +14,7 @@
       "extraTexturePaths": [],
       "shaderName": "Default",
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"},
         {"type": "Tag", "enabled": true, "tag": "Pipe"},
         {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "damage": 10, "isActive": false, "tag": "Default"},
         {"type": "Script", "enabled": true, "scriptPath": "PipeScript", "paramData": ""}

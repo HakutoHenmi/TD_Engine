@@ -25,7 +25,7 @@
       ]
     },
     {
-      "name": "PahaseSystem",
+      "name": "PhaseSystem",
       "locked": true,
       "modelPath": "",
       "texturePath": "Resources/white1x1.png",
@@ -36,7 +36,7 @@
       "extraTexturePaths": [],
       "shaderName": "Default",
       "components": [
-        {"type": "Script", "enabled": true, "scriptPath": "PahaseSystemScript"}
+        {"type": "Script", "enabled": true, "scriptPath": "PhaseSystemScript"}
       ]
     },
     {

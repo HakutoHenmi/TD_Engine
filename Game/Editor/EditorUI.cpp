@@ -34,8 +34,8 @@ namespace fs = std::filesystem;
 std::string EditorUI::currentScenePath = "Resources/scene.json";
 
 // シーン復元ヘルパー (ID保持とヒエラルキー解決)
-static void RestoreSceneFromJson(GameScene* scene, const json& j, bool append) {
-	if (!scene) return;
+static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const json& j, bool append) {
+	if (!scene) return {};
 	auto& reg = scene->GetRegistry();
 	if (!append) {
 		reg.clear();
@@ -60,13 +60,14 @@ static void RestoreSceneFromJson(GameScene* scene, const json& j, bool append) {
 	// Pass 1: Entity Creation & ID Mapping
 	if (j.contains("objects") && j["objects"].is_array()) {
 		for (auto& obj : j["objects"]) {
-			entt::entity newEntity = reg.create();
+			std::string name = obj.value("name", "Object");
+			entt::entity newEntity = scene->CreateEntity(name);
 			entitiesInJson.push_back(newEntity);
 			uint32_t savedId = obj.value("id", (uint32_t)entt::null);
 			if (savedId != (uint32_t)entt::null) idMap[savedId] = newEntity;
 		}
 	} else {
-		return;
+		return {};
 	}
 
 	// Pass 2: Component Restoration & Hierarchy Linking
@@ -100,7 +101,14 @@ static void RestoreSceneFromJson(GameScene* scene, const json& j, bool append) {
 
 				if (type == "MeshRenderer") {
 					auto& c = reg.get_or_emplace<MeshRendererComponent>(entity);
-					c.enabled = en; c.modelPath = comp.value("modelPath", ""); c.texturePath = comp.value("texturePath", "");
+					c.enabled = en;
+					c.modelPath = comp.value("modelPath", "");
+					if (c.modelPath.empty()) c.modelPath = obj.value("modelPath", "");
+					c.texturePath = comp.value("texturePath", "");
+					if (c.texturePath.empty()) c.texturePath = obj.value("texturePath", "");
+					c.shaderName = comp.value("shaderName", "");
+					if (c.shaderName.empty()) c.shaderName = obj.value("shaderName", "Default");
+
 					if (comp.contains("color")) c.color = {comp["color"][0], comp["color"][1], comp["color"][2], comp["color"][3]};
 					if (comp.contains("uvTiling")) c.uvTiling = {comp["uvTiling"][0], comp["uvTiling"][1]};
 					if (comp.contains("uvOffset")) c.uvOffset = {comp["uvOffset"][0], comp["uvOffset"][1]};
@@ -163,7 +171,10 @@ static void RestoreSceneFromJson(GameScene* scene, const json& j, bool append) {
 					c.enabled = en; c.showHealthBar = comp.value("showHealthBar", true);
 				} else if (type == "GpuMeshCollider") {
 					auto& c = reg.get_or_emplace<GpuMeshColliderComponent>(entity);
-					c.enabled = en; c.meshPath = comp.value("meshPath", ""); c.isTrigger = comp.value("isTrigger", false);
+					c.enabled = en;
+					c.meshPath = comp.value("meshPath", "");
+					if (c.meshPath.empty()) c.meshPath = obj.value("modelPath", "");
+					c.isTrigger = comp.value("isTrigger", false);
 					if (!c.meshPath.empty()) c.meshHandle = Engine::Renderer::GetInstance()->LoadObjMesh(c.meshPath);
 				} else if (type == "Animator") {
 					auto& c = reg.get_or_emplace<AnimatorComponent>(entity);
@@ -192,6 +203,7 @@ static void RestoreSceneFromJson(GameScene* scene, const json& j, bool append) {
 			}
 		}
 	}
+	return entitiesInJson;
 }
 
 // ====== Static State ======
@@ -353,7 +365,7 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 	if (auto* cp = registry.try_get<MeshRendererComponent>(entity)) {
 		addComma();
 		ss << "        {\"type\": \"MeshRenderer\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"modelPath\": \"" << EscapeJson(cp->modelPath) << "\", \"texturePath\": \""
-		   << EscapeJson(cp->texturePath) << "\", \"color\": [" << cp->color.x << "," << cp->color.y << "," << cp->color.z << "," << cp->color.w << "], \"uvTiling\": [" << cp->uvTiling.x << "," << cp->uvTiling.y << "], \"uvOffset\": [" << cp->uvOffset.x << "," << cp->uvOffset.y << "]}";
+		   << EscapeJson(cp->texturePath) << "\", \"shaderName\": \"" << EscapeJson(cp->shaderName) << "\", \"color\": [" << cp->color.x << "," << cp->color.y << "," << cp->color.z << "," << cp->color.w << "], \"uvTiling\": [" << cp->uvTiling.x << "," << cp->uvTiling.y << "], \"uvOffset\": [" << cp->uvOffset.x << "," << cp->uvOffset.y << "]}";
 	}
 	if (auto* cp = registry.try_get<BoxColliderComponent>(entity)) {
 		addComma();
@@ -562,36 +574,50 @@ static void LoadSceneInternal(GameScene* scene, const std::string& path, bool ap
 
 void EditorUI::LoadScene(GameScene* scene, const std::string& path) {
 	currentScenePath = path;
-	LoadSceneInternal(scene, path, false);
+	(void)LoadSceneInternal(scene, path, false);
 }
-void EditorUI::AddScene(GameScene* scene, const std::string& path) { LoadSceneInternal(scene, path, true); }
+void EditorUI::AddScene(GameScene* scene, const std::string& path) { (void)LoadSceneInternal(scene, path, true); }
 
 void EditorUI::LoadFromMemory(GameScene* scene, const std::string& data) {
 	if (!scene) return;
 	json j;
 	try { j = json::parse(data); } catch (...) { LogError("JSON Parse Error in memory snapshot"); return; }
-	RestoreSceneFromJson(scene, j, false);
+	(void)RestoreSceneFromJson(scene, j, false);
 }
-void EditorUI::LoadPrefab(GameScene* scene, const std::string& path) {
-	if (!scene) return;
+std::vector<entt::entity> EditorUI::LoadPrefab(GameScene* scene, const std::string& path) {
+	if (!scene) return {};
 	std::string absPath = GetUnifiedProjectPath(path);
 	std::ifstream f(absPath);
 	if (!f.is_open()) {
 		absPath = path; f.open(absPath);
-		if (!f.is_open()) { LogError("Prefab load failed: " + absPath); return; }
+		if (!f.is_open()) { LogError("Prefab load failed: " + absPath); return {}; }
 	}
 	json j;
-	try { f >> j; } catch (...) { LogError("Prefab JSON error: " + path); return; }
+	try { f >> j; } catch (...) { LogError("Prefab JSON error: " + path); return {}; }
 	
-	if (j.contains("objects")) {
-		RestoreSceneFromJson(scene, j, true); // Append mode
+	std::vector<entt::entity> createdEntities;
+	if (j.contains("objects") && j["objects"].is_array()) {
+		createdEntities = RestoreSceneFromJson(scene, j, true); // Append mode
+	} else if (j.contains("prefab")) {
+		// Support "prefab" root key
+		json wrapper = json::object();
+		wrapper["objects"] = json::array();
+		wrapper["objects"].push_back(j["prefab"]);
+		createdEntities = RestoreSceneFromJson(scene, wrapper, true);
 	} else {
 		// Single entity prefab
-		json wrapper;
-		wrapper["objects"] = {j};
-		RestoreSceneFromJson(scene, wrapper, true);
+		json wrapper = json::object();
+		wrapper["objects"] = json::array();
+		wrapper["objects"].push_back(j);
+		createdEntities = RestoreSceneFromJson(scene, wrapper, true);
 	}
-	Log("Prefab loaded: " + path);
+
+	if (createdEntities.empty()) {
+		LogError("Prefab created no entities: " + path);
+	} else {
+		Log("Prefab loaded: " + path + " (" + std::to_string(createdEntities.size()) + " entities)");
+	}
+	return createdEntities;
 }
 
 std::string EditorUI::GetUnifiedProjectPath(const std::string& path) {
