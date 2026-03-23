@@ -110,6 +110,13 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 		auto& tagComponent = scene->GetRegistry().emplace<TagComponent>(enemy);
 		tagComponent.tag = "Enemy";
 
+		auto& hbComponent = scene->GetRegistry().emplace<HitboxComponent>(enemy);
+		hbComponent.isActive = true;
+		hbComponent.tag = "Enemy";
+		hbComponent.damage = 10.0f;
+		hbComponent.size = {1.0f, 2.0f, 1.0f};
+		hbComponent.enabled = true;
+
 		// スクリプトとパラメータの設定
 		auto& scComponent = scene->GetRegistry().emplace<ScriptComponent>(enemy);
 		scComponent.scripts.push_back({ enemyScriptPath, enemyScriptParams, nullptr });
