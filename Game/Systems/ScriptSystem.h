@@ -25,7 +25,7 @@ public:
 			auto entity = entities[i];
 			if (!registry.valid(entity)) return;
 			auto& sc = registry.get<ScriptComponent>(entity);
-			if (sc.enabled && !sc.scriptPath.empty()) {
+			if (sc.enabled && !sc.scripts.empty()) {
 				scriptEngine->Execute(entity, scene_, ctx.dt);
 			}
 		});
@@ -38,7 +38,9 @@ public:
 		auto view = registry.view<ScriptComponent>();
 		for (auto entity : view) {
 			auto& sc = registry.get<ScriptComponent>(entity);
-			sc.instance = nullptr;
+			for (auto& entry : sc.scripts) {
+				entry.instance = nullptr;
+			}
 		}
 	}
 
