@@ -103,7 +103,7 @@ private: // メンバ変数
 	float groundHeight_ = 0.0f;	// FlyTypeが地面の高さを取るため
 	DirectX::XMFLOAT3 targetPos_ = {}; // 移動速度
 	float totalTime_ = 0.0f;
-	float speed_ = 5.0f;
+	float speed_ = 2.0f;
 	float separationRadius_ = 1.5f; // 近づきすぎないための半径
 	float separationWeight_ = 2.0f; // 離れる力の強さ
 	float scanTimer_ = 0.0f; // ★追加: 走査の頻度を下げるためのタイマー

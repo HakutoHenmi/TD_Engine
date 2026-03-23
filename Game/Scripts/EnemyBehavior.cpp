@@ -291,7 +291,7 @@ void EnemyBehavior::ScanSurround(SceneObject& obj, GameScene* scene) {
 				float dist = std::sqrt(dx * dx + dz * dz);
 
 				// 坂の許容範囲
-				float maxSlope = 1.0f; // 45度の坂を許容する（調整可能）
+				float maxSlope = 2.0f; // 45度の坂を許容する（調整可能）
 				float heightDiff = std::abs(cellHeight - currentGroundHeight);
 
 				if (heightDiff > (dist * cellLength_ * maxSlope)) {
