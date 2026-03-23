@@ -1238,7 +1238,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				if (ImGui::CollapsingHeader("Tag", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##Tag", &tag->enabled);
 					char buf[256]; strcpy_s(buf, tag->tag.c_str());
-					if (ImGui::InputText("Tag", buf, sizeof(buf))) tag->tag = buf;
+					if (ImGui::InputText("Tag##TagInput", buf, sizeof(buf))) tag->tag = buf;
 					if (ImGui::Button("Remove##Tag")) registry.remove<TagComponent>(entity);
 				}
 			}
