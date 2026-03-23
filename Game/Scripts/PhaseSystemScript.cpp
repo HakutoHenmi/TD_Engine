@@ -54,6 +54,9 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			isPreparation_ = false;
 			isPlacementMode_ = false;
 			currentPhase_++;
+
+			std::string enemyPrefabPath = "Resources/EnemySpow" + std::to_string(currentPhase_) + ".prefab";
+			EditorUI::LoadPrefab(scene, enemyPrefabPath);
 		}
 
 	} else {
