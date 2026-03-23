@@ -106,7 +106,7 @@ public:
 					bc.size.z * std::abs(dTc.scale.z)
 				};
 
-				if (CheckAABBOverlap(hAPos, hitbox.size, hBPos, defSize)) {
+				if (CheckAABBOverlap(hAPos, hASize, hBPos, defSize)) {
 					if (registry.all_of<HealthComponent>(defenderEntity)) {
 						auto& hc = registry.get<HealthComponent>(defenderEntity);
 						if (hc.invincibleTime <= 0.0f) {
@@ -131,9 +131,10 @@ public:
 private:
 	static bool CheckAABBOverlap(const DirectX::XMFLOAT3& posA, const DirectX::XMFLOAT3& sizeA,
 		const DirectX::XMFLOAT3& posB, const DirectX::XMFLOAT3& sizeB) {
-		return std::abs(posA.x - posB.x) < (sizeA.x + sizeB.x) &&
-		       std::abs(posA.y - posB.y) < (sizeA.y + sizeB.y) &&
-		       std::abs(posA.z - posB.z) < (sizeA.z + sizeB.z);
+		// size は全幅を想定しているため、0.5倍して半辺長(extents)で判定する
+		return std::abs(posA.x - posB.x) < (sizeA.x + sizeB.x) * 0.5f &&
+		       std::abs(posA.y - posB.y) < (sizeA.y + sizeB.y) * 0.5f &&
+		       std::abs(posA.z - posB.z) < (sizeA.z + sizeB.z) * 0.5f;
 	}
 
 	static void ApplyKnockback(entt::registry& registry, entt::entity attacker, entt::entity defender) {

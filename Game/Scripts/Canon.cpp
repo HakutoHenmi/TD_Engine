@@ -158,11 +158,17 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	
 	auto& bTc = registry.emplace<TransformComponent>(bullet);
 	bTc.translate = canonTc.translate;
-	bTc.translate.y += 2.0f;
+	// 大砲の根本（支点）からのオフセット
+	float baseHeight = 2.0f;
+	bTc.translate.y += baseHeight;
 	
-	float muzzleOffset = 2.0f;
-	bTc.translate.x += std::sin(desiredYaw) * muzzleOffset;
-	bTc.translate.z += std::cos(desiredYaw) * muzzleOffset;
+	float muzzleOffset = 2.5f;
+	float cosX = std::cos(canonTc.rotate.x);
+	float sinX = std::sin(canonTc.rotate.x);
+	
+	bTc.translate.x += std::sin(canonTc.rotate.y) * cosX * muzzleOffset;
+	bTc.translate.y += -sinX * muzzleOffset;
+	bTc.translate.z += std::cos(canonTc.rotate.y) * cosX * muzzleOffset;
 	bTc.rotate = canonTc.rotate;
 	bTc.scale = {0.3f, 0.3f, 0.3f};
 
@@ -178,7 +184,7 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	bHitbox.isActive = true;
 	bHitbox.damage = damage_;
 	bHitbox.tag = "Bullet";
-	bHitbox.size = {0.3f, 0.3f, 0.3f};
+	bHitbox.size = {1.0f, 1.0f, 1.0f}; // スケール 0.3f と合わせて 0.3m の立方体にする
 
 	auto& bHealth = registry.emplace<HealthComponent>(bullet);
 	bHealth.hp = 1.0f;

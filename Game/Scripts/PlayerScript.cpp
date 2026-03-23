@@ -40,6 +40,9 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		auto& cc = scene->GetRegistry().emplace<ColorComponent>(sword);
 		cc.color = { 0.9f, 0.9f, 0.9f, 1.0f };
 
+		auto& tcTag = scene->GetRegistry().emplace<TagComponent>(sword);
+		tcTag.tag = "PlayerSword";
+
 		auto* renderer = scene->GetRenderer();
 		if (renderer) {
 			auto& mr = scene->GetRegistry().emplace<MeshRendererComponent>(sword);
@@ -53,9 +56,13 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		hb.isActive = false;
 		hb.damage = 25.0f;
 		hb.tag = "Sword";
-		hb.size = { 0.5f, 0.5f, 3.0f };
+		hb.size = { 1.0f, 1.0f, 1.0f }; // スケールを考慮して1.0に（1.0 * 1.6 = 1.6m）
 		hb.enabled = true;
 	} else {
+		// 既にタグがない場合は追加
+		if (!scene->GetRegistry().all_of<TagComponent>(sword)) {
+			scene->GetRegistry().emplace<TagComponent>(sword).tag = "PlayerSword";
+		}
 		// 既にある場合は基本的なプロパティを維持（色はエディタの設定を優先するため上書きしない）
 		scene->GetRegistry().get<TransformComponent>(sword).scale = { 0.1f, 0.1f, 1.6f };
 		if (scene->GetRegistry().all_of<MeshRendererComponent>(sword)) {
