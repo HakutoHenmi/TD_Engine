@@ -159,7 +159,7 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	auto& bTc = registry.emplace<TransformComponent>(bullet);
 	bTc.translate = canonTc.translate;
 	// 大砲の根本（支点）からのオフセット
-	float baseHeight = 2.0f;
+	float baseHeight = 0.0f;
 	bTc.translate.y += baseHeight;
 	
 	float muzzleOffset = 2.5f;
