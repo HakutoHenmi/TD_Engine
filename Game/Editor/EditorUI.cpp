@@ -1161,12 +1161,18 @@ void EditorUI::ShowInspector(GameScene* scene) {
 		ImGui::TextDisabled("ID: %d", (uint32_t)entity);
 		ImGui::SameLine();
 		if (ImGui::Button("Save Prefab")) {
-			std::string p = "Resources/Prefabs/" + (registry.all_of<NameComponent>(entity) ? registry.get<NameComponent>(entity).name : "object") + ".prefab.json";
-			std::ofstream f(GetUnifiedProjectPath(p));
+			std::string name = (registry.all_of<NameComponent>(entity) ? registry.get<NameComponent>(entity).name : "object");
+			std::string p = "Resources/" + name + ".prefab";
+			std::string fullPath = GetUnifiedProjectPath(p);
+			std::ofstream f(fullPath);
 			if (f.is_open()) {
+				f << "{\n  \"prefab\":\n";
 				f << SerializeEntity(registry, entity);
+				f << "\n}\n";
 				f.close();
 				Log("Prefab saved: " + p);
+			} else {
+				LogError("Failed to save prefab: " + fullPath);
 			}
 		}
 
