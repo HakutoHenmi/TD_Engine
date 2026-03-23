@@ -95,12 +95,7 @@ void BaseScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	hc.maxHp = 1.0f;
 
 	auto& sc = registry.emplace<ScriptComponent>(bullet);
-	sc.scriptPath = "BulletScript";
-	
-	sc.instance = ScriptEngine::GetInstance()->CreateScript(sc.scriptPath);
-	if (sc.instance) {
-		sc.instance->Start(bullet, scene);
-	}
+	sc.scripts.push_back({ "BulletScript", "", nullptr });
 
 	attackTimer_ = attackInterval_;
 }

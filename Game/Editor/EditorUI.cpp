@@ -127,7 +127,18 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 					c.useGravity = comp.value("useGravity", true); c.isKinematic = comp.value("isKinematic", false);
 				} else if (type == "Script") {
 					auto& c = reg.get_or_emplace<ScriptComponent>(entity);
-					c.enabled = en; c.scriptPath = comp.value("scriptPath", ""); c.parameterData = comp.value("parameterData", "");
+					c.enabled = en;
+					if (comp.contains("scripts") && comp["scripts"].is_array()) {
+						for (auto& s : comp["scripts"]) {
+							c.scripts.push_back({ s.value("path", ""), s.value("param", ""), nullptr });
+						}
+					} else {
+						// Backward compatibility: old format
+						std::string path = comp.value("scriptPath", "");
+						if (!path.empty()) {
+							c.scripts.push_back({ path, comp.value("parameterData", ""), nullptr });
+						}
+					}
 				} else if (type == "Variable") {
 					auto& c = reg.get_or_emplace<VariableComponent>(entity);
 					c.enabled = en;
@@ -384,9 +395,15 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 	}
 	if (auto* cp = registry.try_get<ScriptComponent>(entity)) {
 		addComma();
-		std::string params = cp->parameterData;
-		if (cp->instance) params = cp->instance->SerializeParameters();
-		ss << "        {\"type\": \"Script\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"scriptPath\": \"" << EscapeJson(cp->scriptPath) << "\", \"parameterData\": \"" << EscapeJson(params) << "\"}";
+		ss << "        {\"type\": \"Script\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"scripts\": [";
+		for (size_t i = 0; i < cp->scripts.size(); ++i) {
+			auto& entry = cp->scripts[i];
+			std::string params = entry.parameterData;
+			if (entry.instance) params = entry.instance->SerializeParameters();
+			ss << "{\"path\": \"" << EscapeJson(entry.scriptPath) << "\", \"param\": \"" << EscapeJson(params) << "\"}";
+			if (i < cp->scripts.size() - 1) ss << ", ";
+		}
+		ss << "]}";
 	}
 	if (auto* cp = registry.try_get<DirectionalLightComponent>(entity)) {
 		addComma();
@@ -1295,37 +1312,59 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				}
 			}
 			if (auto* cp = registry.try_get<ScriptComponent>(selected)) {
-				if (ImGui::CollapsingHeader("Script", ImGuiTreeNodeFlags_DefaultOpen)) {
-					ImGui::Checkbox("Enabled##Script", &cp->enabled);
+				if (ImGui::CollapsingHeader("Scripts", ImGuiTreeNodeFlags_DefaultOpen)) {
+					ImGui::Checkbox("Enabled##Scripts", &cp->enabled);
 					
 					auto scriptNames = ScriptEngine::GetInstance()->GetRegisteredScriptNames();
-					int current = -1;
-					for(int i=0; i<(int)scriptNames.size(); ++i) {
-						if(scriptNames[i] == cp->scriptPath) { current = i; break; }
-					}
-					
-					std::string comboName = cp->scriptPath.empty() ? "None" : cp->scriptPath;
-					if (ImGui::BeginCombo("Class Name", comboName.c_str())) {
-						for (int i = 0; i < (int)scriptNames.size(); ++i) {
-							bool isSelected = (current == i);
-							if (ImGui::Selectable(scriptNames[i].c_str(), isSelected)) {
-								if (cp->scriptPath != scriptNames[i]) {
-									cp->scriptPath = scriptNames[i];
-									cp->instance = nullptr; // Trigger re-instantiation
-								}
+
+					for (int i = 0; i < (int)cp->scripts.size(); ++i) {
+						auto& entry = cp->scripts[i];
+						ImGui::PushID(i);
+						std::string treeLabel = (entry.scriptPath.empty() ? "None" : entry.scriptPath) + "##Tree";
+						if (ImGui::TreeNodeEx(treeLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+							int current = -1;
+							for (int j = 0; j < (int)scriptNames.size(); ++j) {
+								if (scriptNames[j] == entry.scriptPath) { current = j; break; }
 							}
-							if (isSelected) ImGui::SetItemDefaultFocus();
+
+							std::string comboName = entry.scriptPath.empty() ? "None" : entry.scriptPath;
+							if (ImGui::BeginCombo("Class", comboName.c_str())) {
+								for (int j = 0; j < (int)scriptNames.size(); ++j) {
+									bool isSelected = (current == j);
+									if (ImGui::Selectable(scriptNames[j].c_str(), isSelected)) {
+										if (entry.scriptPath != scriptNames[j]) {
+											entry.scriptPath = scriptNames[j];
+											entry.instance = nullptr;
+										}
+									}
+								}
+								ImGui::EndCombo();
+							}
+
+							if (entry.instance) {
+								ImGui::PushID("ScriptEditor");
+								entry.instance->OnEditorUI();
+								ImGui::PopID();
+							}
+
+							if (ImGui::Button("Remove Script")) {
+								cp->scripts.erase(cp->scripts.begin() + i);
+								// i-- is not needed if we break or handle loop index correctly, but let's be safe
+								ImGui::TreePop();
+								ImGui::PopID();
+								break; 
+							}
+							ImGui::TreePop();
 						}
-						ImGui::EndCombo();
+						ImGui::PopID();
+						ImGui::Separator();
 					}
 
-					if (cp->instance) {
-						ImGui::Separator();
-						ImGui::PushID("ScriptEditor");
-						cp->instance->OnEditorUI();
-						ImGui::PopID();
+					if (ImGui::Button("Add Script")) {
+						cp->scripts.push_back({});
 					}
-					if (ImGui::Button("Remove##SC")) registry.remove<ScriptComponent>(entity);
+					ImGui::SameLine();
+					if (ImGui::Button("Remove Component##SC")) registry.remove<ScriptComponent>(entity);
 				}
 			}
 			if (auto* dl = registry.try_get<DirectionalLightComponent>(entity)) {

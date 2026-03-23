@@ -326,11 +326,16 @@ struct UIButtonComponent : public Component {
 	UIButtonComponent() { type = ComponentType::UIButton; }
 };
 
-// ★変更: Script コンポーネント (ロジックの外部化)
-struct ScriptComponent : public Component {
-	std::string scriptPath = ""; // スクリプトのクラス名 (例: "PlayerScript")
-	std::string parameterData = ""; // ★追加: 初期化用パラメータ(JSON)
+// ★追加: スクリプトの個体エントリ
+struct ScriptEntry {
+	std::string scriptPath = "";      // スクリプトのクラス名 (例: "PlayerScript")
+	std::string parameterData = "";   // 初期化用パラメータ(JSON)
 	std::shared_ptr<IScript> instance = nullptr; // C++スクリプトのインスタンス
+};
+
+// ★変更: Script コンポーネント (マルチスクリプト対応)
+struct ScriptComponent : public Component {
+	std::vector<ScriptEntry> scripts;
 	ScriptComponent() { type = ComponentType::Script; }
 };
 

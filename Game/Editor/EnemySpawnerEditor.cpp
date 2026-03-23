@@ -30,16 +30,18 @@ void EnemySpawnerEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* rende
 	for (auto entity : spawnerView) {
         auto& sc = spawnerView.get<ScriptComponent>(entity);
         auto& tc = spawnerView.get<TransformComponent>(entity);
-        if (!sc.instance && !sc.scriptPath.empty() && !scene->IsPlaying()) {
-            sc.instance = ScriptEngine::GetInstance()->CreateScript(sc.scriptPath);
-            if (sc.instance) {
-                sc.instance->Start(entity, scene);
+        for (auto& entry : sc.scripts) {
+            if (!entry.instance && !entry.scriptPath.empty() && !scene->IsPlaying()) {
+                entry.instance = ScriptEngine::GetInstance()->CreateScript(entry.scriptPath);
+                if (entry.instance) {
+                    entry.instance->Start(entity, scene);
+                }
             }
-        }
-        if (sc.instance) {
-            auto* spawner = dynamic_cast<EnemySpawnerScript*>(sc.instance.get());
-            if (spawner) {
-                spawner->DrawSpawnPreview(tc.translate);
+            if (entry.instance) {
+                auto* spawner = dynamic_cast<EnemySpawnerScript*>(entry.instance.get());
+                if (spawner) {
+                    spawner->DrawSpawnPreview(tc.translate);
+                }
             }
         }
     }
@@ -101,8 +103,7 @@ void EnemySpawnerEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* rende
 
             // EnemySpawnerScript をアタッチ
             auto& sc = scene->GetRegistry().emplace<ScriptComponent>(spawnerObj);
-            sc.scriptPath = "EnemySpawnerScript";
-            sc.instance = ScriptEngine::GetInstance()->CreateScript("EnemySpawnerScript");
+            sc.scripts.push_back({ "EnemySpawnerScript", "", nullptr });
 
             // 新しく配置したスポナーを選択状態にする
             scene->SetSelectedEntity(spawnerObj);

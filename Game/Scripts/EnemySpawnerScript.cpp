@@ -112,9 +112,8 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 
 		// スクリプトとパラメータの設定
 		auto& scComponent = scene->GetRegistry().emplace<ScriptComponent>(enemy);
-		scComponent.scriptPath = enemyScriptPath;
+		scComponent.scripts.push_back({ enemyScriptPath, enemyScriptParams, nullptr });
 		scComponent.enabled = true;
-		scComponent.parameterData = enemyScriptParams; // ★ 保存されていたパラメータを渡す
 
 		// 初期化完了後はGameScene側のキュー等に入れる必要はなく即座に生成されるが
 		// Start処理などを呼ぶために pendingSpawns のような仕組みが必要か、
