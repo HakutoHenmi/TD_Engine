@@ -58,7 +58,7 @@ void ParticleEditor::DrawPreview(const Camera& cam) {
 void ParticleEditor::DrawUI() {
 	if (!targetEmitter) return;
 
-	ImGui::Begin("Particle Editor");
+	// Removed ImGui::Begin("Particle Editor") to support tab embedding
 
 	// ★追加: プレビュー映像の描画
 	ImGui::Text("Preview (Right-click drag to rotate, Scroll to zoom)");
@@ -189,7 +189,7 @@ void ParticleEditor::DrawUI() {
 		}
 	}
 
-	ImGui::End();
+	// Removed ImGui::End() to support tab embedding
 }
 
 } // namespace Engine

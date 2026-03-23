@@ -5,14 +5,15 @@
 #include <cmath>
 
 namespace Game {
-void BulletTank::Start(SceneObject& obj, GameScene* /*scene*/) { (void)obj; }
+void BulletTank::Start(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
-void BulletTank::Update(SceneObject& obj, GameScene* scene, float dt) { (void)scene;
-
-obj.rotate.y += rotationSpeed_ * dt;
-
+void BulletTank::Update(entt::entity entity, GameScene* scene, float dt) {
+	if (!scene || !scene->GetRegistry().valid(entity)) return;
+	auto& registry = scene->GetRegistry();
+	if (!registry.all_of<TransformComponent>(entity)) return;
+	registry.get<TransformComponent>(entity).rotate.y += rotationSpeed_ * dt;
 }
 
-void BulletTank::OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {}
+void BulletTank::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 REGISTER_SCRIPT(BulletTank);
 } // namespace Game

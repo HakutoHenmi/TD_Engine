@@ -9,111 +9,110 @@
 
 namespace Game {
 
-void PlayerScript::Start(SceneObject& obj, GameScene* scene) {
+void PlayerScript::Start(entt::entity entity, GameScene* scene) {
+	// ★追加: プレイヤーを物理演算から切り離し、CharacterController方式（レイキャスト）で制御する
+	if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
+		scene->GetRegistry().get<RigidbodyComponent>(entity).isKinematic = true;
+	}
+	if (scene->GetRegistry().all_of<CharacterMovementComponent>(entity)) {
+		scene->GetRegistry().get<CharacterMovementComponent>(entity).heightOffset = 1.0f; // 2m高キャラの中心がy=1になるように
+	}
+
 	// 剣がシーンに既にあるか確認
-	SceneObject* sword = nullptr;
-	auto& objects = const_cast<std::vector<SceneObject>&>(scene->GetObjects());
-	for (auto& o : objects) {
-		if (o.name == swordName_) {
-			sword = &o;
+	entt::entity sword = entt::null;
+	auto view = scene->GetRegistry().view<NameComponent>();
+	for (auto e : view) {
+		if (view.get<NameComponent>(e).name == swordName_) {
+			sword = e;
 			break;
 		}
 	}
 
-	if (!sword) {
+	if (sword == entt::null) {
 		// 剣がなければ生成
-		SceneObject newSword;
-		newSword.name = swordName_;
-		newSword.color = { 0.9f, 0.9f, 0.9f, 1.0f };
-		newSword.scale = { 0.1f, 0.1f, 1.6f };
+		sword = scene->GetRegistry().create();
+		scene->GetRegistry().emplace<NameComponent>(sword).name = swordName_;
+		auto& tc = scene->GetRegistry().emplace<TransformComponent>(sword);
+		tc.scale = { 0.1f, 0.1f, 1.6f };
+		
+		auto& cc = scene->GetRegistry().emplace<ColorComponent>(sword);
+		cc.color = { 0.9f, 0.9f, 0.9f, 1.0f };
 
 		auto* renderer = scene->GetRenderer();
 		if (renderer) {
-			newSword.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
-			newSword.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
-			MeshRendererComponent mr;
-			mr.modelHandle = newSword.modelHandle;
-			mr.textureHandle = newSword.textureHandle;
-			mr.color = newSword.color;
-			newSword.meshRenderers.push_back(mr);
+			auto& mr = scene->GetRegistry().emplace<MeshRendererComponent>(sword);
+			mr.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
+			mr.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
+			mr.color = { 0.9f, 0.9f, 0.9f, 1.0f };
+			mr.enabled = true;
 		}
 
-		HitboxComponent hb;
+		auto& hb = scene->GetRegistry().emplace<HitboxComponent>(sword);
 		hb.isActive = false;
 		hb.damage = 25.0f;
 		hb.tag = "Sword";
 		hb.size = { 0.5f, 0.5f, 3.0f };
-		newSword.hitboxes.push_back(hb);
-
-		scene->SpawnObject(newSword);
+		hb.enabled = true;
 	} else {
 		// 既にある場合は基本的なプロパティを維持（色はエディタの設定を優先するため上書きしない）
-		sword->scale = { 0.1f, 0.1f, 1.6f };
-		if (!sword->meshRenderers.empty()) {
+		scene->GetRegistry().get<TransformComponent>(sword).scale = { 0.1f, 0.1f, 1.6f };
+		if (scene->GetRegistry().all_of<MeshRendererComponent>(sword)) {
+			auto& mr = scene->GetRegistry().get<MeshRendererComponent>(sword);
 			// モデル未設定なら設定
-			if (sword->modelPath == "" || sword->modelPath.empty()) {
+			if (mr.modelHandle == 0) {
 				auto* renderer = scene->GetRenderer();
 				if (renderer) {
-					sword->modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
-					sword->textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
-					sword->meshRenderers[0].modelHandle = sword->modelHandle;
-					sword->meshRenderers[0].textureHandle = sword->textureHandle;
+					mr.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
+					mr.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
 				}
 			}
 		}
 	}
 
-	std::cout << "PlayerScript Started: " << obj.name << std::endl;
+	if (scene->GetRegistry().all_of<NameComponent>(entity)) {
+		std::cout << "PlayerScript Started: " << scene->GetRegistry().get<NameComponent>(entity).name << std::endl;
+	}
 }
 
-void PlayerScript::Update(SceneObject& obj, GameScene* scene, float dt) {
-	if (!obj.healths.empty() && obj.healths[0].isDead) return;
+void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
+	if (scene->GetRegistry().all_of<HealthComponent>(entity)) {
+		if (scene->GetRegistry().get<HealthComponent>(entity).isDead) return;
+	}
 
 	if (PhaseSystemScript::IsPreparation()) {
-		obj.cameraTargets[0].enabled = false;
-		obj.playerInputs[0].enabled = false;
-
+		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) scene->GetRegistry().get<CameraTargetComponent>(entity).enabled = false;
+		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))  scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = false;
 	} else {
-		UpdateMovement(obj, scene, dt);
-		UpdateAttack(obj, scene, dt);
-		UpdateSword(obj, scene, dt);
-		obj.cameraTargets[0].enabled = true;
-		obj.playerInputs[0].enabled = true;
+		UpdateMovement(entity, scene, dt);
+		UpdateAttack(entity, scene, dt);
+		UpdateSword(entity, scene, dt);
+		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) scene->GetRegistry().get<CameraTargetComponent>(entity).enabled = true;
+		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))  scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = true;
 	}
 	
 }
 
-void PlayerScript::UpdateMovement(SceneObject& obj, GameScene* /*scene*/, float dt) {
-	bool keyW = (GetAsyncKeyState('W') & 0x8000) != 0;
-	bool keyS = (GetAsyncKeyState('S') & 0x8000) != 0;
-	bool keyA = (GetAsyncKeyState('A') & 0x8000) != 0;
-	bool keyD = (GetAsyncKeyState('D') & 0x8000) != 0;
-	bool keySpace = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
+void PlayerScript::UpdateMovement(entt::entity entity, GameScene* scene, float /*dt*/) {
+	if (!scene->GetRegistry().all_of<PlayerInputComponent>(entity)) return;
 
-	float speedMul = isAttacking_ ? 0.3f : 1.0f;
-
-	DirectX::XMFLOAT3 move = { 0, 0, 0 };
-	if (keyW) move.z += speedMul;
-	if (keyS) move.z -= speedMul;
-	if (keyA) move.x -= speedMul;
-	if (keyD) move.x += speedMul;
-
-	if (!obj.playerInputs.empty()) {
-		auto& input = obj.playerInputs[0];
-		input.moveDir = { move.x, move.z };
-		input.jumpRequested = keySpace;
+	auto& input = scene->GetRegistry().get<PlayerInputComponent>(entity);
+	
+	// 攻撃中や待機状態への戻り動作中は移動速度を大幅に減衰させる
+	float speedMul = 1.0f;
+	if (isAttacking_) {
+		speedMul = 0.2f;
+	} else if (isReturning_) {
+		speedMul = 0.5f;
 	}
 
-	if (std::abs(move.x) > 0.1f || std::abs(move.z) > 0.1f) {
-		float targetAngle = std::atan2(move.x, move.z);
-		float angleDiff = targetAngle - obj.rotate.y;
-		while (angleDiff >  DirectX::XM_PI) angleDiff -= DirectX::XM_2PI;
-		while (angleDiff < -DirectX::XM_PI) angleDiff += DirectX::XM_2PI;
-		obj.rotate.y += angleDiff * 10.0f * dt;
-	}
+	// 入力方向を現在の状態（攻撃中など）に合わせて調整
+	input.moveDir.x *= speedMul;
+	input.moveDir.y *= speedMul;
+
+	// 回転処理は CharacterMovementSystem に任せる
 }
 
-void PlayerScript::UpdateAttack(SceneObject& /*obj*/, GameScene* /*scene*/, float dt) {
+void PlayerScript::UpdateAttack(entt::entity /*entity*/, GameScene* /*scene*/, float dt) {
 	bool currentAttackKeyDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
 	if (currentAttackKeyDown && !prevAttackKeyDown_) {
 		attackQueued_ = true;
@@ -194,16 +193,16 @@ void PlayerScript::UpdateAttack(SceneObject& /*obj*/, GameScene* /*scene*/, floa
 	}
 }
 
-void PlayerScript::UpdateSword(SceneObject& obj, GameScene* scene, float /*dt*/) {
-	SceneObject* sword = nullptr;
-	auto& objects = const_cast<std::vector<SceneObject>&>(scene->GetObjects());
-	for (auto& o : objects) {
-		if (o.name == swordName_) {
-			sword = &o;
+void PlayerScript::UpdateSword(entt::entity entity, GameScene* scene, float /*dt*/) {
+	entt::entity sword = entt::null;
+	auto view = scene->GetRegistry().view<NameComponent>();
+	for (auto e : view) {
+		if (view.get<NameComponent>(e).name == swordName_) {
+			sword = e;
 			break;
 		}
 	}
-	if (!sword) return;
+	if (sword == entt::null) return;
 
 	DirectX::XMFLOAT3 currentSwordRotRad = { 0, 0, 0 };
 	bool hitboxActive = false;
@@ -283,59 +282,62 @@ void PlayerScript::UpdateSword(SceneObject& obj, GameScene* scene, float /*dt*/)
 	currentSwordRotRad.y = DirectX::XMConvertToRadians(currentSwordRot_.y);
 	currentSwordRotRad.z = DirectX::XMConvertToRadians(currentSwordRot_.z);
 
-	obj.rotate.x = currentBodyRot_.x;
-	obj.rotate.z = currentBodyRot_.z;
+	auto& objTc = scene->GetRegistry().get<TransformComponent>(entity);
+	auto& swordTc = scene->GetRegistry().get<TransformComponent>(sword);
+
+	objTc.rotate.x = currentBodyRot_.x;
+	objTc.rotate.z = currentBodyRot_.z;
 
 	if (isSheathed_) {
 		// 背中に背負う（斜め）
-		float s = std::sin(obj.rotate.y);
-		float c = std::cos(obj.rotate.y);
+		float s = std::sin(objTc.rotate.y);
+		float c = std::cos(objTc.rotate.y);
 		
 		float backX = -0.2f; float backY = 0.8f; float backZ = -0.4f;
-		sword->translate.x = obj.translate.x + (backX * c + backZ * s);
-		sword->translate.y = obj.translate.y + backY;
-		sword->translate.z = obj.translate.z + (-backX * s + backZ * c);
+		swordTc.translate.x = objTc.translate.x + (backX * c + backZ * s);
+		swordTc.translate.y = objTc.translate.y + backY;
+		swordTc.translate.z = objTc.translate.z + (-backX * s + backZ * c);
 		
-		sword->rotate.x = DirectX::XMConvertToRadians(45.0f);
-		sword->rotate.y = obj.rotate.y + DirectX::XMConvertToRadians(0.0f);
-		sword->rotate.z = DirectX::XMConvertToRadians(30.0f);
+		swordTc.rotate.x = DirectX::XMConvertToRadians(45.0f);
+		swordTc.rotate.y = objTc.rotate.y + DirectX::XMConvertToRadians(0.0f);
+		swordTc.rotate.z = DirectX::XMConvertToRadians(30.0f);
 	} else {
 		// 手元
 		float handX = 0.9f; float handY = 0.5f; float handZ = 1.2f;
-		float baseRotY = obj.rotate.y + currentBodyRot_.y;
+		float baseRotY = objTc.rotate.y + currentBodyRot_.y;
 		float sy = std::sin(baseRotY);
 		float cy = std::cos(baseRotY);
 		
-		float pivotX = obj.translate.x + (handX * cy + handZ * sy);
-		float pivotY = obj.translate.y + handY;
-		float pivotZ = obj.translate.z + (-handX * sy + handZ * cy);
+		float pivotX = objTc.translate.x + (handX * cy + handZ * sy);
+		float pivotY = objTc.translate.y + handY;
+		float pivotZ = objTc.translate.z + (-handX * sy + handZ * cy);
 
-		float swordLength = sword->scale.z;
+		float swordLength = swordTc.scale.z;
 		float halfLength = swordLength * 0.5f;
 
-		float totalRotX = currentSwordRotRad.x + obj.rotate.x;
+		float totalRotX = currentSwordRotRad.x + objTc.rotate.x;
 		float totalRotY = baseRotY + currentSwordRotRad.y;
-		float totalRotZ = currentSwordRotRad.z + obj.rotate.z;
+		float totalRotZ = currentSwordRotRad.z + objTc.rotate.z;
 
 		float dirX = std::sin(totalRotY) * std::cos(totalRotX);
 		float dirY = -std::sin(totalRotX);
 		float dirZ = std::cos(totalRotY) * std::cos(totalRotX);
 
-		sword->translate.x = pivotX + dirX * halfLength;
-		sword->translate.y = pivotY + dirY * halfLength;
-		sword->translate.z = pivotZ + dirZ * halfLength;
+		swordTc.translate.x = pivotX + dirX * halfLength;
+		swordTc.translate.y = pivotY + dirY * halfLength;
+		swordTc.translate.z = pivotZ + dirZ * halfLength;
 
-		sword->rotate.x = totalRotX;
-		sword->rotate.y = totalRotY;
-		sword->rotate.z = totalRotZ;
+		swordTc.rotate.x = totalRotX;
+		swordTc.rotate.y = totalRotY;
+		swordTc.rotate.z = totalRotZ;
 	}
 
-	if (!sword->hitboxes.empty()) {
-		sword->hitboxes[0].isActive = hitboxActive;
+	if (scene->GetRegistry().all_of<HitboxComponent>(sword)) {
+		scene->GetRegistry().get<HitboxComponent>(sword).isActive = hitboxActive;
 	}
 }
 
-void PlayerScript::OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {}
+void PlayerScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 // ★追加: この1行を書くだけでエンジンに自動認識されます！
 REGISTER_SCRIPT(PlayerScript);

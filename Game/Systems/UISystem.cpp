@@ -11,25 +11,24 @@
 
 namespace Game {
 
-void UISystem::Update(std::vector<SceneObject>& /*objects*/, GameContext& /*ctx*/) {
+void UISystem::Update(entt::registry& /*registry*/, GameContext& /*ctx*/) {
     // ボタンの更新や入力判定はワールド座標が確定するDrawフェーズ (RenderNodeWithRect) で実行するため、ここでは何もしない
 }
 
-UISystem::WorldRect UISystem::CalculateWorldRect(const SceneObject& obj, const std::vector<SceneObject>& allObjects, float screenW, float screenH) {
-    if (obj.rectTransforms.empty()) return {0, 0, 0, 0};
+UISystem::WorldRect UISystem::CalculateWorldRect(entt::entity entity, entt::registry& registry, float screenW, float screenH) {
+    if (!registry.all_of<RectTransformComponent>(entity)) return {0, 0, 0, 0};
 
     // 親を辿ってパスを構築
-    std::vector<const SceneObject*> path;
-    const SceneObject* current = &obj;
-    while (current) {
+    std::vector<entt::entity> path;
+    entt::entity current = entity;
+    while (registry.valid(current)) {
         path.push_back(current);
-        const SceneObject* parent = nullptr;
-        if (current->parentId != 0) {
-            for (const auto& o : allObjects) {
-                if (o.id == current->parentId) {
-                    parent = &o;
-                    break;
-                }
+        entt::entity parent = entt::null;
+        
+        if (registry.all_of<HierarchyComponent>(current)) {
+            entt::entity parentId = registry.get<HierarchyComponent>(current).parentId;
+            if (parentId != entt::null) {
+                parent = parentId;
             }
         }
         current = parent;
@@ -38,9 +37,9 @@ UISystem::WorldRect UISystem::CalculateWorldRect(const SceneObject& obj, const s
 
     WorldRect currentRect = { 0, 0, screenW, screenH };
 
-    for (const SceneObject* pObj : path) {
-        if (pObj->rectTransforms.empty()) continue;
-        auto& rect = pObj->rectTransforms[0];
+    for (entt::entity pObj : path) {
+        if (!registry.all_of<RectTransformComponent>(pObj)) continue;
+        auto& rect = registry.get<RectTransformComponent>(pObj);
         
         float worldW = rect.size.x;
         float worldH = rect.size.y;
@@ -54,15 +53,20 @@ UISystem::WorldRect UISystem::CalculateWorldRect(const SceneObject& obj, const s
     return currentRect;
 }
 
-void UISystem::Draw(std::vector<SceneObject>& objects, GameContext& ctx) {
+void UISystem::Draw(entt::registry& registry, GameContext& ctx) {
     std::unordered_map<uint32_t, WorldRect> cache;
 
     // --- 既存のUI（Canvasベース）の描画 ---
-    auto renderRecursive = [&](auto self, uint32_t parentId, WorldRect parentRect) -> void {
-        for (auto& obj : objects) {
-            if (obj.rectTransforms.empty()) continue;
-            if (obj.parentId == parentId) {
-                auto& rect = obj.rectTransforms[0];
+    auto renderRecursive = [&](auto self, entt::entity parentId, WorldRect parentRect) -> void {
+        auto view = registry.view<RectTransformComponent>();
+        for (auto e : view) {
+            entt::entity currentParentId = entt::null;
+            if (registry.all_of<HierarchyComponent>(e)) {
+                currentParentId = registry.get<HierarchyComponent>(e).parentId;
+            }
+
+            if (currentParentId == parentId) {
+                auto& rect = view.get<RectTransformComponent>(e);
                 float worldW = rect.size.x;
                 float worldH = rect.size.y;
                 float anchorX = parentRect.x + parentRect.w * rect.anchor.x;
@@ -71,37 +75,41 @@ void UISystem::Draw(std::vector<SceneObject>& objects, GameContext& ctx) {
                 float worldY = anchorY - worldH * rect.pivot.y + rect.pos.y;
                 
                 WorldRect selfRect = { worldX, worldY, worldW, worldH };
-                cache[obj.id] = selfRect;
+                uint32_t eId = static_cast<uint32_t>(e);
+                cache[eId] = selfRect;
 
-                RenderNodeWithRect(obj, selfRect, ctx);
-                self(self, obj.id, selfRect);
+                RenderNodeWithRect(e, registry, selfRect, ctx);
+                self(self, e, selfRect);
             }
         }
     };
 
     WorldRect screen = { 0, 0, (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH };
-    renderRecursive(renderRecursive, 0, screen);
+    renderRecursive(renderRecursive, entt::null, screen);
 
     // --- ★追加: ワールド空間UI（HPバー、ダメージ数字）の描画 ---
     if (ctx.isPlaying && ctx.camera) {
         ImDrawList* drawList = ImGui::GetBackgroundDrawList();
         if (!drawList) return;
 
-        for (auto& obj : objects) {
-            if (obj.isPendingDestroy) continue;
+        auto viewHealth = registry.view<HealthComponent, TransformComponent>();
+        for (auto e : viewHealth) {
+            auto& hc = viewHealth.get<HealthComponent>(e);
+            auto& tc = viewHealth.get<TransformComponent>(e);
+            
+            const WorldSpaceUIComponent* uiComp = nullptr;
+            if (registry.all_of<WorldSpaceUIComponent>(e)) {
+                uiComp = &registry.get<WorldSpaceUIComponent>(e);
+            }
 
-            // WorldSpaceUIコンポーネントがあるかチェック
-            const WorldSpaceUIComponent* uiComp = obj.worldSpaceUIs.empty() ? nullptr : &obj.worldSpaceUIs[0];
-
-            // 1. HPバーの描画 (Healthコンポーネントを持ち、かつWorldSpaceUIコンポーネントで表示が許可されている場合)
-            if (!obj.healths.empty() && obj.healths[0].enabled && !obj.healths[0].isDead) {
-                auto& hc = obj.healths[0];
+            // 1. HPバーの描画
+            if (hc.enabled && !hc.isDead) {
                 bool shouldShow = (!uiComp || uiComp->showHealthBar);
 
                 // HPが満タンでない、かつコンポーネント設定で許可されている場合に表示
                 if (shouldShow && hc.hp < hc.maxHp) {
                     float sx, sy;
-                    DirectX::XMFLOAT3 pos = obj.translate;
+                    DirectX::XMFLOAT3 pos = tc.translate;
                     float barW = 60.0f;
                     float barH = 6.0f;
 
@@ -113,7 +121,7 @@ void UISystem::Draw(std::vector<SceneObject>& objects, GameContext& ctx) {
                         barH = uiComp->barHeight;
                     } else {
                         // コンポーネントがない場合のデフォルト位置
-                        pos.y += obj.scale.y * 1.2f + 0.5f;
+                        pos.y += tc.scale.y * 1.2f + 0.5f;
                     }
 
                     if (WorldToScreen(pos, *ctx.camera, sx, sy)) {
@@ -131,37 +139,9 @@ void UISystem::Draw(std::vector<SceneObject>& objects, GameContext& ctx) {
                     }
                 }
             }
-
-            // 2. 汎用変数を使ったダメージ数字演出
-            bool showDmg = (!uiComp || uiComp->showDamageNumbers);
-            if (showDmg) {
-                float dmgTimer = obj.GetVariable("damage_timer", 0.0f);
-                if (dmgTimer > 0.0f) {
-                    std::string dmgStr = obj.GetString("damage_text", "");
-                    if (!dmgStr.empty()) {
-                        float sx, sy;
-                        DirectX::XMFLOAT3 pos = obj.translate;
-                        // タイマーに応じて上に浮かび上がらせる
-                        float t = 1.0f - dmgTimer; // 1秒演出想定
-                        
-                        if (uiComp) {
-                            pos.x += uiComp->offset.x;
-                            pos.y += uiComp->offset.y + t * 2.0f;
-                            pos.z += uiComp->offset.z;
-                        } else {
-                            pos.y += obj.scale.y + t * 2.0f;
-                        }
-
-                        if (WorldToScreen(pos, *ctx.camera, sx, sy)) {
-                            ImU32 col = IM_COL32(255, 255, 50, (int)(dmgTimer * 255));
-                            drawList->AddText(ImGui::GetFont(), 24.0f, ImVec2(sx, sy), col, dmgStr.c_str());
-                        }
-                        // タイマー更新
-                        obj.SetVariable("damage_timer", dmgTimer - ctx.dt);
-                    }
-                }
-            }
         }
+
+        // ダメージ数値などは EditorState や一時データではなく、変数コンポーネントがあれば処理（一旦保留）
     }
 }
 
@@ -185,27 +165,29 @@ bool UISystem::WorldToScreen(const DirectX::XMFLOAT3& worldPos, const Engine::Ca
     return true;
 }
 
-void UISystem::Reset(std::vector<SceneObject>& /*objects*/) {
+void UISystem::Reset(entt::registry& /*registry*/) {
     // 必要に応じて初期化処理を記述
 }
 
-void UISystem::RenderNodeWithRect(SceneObject& obj, const WorldRect& wr, GameContext& ctx) {
+void UISystem::RenderNodeWithRect(entt::entity entity, entt::registry& registry, const WorldRect& wr, GameContext& ctx) {
     // ボタンの更新
-    if (!obj.buttons.empty()) {
-        ProcessButton(obj, obj.buttons[0], wr.x, wr.y, wr.w, wr.h, ctx);
+    if (registry.all_of<UIButtonComponent>(entity)) {
+        auto& btn = registry.get<UIButtonComponent>(entity);
+        ProcessButton(entity, registry, btn, wr.x, wr.y, wr.w, wr.h, ctx);
     }
 
     // ボタンの状態に応じた色を決定
     DirectX::XMFLOAT4 buttonColor = { 1, 1, 1, 1 };
-    if (!obj.buttons.empty()) {
-        auto& btn = obj.buttons[0];
+    if (registry.all_of<UIButtonComponent>(entity)) {
+        auto& btn = registry.get<UIButtonComponent>(entity);
         if (btn.isPressed) buttonColor = btn.pressedColor;
         else if (btn.isHovered) buttonColor = btn.hoverColor;
         else buttonColor = btn.normalColor;
     }
 
     // 画像の描画
-    for (const auto& img : obj.images) {
+    if (registry.all_of<UIImageComponent>(entity)) {
+        auto& img = registry.get<UIImageComponent>(entity);
         if (img.enabled) {
             DirectX::XMFLOAT4 finalColor = { img.color.x * buttonColor.x, img.color.y * buttonColor.y, img.color.z * buttonColor.z, img.color.w * buttonColor.w };
             if (img.is9Slice) {
@@ -213,27 +195,28 @@ void UISystem::RenderNodeWithRect(SceneObject& obj, const WorldRect& wr, GameCon
                 s.x = wr.x; s.y = wr.y; s.w = wr.w; s.h = wr.h;
                 s.left = img.borderLeft; s.right = img.borderRight; s.top = img.borderTop; s.bottom = img.borderBottom;
                 s.color = { finalColor.x, finalColor.y, finalColor.z, finalColor.w };
-                s.rotationRad = DirectX::XMConvertToRadians(obj.rectTransforms[0].rotation);
+                s.rotationRad = DirectX::XMConvertToRadians(registry.get<RectTransformComponent>(entity).rotation);
                 ctx.renderer->DrawSprite9Slice(img.textureHandle, s);
             } else {
                 Engine::Renderer::SpriteDesc s;
                 s.x = wr.x; s.y = wr.y; s.w = wr.w; s.h = wr.h;
                 s.color = { finalColor.x, finalColor.y, finalColor.z, finalColor.w };
-                s.rotationRad = DirectX::XMConvertToRadians(obj.rectTransforms[0].rotation);
+                s.rotationRad = DirectX::XMConvertToRadians(registry.get<RectTransformComponent>(entity).rotation);
                 ctx.renderer->DrawSprite(img.textureHandle, s);
             }
         }
     }
 
     // テキストの描画
-    for (const auto& text : obj.texts) {
+    if (registry.all_of<UITextComponent>(entity)) {
+        auto& text = registry.get<UITextComponent>(entity);
         if (text.enabled) {
-            DrawText(obj, text, wr.x, wr.y, wr.w, wr.h, ctx.renderer);
+            DrawTextW(entity, registry, text, wr.x, wr.y, wr.w, wr.h, ctx.renderer);
         }
     }
 }
 
-void UISystem::DrawText(const SceneObject& /*obj*/, const UITextComponent& text, float worldX, float worldY, float worldW, float worldH, Engine::Renderer* /*renderer*/) {
+void UISystem::DrawTextW(entt::entity /*entity*/, entt::registry& /*registry*/, const UITextComponent& text, float worldX, float worldY, float worldW, float worldH, Engine::Renderer* /*renderer*/) {
     ImDrawList* drawList = ImGui::GetBackgroundDrawList();
     if (!drawList) return;
 
@@ -247,7 +230,7 @@ void UISystem::DrawText(const SceneObject& /*obj*/, const UITextComponent& text,
     drawList->AddText(ImGui::GetFont(), text.fontSize, pos, color, text.text.c_str());
 }
 
-void UISystem::ProcessButton(SceneObject& obj, UIButtonComponent& btn, float worldX, float worldY, float worldW, float worldH, GameContext& ctx) {
+void UISystem::ProcessButton(entt::entity entity, entt::registry& registry, UIButtonComponent& btn, float worldX, float worldY, float worldW, float worldH, GameContext& ctx) {
     if (!ctx.input) return;
 
     float mx, my;
@@ -279,8 +262,12 @@ void UISystem::ProcessButton(SceneObject& obj, UIButtonComponent& btn, float wor
 
     if (hovered && ctx.input->IsMouseTrigger(0)) {
         // クリック時: スクリプト側へ通知
-        if (!obj.scripts.empty() && obj.scripts[0].enabled && obj.scripts[0].instance) {
-            obj.scripts[0].instance->OnClick(obj, ctx.scene, btn.onClickCallback);
+        if (registry.all_of<ScriptComponent>(entity)) {
+            auto& sc = registry.get<ScriptComponent>(entity);
+            if (sc.enabled && sc.instance) {
+                // To DO: on click needs to accept entt::entity instead of SceneObject
+                // sc.instance->OnClick(entity, ctx.scene, btn.onClickCallback);
+            }
         }
     }
 }

@@ -24,7 +24,13 @@ void Camera::Initialize() {
 // デバッグ更新（既存APIは維持）
 // ===============================
 void Camera::Update(const Input& in) {
-	// 矢印キーで回転
+	// Shiftキーで加速
+	float currentMoveSpd = moveSpd_;
+	if (in.Down(DIK_LSHIFT) || in.Down(DIK_RSHIFT)) {
+		currentMoveSpd *= 5.0f;
+	}
+
+	// 矢印キーまたはマウスドラッグで回転
 	if (in.Down(DIK_LEFT))
 		rot_.y -= rotSpd_;
 	if (in.Down(DIK_RIGHT))
@@ -34,20 +40,29 @@ void Camera::Update(const Input& in) {
 	if (in.Down(DIK_DOWN))
 		rot_.x += rotSpd_;
 
+	// 右ドラッグで回転
+	if (in.IsMouseDown(1)) { // 右ボタン
+		rot_.y += in.GetMouseDeltaX() * 0.005f;
+		rot_.x += in.GetMouseDeltaY() * 0.005f;
+	}
+
 	// WASD+QEで移動
 	XMFLOAT3 mv{};
 	if (in.Down(DIK_W))
-		mv.z += moveSpd_;
+		mv.z += currentMoveSpd;
 	if (in.Down(DIK_S))
-		mv.z -= moveSpd_;
+		mv.z -= currentMoveSpd;
 	if (in.Down(DIK_A))
-		mv.x -= moveSpd_;
+		mv.x -= currentMoveSpd;
 	if (in.Down(DIK_D))
-		mv.x += moveSpd_;
+		mv.x += currentMoveSpd;
 	if (in.Down(DIK_Q))
-		mv.y += moveSpd_;
+		mv.y += currentMoveSpd;
 	if (in.Down(DIK_E))
-		mv.y -= moveSpd_;
+		mv.y -= currentMoveSpd;
+
+	// マウスホイールで前後移動
+	mv.z += in.GetMouseWheelDelta() * currentMoveSpd * 10.0f;
 
 	// 回転を考慮したローカル→ワールド移動
 	XMMATRIX r = XMMatrixRotationRollPitchYaw(rot_.x, rot_.y, rot_.z);

@@ -5,14 +5,15 @@
 #include <Windows.h>
 #include <string>
 #include <cmath>
+#include "../../externals/entt/entt.hpp"
 
 namespace Game {
 
 class PlayerScript : public IScript {
 public:
-	void Start(SceneObject& obj, GameScene* scene) override;
-	void Update(SceneObject& obj, GameScene* scene, float dt) override;
-	void OnDestroy(SceneObject& obj, GameScene* scene) override;
+	void Start(entt::entity entity, GameScene* scene) override;
+	void Update(entt::entity entity, GameScene* scene, float dt) override;
+	void OnDestroy(entt::entity entity, GameScene* scene) override;
 
 private:
 	float speed_ = 7.0f;
@@ -56,9 +57,9 @@ private:
 	// 剣オブジェクトの名前（ヒエラルキーから探す用）
 	std::string swordName_ = "PlayerSword";
 
-	void UpdateMovement(SceneObject& obj, GameScene* /*scene*/, float dt);
-	void UpdateAttack(SceneObject& /*obj*/, GameScene* /*scene*/, float dt);
-	void UpdateSword(SceneObject& obj, GameScene* scene, float dt);
+	void UpdateMovement(entt::entity entity, GameScene* /*scene*/, float dt);
+	void UpdateAttack(entt::entity /*entity*/, GameScene* /*scene*/, float dt);
+	void UpdateSword(entt::entity entity, GameScene* scene, float dt);
 };
 
 } // namespace Game

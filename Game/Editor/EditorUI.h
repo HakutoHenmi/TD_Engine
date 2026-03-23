@@ -44,7 +44,7 @@ public:
 	static void Redo();
 
 	// レンダリングサポート用
-	static void ScreenToWorldRay(float screenX, float screenY, float imageW, float imageH, DirectX::XMMATRIX view, DirectX::XMMATRIX proj, DirectX::XMVECTOR& outOrig, DirectX::XMVECTOR& outDir);
+	static void ScreenToWorldRay(float screenX, float screenY, float imageW, float imageH, const DirectX::XMMATRIX& view, const DirectX::XMMATRIX& proj, DirectX::XMVECTOR& outOrig, DirectX::XMVECTOR& outDir);
 
 	// ★ Console API
 	static void Log(const std::string& msg);
@@ -52,13 +52,31 @@ public:
 	static void LogError(const std::string& msg);
 
 	// ★ シーン保存/読み込み
-	static void SaveScene(GameScene* scene, const std::string& path);
+	static std::string currentScenePath;
+	static void SaveScene(GameScene* scene, const std::string& path = "");
+	static std::string SaveToMemory(GameScene* scene);
 	static void LoadScene(GameScene* scene, const std::string& path);
+	static void LoadFromMemory(GameScene* scene, const std::string& data);
 	
 	// ★追加: 実行ファイルの場所に関わらず必ずTD_Engineプロジェクトを指す絶対パスを取得
 	static std::string GetUnifiedProjectPath(const std::string& path);
-	static void AddScene(GameScene* scene, const std::string& path); // ★追加
+	static void AddScene(GameScene* scene, const std::string& path);
 	static void LoadPrefab(GameScene* scene, const std::string& path);
+
+	// ★追加: 初期化（アイコンのロードなど）
+	static void Initialize(Engine::Renderer* renderer);
+
+private:
+	// アイコン用テクスチャハンドル
+	struct Icons {
+		uint32_t folder = 0;
+		uint32_t file = 0;
+		uint32_t model = 0;
+		uint32_t prefab = 0;
+		uint32_t audio = 0;
+		uint32_t script = 0;
+	};
+	static Icons s_icons;
 
 private:
 	static void ShowHierarchy(GameScene* scene);

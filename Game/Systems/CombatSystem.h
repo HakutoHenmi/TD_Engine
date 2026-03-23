@@ -6,97 +6,121 @@ namespace Game {
 
 class CombatSystem : public ISystem {
 public:
-	void Update(std::vector<SceneObject>& objects, GameContext& ctx) override {
+	void Update(entt::registry& registry, GameContext& ctx) override {
 		if (!ctx.isPlaying) return;
 
-		for (size_t ai = 0; ai < objects.size(); ++ai) {
-			auto& attacker = objects[ai];
-				for (auto& hitbox : attacker.hitboxes) {
-					if (!hitbox.enabled || !hitbox.isActive) continue;
+		// Hitboxを持つエンティティをリスト化
+		auto attackerView = registry.view<HitboxComponent, TransformComponent>();
+		std::vector<entt::entity> attackers(attackerView.begin(), attackerView.end());
 
-					// スケールを考慮したHitbox位置とサイズ
-					DirectX::XMFLOAT3 hAPos = {
-						attacker.translate.x + hitbox.center.x * std::abs(attacker.scale.x),
-						attacker.translate.y + hitbox.center.y * std::abs(attacker.scale.y),
-						attacker.translate.z + hitbox.center.z * std::abs(attacker.scale.z)
-					};
-					DirectX::XMFLOAT3 hASize = {
-						hitbox.size.x * std::abs(attacker.scale.x),
-						hitbox.size.y * std::abs(attacker.scale.y),
-						hitbox.size.z * std::abs(attacker.scale.z)
-					};
+		for (auto attackerEntity : attackers) {
+			if (!registry.valid(attackerEntity)) continue;
+			auto& hitbox = registry.get<HitboxComponent>(attackerEntity);
+			if (!hitbox.enabled || !hitbox.isActive) continue;
 
-					for (size_t di = 0; di < objects.size(); ++di) {
-						if (ai == di) continue;
-						auto& defender = objects[di];
+			auto& aTc = registry.get<TransformComponent>(attackerEntity);
+			DirectX::XMFLOAT3 hAPos = {
+				aTc.translate.x + hitbox.center.x * std::abs(aTc.scale.x),
+				aTc.translate.y + hitbox.center.y * std::abs(aTc.scale.y),
+				aTc.translate.z + hitbox.center.z * std::abs(aTc.scale.z)
+			};
+			DirectX::XMFLOAT3 hASize = {
+				hitbox.size.x * std::abs(aTc.scale.x),
+				hitbox.size.y * std::abs(aTc.scale.y),
+				hitbox.size.z * std::abs(aTc.scale.z)
+			};
 
-						// プレイヤーと自身の剣の間での当たり判定をスキップ（自爆防止）
-						if ((attacker.name == "Player" && defender.name == "PlayerSword") ||
-							(attacker.name == "PlayerSword" && defender.name == "Player")) {
-							continue;
-						}
+			// Hurtboxを持つエンティティと衝突判定
+			auto defenderView = registry.view<HurtboxComponent, TransformComponent>();
+			for (auto defenderEntity : defenderView) {
+				if (attackerEntity == defenderEntity) continue;
+				if (!registry.valid(defenderEntity)) continue;
 
-						// Hurtbox判定
-						bool hit = false;
-						for (auto& hurtbox : defender.hurtboxes) {
-							if (!hurtbox.enabled) continue;
-							
-							// スケールを考慮したHurtbox位置とサイズ
-							DirectX::XMFLOAT3 hBPos = {
-								defender.translate.x + hurtbox.center.x * std::abs(defender.scale.x),
-								defender.translate.y + hurtbox.center.y * std::abs(defender.scale.y),
-								defender.translate.z + hurtbox.center.z * std::abs(defender.scale.z)
-							};
-							DirectX::XMFLOAT3 hBSize = {
-								hurtbox.size.x * std::abs(defender.scale.x),
-								hurtbox.size.y * std::abs(defender.scale.y),
-								hurtbox.size.z * std::abs(defender.scale.z)
-							};
+				// プレイヤーと自身の剣の間での当たり判定をスキップ
+				bool skipSelfDamage = false;
+				if (registry.all_of<TagComponent>(attackerEntity) && registry.all_of<TagComponent>(defenderEntity)) {
+					auto& aTag = registry.get<TagComponent>(attackerEntity);
+					auto& dTag = registry.get<TagComponent>(defenderEntity);
+					if ((aTag.tag == "Player" && dTag.tag == "PlayerSword") ||
+						(aTag.tag == "PlayerSword" && dTag.tag == "Player")) {
+						skipSelfDamage = true;
+					}
+				}
+				if (skipSelfDamage) continue;
 
-							if (CheckAABBOverlap(hAPos, hASize, hBPos, hBSize)) {
-								hit = true;
-								if (!defender.healths.empty() && defender.healths[0].invincibleTime <= 0.0f) {
-									defender.healths[0].hp -= hitbox.damage * hurtbox.damageMultiplier;
-									defender.healths[0].invincibleTime = 0.5f;
-									ApplyKnockback(attacker, defender);
-								}
-								break;
-							}
-						}
+				auto& hurtbox = registry.get<HurtboxComponent>(defenderEntity);
+				auto& dTc = registry.get<TransformComponent>(defenderEntity);
+				if (!hurtbox.enabled) continue;
 
-					// BoxColliderフォールバック（Hurtboxがない場合）
-					if (!hit && defender.hurtboxes.empty() && !defender.boxColliders.empty()) {
-						for (auto& bc : defender.boxColliders) {
-							if (!bc.enabled) continue;
-							DirectX::XMFLOAT3 hBPos = {
-								defender.translate.x + bc.center.x,
-								defender.translate.y + bc.center.y,
-								defender.translate.z + bc.center.z
-							};
-							DirectX::XMFLOAT3 defSize = {
-								bc.size.x * std::abs(defender.scale.x),
-								bc.size.y * std::abs(defender.scale.y),
-								bc.size.z * std::abs(defender.scale.z)
-							};
-							if (CheckAABBOverlap(hAPos, hitbox.size, hBPos, defSize)) {
-								hit = true;
-								if (!defender.healths.empty() && defender.healths[0].invincibleTime <= 0.0f) {
-									defender.healths[0].hp -= hitbox.damage;
-									defender.healths[0].invincibleTime = 0.5f;
-								}
-								break;
-							}
+				DirectX::XMFLOAT3 hBPos = {
+					dTc.translate.x + hurtbox.center.x * std::abs(dTc.scale.x),
+					dTc.translate.y + hurtbox.center.y * std::abs(dTc.scale.y),
+					dTc.translate.z + hurtbox.center.z * std::abs(dTc.scale.z)
+				};
+				DirectX::XMFLOAT3 hBSize = {
+					hurtbox.size.x * std::abs(dTc.scale.x),
+					hurtbox.size.y * std::abs(dTc.scale.y),
+					hurtbox.size.z * std::abs(dTc.scale.z)
+				};
+
+				if (CheckAABBOverlap(hAPos, hASize, hBPos, hBSize)) {
+					if (registry.all_of<HealthComponent>(defenderEntity)) {
+						auto& hc = registry.get<HealthComponent>(defenderEntity);
+						if (hc.invincibleTime <= 0.0f) {
+							hc.hp -= hitbox.damage * hurtbox.damageMultiplier;
+							hc.invincibleTime = 0.5f;
+							ApplyKnockback(registry, attackerEntity, defenderEntity);
 						}
 					}
 
 					// 弾が当たったら破壊
-					if (hit) {
-						bool isBullet = false;
-						for (const auto& t : attacker.tags) {
-							if (t.tag == "Bullet") isBullet = true;
+					if (registry.all_of<TagComponent>(attackerEntity)) {
+						if (registry.get<TagComponent>(attackerEntity).tag == "Bullet") {
+							if (registry.all_of<HealthComponent>(attackerEntity)) {
+								registry.get<HealthComponent>(attackerEntity).isDead = true;
+							}
 						}
-						if (isBullet && !attacker.healths.empty()) {
-							attacker.healths[0].isDead = true;
+					}
+				}
+			}
+
+			// BoxColliderフォールバック（Hurtboxがない場合）
+			auto bcView = registry.view<BoxColliderComponent, TransformComponent>();
+			for (auto defenderEntity : bcView) {
+				if (attackerEntity == defenderEntity) continue;
+				if (!registry.valid(defenderEntity)) continue;
+				if (registry.all_of<HurtboxComponent>(defenderEntity)) continue; // Hurtbox持ちは既に処理済み
+
+				auto& bc = registry.get<BoxColliderComponent>(defenderEntity);
+				auto& dTc = registry.get<TransformComponent>(defenderEntity);
+				if (!bc.enabled) continue;
+
+				DirectX::XMFLOAT3 hBPos = {
+					dTc.translate.x + bc.center.x,
+					dTc.translate.y + bc.center.y,
+					dTc.translate.z + bc.center.z
+				};
+				DirectX::XMFLOAT3 defSize = {
+					bc.size.x * std::abs(dTc.scale.x),
+					bc.size.y * std::abs(dTc.scale.y),
+					bc.size.z * std::abs(dTc.scale.z)
+				};
+
+				if (CheckAABBOverlap(hAPos, hitbox.size, hBPos, defSize)) {
+					if (registry.all_of<HealthComponent>(defenderEntity)) {
+						auto& hc = registry.get<HealthComponent>(defenderEntity);
+						if (hc.invincibleTime <= 0.0f) {
+							hc.hp -= hitbox.damage;
+							hc.invincibleTime = 0.5f;
+						}
+					}
+
+					// 弾が当たったら破壊
+					if (registry.all_of<TagComponent>(attackerEntity)) {
+						if (registry.get<TagComponent>(attackerEntity).tag == "Bullet") {
+							if (registry.all_of<HealthComponent>(attackerEntity)) {
+								registry.get<HealthComponent>(attackerEntity).isDead = true;
+							}
 						}
 					}
 				}
@@ -112,17 +136,21 @@ private:
 		       std::abs(posA.z - posB.z) < (sizeA.z + sizeB.z);
 	}
 
-	static void ApplyKnockback(const SceneObject& attacker, SceneObject& defender) {
-		if (!defender.rigidbodies.empty() && !defender.rigidbodies[0].isKinematic) {
-			float dx = defender.translate.x - attacker.translate.x;
-			float dz = defender.translate.z - attacker.translate.z;
-			float dist = std::sqrt(dx * dx + dz * dz);
-			if (dist > 0.001f) {
-				float knockbackPower = 5.0f;
-				defender.rigidbodies[0].velocity.x += (dx / dist) * knockbackPower;
-				defender.rigidbodies[0].velocity.z += (dz / dist) * knockbackPower;
-				defender.rigidbodies[0].velocity.y += 2.0f;
-			}
+	static void ApplyKnockback(entt::registry& registry, entt::entity attacker, entt::entity defender) {
+		if (!registry.all_of<RigidbodyComponent>(defender) || !registry.all_of<TransformComponent>(attacker) || !registry.all_of<TransformComponent>(defender)) return;
+		auto& dRb = registry.get<RigidbodyComponent>(defender);
+		if (dRb.isKinematic) return;
+
+		auto& aTc = registry.get<TransformComponent>(attacker);
+		auto& dTc = registry.get<TransformComponent>(defender);
+		float dx = dTc.translate.x - aTc.translate.x;
+		float dz = dTc.translate.z - aTc.translate.z;
+		float dist = std::sqrt(dx * dx + dz * dz);
+		if (dist > 0.001f) {
+			float knockbackPower = 10.0f;
+			dRb.velocity.x += (dx / dist) * knockbackPower;
+			dRb.velocity.z += (dz / dist) * knockbackPower;
+			dRb.velocity.y += 4.0f;
 		}
 	}
 };

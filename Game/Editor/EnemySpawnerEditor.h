@@ -19,6 +19,7 @@ public:
                        float tW, float tH);
 
     bool IsSpawnerMode() const { return spawnerMode_; }
+    void SetSpawnerMode(bool mode) { this->spawnerMode_ = mode; }
 
 private:
     bool spawnerMode_ = false;

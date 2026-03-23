@@ -11,6 +11,8 @@
 #include <vector>
 #include <set>
 #include <memory>
+#include <mutex>
+#include "../../externals/entt/entt.hpp"
 #include "../../Engine/ParticleEmitter.h"
 #include "../../Engine/ParticleEditor.h"
 
@@ -27,35 +29,48 @@ public:
     void DrawSelectionHighlight();
     void DrawLightGizmos();
 
-	// ★ 汎用スポーン（スクリプトから呼べる）
-	void SpawnObject(const SceneObject& obj);
+	// ★ 汎用スポーン（Registryを直接操作することを推奨）
+	entt::entity CreateEntity(const std::string& name = "New Object");
 	// ★追加: オブジェクトをIDで破棄保留にする
 	void DestroyObject(uint32_t id);
 
-    const std::vector<SceneObject>& GetObjects() const { return objects_; }
-    void SetObjects(const std::vector<SceneObject>& o) { objects_ = o; }
-    bool IsPlaying() const { return isPlaying_; }
-    Engine::Renderer* GetRenderer() const { return renderer_; } // ★追加
-    Engine::Matrix4x4 GetWorldMatrix(int index) const; // ★追加
-	Engine::Camera& GetCamera() { return camera_; } // ★追加: カメラへのアクセス
-	Engine::EventSystem& GetEventSystem() { return eventSystem_; } // ★追加: イベントシステムへのアクセス
+    entt::registry& GetRegistry() { return registry_; }
+    const entt::registry& GetRegistry() const { return registry_; }
+	Engine::EventSystem& GetEventSystem() { return eventSystem_; }
+	Engine::ParticleEditor& GetParticleEditor() { return particleEditor_; }
+	bool GetIsPlaying() const { return isPlaying_; }
+	bool IsPlaying() const { return isPlaying_; } // Alias for backward compatibility
+	void SetIsPlaying(bool play);
+	Engine::Renderer* GetRenderer() const { return renderer_; }
+	Engine::Matrix4x4 GetWorldMatrix(int index) const; // Remove inline definition to stop recursion
+	Engine::Camera& GetCamera() { return camera_; }
+	entt::entity GetSelectedEntity() const { return selectedEntity_; }
+	void SetSelectedEntity(entt::entity entity) { selectedEntity_ = entity; }
+	std::set<entt::entity>& GetSelectedEntities() { return selectedEntities_; }
 
 	// ★追加: 名前でオブジェクトを検索するヘルパー
-	SceneObject* FindObjectByName(const std::string& name);
-	// ★追加: 指定座標のメッシュ表面の高さを取得
-	float GetHeightAt(float x, float z, uint32_t excludeId = 0);
+	entt::entity FindObjectByName(const std::string& name);
+	// ★追加: 指定座標のメッシュ表面の高さを取得 (startY 付近から下を探索)
+	float GetHeightAt(float x, float z, float startY = 1000.0f, uint32_t excludeId = 0);
+	// ★追加: 汎用レイキャスト (壁判定などに使用)
+	bool RayCast(const Engine::Vector3& origin, const Engine::Vector3& direction, float maxDist, uint32_t excludeId, float& outDist);
 
 private:
     Engine::WindowDX* dx_ = nullptr;
     Engine::Renderer* renderer_ = nullptr;
     Engine::Camera camera_;
     Engine::EventSystem eventSystem_; // ★追加: スクリプト間通信用
-    std::vector<SceneObject> objects_;
-    std::set<int> selectedIndices_;
-    int selectedObjectIndex_ = -1;
+    entt::registry registry_;
+    std::set<entt::entity> selectedEntities_;
+    entt::entity selectedEntity_ = entt::null;
 
     bool isPlaying_ = false;
-    std::vector<SceneObject> pendingSpawns_;
+    entt::registry pendingSpawns_;
+    std::vector<entt::entity> pendingDestroys_;
+    std::mutex spawnMutex_; // ★追加: マルチスレッドから安全にスポーン・破棄登録を行えるようにする
+
+	std::string sceneSnapshot_; // ★追加: Play開始時のシリアライズ文字列
+	std::string initialSceneSnapshot_; // ★追加: 起動（JSONロード）直後の状態
 
     // ★ ECS風Systemリスト
     std::vector<std::unique_ptr<ISystem>> systems_;

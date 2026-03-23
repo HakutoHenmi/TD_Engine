@@ -139,7 +139,8 @@ bool Renderer::Initialize(WindowDX* window) {
 	models_.push_back(std::make_shared<Model>());
 
 	for (uint32_t i = 0; i < kFrameCount; ++i) {
-		upload_[i].sizeBytes = 8 * 1024 * 1024;
+		// 8MB -> 32MB に増量 (大量のインスタンシング描画に対応)
+		upload_[i].sizeBytes = 32 * 1024 * 1024;
 		CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_UPLOAD);
 		CD3DX12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Buffer(upload_[i].sizeBytes);
 
@@ -291,8 +292,9 @@ void Renderer::BeginFrame(const float clearColorRGBA[4]) {
 	cbFrame_.time += 0.016f; // 固定値だが、本来はDeltaTimeを使うべき
 
 	// インスタンス描画用のキューをクリア
-	instancedDrawCalls_.clear();
-	instancedParticleDrawCalls_.clear();
+	instancedDrawCalls_.clear();                    
+	instancedParticleDrawCalls_.clear();            
+	lastIDCIndex_ = -1;
 	srvDynamicCursor_ = kSrvStaticMax; // 動的SRVカーソルをリセット
 	spriteDrawCalls_.clear(); // ★スプライトもクリア
 
@@ -464,7 +466,7 @@ void Renderer::FlushDrawCalls() {
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
-		CBObj ocb{}; ocb.world = dc.tr.ToMatrix(); 
+		CBObj ocb{}; ocb.world = dc.worldMatrix; 
 		ocb.color[0]=dc.color.x; ocb.color[1]=dc.color.y; ocb.color[2]=dc.color.z; ocb.color[3]=dc.color.w;
 		uint32_t oOff = upload_[fi].Allocate(sizeof(CBObj), 256);
 		if (oOff != UINT32_MAX) {
@@ -667,7 +669,7 @@ void Renderer::EndFrame() {
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
-			CBObj objCb{}; objCb.world = dc.tr.ToMatrix(); 
+			CBObj objCb{}; objCb.world = dc.worldMatrix; 
 			uint32_t oOff = upload_[fi].Allocate(sizeof(CBObj), 256);
 			std::memcpy(upload_[fi].mapped + oOff, &objCb, sizeof(CBObj));
 			list_->SetGraphicsRootConstantBufferView(1, upload_[fi].buffer->GetGPUVirtualAddress() + oOff);
@@ -685,6 +687,28 @@ void Renderer::EndFrame() {
 			}
 
 			model->Draw(list_, 3);
+		}
+
+		// Instanced Shadow Pass
+		for (const auto& idc : instancedDrawCalls_) {
+			// パーティクルや2Dはシャドウを落とさない (idc.shaderName == "Particle" 等)
+			if (idc.shaderName == "Particle" || idc.shaderName == "ParticleInstanced" || idc.shaderName == "2D") continue;
+			
+			auto* model = GetModel(idc.mesh);
+			if (!model || idc.instances.empty()) continue;
+
+			list_->SetPipelineState(shadowInstancedPso_.Get());
+			list_->SetGraphicsRootSignature(rootSig3D_.Get());
+			list_->SetGraphicsRootConstantBufferView(0, sCbAddr);
+
+			// インスタンスデータバインド (Slot 6) - ※RootSignature params[6] is t2
+			uint32_t dataSize = static_cast<uint32_t>(sizeof(InstanceData) * idc.instances.size());
+			uint32_t offset = upload_[fi].Allocate(dataSize, 256);
+			if (offset != UINT32_MAX) {
+				std::memcpy(upload_[fi].mapped + offset, idc.instances.data(), dataSize);
+				list_->SetGraphicsRootShaderResourceView(6, upload_[fi].buffer->GetGPUVirtualAddress() + offset);
+				model->DrawInstanced(list_, static_cast<uint32_t>(idc.instances.size()));
+			}
 		}
 
 		b = CD3DX12_RESOURCE_BARRIER::Transition(shadowMap_.Get(), D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -1377,9 +1401,19 @@ float4 main(VSIn v) : SV_POSITION {
 }
 )";
 
+	static const char* kVSInstancedShadow = R"(
+struct InstanceData { row_major float4x4 world; float4 color; float4 uvScaleOffset; };
+StructuredBuffer<InstanceData> gInstanceData : register(t2);
+cbuffer CBFrame : register(b0) { row_major float4x4 gView; row_major float4x4 gProj; row_major float4x4 gViewProj; float3 gCamPos; float gTime; };
+struct VSIn { float4 pos : POSITION; };
+float4 main(VSIn v, uint instanceID : SV_InstanceID) : SV_POSITION {
+    return mul(mul(v.pos, gInstanceData[instanceID].world), gViewProj);
+}
+)";
 	auto vsShadow = CompileShader(kVSShadow, "main", "vs_5_0");
 	auto vsSkinShadow = CompileShader(kVSSkinShadow, "main", "vs_5_0");
-	if (vsShadow && vsSkinShadow) {
+	auto vsInstShadow = CompileShader(kVSInstancedShadow, "main", "vs_5_0");
+	if (vsShadow && vsSkinShadow && vsInstShadow) {
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
 		psoDesc.pRootSignature = rootSig3D_.Get();
 		psoDesc.VS = {vsShadow->GetBufferPointer(), vsShadow->GetBufferSize()};
@@ -1408,6 +1442,13 @@ float4 main(VSIn v) : SV_POSITION {
 		psoDesc.VS = {vsSkinShadow->GetBufferPointer(), vsSkinShadow->GetBufferSize()};
 		psoDesc.InputLayout = {skinLayout, _countof(skinLayout)};
 		dev_->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&shadowSkinPso_));
+
+		psoDesc.VS = {vsInstShadow->GetBufferPointer(), vsInstShadow->GetBufferSize()};
+		D3D12_INPUT_ELEMENT_DESC instLayout[] = {
+			{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+		};
+		psoDesc.InputLayout = {instLayout, _countof(instLayout)};
+		dev_->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&shadowInstancedPso_));
 	}
 
 	// 2D Shader (変更なし)
@@ -1823,6 +1864,24 @@ Renderer::TextureHandle Renderer::LoadTexture2D(const std::string& filePath, boo
 
 void Renderer::DrawMeshInstanced(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, 
 								 const std::string& shaderName, const std::vector<TextureHandle>& extraTex) {
+	DrawMeshInstanced(mesh, texture, transform.ToMatrix(), mulColor, shaderName, extraTex);
+}
+
+void Renderer::DrawMeshInstanced(MeshHandle mesh, TextureHandle texture, const Matrix4x4& worldMatrix, const Vector4& mulColor, 
+								 const std::string& shaderName, const std::vector<TextureHandle>& extraTex) {
+	// キャッシュチェック (前回のドローコールと同じアセットなら検索をスキップ)
+	if (lastIDCIndex_ != -1 && lastIDCIndex_ < (int)instancedDrawCalls_.size()) {
+		auto& last = instancedDrawCalls_[lastIDCIndex_];
+		if (last.mesh == mesh && last.tex == texture && last.shaderName == shaderName && last.extraTex == extraTex) {
+			InstanceData data;
+			data.world = worldMatrix;
+			data.color = mulColor;
+			data.uvScaleOffset = {1, 1, 0, 0};
+			last.instances.push_back(data);
+			return;
+		}
+	}
+
 	// 既存のInstancedDrawCallを探す
 	auto it = std::find_if(instancedDrawCalls_.begin(), instancedDrawCalls_.end(), [&](const InstancedDrawCall& idc) {
 		return idc.mesh == mesh && idc.tex == texture && idc.shaderName == shaderName && idc.extraTex == extraTex;
@@ -1832,14 +1891,16 @@ void Renderer::DrawMeshInstanced(MeshHandle mesh, TextureHandle texture, const T
 		InstancedDrawCall newIdc;
 		newIdc.mesh = mesh;
 		newIdc.tex = texture;
-		newIdc.extraTex = extraTex; // ★追加
+		newIdc.extraTex = extraTex; 
 		newIdc.shaderName = shaderName;
 		instancedDrawCalls_.push_back(newIdc);
 		it = instancedDrawCalls_.end() - 1;
 	}
 
+	lastIDCIndex_ = static_cast<int>(std::distance(instancedDrawCalls_.begin(), it));
+
 	InstanceData data;
-	data.world = transform.ToMatrix();
+	data.world = worldMatrix;
 	data.color = mulColor;
 	data.uvScaleOffset = {1, 1, 0, 0}; // デフォルト
 	it->instances.push_back(data);
@@ -1916,13 +1977,17 @@ Model* Renderer::GetModel(MeshHandle handle) {
 }
 
 void Renderer::DrawMesh(MeshHandle meshH, TextureHandle texH, const Transform& tr, const Vector4& mulColor, const std::string& shaderName) {
+	DrawMesh(meshH, texH, tr.ToMatrix(), mulColor, shaderName);
+}
+
+void Renderer::DrawMesh(MeshHandle meshH, TextureHandle texH, const Matrix4x4& worldMatrix, const Vector4& mulColor, const std::string& shaderName) {
 	if (meshH == 0 || meshH >= models_.size())
 		return;
 
 	DrawCall dc{};
 	dc.mesh = meshH;
 	dc.tex = texH;
-	dc.tr = tr;
+	dc.worldMatrix = worldMatrix;
 	dc.color = mulColor;
 	dc.shaderName = shaderName;
 	drawCalls_.push_back(dc);
@@ -1932,13 +1997,19 @@ void Renderer::DrawMesh(MeshHandle meshH, TextureHandle texH, const Transform& t
 void Renderer::DrawParticle(MeshHandle meshH, TextureHandle texH, const Transform& tr, 
 							const Vector4& mulColor, const Vector4& uvScaleOffset, 
 							const std::string& shaderName) {
+	DrawParticle(meshH, texH, tr.ToMatrix(), mulColor, uvScaleOffset, shaderName);
+}
+
+void Renderer::DrawParticle(MeshHandle meshH, TextureHandle texH, const Matrix4x4& worldMatrix, 
+							const Vector4& mulColor, const Vector4& uvScaleOffset, 
+							const std::string& shaderName) {
 	if (meshH == 0 || meshH >= models_.size())
 		return;
 
 	DrawCall dc{};
 	dc.mesh = meshH;
 	dc.tex = texH;
-	dc.tr = tr;
+	dc.worldMatrix = worldMatrix;
 	dc.color = mulColor;
 	dc.shaderName = shaderName;
 	dc.isParticle = true;
@@ -1947,16 +2018,20 @@ void Renderer::DrawParticle(MeshHandle meshH, TextureHandle texH, const Transfor
 }
 
 void Renderer::DrawSkinnedMesh(MeshHandle meshH, TextureHandle texH, const Transform& tr, const std::vector<Matrix4x4>& bones, const Vector4& mulColor) {
+	DrawSkinnedMesh(meshH, texH, tr.ToMatrix(), bones, mulColor);
+}
+
+void Renderer::DrawSkinnedMesh(MeshHandle meshH, TextureHandle texH, const Matrix4x4& worldMatrix, const std::vector<Matrix4x4>& bones, const Vector4& mulColor) {
 	if (meshH == 0 || meshH >= models_.size())
 		return;
 
 	DrawCall dc{};
 	dc.mesh = meshH;
 	dc.tex = texH;
-	dc.tr = tr;
+	dc.worldMatrix = worldMatrix;
 	dc.color = mulColor;
 	dc.shaderName = "Skinning";
-		dc.isSkinned = true;
+	dc.isSkinned = true;
 	dc.bones = bones;
 	drawCalls_.push_back(dc);
 }

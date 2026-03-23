@@ -1,6 +1,7 @@
 #pragma once
 #include "../Scripts/ScriptEngine.h"
 #include "ISystem.h"
+#include "../../Engine/JobSystem.h"
 
 namespace Game {
 
@@ -10,23 +11,34 @@ class ScriptSystem : public ISystem {
 public:
 	void SetScene(GameScene* scene) { scene_ = scene; }
 
-	void Update(std::vector<SceneObject>& objects, GameContext& ctx) override {
+	void Update(entt::registry& registry, GameContext& ctx) override {
 		if (!ctx.isPlaying)
 			return;
 
 		auto* scriptEngine = ScriptEngine::GetInstance();
-		for (auto& obj : objects) {
-			if (!obj.scripts.empty() && obj.scripts[0].enabled && !obj.scripts[0].scriptPath.empty()) {
-				scriptEngine->Execute(obj, scene_, ctx.dt);
+
+		auto view = registry.view<ScriptComponent>();
+		std::vector<entt::entity> entities(view.begin(), view.end());
+		if (entities.empty()) return;
+
+		Engine::JobSystem::Dispatch((uint32_t)entities.size(), 64, [&](uint32_t i) {
+			auto entity = entities[i];
+			if (!registry.valid(entity)) return;
+			auto& sc = registry.get<ScriptComponent>(entity);
+			if (sc.enabled && !sc.scriptPath.empty()) {
+				scriptEngine->Execute(entity, scene_, ctx.dt);
 			}
-		}
+		});
+		
+		// 全スクリプトの実行完了を待機
+		Engine::JobSystem::Wait();
 	}
 
-	void Reset(std::vector<SceneObject>& objects) override {
-		for (auto& obj : objects) {
-			for (auto& sc : obj.scripts) {
-				sc.instance = nullptr;
-			}
+	void Reset(entt::registry& registry) override {
+		auto view = registry.view<ScriptComponent>();
+		for (auto entity : view) {
+			auto& sc = registry.get<ScriptComponent>(entity);
+			sc.instance = nullptr;
 		}
 	}
 

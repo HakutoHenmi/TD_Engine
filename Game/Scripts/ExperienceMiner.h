@@ -1,14 +1,14 @@
 #pragma once
 #include "IScript.h"
-#include "Scenes/GameScene.h"
+#include "../../externals/entt/entt.hpp"
+
 namespace Game {
 
 class ExperienceMiner : public IScript {
-
-	void Start(SceneObject& obj, GameScene* scene) override;
-	void Update(SceneObject& obj, GameScene* scene, float dt) override;
-	void OnDestroy(SceneObject& obj, GameScene* scene) override;
-
-private:
+public:
+	void Start(entt::entity entity, GameScene* scene) override;
+	void Update(entt::entity entity, GameScene* scene, float dt) override;
+	void OnDestroy(entt::entity entity, GameScene* scene) override;
 };
+
 } // namespace Game

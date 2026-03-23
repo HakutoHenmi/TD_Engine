@@ -1,191 +1,119 @@
 #include "ExperienceHopper.h"
 #include "ScriptEngine.h"
+#include "Scenes/GameScene.h"
+#include "ObjectTypes.h"
 #include "../imgui/imgui.h"
+#include <cmath>
+
 namespace Game {
-// タグ走査
-static bool HasTag(const SceneObject& obj, const char* tagName) {
-	for (int i = 0; i < (int)obj.tags.size(); ++i) {
-		if (obj.tags[i].tag == tagName) {
-			return true;
-		}
-	}
-	return false;
+
+// タグ走査 (entt版)
+static bool HasTag(entt::registry& registry, entt::entity entity, const char* tagName) {
+	if (!registry.valid(entity) || !registry.all_of<TagComponent>(entity)) return false;
+	return registry.get<TagComponent>(entity).tag == tagName;
 }
 
-static int CountExperienceOrbs(GameScene* scene) {
+static int CountExperienceOrbs(entt::registry& registry) {
 	int orbCount = 0;
-
-	for (const SceneObject& other : scene->GetObjects()) {
-		if (HasTag(other, "ExperienceOrb")) {
-			orbCount += 1;
-		}
+	auto view = registry.view<TagComponent>();
+	for (auto entity : view) {
+		if (view.get<TagComponent>(entity).tag == "ExperienceOrb") orbCount++;
 	}
-
 	return orbCount;
 }
-// 球体接続判定
-static bool IsConnectedSphere(const SceneObject& a, const SceneObject& b, float connectRange) {
-	float dx = b.translate.x - a.translate.x;
-	float dy = b.translate.y - a.translate.y;
-	float dz = b.translate.z - a.translate.z;
 
-	float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
-
-	if (dist > connectRange) {
-		return false;
-	}
-
-	return true;
+static bool IsConnectedSphere(entt::registry& registry, entt::entity a, entt::entity b, float connectRange) {
+	if (!registry.all_of<TransformComponent>(a) || !registry.all_of<TransformComponent>(b)) return false;
+	auto& posA = registry.get<TransformComponent>(a).translate;
+	auto& posB = registry.get<TransformComponent>(b).translate;
+	float dx = posB.x - posA.x, dy = posB.y - posA.y, dz = posB.z - posA.z;
+	return std::sqrt(dx*dx + dy*dy + dz*dz) <= connectRange;
 }
 
-// 訪問済みチェック
-static bool IsAlreadyVisited(const std::vector<const SceneObject*>& visitedObjects, const SceneObject& obj) {
-	for (int i = 0; i < (int)visitedObjects.size(); ++i) {
-		if (visitedObjects[i] == &obj) {
-			return true;
+static bool IsAlreadyVisited(const std::vector<entt::entity>& visited, entt::entity e) {
+	for (auto v : visited) if (v == e) return true;
+	return false;
+}
+
+static bool IsPipeConnectedToExperienceMinerRecursive(entt::registry& registry, entt::entity currentPipe, std::vector<entt::entity>& visited, float connectRange) {
+	visited.push_back(currentPipe);
+	auto view = registry.view<TransformComponent>();
+	for (auto other : view) {
+		if (other == currentPipe) continue;
+		if (!IsConnectedSphere(registry, currentPipe, other, connectRange)) continue;
+		if (HasTag(registry, other, "ExperienceMiner")) return true;
+		if (HasTag(registry, other, "Pipe")) {
+			if (IsAlreadyVisited(visited, other)) continue;
+			if (IsPipeConnectedToExperienceMinerRecursive(registry, other, visited, connectRange)) return true;
 		}
 	}
 	return false;
 }
 
-// Pipe をたどって ExperienceMiner に届くか
-static bool IsPipeConnectedToExperienceMinerRecursive(GameScene* scene, const SceneObject& currentPipe, std::vector<const SceneObject*>& visitedObjects, float connectRange) {
-
-	visitedObjects.push_back(&currentPipe);
-
-	for (const SceneObject& other : scene->GetObjects()) {
-
-		if (&other == &currentPipe) {
-			continue;
-		}
-
-		if (!IsConnectedSphere(currentPipe, other, connectRange)) {
-			continue;
-		}
-
-		if (HasTag(other, "ExperienceMiner")) {
-			return true;
-		}
-
-		if (HasTag(other, "Pipe")) {
-
-			if (IsAlreadyVisited(visitedObjects, other)) {
-				continue;
-			}
-
-			bool connected = IsPipeConnectedToExperienceMinerRecursive(scene, other, visitedObjects, connectRange);
-
-			if (connected) {
-				return true;
-			}
-		}
-	}
-
-	return false;
-}
-
-// ExperienceHopper から Pipe を通して ExperienceMiner につながるか
-static bool IsExperienceHopperConnectedToExperienceMiner(GameScene* scene, const SceneObject& hopperObj) {
+static bool IsHopperConnectedToMiner(entt::registry& registry, entt::entity hopperEntity) {
 	const float connectRange = 2.5f;
-
-	for (const SceneObject& other : scene->GetObjects()) {
-
-		if (!HasTag(other, "Pipe")) {
-			continue;
-		}
-
-		if (!IsConnectedSphere(hopperObj, other, connectRange)) {
-			continue;
-		}
-
-		std::vector<const SceneObject*> visitedObjects;
-
-		bool connected = IsPipeConnectedToExperienceMinerRecursive(scene, other, visitedObjects, connectRange);
-
-		if (connected) {
-			return true;
-		}
+	auto view = registry.view<TransformComponent>();
+	for (auto other : view) {
+		if (!HasTag(registry, other, "Pipe")) continue;
+		if (!IsConnectedSphere(registry, hopperEntity, other, connectRange)) continue;
+		std::vector<entt::entity> visited;
+		if (IsPipeConnectedToExperienceMinerRecursive(registry, other, visited, connectRange)) return true;
 	}
-
 	return false;
 }
 
-void Game::ExperienceHopper::Start(SceneObject& obj, GameScene* scene) {
-	(void)obj;
-	(void)scene;
+void ExperienceHopper::Start(entt::entity /*entity*/, GameScene* /*scene*/) {
 }
 
-void ExperienceHopper::Update(SceneObject& obj, GameScene* scene, float dt) {
-	obj.rotate.y += 1.0f * dt;
+void ExperienceHopper::Update(entt::entity entity, GameScene* scene, float dt) {
+	if (!scene || !scene->GetRegistry().valid(entity)) return;
+	auto& registry = scene->GetRegistry();
+	if (!registry.all_of<TransformComponent>(entity)) return;
+	auto& tc = registry.get<TransformComponent>(entity);
+	tc.rotate.y += 1.0f * dt;
 
-	if (spawnTimer_ > 0.0f) {
-		spawnTimer_ -= dt;
-	}
+	if (spawnTimer_ > 0.0f) spawnTimer_ -= dt;
 
-	bool connected = IsExperienceHopperConnectedToExperienceMiner(scene, obj);
+	bool connected = IsHopperConnectedToMiner(registry, entity);
+	if (!connected) return;
 
-	if (!connected) {
-		return;
-	}
+	int orbCount = CountExperienceOrbs(registry);
+	if (orbCount >= 10) return;
+	if (spawnTimer_ > 0.0f) return;
 
-	int orbCount = CountExperienceOrbs(scene);
+	// ExperienceOrb を生成 (enTT)
+	entt::entity orb = registry.create();
+	auto& oTag = registry.emplace<TagComponent>(orb);
+	oTag.tag = "ExperienceOrb";
+	auto& oTc = registry.emplace<TransformComponent>(orb);
+	oTc.translate = tc.translate;
+	oTc.translate.y += 0.5f;
+	oTc.scale = {0.2f, 0.2f, 0.2f};
 
-	if (orbCount >= 10) {
-		return;
-	}
+	auto& oHc = registry.emplace<HealthComponent>(orb);
+	oHc.hp = 1.0f;
+	oHc.maxHp = 1.0f;
 
-	if (spawnTimer_ > 0.0f) {
-		return;
-	}
+	auto& oHitbox = registry.emplace<HitboxComponent>(orb);
+	oHitbox.isActive = true;
+	oHitbox.damage = 0.0f;
+	oHitbox.tag = "ExperienceOrb";
+	oHitbox.size = {1.0f, 1.0f, 1.0f};
 
-	SceneObject orb;
-	orb.name = "ExperienceOrb";
-
-	orb.translate = obj.translate;
-	orb.translate.y += 0.5f;
-	orb.scale = {0.2f, 0.2f, 0.2f};
-	orb.rotate = {0.0f, 0.0f, 0.0f};
-
-	//
-	TagComponent tag;
-	tag.tag = "ExperienceOrb";
-	orb.tags.push_back(tag);
-	// 体力
-	HealthComponent health;
-	health.hp = 1.0f;
-	health.maxHp = 1.0f;
-	orb.healths.push_back(health);
-	// 当たり判定
-	HitboxComponent hitbox;
-	hitbox.isActive = true;
-	hitbox.damage = 0.0f;
-	hitbox.tag = "ExperienceOrb";
-	hitbox.size = {1.0f, 1.0f, 1.0f};
-
-	orb.hitboxes.push_back(hitbox);
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
-		orb.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
-		orb.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
-
-		MeshRendererComponent meshRenderer;
-		meshRenderer.modelHandle = orb.modelHandle;
-		meshRenderer.textureHandle = orb.textureHandle;
-		orb.meshRenderers.push_back(meshRenderer);
+		auto& oMesh = registry.emplace<GpuMeshColliderComponent>(orb);
+		oMesh.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
+		oMesh.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
 	}
-	ScriptComponent script;
-	script.scriptPath = "ExperienceOrbScript";
-	orb.scripts.push_back(script);
 
-	scene->SpawnObject(orb);
+	auto& oScript = registry.emplace<ScriptComponent>(orb);
+	oScript.scriptPath = "ExperienceOrbScript";
 
 	spawnTimer_ = 1.0f;
-
 }
 
-void Game::ExperienceHopper::OnDestroy(SceneObject& obj, GameScene* scene) {
-	(void)obj;
-	(void)scene;
+void ExperienceHopper::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
 }
 
 REGISTER_SCRIPT(ExperienceHopper);

@@ -6,22 +6,27 @@
 
 namespace Game {
 
-void BulletScript::Start(SceneObject& /*obj*/, GameScene* /*scene*/) {
+void BulletScript::Start(entt::entity /*entity*/, GameScene* /*scene*/) {
 }
 
-void BulletScript::Update(SceneObject& obj, GameScene* /*scene*/, float dt) {
+void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
+	if (!scene || !scene->GetRegistry().valid(entity)) return;
+	auto& registry = scene->GetRegistry();
+	if (!registry.all_of<TransformComponent>(entity)) return;
+	auto& tc = registry.get<TransformComponent>(entity);
+
 	// 前方に進む処理
-	float moveX = std::sin(obj.rotate.y) * speed_ * dt;
-	float moveZ = std::cos(obj.rotate.y) * speed_ * dt;
-	
-	obj.translate.x += moveX;
-	obj.translate.z += moveZ;
+	float moveX = std::sin(tc.rotate.y) * speed_ * dt;
+	float moveZ = std::cos(tc.rotate.y) * speed_ * dt;
+
+	tc.translate.x += moveX;
+	tc.translate.z += moveZ;
 
 	// 衝突時の死亡フラグは Hitbox と Hurtbox の処理で GameScene.cpp 側がやっているため、
 	// ここは移動のみ。寿命による消滅も GameScene.cpp が担っている。
 }
 
-void BulletScript::OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {
+void BulletScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
 }
 
 // ★ スクリプト自動登録

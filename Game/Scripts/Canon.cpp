@@ -11,174 +11,130 @@
 namespace Game {
 
 // タグ走査
-static bool HasTag(const SceneObject& obj, const char* tagName) {
-	for (int i = 0; i < (int)obj.tags.size(); ++i) {
-		if (obj.tags[i].tag == tagName) {
-			return true;
-		}
-	}
-	return false;
+static bool HasTag(entt::registry& registry, entt::entity entity, const char* tagName) {
+	if (!registry.valid(entity) || !registry.all_of<TagComponent>(entity)) return false;
+	return registry.get<TagComponent>(entity).tag == tagName;
 }
 
 // 球体接続判定
-static bool IsConnectedSphere(const SceneObject& a, const SceneObject& b, float connectRange) {
-	float dx = b.translate.x - a.translate.x;
-	float dy = b.translate.y - a.translate.y;
-	float dz = b.translate.z - a.translate.z;
+static bool IsConnectedSphere(entt::registry& registry, entt::entity a, entt::entity b, float connectRange) {
+	if (!registry.valid(a) || !registry.all_of<TransformComponent>(a) ||
+		!registry.valid(b) || !registry.all_of<TransformComponent>(b)) return false;
+
+	const auto& posA = registry.get<TransformComponent>(a).translate;
+	const auto& posB = registry.get<TransformComponent>(b).translate;
+
+	float dx = posB.x - posA.x;
+	float dy = posB.y - posA.y;
+	float dz = posB.z - posA.z;
 
 	float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
 
-	if (dist > connectRange) {
-		return false;
-	}
-
-	return true;
+	return dist <= connectRange;
 }
 
-// すでに訪問したオブジェクトかどうか（ループ防止）
-static bool IsAlreadyVisited(const std::vector<const SceneObject*>& visitedObjects, const SceneObject& obj) {
-	for (int i = 0; i < (int)visitedObjects.size(); ++i) {
-		if (visitedObjects[i] == &obj) {
-			return true;
-		}
+// すでに訪問したか
+static bool IsAlreadyVisited(const std::vector<entt::entity>& visitedObjects, entt::entity entity) {
+	for (auto v : visitedObjects) {
+		if (v == entity) return true;
 	}
 	return false;
 }
 
-static bool IsPipeConnectedToBulletTankRecursive(GameScene* scene, const SceneObject& currentPipe, std::vector<const SceneObject*>& visitedObjects, float connectRange) {
-	
-	visitedObjects.push_back(&currentPipe);
+static bool IsPipeConnectedToBulletTankRecursive(entt::registry& registry, entt::entity currentPipe, std::vector<entt::entity>& visitedObjects, float connectRange) {
+	visitedObjects.push_back(currentPipe);
 
-	for (const SceneObject& other : scene->GetObjects()) {
+	auto view = registry.view<TransformComponent>();
+	for (auto other : view) {
+		if (other == currentPipe) continue;
+		if (!IsConnectedSphere(registry, currentPipe, other, connectRange)) continue;
 
-		if (&other == &currentPipe) {
-			continue;
-		}
+		if (HasTag(registry, other, "BulletTank")) return true;
 
-		if (!IsConnectedSphere(currentPipe, other, connectRange)) {
-			continue;
-		}
-
-		if (HasTag(other, "BulletTank")) {
-			return true;
-		}
-
-		if (HasTag(other, "Pipe")) {
-
-			if (IsAlreadyVisited(visitedObjects, other)) {
-				continue;
-			}
-
-			bool connected = IsPipeConnectedToBulletTankRecursive(scene, other, visitedObjects, connectRange);
-
-			if (connected) {
+		if (HasTag(registry, other, "Pipe")) {
+			if (IsAlreadyVisited(visitedObjects, other)) continue;
+			if (IsPipeConnectedToBulletTankRecursive(registry, other, visitedObjects, connectRange)) {
 				return true;
 			}
 		}
 	}
-
 	return false;
 }
 
-static bool IsCanonConnectedToBulletTank(GameScene* scene, const SceneObject& canonObj) {
+static bool IsCanonConnectedToBulletTank(entt::registry& registry, entt::entity canonEntity) {
 	const float connectRange = 2.5f;
 	
-	for (const SceneObject& other : scene->GetObjects()) {
+	auto view = registry.view<TransformComponent>();
+	for (auto other : view) {
+		if (!HasTag(registry, other, "Pipe")) continue;
+		if (!IsConnectedSphere(registry, canonEntity, other, connectRange)) continue;
 
-		if (!HasTag(other, "Pipe")) {
-			continue;
-		}
-
-		if (!IsConnectedSphere(canonObj, other, connectRange)) {
-			continue;
-		}
-
-		std::vector<const SceneObject*> visitedObjects;
-
-		bool connected = IsPipeConnectedToBulletTankRecursive(scene, other, visitedObjects, connectRange);
-
-		if (connected) {
+		std::vector<entt::entity> visitedObjects;
+		if (IsPipeConnectedToBulletTankRecursive(registry, other, visitedObjects, connectRange)) {
 			return true;
 		}
 	}
-
 	return false;
 }
 
-void Canon::Start(SceneObject& obj, GameScene* /*scene*/) {
-	(void)obj;
-
+void Canon::Start(entt::entity /*entity*/, GameScene* /*scene*/) {
 	attackTimer_ = 0.0f;
 }
 
-void Canon::Update(SceneObject& obj, GameScene* scene, float dt) {
+void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
+	if (!scene || !scene->GetRegistry().valid(entity)) return;
+	auto& registry = scene->GetRegistry();
 
 	objectCount = 0;
 	pipeCount = 0;
 	enemyCount = 0;
 
-	for (const SceneObject& other : scene->GetObjects()) {
+	auto allView = registry.view<TransformComponent>();
+	for (auto other : allView) {
 		objectCount += 1;
-
-		if (HasTag(other, "Pipe")) {
-			pipeCount += 1;
-		}
-
-		if (HasTag(other, "Enemy")) {
-			enemyCount += 1;
-		}
+		if (HasTag(registry, other, "Pipe")) pipeCount += 1;
+		if (HasTag(registry, other, "Enemy")) enemyCount += 1;
 	}
 
-	bool connected = IsCanonConnectedToBulletTank(scene, obj);
-
+	bool connected = IsCanonConnectedToBulletTank(registry, entity);
 	Debug(connected);
 
-	// クールダウン
-	if (attackTimer_ > 0.0f) {
-		attackTimer_ -= dt;
-	}
+	if (attackTimer_ > 0.0f) attackTimer_ -= dt;
+	if (!connected) return;
 
-	// 弾倉と繋がっていないなら何もしない
-	if (!connected) {
-		return;
-	}
-
-	// 一番近い Enemy を探す（範囲内）
-	const SceneObject* target = nullptr;
+	// 一番近い Enemy を探す
+	entt::entity target = entt::null;
 	float bestDistance = attackRange_;
 
-	for (const SceneObject& other : scene->GetObjects()) {
+	if (!registry.all_of<TransformComponent>(entity)) return;
+	auto& canonTc = registry.get<TransformComponent>(entity);
 
-		if (!HasTag(other, "Enemy")) {
-			continue;
-		}
+	auto enemyView = registry.view<TagComponent, TransformComponent>();
+	for (auto other : enemyView) {
+		if (enemyView.get<TagComponent>(other).tag != "Enemy") continue;
 
-		float dx = other.translate.x - obj.translate.x;
-		float dz = other.translate.z - obj.translate.z;
+		auto& otherTc = enemyView.get<TransformComponent>(other);
+		float dx = otherTc.translate.x - canonTc.translate.x;
+		float dz = otherTc.translate.z - canonTc.translate.z;
 		float distance = std::sqrt(dx * dx + dz * dz);
 
 		if (distance < bestDistance) {
 			bestDistance = distance;
-			target = &other;
+			target = other;
 		}
 	}
 
-	// ターゲットがいないなら何もしない
-	if (target == nullptr) {
-		return;
-	}
+	if (target == entt::null) return;
 
-	// 敵方向（XZ）
-	float toX = target->translate.x - obj.translate.x;
-	float toZ = target->translate.z - obj.translate.z;
+	auto& targetTc = registry.get<TransformComponent>(target);
+	float toX = targetTc.translate.x - canonTc.translate.x;
+	float toZ = targetTc.translate.z - canonTc.translate.z;
 
-	if (std::fabs(toX) < 0.0001f && std::fabs(toZ) < 0.0001f) {
-		return;
-	}
+	if (std::fabs(toX) < 0.0001f && std::fabs(toZ) < 0.0001f) return;
 
-	// 大砲を敵の方向へ向ける（毎フレーム）
+	// 大砲を敵の方向へ向ける
 	float desiredYaw = std::atan2(toX, toZ);
-	obj.rotate.y = desiredYaw;
+	canonTc.rotate.y = desiredYaw;
 
 	// クールダウン中なら撃たない（向くだけ）
 	if (attackTimer_ > 0.0f) {
@@ -186,65 +142,55 @@ void Canon::Update(SceneObject& obj, GameScene* scene, float dt) {
 	}
 
 	// =========================
-	// 弾を生成して撃つ
+	// 弾を生成して撃つ (enTT)
 	// =========================
-	SceneObject bullet;
-	bullet.name = "Bullet";
-
-	bullet.translate = obj.translate;
-	bullet.translate.y += 2.0f;
-
-	// 砲口を前に出す
+	entt::entity bullet = registry.create();
+	
+	auto& bTag = registry.emplace<TagComponent>(bullet);
+	bTag.tag = "Bullet";
+	
+	auto& bTc = registry.emplace<TransformComponent>(bullet);
+	bTc.translate = canonTc.translate;
+	bTc.translate.y += 2.0f;
+	
 	float muzzleOffset = 2.0f;
-	bullet.translate.x += std::sin(desiredYaw) * muzzleOffset;
-	bullet.translate.z += std::cos(desiredYaw) * muzzleOffset;
+	bTc.translate.x += std::sin(desiredYaw) * muzzleOffset;
+	bTc.translate.z += std::cos(desiredYaw) * muzzleOffset;
+	bTc.rotate = canonTc.rotate;
+	bTc.scale = {0.3f, 0.3f, 0.3f};
 
-	bullet.rotate = obj.rotate;
-	bullet.scale = {0.3f, 0.3f, 0.3f};
-
-	// 見た目
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
-		bullet.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
-		bullet.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
-
-		MeshRendererComponent meshRenderer;
-		meshRenderer.modelHandle = bullet.modelHandle;
-		meshRenderer.textureHandle = bullet.textureHandle;
-		bullet.meshRenderers.push_back(meshRenderer);
+		auto& bMr = registry.emplace<MeshRendererComponent>(bullet);
+		bMr.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
+		bMr.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
+		// SceneObjectでいうmeshRenderers[0]の代わり
 	}
 
-	// 当たり判定
-	HitboxComponent hitbox;
-	hitbox.isActive = true;
-	hitbox.damage = damage_;
-	hitbox.tag = "Bullet";
-	hitbox.size = {0.3f, 0.3f, 0.3f};
-	bullet.hitboxes.push_back(hitbox);
+	auto& bHitbox = registry.emplace<HitboxComponent>(bullet);
+	bHitbox.isActive = true;
+	bHitbox.damage = damage_;
+	bHitbox.tag = "Bullet";
+	bHitbox.size = {0.3f, 0.3f, 0.3f};
 
-	// 体力
-	HealthComponent health;
-	health.hp = 1.0f;
-	health.maxHp = 1.0f;
-	bullet.healths.push_back(health);
+	auto& bHealth = registry.emplace<HealthComponent>(bullet);
+	bHealth.hp = 1.0f;
+	bHealth.maxHp = 1.0f;
 
-	// タグ
-	TagComponent tag;
-	tag.tag = "Bullet";
-	bullet.tags.push_back(tag);
+	auto& bScript = registry.emplace<ScriptComponent>(bullet);
+	bScript.scriptPath = "BulletScript";
+	
+	// スクリプトのStartを呼ぶ
+	bScript.instance = ScriptEngine::GetInstance()->CreateScript(bScript.scriptPath);
+	if (bScript.instance) {
+		bScript.instance->Start(bullet, scene);
+		// TODO: エンティティベースでのスクリプトのアタッチとライフサイクル管理は設計に合わせる。
+	}
 
-	// 弾スクリプト
-	ScriptComponent script;
-	script.scriptPath = "BulletScript";
-	bullet.scripts.push_back(script);
-
-	scene->SpawnObject(bullet);
-
-	// クールダウン再セット
 	attackTimer_ = attackInterval_;
 }
 
-void Canon::OnDestroy(SceneObject& /*obj*/, GameScene* /*scene*/) {}
+void Canon::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 void Canon::Debug(bool connected) {
 	(void)connected;
@@ -254,12 +200,14 @@ void Canon::Debug(bool connected) {
 		connectedText = "YES";
 	}
 
+/*
 	ImGui::Begin("Debug Pipe");
 	ImGui::Text("Objects: %d", objectCount);
 	ImGui::Text("Pipes  : %d", pipeCount);
 	ImGui::Text("Enemies: %d", enemyCount);
 	ImGui::Text("Canon connected to tank: %s", connectedText);
 	ImGui::End();
+*/
 #endif
 }
 

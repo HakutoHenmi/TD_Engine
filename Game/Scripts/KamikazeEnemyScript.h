@@ -1,16 +1,18 @@
 #pragma once
 #include "IScript.h"
 
+#include "../../externals/entt/entt.hpp"
+
 namespace Game {
 
 class KamikazeEnemyScript : public IScript {
 public:
-	void Start(SceneObject& obj, GameScene* scene) override;
-	void Update(SceneObject& obj, GameScene* scene, float dt) override;
-	void OnDestroy(SceneObject& obj, GameScene* scene) override;
+	void Start(entt::entity entity, GameScene* scene) override;
+	void Update(entt::entity entity, GameScene* scene, float dt) override;
+	void OnDestroy(entt::entity entity, GameScene* scene) override;
 
 private:
-	void Explode(SceneObject& obj, GameScene* scene);
+	void Explode(entt::entity entity, GameScene* scene);
 
 	float speed_ = 6.0f;           // 通常の敵より速い
 	float sightRange_ = 25.0f;     // 感知範囲
