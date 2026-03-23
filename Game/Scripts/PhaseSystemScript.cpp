@@ -53,13 +53,12 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		if (keyP && !preKeyP_) {
 			isPreparation_ = false;
 			isPlacementMode_ = false;
+			currentPhase_++;
 		}
 
 	} else {
 		isPlacementMode_ = false;
-		if (keyP && !preKeyP_) {
-			isPreparation_ = true;
-		}
+		
 	}
 	preKeyP_ = keyP;
 	preKey1_ = key1;
