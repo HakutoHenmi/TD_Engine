@@ -863,8 +863,10 @@ void GameScene::SetIsPlaying(bool play) {
 		auto scView = registry_.view<ScriptComponent>();
 		for (auto entity : scView) {
 			auto& sc = scView.get<ScriptComponent>(entity);
-			if (sc.instance) {
-				sc.parameterData = sc.instance->SerializeParameters();
+			for (auto& entry : sc.scripts) {
+				if (entry.instance) {
+					entry.parameterData = entry.instance->SerializeParameters();
+				}
 			}
 		}
 

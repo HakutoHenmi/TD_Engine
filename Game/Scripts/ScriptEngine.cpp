@@ -50,23 +50,27 @@ void ScriptEngine::Execute(entt::entity entity, GameScene* scene, float dt) {
 	if (!registry.valid(entity) || !registry.all_of<ScriptComponent>(entity)) return;
 
 	auto& comp = registry.get<ScriptComponent>(entity);
-	if (!comp.enabled || comp.scriptPath.empty()) return;
+	if (!comp.enabled) return;
 
-	if (!comp.instance) {
-		comp.instance = CreateScript(comp.scriptPath);
-		if (comp.instance) {
-			// ★追加: 保持されているパラメータをデシリアライズして反映
-			if (!comp.parameterData.empty()) {
-				comp.instance->DeserializeParameters(comp.parameterData);
+	for (auto& entry : comp.scripts) {
+		if (entry.scriptPath.empty()) continue;
+
+		if (!entry.instance) {
+			entry.instance = CreateScript(entry.scriptPath);
+			if (entry.instance) {
+				// ★追加: 保持されているパラメータをデシリアライズして反映
+				if (!entry.parameterData.empty()) {
+					entry.instance->DeserializeParameters(entry.parameterData);
+				}
+				entry.instance->Start(entity, scene);
+			} else {
+				continue;
 			}
-			comp.instance->Start(entity, scene);
-		} else {
-			return;
 		}
-	}
 
-	if (comp.instance) {
-		comp.instance->Update(entity, scene, dt);
+		if (entry.instance) {
+			entry.instance->Update(entity, scene, dt);
+		}
 	}
 }
 

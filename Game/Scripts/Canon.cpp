@@ -185,14 +185,7 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	bHealth.maxHp = 1.0f;
 
 	auto& bScript = registry.emplace<ScriptComponent>(bullet);
-	bScript.scriptPath = "BulletScript";
-	
-	// スクリプトのStartを呼ぶ
-	bScript.instance = ScriptEngine::GetInstance()->CreateScript(bScript.scriptPath);
-	if (bScript.instance) {
-		bScript.instance->Start(bullet, scene);
-		// TODO: エンティティベースでのスクリプトのアタッチとライフサイクル管理は設計に合わせる。
-	}
+	bScript.scripts.push_back({ "BulletScript", "", nullptr });
 
 	attackTimer_ = attackInterval_;
 }

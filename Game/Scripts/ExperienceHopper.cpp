@@ -111,7 +111,7 @@ void ExperienceHopper::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 
 	auto& oScript = registry.emplace<ScriptComponent>(orb);
-	oScript.scriptPath = "ExperienceOrbScript";
+	oScript.scripts.push_back({ "ExperienceOrbScript", "", nullptr });
 
 	spawnTimer_ = 1.0f;
 }

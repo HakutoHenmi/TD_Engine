@@ -264,9 +264,13 @@ void UISystem::ProcessButton(entt::entity entity, entt::registry& registry, UIBu
         // クリック時: スクリプト側へ通知
         if (registry.all_of<ScriptComponent>(entity)) {
             auto& sc = registry.get<ScriptComponent>(entity);
-            if (sc.enabled && sc.instance) {
-                // To DO: on click needs to accept entt::entity instead of SceneObject
-                // sc.instance->OnClick(entity, ctx.scene, btn.onClickCallback);
+            if (sc.enabled) {
+                for (auto& entry : sc.scripts) {
+                    if (entry.instance) {
+                        // To DO: on click needs to accept entt::entity instead of SceneObject
+                        // entry.instance->OnClick(entity, ctx.scene, btn.onClickCallback);
+                    }
+                }
             }
         }
     }
