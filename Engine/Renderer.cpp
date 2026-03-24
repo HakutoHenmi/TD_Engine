@@ -1,5 +1,6 @@
 #include "Renderer.h"
 #include "Model.h"
+#include "PathUtils.h"
 #include "../Game/ObjectTypes.h"
 
 #include <algorithm>
@@ -917,18 +918,19 @@ ComPtr<ID3DBlob> Renderer::CompileShader(const char* src, const char* entry, con
 }
 
 ComPtr<ID3DBlob> Renderer::CompileShaderFromFile(const wchar_t* filePath, const char* entry, const char* target) {
+	std::wstring unifiedPath = PathUtils::GetUnifiedPathW(filePath);
 	UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
 #if defined(_DEBUG)
 	flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 #endif
 	ComPtr<ID3DBlob> blob, err;
-	HRESULT hr = D3DCompileFromFile(filePath, nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, entry, target, flags, 0, &blob, &err);
+	HRESULT hr = D3DCompileFromFile(unifiedPath.c_str(), nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, entry, target, flags, 0, &blob, &err);
 	if (FAILED(hr)) {
 		if (err) {
 			::MessageBoxA(nullptr, (const char*)err->GetBufferPointer(), "HLSL CompileFromFile Error", MB_OK);
 		} else {
 			wchar_t msg[512];
-			wsprintfW(msg, L"File: %s\nHRESULT: 0x%08X", filePath, hr);
+			wsprintfW(msg, L"File: %s\nHRESULT: 0x%08X", unifiedPath.c_str(), hr);
 			::MessageBoxW(nullptr, msg, L"HLSL CompileFromFile Error (no message)", MB_OK);
 		}
 		return nullptr;
@@ -1777,12 +1779,14 @@ float4 main(PSIn i) : SV_TARGET { return i.color; }
 Renderer::TextureHandle Renderer::LoadTexture2D(const std::string& filePath, bool sRGB) {
 	if (filePath.empty())
 		return 0;
-	auto it = textureCache_.find(filePath);
+	
+	std::string unifiedPath = PathUtils::GetUnifiedPath(filePath);
+	auto it = textureCache_.find(unifiedPath);
 	if (it != textureCache_.end())
 		return it->second;
 
 	DirectX::ScratchImage img;
-	std::wstring wpath(filePath.begin(), filePath.end());
+	std::wstring wpath(unifiedPath.begin(), unifiedPath.end());
 	HRESULT hr = DirectX::LoadFromWICFile(wpath.c_str(), DirectX::WIC_FLAGS_NONE, nullptr, img);
 	if (FAILED(hr))
 		return 0;
@@ -1858,7 +1862,7 @@ Renderer::TextureHandle Renderer::LoadTexture2D(const std::string& filePath, boo
 
 	TextureHandle handle = (TextureHandle)textures_.size();
 	textures_.push_back(t);
-	textureCache_[filePath] = handle;
+	textureCache_[unifiedPath] = handle;
 	return handle;
 }
 
@@ -1930,7 +1934,9 @@ void Renderer::DrawParticleInstanced(MeshHandle mesh, TextureHandle texture, con
 Renderer::MeshHandle Renderer::LoadObjMesh(const std::string& objFilePath) {
 	if (objFilePath.empty())
 		return 0;
-	auto it = meshCache_.find(objFilePath);
+
+	std::string unifiedPath = PathUtils::GetUnifiedPath(objFilePath);
+	auto it = meshCache_.find(unifiedPath);
 	if (it != meshCache_.end())
 		return (MeshHandle)it->second;
 
@@ -1966,7 +1972,7 @@ Renderer::MeshHandle Renderer::LoadObjMesh(const std::string& objFilePath) {
 
 	MeshHandle handle = (MeshHandle)models_.size();
 	models_.push_back(model);
-	meshCache_[objFilePath] = (int)handle;
+	meshCache_[unifiedPath] = (int)handle;
 	return handle;
 }
 

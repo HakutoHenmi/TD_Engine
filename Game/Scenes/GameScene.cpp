@@ -865,7 +865,11 @@ void GameScene::SetIsPlaying(bool play) {
 			auto& sc = scView.get<ScriptComponent>(entity);
 			for (auto& entry : sc.scripts) {
 				if (entry.instance) {
+					std::string oldParam = entry.parameterData;
 					entry.parameterData = entry.instance->SerializeParameters();
+					if (entry.parameterData != oldParam) {
+						OutputDebugStringA(("[GameScene] Script synced: " + entry.scriptPath + " from " + oldParam + " to " + entry.parameterData + "\n").c_str());
+					}
 				}
 			}
 		}
@@ -881,10 +885,38 @@ void GameScene::SetIsPlaying(bool play) {
 		isPlaying_ = true;
 	} else {
 		// プレイ停止時: Play ボタンを押した直前の状態 (`sceneSnapshot_`) に戻す
-		// これにより、Play中に生成された一時オブジェクトが破棄され、綺麗な初期状態に戻ります
+		// 選択状態のエンティティ名を一時保存
+		std::vector<std::string> selectedNames;
+		auto& reg = GetRegistry();
+		for (auto entity : selectedEntities_) {
+			if (reg.valid(entity) && reg.all_of<NameComponent>(entity)) {
+				selectedNames.push_back(reg.get<NameComponent>(entity).name);
+			}
+		}
+
 		isPlaying_ = false;
 		if (!sceneSnapshot_.empty()) {
+			OutputDebugStringA(("[GameScene] Restoring from memory snapshot (size: " + std::to_string(sceneSnapshot_.size()) + ")...\n").c_str());
 			EditorUI::LoadFromMemory(this, sceneSnapshot_);
+			
+			// 保存しておいた名前を元に選択状態を復元
+			selectedEntities_.clear();
+			selectedEntity_ = entt::null;
+			auto view = reg.view<NameComponent>();
+			for (const auto& name : selectedNames) {
+				for (auto entity : view) {
+					if (view.get<NameComponent>(entity).name == name) {
+						selectedEntities_.insert(entity);
+						if (selectedEntity_ == entt::null) selectedEntity_ = entity;
+						break;
+					}
+				}
+			}
+			if (!selectedNames.empty()) {
+				OutputDebugStringA(("[GameScene] Restored selection for " + std::to_string(selectedEntities_.size()) + " entities.\n").c_str());
+			}
+		} else {
+			OutputDebugStringA("[GameScene] ERROR: Memory snapshot is empty on STOP!\n");
 		}
 		sceneSnapshot_ = "";
 	}
