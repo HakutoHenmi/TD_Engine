@@ -54,8 +54,8 @@ public:
 				float futureX = tc.translate.x + desiredX;
 				float futureZ = tc.translate.z + desiredZ;
 				float currentFeetY = tc.translate.y - cm.heightOffset;
-				// 移動先の地面高さを先読み (startY は現在地 + 1.0f)
-				float futureGround = ctx.scene->GetHeightAt(futureX, futureZ, tc.translate.y + 1.0f, static_cast<uint32_t>(entity));
+				// 移動先の地面高さを先読み (startY は現在地 y。自己判定回避のため中心から発射)
+				float futureGround = ctx.scene->GetHeightAt(futureX, futureZ, tc.translate.y, static_cast<uint32_t>(entity));
 
 				// 移動先が 0.4m 以上高いなら壁とみなして移動をブロック
 				if (futureGround > currentFeetY + 0.4f) {
@@ -92,18 +92,26 @@ public:
 			// 3. 接地判定とスナップ (レイキャストを使用)
 			if (ctx.scene) {
 				// 自身の位置から真下の地面高さを取得 (excludeIdに自分を指定)
-				// 現在の高さ付近 (y+1.0f) から下にある地面を探すように制限 (上昇バグ防止)
-				float groundHeight = ctx.scene->GetHeightAt(tc.translate.x, tc.translate.z, tc.translate.y + 1.0f, static_cast<uint32_t>(entity));
+				// 発射位置を y (中心) にすることで、自分の上半身や剣への誤判定を物理的に防ぐ
+				float groundHeight = ctx.scene->GetHeightAt(tc.translate.x, tc.translate.z, tc.translate.y, static_cast<uint32_t>(entity));
 				
-				// 地面に触れているか、地面より下にめり込んだ場合 (高さオフセットを考慮)
-				if (tc.translate.y <= groundHeight + cm.heightOffset + 0.1f) {
-					// 下降中、または既にめり込んでいる場合は着地
-					if (rb.velocity.y <= 0.01f) {
+				// 接地判定ロジックの刷新: 
+				// 1. 上昇中 (rb.velocity.y > 0.01) は絶対に接地させない (多段ジャンプ防止)
+				// 2. 落下または静止中 (rb.velocity.y <= 0.01) かつ 地面を突き抜けた(埋まった)場合のみ着地・固定
+				// 3. 地面から離れている場合は grounded を解除 (空中浮遊防止)
+				
+				float feetY = tc.translate.y - cm.heightOffset;
+				if (rb.velocity.y <= 0.01f) {
+					// 地面を通過したか、ほぼ地表にある場合のみ snap
+					if (feetY <= groundHeight + 0.01f && groundHeight > -5000.0f) {
 						tc.translate.y = groundHeight + cm.heightOffset;
 						rb.velocity.y = 0.0f;
 						cm.isGrounded = true;
+					} else {
+						cm.isGrounded = false;
 					}
 				} else {
+					// 打ち上げ中
 					cm.isGrounded = false;
 				}
 			}

@@ -76,12 +76,13 @@ void App::Run() {
 		renderer_.EndFrame();
 
 #ifdef USE_IMGUI
-#ifndef NDEBUG
  		Engine::IScene* currentScene = sceneManager_.Current();
  		if (currentScene) {
+#ifndef NDEBUG
  			currentScene->DrawEditor();
- 		}
 #endif
+			currentScene->DrawUI(); // リバースでもエディタでも共通で描画
+ 		}
 
 		imgui_.Render(dx_);
 #endif

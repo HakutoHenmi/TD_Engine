@@ -898,12 +898,17 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	gameImageMin = ImGui::GetCursorScreenPos();
 	gameImageMax = ImVec2(gameImageMin.x + renderW, gameImageMin.y + renderH);
 	
+	// ★追加: UISystemなどの座標変換用にコンテキストへ設定
+	auto& gctx = gameScene->GetContext();
+	gctx.viewportOffset = { gameImageMin.x, gameImageMin.y };
+	gctx.viewportSize = { renderW, renderH };
+	
 	// Tool Editors Update & Draw (Overlays)
 	s_pipeEditor.UpdateAndDraw(gameScene, renderer, gameImageMin, gameImageMax, renderW, renderH);
 	s_spawnerEditor.UpdateAndDraw(gameScene, renderer, gameImageMin, gameImageMax, renderW, renderH);
 
 	ImGui::Image((ImTextureID)renderer->GetGameFinalSRV().ptr, ImVec2(renderW, renderH));
-
+	
 	// Project to Scene Drop
 	if (ImGui::BeginDragDropTarget()) {
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROJECT_ASSET")) {

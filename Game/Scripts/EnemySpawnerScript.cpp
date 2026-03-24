@@ -96,7 +96,7 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 		}
 
 		auto& bcComponent = scene->GetRegistry().emplace<BoxColliderComponent>(enemy);
-		bcComponent.size = {1.0f, 2.0f, 1.0f};
+		bcComponent.size = {2.0f, 2.0f, 2.0f};
 		bcComponent.enabled = true;
 
 		auto& rbComponent = scene->GetRegistry().emplace<RigidbodyComponent>(enemy);
@@ -107,6 +107,11 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 		hComponent.hp = 100.0f;
 		hComponent.maxHp = 100.0f;
 
+		auto& hurtbox = scene->GetRegistry().emplace<HurtboxComponent>(enemy);
+		hurtbox.size = { 2.0f, 2.0f, 2.0f };
+		hurtbox.tag = "Enemy";
+		hurtbox.enabled = true;
+
 		auto& tagComponent = scene->GetRegistry().emplace<TagComponent>(enemy);
 		tagComponent.tag = "Enemy";
 
@@ -114,8 +119,14 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 		hbComponent.isActive = true;
 		hbComponent.tag = "Enemy";
 		hbComponent.damage = 10.0f;
-		hbComponent.size = {1.0f, 2.0f, 1.0f};
+		hbComponent.size = { 2.0f, 2.0f, 2.0f };
 		hbComponent.enabled = true;
+
+		// ★追加: 敵HPUI（頭上HPバー）の付与
+		auto& ui = scene->GetRegistry().emplace<WorldSpaceUIComponent>(enemy);
+		ui.showHealthBar = true;
+		ui.offset = { 0.0f, 2.2f, 0.0f }; // 2mのcubeの少し上
+		ui.barWidth = 80.0f;
 
 		// スクリプトとパラメータの設定
 		auto& scComponent = scene->GetRegistry().emplace<ScriptComponent>(enemy);

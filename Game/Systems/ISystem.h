@@ -24,6 +24,8 @@ struct GameContext {
 	bool useOverrideMouse = false;
 	float overrideMouseX = 0.0f;
 	float overrideMouseY = 0.0f;
+	DirectX::XMFLOAT2 viewportOffset = { 0, 0 };
+	DirectX::XMFLOAT2 viewportSize = { 0, 0 };
 };
 
 // System基底インターフェース
@@ -32,6 +34,7 @@ public:
 	virtual ~ISystem() = default;
 	virtual void Update(entt::registry& registry, GameContext& ctx) = 0;
 	virtual void Draw(entt::registry& /*registry*/, GameContext& /*ctx*/) {} // 描画処理用
+	virtual void DrawUI(entt::registry& /*registry*/, GameContext& /*ctx*/) {} // ImGui等のUI処理用
 	virtual void Reset(entt::registry& /*registry*/) {} // Play開始時のリセット
 };
 

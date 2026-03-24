@@ -11,12 +11,14 @@ public:
 
     void Update(entt::registry& registry, GameContext& ctx) override;
     void Draw(entt::registry& registry, GameContext& ctx) override;
+    void DrawUI(entt::registry& registry, GameContext& ctx) override;
     void Reset(entt::registry& registry) override;
 
     static WorldRect CalculateWorldRect(entt::entity entity, entt::registry& registry, float screenW, float screenH);
 
-    // ★追加: 3Dワールド座標からスクリーン座標(0~1)に変換
+    // ★追加: 3Dワールド座標からスクリーン座標に変換 (Viewport考慮版)
     static bool WorldToScreen(const DirectX::XMFLOAT3& worldPos, const Engine::Camera& camera, float& screenX, float& screenY);
+    static bool WorldToScreenWithView(const DirectX::XMFLOAT3& worldPos, const Engine::Camera& camera, const DirectX::XMFLOAT2& viewOffset, const DirectX::XMFLOAT2& viewSize, float& screenX, float& screenY);
 
 private:
     void RenderNodeWithRect(entt::entity entity, entt::registry& registry, const WorldRect& wr, GameContext& ctx);

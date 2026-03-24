@@ -26,6 +26,9 @@ public:
 
 	// エディターUI描画（デバッグ用）
 	virtual void DrawEditor() {}
+	
+	// ワールド空間UI描画（リリース共用）
+	virtual void DrawUI() {}
 
 	// このシーンを終了するか？（true で次のシーンへ）
 	// ※ ゲーム側が任意の条件で true を返す
