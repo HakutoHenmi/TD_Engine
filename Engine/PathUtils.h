@@ -41,11 +41,19 @@ private:
             std::filesystem::path current = exeDir;
             bool found = false;
             for (int i = 0; i < 6; ++i) {
+                // 1. 直下に .sln があるか確認
                 if (std::filesystem::exists(current / "DirectXGame_New.sln")) {
                     rootPath = current.string();
                     found = true;
                     break;
                 }
+                // 2. [追加] 子フォルダに TD_Engine があり、その中に .sln があるか確認 (並列フォルダ対策)
+                if (std::filesystem::exists(current / "TD_Engine" / "DirectXGame_New.sln")) {
+                    rootPath = (current / "TD_Engine").string();
+                    found = true;
+                    break;
+                }
+                
                 if (current.has_parent_path()) {
                     current = current.parent_path();
                 } else {

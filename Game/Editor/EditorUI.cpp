@@ -564,7 +564,7 @@ void EditorUI::SaveScene(GameScene* scene, const std::string& path) {
 	if (!f.is_open()) { LogError("Save failed: " + absPath); return; }
 	f << SaveToMemory(scene);
 	f.close();
-	Log("Scene saved: " + targetPath);
+	Log("Scene saved: " + absPath);
 }
 
 // ====== Utility Functions & File Dialogs ======
@@ -612,7 +612,7 @@ static void LoadSceneInternal(GameScene* scene, const std::string& path, bool ap
 	json j;
 	try { f >> j; } catch (...) { EditorUI::LogError("JSON Syntax Error: " + path); return; }
 	RestoreSceneFromJson(scene, j, append);
-	EditorUI::Log((append ? "Scene appended: " : "Scene loaded: ") + path);
+	EditorUI::Log((append ? "Scene appended: " : "Scene loaded: ") + absPath);
 }
 
 void EditorUI::LoadScene(GameScene* scene, const std::string& path) {
@@ -660,9 +660,9 @@ std::vector<entt::entity> EditorUI::LoadPrefab(GameScene* scene, const std::stri
 	}
 
 	if (createdEntities.empty()) {
-		LogError("Prefab created no entities: " + path);
+		LogError("Prefab created no entities: " + absPath);
 	} else {
-		Log("Prefab loaded: " + path + " (" + std::to_string(createdEntities.size()) + " entities)");
+		Log("Prefab loaded: " + absPath + " (" + std::to_string(createdEntities.size()) + " entities)");
 	}
 	return createdEntities;
 }
