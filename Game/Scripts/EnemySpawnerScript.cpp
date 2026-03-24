@@ -318,6 +318,11 @@ void EnemySpawnerScript::DrawSpawnPreview(const DirectX::XMFLOAT3& worldPos) con
 // ========== シリアライズ ==========
 
 std::string EnemySpawnerScript::SerializeParameters() {
+	// シリアライズ前に最新の編集内容を文字列に反映
+	if (editorScriptInstance_) {
+		enemyScriptParams = editorScriptInstance_->SerializeParameters();
+	}
+
 	json j;
 	j["waveCount"] = waveCount;
 	j["startWave"] = startWave;
@@ -346,7 +351,12 @@ void EnemySpawnerScript::DeserializeParameters(const std::string& data) {
 		if (j.contains("pattern")) pattern = static_cast<SpawnPattern>(j["pattern"].get<int>());
 		if (j.contains("patternRadius")) patternRadius = j["patternRadius"].get<float>();
 		if (j.contains("maxCount")) maxCount = j["maxCount"].get<int>();
+
+		OutputDebugStringA(("[EnemySpawnerScript] Deserialized OK: path=" + enemyScriptPath + " params=" + enemyScriptParams + "\n").c_str());
+	} catch (const std::exception& e) {
+		OutputDebugStringA(("[EnemySpawnerScript] Deserialize EXCEPTION: " + std::string(e.what()) + "\n").c_str());
 	} catch (...) {
+		OutputDebugStringA("[EnemySpawnerScript] Deserialize UNKNOWN ERROR!\n");
 	}
 }
 

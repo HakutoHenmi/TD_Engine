@@ -1,4 +1,5 @@
 #include "EditorUI.h"
+#include "../../Engine/PathUtils.h"
 #include "../../externals/imgui/imgui.h"
 #include "../../externals/imgui/imgui_internal.h"
 #include "../Scenes/GameScene.h"
@@ -38,6 +39,7 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 	if (!scene) return {};
 	auto& reg = scene->GetRegistry();
 	if (!append) {
+		OutputDebugStringA("[EditorUI] RestoreSceneFromJson: Clearing registry (FULL RELOAD)\n");
 		reg.clear();
 		scene->GetSelectedEntities().clear();
 		scene->SetSelectedEntity(entt::null);
@@ -130,7 +132,10 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 					c.enabled = en;
 					if (comp.contains("scripts") && comp["scripts"].is_array()) {
 						for (auto& s : comp["scripts"]) {
-							c.scripts.push_back({ s.value("path", ""), s.value("param", ""), nullptr });
+							std::string scriptPath = s.value("path", "");
+							std::string paramData = s.value("param", "");
+							OutputDebugStringA(("[EditorUI] Restoring script: " + scriptPath + " params=" + paramData + "\n").c_str());
+							c.scripts.push_back({ scriptPath, paramData, nullptr });
 						}
 					} else {
 						// Backward compatibility: old format
@@ -233,7 +238,13 @@ static float globalTime = 0.0f;
 bool gizmoDragging = false;
 int gizmoDragAxis = -1; 
 static ImVec2 gizmoDragStartMouse = {};
-static bool objectDragging = false;               
+static DirectX::XMFLOAT3 gizmoStartTranslate;
+static DirectX::XMFLOAT3 gizmoStartRotate;
+static DirectX::XMFLOAT3 gizmoStartScale;
+static DirectX::XMFLOAT3 s_inspectorStartTranslate;
+static DirectX::XMFLOAT3 s_inspectorStartRotate;
+static DirectX::XMFLOAT3 s_inspectorStartScale;
+static bool objectDragging = false;
 static std::vector<entt::entity> clipboardEntities; 
 static bool s_riverPlaceMode = false;             
 static int s_riverPlaceCompIdx = 0;               
@@ -333,9 +344,23 @@ ImVec2 EditorUI::GetGameImageMax() { return gameImageMax; }
 static std::string EscapeJson(const std::string& s) {
 	std::string o;
 	for (char c : s) {
-		if (c == '"') o += "\\\"";
-		else if (c == '\\') o += "\\\\";
-		else o += c;
+		switch (c) {
+		case '"':  o += "\\\""; break;
+		case '\\': o += "\\\\"; break;
+		case '\b': o += "\\b";  break;
+		case '\f': o += "\\f";  break;
+		case '\n': o += "\\n";  break;
+		case '\r': o += "\\r";  break;
+		case '\t': o += "\\t";  break;
+		default:
+			if (static_cast<unsigned char>(c) < 32) {
+				char buf[8];
+				sprintf_s(buf, "\\u%04x", static_cast<int>(c));
+				o += buf;
+			} else {
+				o += c;
+			}
+		}
 	}
 	return o;
 }
@@ -534,6 +559,7 @@ void EditorUI::SaveScene(GameScene* scene, const std::string& path) {
 	else currentScenePath = targetPath;
 
 	std::string absPath = GetUnifiedProjectPath(targetPath);
+	OutputDebugStringA(("[EditorUI] Saving scene to: " + absPath + "\n").c_str());
 	std::ofstream f(absPath);
 	if (!f.is_open()) { LogError("Save failed: " + absPath); return; }
 	f << SaveToMemory(scene);
@@ -598,7 +624,11 @@ void EditorUI::AddScene(GameScene* scene, const std::string& path) { (void)LoadS
 void EditorUI::LoadFromMemory(GameScene* scene, const std::string& data) {
 	if (!scene) return;
 	json j;
-	try { j = json::parse(data); } catch (...) { LogError("JSON Parse Error in memory snapshot"); return; }
+	OutputDebugStringA(("[EditorUI] LoadFromMemory: data size = " + std::to_string(data.size()) + "\n").c_str());
+	try { j = json::parse(data); } catch (const std::exception& e) { 
+		LogError("JSON Parse Error in memory snapshot: " + std::string(e.what())); 
+		return; 
+	}
 	(void)RestoreSceneFromJson(scene, j, false);
 }
 std::vector<entt::entity> EditorUI::LoadPrefab(GameScene* scene, const std::string& path) {
@@ -638,12 +668,7 @@ std::vector<entt::entity> EditorUI::LoadPrefab(GameScene* scene, const std::stri
 }
 
 std::string EditorUI::GetUnifiedProjectPath(const std::string& path) {
-	std::string absPath = path;
-	if (absPath.length() >= 2 && (absPath[1] == ':' || absPath[0] == '/' || absPath[0] == '\\')) return absPath;
-	char exePath[MAX_PATH] = {0};
-	::GetModuleFileNameA(nullptr, exePath, MAX_PATH);
-	std::filesystem::path p = std::filesystem::path(exePath).parent_path();
-	return (p / path).string();
+	return Engine::PathUtils::GetUnifiedPath(path);
 }
 
 void EditorUI::Initialize(Engine::Renderer* renderer) {
@@ -680,7 +705,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	}
 
 	// Global Shortcuts
-	if (!io.WantTextInput && !ImGui::IsAnyItemActive()) {
+	if (!io.WantTextInput) {
 		if (io.KeyCtrl) {
 			if (ImGui::IsKeyPressed(ImGuiKey_S)) SaveScene(gameScene, "Resources/scene.json");
 			if (ImGui::IsKeyPressed(ImGuiKey_Z)) Undo();
@@ -806,7 +831,10 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	ImGui::Begin("Inspector / Tools");
 	if (ImGui::BeginTabBar("RightSideTabs")) {
 		if (ImGui::BeginTabItem("Inspector")) {
+			// PLAY 中はインスペクターの編集を無効化
+			ImGui::BeginDisabled(gameScene->GetIsPlaying());
 			ShowInspector(gameScene);
+			ImGui::EndDisabled();
 			ImGui::EndTabItem();
 		}
 		if (ImGui::BeginTabItem("Animation")) {
@@ -895,9 +923,10 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	}
 	// Picking and Gizmo Logic
 	bool gizmoHovered = false;
+	bool isPlaying = gameScene->GetIsPlaying();
 	auto selectedEnt = gameScene->GetSelectedEntity();
 
-	if (selectedEnt != entt::null && gameScene->GetRegistry().valid(selectedEnt)) {
+	if (!isPlaying && selectedEnt != entt::null && gameScene->GetRegistry().valid(selectedEnt)) {
 		auto& tc = gameScene->GetRegistry().get<TransformComponent>(selectedEnt);
 		DirectX::XMVECTOR objPos3D = DirectX::XMLoadFloat3(&tc.translate);
 		DirectX::XMMATRIX view = gameScene->GetCamera().View();
@@ -956,10 +985,38 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				gizmoDragging = true;
 				gizmoDragAxis = hoveredAxis;
 				gizmoDragStartMouse = mousePos;
+				gizmoStartTranslate = tc.translate;
+				gizmoStartRotate = tc.rotate;
+				gizmoStartScale = tc.scale;
 			}
 
 			if (gizmoDragging) {
 				if (ImGui::IsMouseReleased(0)) {
+					// Undo support
+					DirectX::XMFLOAT3 endT = tc.translate;
+					DirectX::XMFLOAT3 endR = tc.rotate;
+					DirectX::XMFLOAT3 endS = tc.scale;
+					DirectX::XMFLOAT3 startT = gizmoStartTranslate;
+					DirectX::XMFLOAT3 startR = gizmoStartRotate;
+					DirectX::XMFLOAT3 startS = gizmoStartScale;
+					entt::entity e = selectedEnt;
+
+					PushUndo({
+						"Transform",
+						[=, &reg = gameScene->GetRegistry()]() {
+							if (reg.valid(e)) {
+								auto& t = reg.get<TransformComponent>(e);
+								t.translate = startT; t.rotate = startR; t.scale = startS;
+							}
+						},
+						[=, &reg = gameScene->GetRegistry()]() {
+							if (reg.valid(e)) {
+								auto& t = reg.get<TransformComponent>(e);
+								t.translate = endT; t.rotate = endR; t.scale = endS;
+							}
+						}
+					});
+
 					gizmoDragging = false;
 					gizmoDragAxis = -1;
 				} else if (ImGui::IsMouseDragging(0)) {
@@ -1012,15 +1069,15 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 		}
 	}
 
-	// Hotkeys for Gizmo
-	if (ImGui::IsWindowFocused() && !ImGui::IsAnyItemActive()) {
+	// Hotkeys for Gizmo - Also disabled during PLAY
+	if (!isPlaying && ImGui::IsWindowFocused() && !ImGui::IsAnyItemActive()) {
 		if (ImGui::IsKeyPressed(ImGuiKey_W)) currentGizmoMode = GizmoMode::Translate;
 		if (ImGui::IsKeyPressed(ImGuiKey_E)) currentGizmoMode = GizmoMode::Rotate;
 		if (ImGui::IsKeyPressed(ImGuiKey_R)) currentGizmoMode = GizmoMode::Scale;
 	}
 
-	// Scene Picking (only if not clicking on Gizmo)
-	if (ImGui::IsItemHovered() && !gizmoHovered) {
+	// Scene Picking - Also disabled during PLAY (optional, but requested "nothing can be done")
+	if (!isPlaying && ImGui::IsItemHovered() && !gizmoHovered) {
 		if (ImGui::IsMouseClicked(0)) {
 			ImVec2 mousePos = ImGui::GetMousePos();
 			float sx = mousePos.x - gameImageMin.x;
@@ -1096,7 +1153,17 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 			// Right-click menu for a specific entity
 			if (ImGui::BeginPopupContextItem()) {
 				if (ImGui::MenuItem("Delete")) {
-					scene->DestroyObject(static_cast<uint32_t>(entity));
+					uint32_t id = static_cast<uint32_t>(entity);
+					std::string snapshot = SerializeEntity(registry, entity);
+					PushUndo({"Delete Entity",
+						[=, &reg = scene->GetRegistry()](){ 
+							// Restore from snapshot
+							json j = json::parse("{\"objects\": [" + snapshot + "]}");
+							RestoreSceneFromJson(scene, j, true);
+						},
+						[=](){ scene->DestroyObject(id); }
+					});
+					scene->DestroyObject(id);
 					if (scene->GetSelectedEntity() == entity) scene->SetSelectedEntity(entt::null);
 				}
 				ImGui::EndPopup();
@@ -1196,9 +1263,41 @@ void EditorUI::ShowInspector(GameScene* scene) {
 		if (auto* tc = registry.try_get<TransformComponent>(entity)) {
 			ImGui::Separator();
 			ImGui::Text("Transform");
-			ImGui::DragFloat3("Pos", &tc->translate.x, 0.1f);
-			ImGui::DragFloat3("Rot", &tc->rotate.x, 0.01f);
-			ImGui::DragFloat3("Scale", &tc->scale.x, 0.01f);
+			if (ImGui::DragFloat3("Pos", &tc->translate.x, 0.1f)) {}
+			if (ImGui::IsItemActivated()) s_inspectorStartTranslate = tc->translate;
+			if (ImGui::IsItemDeactivatedAfterEdit()) {
+				DirectX::XMFLOAT3 start = s_inspectorStartTranslate;
+				DirectX::XMFLOAT3 end = tc->translate;
+				entt::entity e = entity;
+				PushUndo({"Change Position",
+					[=, &reg = scene->GetRegistry()](){ if(reg.valid(e)) reg.get<TransformComponent>(e).translate = start; },
+					[=, &reg = scene->GetRegistry()](){ if(reg.valid(e)) reg.get<TransformComponent>(e).translate = end; }
+				});
+			}
+
+			if (ImGui::DragFloat3("Rot", &tc->rotate.x, 0.01f)) {}
+			if (ImGui::IsItemActivated()) s_inspectorStartRotate = tc->rotate;
+			if (ImGui::IsItemDeactivatedAfterEdit()) {
+				DirectX::XMFLOAT3 start = s_inspectorStartRotate;
+				DirectX::XMFLOAT3 end = tc->rotate;
+				entt::entity e = entity;
+				PushUndo({"Change Rotation",
+					[=, &reg = scene->GetRegistry()](){ if(reg.valid(e)) reg.get<TransformComponent>(e).rotate = start; },
+					[=, &reg = scene->GetRegistry()](){ if(reg.valid(e)) reg.get<TransformComponent>(e).rotate = end; }
+				});
+			}
+
+			if (ImGui::DragFloat3("Scale", &tc->scale.x, 0.01f)) {}
+			if (ImGui::IsItemActivated()) s_inspectorStartScale = tc->scale;
+			if (ImGui::IsItemDeactivatedAfterEdit()) {
+				DirectX::XMFLOAT3 start = s_inspectorStartScale;
+				DirectX::XMFLOAT3 end = tc->scale;
+				entt::entity e = entity;
+				PushUndo({"Change Scale",
+					[=, &reg = scene->GetRegistry()](){ if(reg.valid(e)) reg.get<TransformComponent>(e).scale = start; },
+					[=, &reg = scene->GetRegistry()](){ if(reg.valid(e)) reg.get<TransformComponent>(e).scale = end; }
+				});
+			}
 		}
 
 		ImGui::Separator();
@@ -1335,15 +1434,28 @@ void EditorUI::ShowInspector(GameScene* scene) {
 										if (entry.scriptPath != scriptNames[j]) {
 											entry.scriptPath = scriptNames[j];
 											entry.instance = nullptr;
+											entry.parameterData = "{}"; // Reset parameters for new script type
 										}
 									}
 								}
 								ImGui::EndCombo();
 							}
 
+							if (!entry.instance && !entry.scriptPath.empty()) {
+								entry.instance = ScriptEngine::GetInstance()->CreateScript(entry.scriptPath);
+								if (entry.instance && !entry.parameterData.empty()) {
+									entry.instance->DeserializeParameters(entry.parameterData);
+								}
+							}
+
 							if (entry.instance) {
 								ImGui::PushID("ScriptEditor");
 								entry.instance->OnEditorUI();
+								// エディタでの変更を即座に文字列パラメータに反映 (同期漏れ防止)
+								// ただし PLAY 中は実行状態を書き戻さないようにガード
+								if (!scene->GetIsPlaying()) {
+									entry.parameterData = entry.instance->SerializeParameters();
+								}
 								ImGui::PopID();
 							}
 
@@ -1684,9 +1796,10 @@ void EditorUI::ShowPlayModeMonitor([[maybe_unused]] GameScene* scene) {
 	if (scene) {
 		auto& reg = scene->GetRegistry();
 		auto view = reg.view<PlayerInputComponent, TransformComponent>();
-		if (view.begin() == view.end()) ImGui::TextDisabled("No Player Activity detected...");
-		for (auto e : view) {
-			auto& tc = view.get<TransformComponent>(e);
+		bool hasPlayer = false;
+		view.each([&hasPlayer](auto, auto&, auto&) { hasPlayer = true; });
+		if (!hasPlayer) ImGui::TextDisabled("No Player Activity detected...");
+		view.each([&](auto e, [[maybe_unused]] auto& pic, auto& tc) {
 			std::string name = "Player";
 			if (auto* nc = reg.try_get<NameComponent>(e)) name = nc->name;
 			
@@ -1704,7 +1817,7 @@ void EditorUI::ShowPlayModeMonitor([[maybe_unused]] GameScene* scene) {
 					ImGui::ProgressBar(hp->hp / hp->maxHp, ImVec2(-1, 0), "Health");
 				}
 			}
-		}
+		});
 	}
 }
 

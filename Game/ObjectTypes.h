@@ -331,6 +331,7 @@ struct ScriptEntry {
 	std::string scriptPath = "";      // スクリプトのクラス名 (例: "PlayerScript")
 	std::string parameterData = "";   // 初期化用パラメータ(JSON)
 	std::shared_ptr<IScript> instance = nullptr; // C++スクリプトのインスタンス
+	bool isStarted = false; // PlayモードでStart()が呼ばれたか
 };
 
 // ★変更: Script コンポーネント (マルチスクリプト対応)

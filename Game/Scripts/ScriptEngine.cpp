@@ -62,10 +62,14 @@ void ScriptEngine::Execute(entt::entity entity, GameScene* scene, float dt) {
 				if (!entry.parameterData.empty()) {
 					entry.instance->DeserializeParameters(entry.parameterData);
 				}
-				entry.instance->Start(entity, scene);
 			} else {
 				continue;
 			}
+		}
+
+		if (entry.instance && !entry.isStarted) {
+			entry.instance->Start(entity, scene);
+			entry.isStarted = true;
 		}
 
 		if (entry.instance) {
