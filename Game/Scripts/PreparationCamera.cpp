@@ -9,17 +9,23 @@
 
 namespace Game {
 
-void PreparationCamera::Start(entt::entity /*entity*/, GameScene* /*scene*/) {
-}
+void PreparationCamera::Start(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 void PreparationCamera::Update(entt::entity entity, GameScene* scene, float dt) {
-	if (!scene || !scene->GetRegistry().valid(entity)) return;
+	if (!scene || !scene->GetRegistry().valid(entity))
+		return;
 	auto& registry = scene->GetRegistry();
-	if (!registry.all_of<TransformComponent>(entity)) return;
+	if (!registry.all_of<TransformComponent>(entity))
+		return;
 
 	if (PhaseSystemScript::IsPreparation()) {
 		UpdateMovement(entity, scene, dt);
+		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity))scene->GetRegistry().get<CameraTargetComponent>(entity).enabled = true;
+		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = true;
 		// cameraTargets はECS化が必要だが、一旦省略
+	} else {
+		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity))scene->GetRegistry().get<CameraTargetComponent>(entity).enabled = false;
+		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = false;
 	}
 }
 

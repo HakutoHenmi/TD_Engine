@@ -1,24 +1,18 @@
 {
   "prefab":
     {
-      "id": 81,
-      "parentId": 0,
+      "id": 1048593,
+      "parentId": 4294967295,
       "name": "Canon",
       "locked": false,
-      "modelPath": "Resources/cube/cube.obj",
-      "texturePath": "Resources/white1x1.png",
-      "translate": [5.5, 0, 0],
-      "rotate": [0, -1.2353, 0],
+      "translate": [5.41751, 8.70545, 0.651643],
+      "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
-      "color": [0, 0, 0, 1],
-      "extraTexturePaths": [],
-      "shaderName": "Default",
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"},
-        {"type": "Tag", "enabled": true, "tag": "Untagged"},
-        {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [1,1,1], "damage": 10, "isActive": false, "tag": "Default"},
-        {"type": "Health", "enabled": true, "hp": 100, "maxHp": 100, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
-        {"type": "Script", "enabled": true, "scriptPath": "Canon", "paramData": ""}
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/canon.obj", "texturePath": "Resources/white1x1.png", "shaderName": "Default", "color": [0.301158,0.29767,0.29767,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "Canon", "param": ""}]},
+        {"type": "Health", "enabled": true, "hp": 100, "maxHp": 100, "isDead": false},
+        {"type": "Tag", "enabled": true, "tag": "Untagged"}
       ]
     }
 }

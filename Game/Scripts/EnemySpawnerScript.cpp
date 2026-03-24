@@ -1,5 +1,6 @@
 #include "EnemySpawnerScript.h"
 #include "ScriptEngine.h"
+#include "PhaseSystemScript.h"
 #include "../Scenes/GameScene.h"
 #include "../../Engine/Renderer.h"
 #ifdef USE_IMGUI
@@ -31,7 +32,37 @@ void EnemySpawnerScript::Start(entt::entity /*entity*/, GameScene* /*scene*/) {
 }
 
 void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, float dt) {
-	if (currentWave_ >= waveCount) return;
+	// Kを押して今いる敵を消す処理
+	if (GetAsyncKeyState('K') & 0x8000) {
+		std::vector<entt::entity> toDestroy;
+		auto view = scene->GetRegistry().view<TagComponent>();
+		for (auto e : view) {
+			if (view.get<TagComponent>(e).tag == "Enemy") {
+				toDestroy.push_back(e);
+			}
+		}
+		for (auto e : toDestroy) {
+			scene->GetRegistry().destroy(e);
+		}
+	}
+
+	if (currentWave_ >= waveCount) {
+		bool hasEnemy = false;
+		auto view = scene->GetRegistry().view<TagComponent>();
+		for (auto e : view) {
+			if (view.get<TagComponent>(e).tag == "Enemy") {
+				hasEnemy = true;
+				break;
+			}
+		}
+
+		if (!hasEnemy) {
+			auto& sc = scene->GetRegistry().get<ScriptComponent>(spawnerEntity);
+			sc.enabled = false;
+			PhaseSystemScript::SetPreparation(true);
+		}
+		return;
+	}
 
 	elapsedTime_ += dt;
 

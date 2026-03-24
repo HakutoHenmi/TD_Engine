@@ -7,24 +7,51 @@
   },
   "objects": [
     {
-      "id": 17,
+      "id": 3145735,
       "parentId": 4294967295,
-      "name": "EnemySpawner",
+      "name": "PhysicsSystem",
       "locked": true,
-      "translate": [-22.6678, 7.89936, -8.18447],
+      "translate": [0, 0, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "EnemySpawnerScript", "param": "{\"enemyScriptParams\":\"{\\\"moveType\\\":0,\\\"priority\\\":0,\\\"speed\\\":2.0,\\\"targetType\\\":0}\",\"enemyScriptPath\":\"EnemyBehavior\",\"enemyType\":0,\"maxCount\":11,\"pattern\":1,\"patternRadius\":3.0,\"spawnDuration\":10.0,\"startWave\":0,\"waveCount\":1,\"waveDelay\":2.0}"}]}
+        {"type": "Script", "enabled": true, "scripts": [{"path": "PhaseSystemScript", "param": ""}]}
       ]
     },
     {
-      "id": 16,
+      "id": 3145734,
+      "parentId": 4294967295,
+      "name": "PlayerSword",
+      "locked": false,
+      "translate": [40.1471, 1.4647, -17.2338],
+      "rotate": [0.0615238, -10.6269, -0.246095],
+      "scale": [0.1, 0.1, 1.6],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "shaderName": "Default", "color": [0.9,0.9,0.9,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "PlayerSword"}
+      ]
+    },
+    {
+      "id": 3145733,
+      "parentId": 4294967295,
+      "name": "Floor",
+      "locked": true,
+      "translate": [0, 0, 0],
+      "rotate": [-1.57, 0, 0],
+      "scale": [100, 100, 100],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/plane.obj", "texturePath": "Resources/white1x1.png", "shaderName": "Default", "color": [0.698842,0.307598,0.307598,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,1,1], "isTrigger": false},
+        {"type": "Tag", "enabled": true, "tag": "Floor"}
+      ]
+    },
+    {
+      "id": 3145732,
       "parentId": 4294967295,
       "name": "Player",
       "locked": true,
-      "translate": [13.5601, 1.01528, -19.1884],
-      "rotate": [0, -19.2655, 0.00390165],
+      "translate": [37.9888, 1.01389, -17.4483],
+      "rotate": [0, -11.6728, 0],
       "scale": [1, 1, 1],
       "components": [
         {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "shaderName": "Default", "color": [0.2,0.5,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
@@ -32,7 +59,6 @@
         {"type": "Rigidbody", "enabled": true, "velocity": [0,0,0], "useGravity": true, "isKinematic": true},
         {"type": "Script", "enabled": true, "scripts": [{"path": "PlayerScript", "param": ""}]},
         {"type": "Health", "enabled": true, "hp": 660, "maxHp": 1000, "isDead": false},
-        {"type": "Tag", "enabled": true, "tag": "Player"},
         {"type": "PlayerInput", "enabled": true},
         {"type": "CharacterMovement", "enabled": true, "speed": 7, "jumpPower": 20, "gravity": 9.8},
         {"type": "CameraTarget", "enabled": true, "distance": 10, "height": 3, "smoothSpeed": 5},
@@ -40,7 +66,7 @@
       ]
     },
     {
-      "id": 15,
+      "id": 3145731,
       "parentId": 4294967295,
       "name": "Sun",
       "locked": true,
@@ -52,7 +78,7 @@
       ]
     },
     {
-      "id": 14,
+      "id": 3145730,
       "parentId": 4294967295,
       "name": "UI",
       "locked": true,
@@ -66,70 +92,36 @@
       ]
     },
     {
-      "id": 13,
+      "id": 3145729,
       "parentId": 4294967295,
-      "name": "PlayerSword",
-      "locked": true,
-      "translate": [13.9042, 1.46612, -17.0172],
-      "rotate": [0.061483, -18.2827, -0.230325],
-      "scale": [0.1, 0.1, 1.6],
-      "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "shaderName": "Default", "color": [0.9,0.9,0.9,1], "uvTiling": [1,1], "uvOffset": [0,0]},
-        {"type": "Tag", "enabled": true, "tag": "PlayerSword"}
-      ]
-    },
-    {
-      "id": 12,
-      "parentId": 4294967295,
-      "name": "plane",
-      "locked": true,
-      "translate": [0, 0, 0],
-      "rotate": [-1.57, 0, 0],
-      "scale": [100, 100, 100],
-      "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/plane.obj", "texturePath": "Resources/white1x1.png", "shaderName": "Default", "color": [0.698842,0.307598,0.307598,1], "uvTiling": [1,1], "uvOffset": [0,0]}
-      ]
-    },
-    {
-      "id": 11,
-      "parentId": 4294967295,
-      "name": "Canon",
+      "name": "Core",
       "locked": false,
-      "translate": [0, 1.48835, -14.8173],
-      "rotate": [0, 0, 0],
+      "translate": [50, 0, 0],
+      "rotate": [0, 328.115, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "shaderName": "Default", "color": [0,0,0,1], "uvTiling": [1,1], "uvOffset": [0,0]},
-        {"type": "Script", "enabled": true, "scripts": [{"path": "Canon", "param": ""}]},
-        {"type": "Tag", "enabled": true, "tag": "Canon"}
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/sword.obj", "texturePath": "Resources/white1x1.png", "shaderName": "Default", "color": [0.0926641,0.65318,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "BaseScript", "param": "rotationSpeed=1;attackInterval=1;damage=10;attackRange=30;"}]},
+        {"type": "Health", "enabled": true, "hp": 100, "maxHp": 100, "isDead": false},
+        {"type": "Tag", "enabled": true, "tag": "Player"}
       ]
     },
     {
-      "id": 10,
-      "parentId": 4294967295,
-      "name": "Cube",
+      "id": 3145728,
+      "parentId": 3145729,
+      "name": "PreparationCamera",
       "locked": false,
-      "translate": [0, 1.46659, -13.2212],
-      "rotate": [0, 0, 137.291],
+      "translate": [6.67889, 9.09971, -2.90317],
+      "rotate": [0, 2.30138, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
-        {"type": "Script", "enabled": true, "scripts": [{"path": "PipeScript", "param": ""}]},
-        {"type": "Tag", "enabled": true, "tag": "pipe"}
-      ]
-    },
-    {
-      "id": 9,
-      "parentId": 4294967295,
-      "name": "Cube",
-      "locked": false,
-      "translate": [0, 1.89609, -12.0943],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/cube/cube.obj", "texturePath": "Resources/white1x1.png", "shaderName": "Default", "color": [0.810811,0.068872,0.068872,1], "uvTiling": [1,1], "uvOffset": [0,0]},
-        {"type": "Script", "enabled": true, "scripts": [{"path": "", "param": ""}]},
-        {"type": "Tag", "enabled": true, "tag": "BulletTank"}
+        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,1,1], "isTrigger": false},
+        {"type": "Rigidbody", "enabled": true, "velocity": [0,0,0], "useGravity": false, "isKinematic": false},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "PreparationCamera", "param": ""}]},
+        {"type": "PlayerInput", "enabled": false},
+        {"type": "CharacterMovement", "enabled": true, "speed": 5, "jumpPower": 12, "gravity": 0},
+        {"type": "CameraTarget", "enabled": false, "distance": 10, "height": 3, "smoothSpeed": 5},
+        {"type": "RectTransform", "enabled": true, "pos": [0,0], "size": [100,100], "anchor": [0.5,0.5]}
       ]
     }
   ]
