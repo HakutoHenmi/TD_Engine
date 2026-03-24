@@ -98,6 +98,10 @@ void BaseScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	sc.scripts.push_back({ "BulletScript", "", nullptr });
 
 	attackTimer_ = attackInterval_;
+
+
+	
+
 }
 
 void BaseScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
