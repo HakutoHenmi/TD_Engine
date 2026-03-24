@@ -20,9 +20,9 @@ void EnemyBehavior::Start(entt::entity entity, GameScene* scene) {
 	auto& registry = scene->GetRegistry();
 	auto& tc = registry.get<TransformComponent>(entity);
 
-	// ★追加: 物理演算から切り離し、マニュアル制御にする
+	// ★修正: 物理演算を有効化し、ノックバックを受け入れ可能にする
 	if (registry.all_of<RigidbodyComponent>(entity)) {
-		registry.get<RigidbodyComponent>(entity).isKinematic = true;
+		registry.get<RigidbodyComponent>(entity).isKinematic = false;
 	}
 
 	// 出現時に一度ターゲットを検索
@@ -59,12 +59,20 @@ void EnemyBehavior::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	ownerId_ = static_cast<uint32_t>(entity);
 	pCurrentScene_ = scene;
+
+	if (registry.all_of<HealthComponent>(entity)) {
+		auto& hc = registry.get<HealthComponent>(entity);
+		if (hc.isDead) return;
+		if (hc.hitStopTimer > 0.0f) return; // ヒットストップ中は動きを止める
+	}
 	
-	// ★追加: Kinematic を毎フレーム保証 (物理システムによる干渉を完全に防ぐ)
+	// ★修正: 物理システムに任せるため、Kinematic 強制設定を削除
+	/*
 	if (registry.all_of<RigidbodyComponent>(entity)) {
 		auto& rb = registry.get<RigidbodyComponent>(entity);
 		if (!rb.isKinematic) rb.isKinematic = true;
 	}
+	*/
 
 	// ターゲットが実在するか確認
 	bool targetExists = false;
@@ -238,10 +246,14 @@ void EnemyBehavior::Move(entt::entity entity, GameScene* scene, float dt) {
 	if (futureGround > currentFeetY + 0.4f) {
 		vx = 0;
 		vz = 0;
-	} else {
+	}
+	// ★修正: tc.translate を直接書き換えるのではなく、PhysicsSystem に任せるためにここでは何もしない
+	/*
+	else {
 		tc.translate.x = nextX;
 		tc.translate.z = nextZ;
 	}
+	*/
 
 	// 2. 垂直移動と重力の計算
 	if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
@@ -268,15 +280,16 @@ void EnemyBehavior::Move(entt::entity entity, GameScene* scene, float dt) {
 			rb.velocity.y = 0.0f;
 		}
 		
-		// 外部参照用に速度を保存しておく（実体移動はtcで行うが、他システムが見る可能性があるため）
+		// 実体移動は PhysicsSystem が rb.velocity に基づいて行う。
+		// ここでは AI が望む速度（vx, vz）をセットする。
 		rb.velocity.x = vx;
 		rb.velocity.z = vz;
-	}
+}
 
-	// 目標地点に十分近い場合の補正
+	// 目標地点に十分近い場合の補正 (Velocityベース移動の場合はスキップするか、微調整)
 	if (distance <= 0.1f && path_.size() > 1) {
-		tc.translate.x = nextPos.x;
-		tc.translate.z = nextPos.z;
+		// tc.translate.x = nextPos.x;
+		// tc.translate.z = nextPos.z;
 	}
 
 	// 現在のXZ座標から地面の高さを取得 (負荷軽減のため頻度を制限)

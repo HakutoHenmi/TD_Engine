@@ -23,6 +23,7 @@ public:
     void Initialize(Engine::WindowDX* dx) override;
     void Update() override;
     void Draw() override;
+    void DrawUI() override; // ★追加: ワールド空間UI用
     void DrawEditor() override;
 
     void DrawEditorGizmos();
@@ -47,6 +48,9 @@ public:
 	entt::entity GetSelectedEntity() const { return selectedEntity_; }
 	void SetSelectedEntity(entt::entity entity) { selectedEntity_ = entity; }
 	std::set<entt::entity>& GetSelectedEntities() { return selectedEntities_; }
+
+	// ★追加: コンテキストへのアクセス
+	GameContext& GetContext() { return ctx_; }
 
 	// ★追加: 名前でオブジェクトを検索するヘルパー
 	entt::entity FindObjectByName(const std::string& name);

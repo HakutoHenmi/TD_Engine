@@ -148,6 +148,10 @@ void GameScene::Update() {
 	ctx_.eventSystem = &eventSystem_; // ★追加: イベントシステム
 	ctx_.pendingSpawns = &pendingSpawns_;
 
+	// viewportのデフォルト設定（フルスクリーン想定）
+	ctx_.viewportOffset = { 0, 0 };
+	ctx_.viewportSize = { (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH };
+
 	// GPU Collision Dispatch（エンジンの汎用 PhysicsSystem.h に移行したため、ここでは何もしない）
 	// Animation（エンジン固有処理のため残留）
 
@@ -330,7 +334,8 @@ float GameScene::GetHeightAt(float x, float z, float startY, uint32_t excludeId)
 		bool isEnemyOrBullet = false;
 		if (registry_.all_of<TagComponent>(entity)) {
 			const auto& tag = registry_.get<TagComponent>(entity).tag;
-			if (tag == "Enemy" || tag == "Bullet" || tag == "Player") {
+			if (tag == "Enemy" || tag == "Bullet" || tag == "Player" || tag == "Sword" || tag == "PlayerSword" || tag == "Projectile" || 
+				tag == "pipe" || tag == "Canon" || tag == "BulletTank" || tag == "pipe_cannon") {
 				isEnemyOrBullet = true;
 			}
 		}
@@ -380,7 +385,7 @@ bool GameScene::RayCast(const Engine::Vector3& origin, const Engine::Vector3& di
 		// タグによるフィルタリング
 		if (registry_.all_of<TagComponent>(entity)) {
 			const auto& tag = registry_.get<TagComponent>(entity).tag;
-			if (tag == "Enemy" || tag == "Bullet" || tag == "Player") continue;
+			if (tag == "Enemy" || tag == "Bullet" || tag == "Player" || tag == "Sword" || tag == "PlayerSword" || tag == "Projectile") continue;
 		}
 
 		uint32_t modelHandle = 0;
@@ -582,6 +587,12 @@ void GameScene::Draw() {
 }
 
 extern GizmoMode currentGizmoMode;
+void GameScene::DrawUI() {
+	for (auto& sys : systems_) {
+		sys->DrawUI(registry_, ctx_);
+	}
+}
+
 extern bool gizmoDragging;
 extern int gizmoDragAxis;
 

@@ -279,6 +279,13 @@ struct HealthComponent : public Component {
 	float maxStamina = 100.0f;       // 最大スタミナ
 	float invincibleTime = 0.0f;     // 残り無敵時間（ゼロ以上なら無敵）
 	bool isDead = false;             // 死亡フラグ
+
+	// ★追加: ヒット演出用
+	float hitFlashTimer = 0.0f;      // ヒットフラッシュ（白く光る）
+	float hitStopTimer = 0.0f;       // ヒットストップ（一時停止）
+	DirectX::XMFLOAT4 baseColor = { 1, 1, 1, 1 }; // 元の色保存用
+	bool baseColorSaved = false;
+
 	HealthComponent() { type = ComponentType::Health; }
 };
 
