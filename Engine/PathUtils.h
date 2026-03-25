@@ -54,6 +54,13 @@ private:
                     break;
                 }
                 
+                // 3. [追加] .sln が見つからない場合、Resources フォルダそのものを探す (本番/配布環境)
+                if (std::filesystem::exists(current / "Resources")) {
+                    rootPath = current.string();
+                    found = true;
+                    // 他に .sln があるかもしれないので続行するが、見つからなかった時のデフォルトにする
+                }
+
                 if (current.has_parent_path()) {
                     current = current.parent_path();
                 } else {

@@ -94,8 +94,13 @@ void UISystem::DrawUI(entt::registry& registry, GameContext& ctx) {
     if (!ctx.camera) return;
 
     // OS画面全体に対して描画するため GetForegroundDrawList を使用
+#ifdef USE_IMGUI
     ImDrawList* drawList = ImGui::GetForegroundDrawList(); 
     if (!drawList) return;
+#else
+    (void)registry;
+    return;
+#endif
 
     auto viewHealth = registry.view<HealthComponent>();
     for (auto e : viewHealth) {
@@ -247,6 +252,7 @@ void UISystem::RenderNodeWithRect(entt::entity entity, entt::registry& registry,
 }
 
 void UISystem::DrawTextW(entt::entity /*entity*/, entt::registry& /*registry*/, const UITextComponent& text, float worldX, float worldY, float worldW, float worldH, Engine::Renderer* /*renderer*/) {
+#ifdef USE_IMGUI
     ImDrawList* drawList = ImGui::GetBackgroundDrawList();
     if (!drawList) return;
 
@@ -258,6 +264,9 @@ void UISystem::DrawTextW(entt::entity /*entity*/, entt::registry& /*registry*/, 
 
     ImU32 color = ImGui::GetColorU32(ImVec4(text.color.x, text.color.y, text.color.z, text.color.w));
     drawList->AddText(ImGui::GetFont(), text.fontSize, pos, color, text.text.c_str());
+#else
+    (void)text; (void)worldX; (void)worldY; (void)worldW; (void)worldH;
+#endif
 }
 
 void UISystem::ProcessButton(entt::entity entity, entt::registry& registry, UIButtonComponent& btn, float worldX, float worldY, float worldW, float worldH, GameContext& ctx) {

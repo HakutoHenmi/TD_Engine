@@ -63,6 +63,12 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 		mesh.texturePath = "Resources/white1x1.png";
 		
 		registry_.emplace<TransformComponent>(plane, DirectX::XMFLOAT3{0, 0, 0}, DirectX::XMFLOAT3{0, 0, 0}, DirectX::XMFLOAT3{20, 1, 20});
+
+		// 準備フェーズシステムの作成 (フォールバック)
+		auto ps = registry_.create();
+		registry_.emplace<NameComponent>(ps, "PhaseSystem");
+		auto& sc = registry_.emplace<ScriptComponent>(ps);
+		sc.scripts.push_back({"PhaseSystemScript"});
 	}
 
 	// エディターUIの初期化

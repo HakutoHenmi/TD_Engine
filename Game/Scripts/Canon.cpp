@@ -186,9 +186,6 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	bHitbox.tag = "Bullet";
 	bHitbox.size = {1.0f, 1.0f, 1.0f}; // スケール 0.3f と合わせて 0.3m の立方体にする
 
-	auto& bHealth = registry.emplace<HealthComponent>(bullet);
-	bHealth.hp = 1.0f;
-	bHealth.maxHp = 1.0f;
 
 	auto& bScript = registry.emplace<ScriptComponent>(bullet);
 	bScript.scripts.push_back({ "BulletScript", "", nullptr });

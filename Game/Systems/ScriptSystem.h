@@ -21,17 +21,13 @@ public:
 		std::vector<entt::entity> entities(view.begin(), view.end());
 		if (entities.empty()) return;
 
-		Engine::JobSystem::Dispatch((uint32_t)entities.size(), 64, [&](uint32_t i) {
-			auto entity = entities[i];
-			if (!registry.valid(entity)) return;
+		for (auto entity : entities) {
+			if (!registry.valid(entity)) continue;
 			auto& sc = registry.get<ScriptComponent>(entity);
 			if (sc.enabled && !sc.scripts.empty()) {
 				scriptEngine->Execute(entity, scene_, ctx.dt);
 			}
-		});
-		
-		// 全スクリプトの実行完了を待機
-		Engine::JobSystem::Wait();
+		}
 	}
 
 	void Reset(entt::registry& registry) override {

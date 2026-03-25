@@ -1,6 +1,7 @@
 #include "Model.h"
 #include "Renderer.h"
 #include "WindowDX.h"
+#include "PathUtils.h"
 
 #include <algorithm>
 #include <cassert>
@@ -320,7 +321,8 @@ bool Model::Load(ID3D12Device* device, ID3D12GraphicsCommandList* cmd, const std
 
 	if (!data_.material.textureFilePath.empty()) {
 		ScratchImage mip;
-		if (SUCCEEDED(LoadFromWICFile(ToWide(data_.material.textureFilePath).c_str(), WIC_FLAGS_FORCE_SRGB, nullptr, mip))) {
+		std::wstring widePath = PathUtils::GetUnifiedPathW(ToWide(data_.material.textureFilePath));
+		if (SUCCEEDED(LoadFromWICFile(widePath.c_str(), WIC_FLAGS_FORCE_SRGB, nullptr, mip))) {
 			tex_ = CreateTextureResource(device, mip.GetMetadata());
 			upload_ = UploadTextureData(tex_.Get(), mip, device, cmd);
 			srvDesc_.Format = mip.GetMetadata().format;

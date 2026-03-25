@@ -114,9 +114,6 @@ void BaseScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	hb.tag = "Bullet";
 	hb.size = {0.2f, 0.2f, 0.2f};
 
-	auto& hc = registry.emplace<HealthComponent>(bullet);
-	hc.hp = 1.0f;
-	hc.maxHp = 1.0f;
 
 	auto& sc = registry.emplace<ScriptComponent>(bullet);
 	sc.scripts.push_back({ "BulletScript", "", nullptr });

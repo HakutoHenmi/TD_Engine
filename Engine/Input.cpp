@@ -11,6 +11,7 @@ Input* Input::instance_ = nullptr;
 
 void Input::Initialize(HINSTANCE hInst, HWND hwnd) {
 	instance_ = this;
+	hwnd_ = hwnd;
 	HRESULT hr;
 
 	// --- DirectInput本体 ---
@@ -69,12 +70,24 @@ void Input::Update() {
 	mouseX_ = static_cast<float>(mouseState_.lX);
 	mouseY_ = static_cast<float>(mouseState_.lY);
 
-	// ★絶対座標の更新（簡易版。本来はウィンドウメッセージから取るのが望ましいが、一旦差分で蓄積）
-	absMouseX_ += mouseX_;
-	absMouseY_ += mouseY_;
-	// クランプ処理（仮）
-	absMouseX_ = (std::max)(0.0f, (std::min)(absMouseX_, (float)WindowDX::kW));
-	absMouseY_ = (std::max)(0.0f, (std::min)(absMouseY_, (float)WindowDX::kH));
+	// ★絶対座標の更新（OSカーソルと同期し、内部解像度にスケーリング）
+	POINT pt;
+	GetCursorPos(&pt);
+	ScreenToClient(hwnd_, &pt);
+
+	// クライアント領域のサイズを取得してスケーリング
+	RECT rc;
+	GetClientRect(hwnd_, &rc);
+	float clientW = static_cast<float>(rc.right - rc.left);
+	float clientH = static_cast<float>(rc.bottom - rc.top);
+
+	if (clientW > 0 && clientH > 0) {
+		absMouseX_ = static_cast<float>(pt.x) * (static_cast<float>(WindowDX::kW) / clientW);
+		absMouseY_ = static_cast<float>(pt.y) * (static_cast<float>(WindowDX::kH) / clientH);
+	} else {
+		absMouseX_ = static_cast<float>(pt.x);
+		absMouseY_ = static_cast<float>(pt.y);
+	}
 
 	// ホイール量（上:+、下:-）
 	wheel_ = static_cast<float>(mouseState_.lZ) / WHEEL_DELTA;
