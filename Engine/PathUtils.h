@@ -54,11 +54,11 @@ private:
                     break;
                 }
                 
-                // 3. [追加] .sln が見つからない場合、Resources フォルダそのものを探す (本番/配布環境)
-                if (std::filesystem::exists(current / "Resources")) {
+                // 3. [追加] .sln が見つからない場合、Resources/shaders フォルダを探す (本番/配布環境)
+                if (std::filesystem::exists(current / "Resources" / "shaders")) {
                     rootPath = current.string();
                     found = true;
-                    // 他に .sln があるかもしれないので続行するが、見つからなかった時のデフォルトにする
+                    break; // 最も近い一致で確定する（上位フォルダの誤検出を防ぐ）
                 }
 
                 if (current.has_parent_path()) {
