@@ -11,6 +11,8 @@
 #include <imgui.h>
 #endif
 #include <iostream>
+#include "../../Engine/Input.h"
+#include "../../Engine/WindowDX.h"
 
 namespace Game {
 
@@ -25,24 +27,34 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	(void)scene;
 	(void)dt;
 	auto* input = Engine::Input::GetInstance();
-	bool keyP = (GetAsyncKeyState('P') & 0x8000) != 0;
-	bool keySpace = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
-	bool key1 = (GetAsyncKeyState('1') & 0x8000) != 0;
-	bool key2 = (GetAsyncKeyState('2') & 0x8000) != 0;
-	bool key3 = (GetAsyncKeyState('3') & 0x8000) != 0;
+	if (!input) return;
+
+	// スクリプト動作確認用の白い線 (常に表示)
+	auto* renderer = scene->GetRenderer();
+	if (renderer) {
+		renderer->DrawLine3D({0, 20, 0}, {5, 20, 0}, {1, 1, 1, 1}, true);
+		if (isPreparation_) renderer->DrawLine3D({0, 21, 0}, {5, 21, 0}, {0, 1, 0, 1}, true);
+		if (isPlacementMode_) renderer->DrawLine3D({0, 22, 0}, {5, 22, 0}, {0, 0, 1, 1}, true);
+	}
+
+	bool key1 = input->Trigger(DIK_1) || (GetAsyncKeyState('1') & 0x8001);
+	bool key2 = input->Trigger(DIK_2) || (GetAsyncKeyState('2') & 0x8001);
+	bool key3 = input->Trigger(DIK_3) || (GetAsyncKeyState('3') & 0x8001);
+	bool keyP = input->Trigger(DIK_P) || (GetAsyncKeyState('P') & 0x8001);
+	bool keySpace = input->Trigger(DIK_SPACE) || (GetAsyncKeyState(VK_SPACE) & 0x8001);
 
 	if (isPreparation_) {
-		if (key1 && !preKey1_) {
+		if (key1) {
 			selectedObjPath_ = "Resources/BulletTank.prefab";
 			isPlacementMode_ = true;
 		}
 
-		if (key2 && !preKey2_) {
+		if (key2) {
 			selectedObjPath_ = "Resources/Pipe.prefab";
 			isPlacementMode_ = true;
 		}
 
-		if (key3 && !preKey3_) {
+		if (key3) {
 			selectedObjPath_ = "Resources/Canon.prefab";
 			isPlacementMode_ = true;
 		}
@@ -52,7 +64,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		Installation(scene, selectedObjPath_);
 
-		if (keySpace && !prekeySpace_) {
+		if (keySpace) {
 			isPreparation_ = false;
 			isPlacementMode_ = false;
 			currentPhase_++;
@@ -72,17 +84,11 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		}
 
 	} else {
-		if (keyP && !preKeyP_) {
+		if (keyP) {
 			isPreparation_ = true;
 		}
 		isPlacementMode_ = false;
-		
 	}
-	preKeyP_ = keyP;
-	prekeySpace_ = keySpace;
-	preKey1_ = key1;
-	preKey2_ = key2;
-	preKey3_ = key3;
 }
 
 void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPath) {
@@ -112,7 +118,7 @@ bool PhaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3&
 	float localX = 0, localY = 0;
 	float tW = 0, tH = 0;
 
-#ifdef USE_IMGUI
+#if defined(USE_IMGUI) && !defined(NDEBUG)
 	ImVec2 mousePos = ImGui::GetMousePos();
 	ImVec2 gameMin = EditorUI::GetGameImageMin();
 	ImVec2 gameMax = EditorUI::GetGameImageMax();
@@ -127,9 +133,11 @@ bool PhaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3&
 	if (!insideImage)
 		return false;
 #else
-    // リリース時は画面中央や、ネイティブなマウス座標を使う必要があるが、
-    // 基本的にプレイ中にこの配置モードに入らない想定なら false を返す
-    return false;
+    auto* input = Engine::Input::GetInstance();
+    if (!input) return false;
+    input->GetMousePos(localX, localY);
+    tW = (float)Engine::WindowDX::kW;
+    tH = (float)Engine::WindowDX::kH;
 #endif
 
 	auto& camera = scene->GetCamera();
@@ -153,7 +161,11 @@ bool PhaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3&
 		const auto& nc = terrainView.get<NameComponent>(entity);
 		const auto& tc = terrainView.get<TransformComponent>(entity);
 
-		bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || (nc.name.find("Floor") != std::string::npos) || (nc.name.find("Ground") != std::string::npos) || (nc.name.find("Stage") != std::string::npos);
+		bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || 
+		                 (nc.name.find("Floor") != std::string::npos) || 
+		                 (nc.name.find("Ground") != std::string::npos) || 
+		                 (nc.name.find("Stage") != std::string::npos) ||
+		                 (nc.name.find("Plane") != std::string::npos);
 		if (!isTerrain)
 			continue;
 
@@ -182,6 +194,21 @@ bool PhaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3&
 			bestDist = d;
 			outHitPoint = hp;
 			hitTerrain = true;
+		}
+	}
+
+	// --- フォールバック: 仮想的な y=0 平面との交差判定 ---
+	if (!hitTerrain) {
+		DirectX::XMFLOAT3 orig, dir;
+		DirectX::XMStoreFloat3(&orig, rayOrig);
+		DirectX::XMStoreFloat3(&dir, rayDir);
+
+		if (std::abs(dir.y) > 0.0001f) {
+			float t = -orig.y / dir.y;
+			if (t > 0) {
+				outHitPoint = { orig.x + dir.x * t, 0.0f, orig.z + dir.z * t };
+				hitTerrain = true;
+			}
 		}
 	}
 
@@ -222,9 +249,12 @@ bool PhaseSystemScript::IsPrefabPath(const std::string& path) const {
 }
 
 bool PhaseSystemScript::ExtractPrefabRenderPaths(const std::string& prefabPath, std::string& outModelPath, std::string& outTexturePath) const {
-	std::ifstream f(prefabPath);
-	if (!f.is_open())
-		return false;
+	std::string absPath = EditorUI::GetUnifiedProjectPath(prefabPath);
+	std::ifstream f(absPath);
+	if (!f.is_open()) {
+		f.open(prefabPath);
+		if (!f.is_open()) return false;
+	}
 
 	std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
 	f.close();
@@ -265,7 +295,11 @@ bool PhaseSystemScript::IsPlacementBlocked(GameScene* scene, const Engine::Vecto
 
 		if (registry.all_of<NameComponent>(entity)) {
 			const auto& nc = registry.get<NameComponent>(entity);
-			const bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || (nc.name.find("Floor") != std::string::npos) || (nc.name.find("Ground") != std::string::npos) || (nc.name.find("Stage") != std::string::npos);
+			const bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || 
+			                       (nc.name.find("Floor") != std::string::npos) || 
+			                       (nc.name.find("Ground") != std::string::npos) || 
+			                       (nc.name.find("Stage") != std::string::npos) ||
+			                       (nc.name.find("Plane") != std::string::npos);
 			if (isTerrain)
 				continue;
 		}
