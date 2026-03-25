@@ -203,6 +203,8 @@ exit /b 0
     <ClCompile Include="Game\Scripts\EnemyBehavior.cpp" />
     <ClCompile Include="Game\Scripts\TowerScript.cpp" />
     <ClCompile Include="Game\Scripts\EnemySpawnerScript.cpp" />
+    <ClCompile Include="Game\Scripts\IScript.cpp" />
+    <ClCompile Include="Game\Scripts\CommunicationTestScript.cpp" />
     <!-- ★追加 -->
     <ClCompile Include="Game\Systems\UISystem.cpp" />
     <ClCompile Include="Game\Systems\RiverSystem.cpp" />
@@ -231,6 +233,8 @@ exit /b 0
     <ClInclude Include="Game\Scripts\EnemyBehavior.h" />
     <ClInclude Include="Game\Scripts\TowerScript.h" />
     <ClInclude Include="Game\Scripts\EnemySpawnerScript.h" />
+    <ClInclude Include="Game\Scripts\CommunicationTestScript.h" />
+    <ClInclude Include="Game\Scripts\ScriptUtils.h" />
     <!-- ★追加 -->
     <ClInclude Include="Game\Systems\UISystem.h" />
     <ClInclude Include="Game\Systems\ISystem.h" />
