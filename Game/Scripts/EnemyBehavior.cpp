@@ -43,7 +43,6 @@ void EnemyBehavior::Start(entt::entity entity, GameScene* scene) {
 			rb.useGravity = false;
 			rb.velocity = {0, 0, 0};
 		}
-		
 
 		// スポナーの高さではなく、即座に正しい浮遊高度へ移動
 		float baseHeight = 9.0f;
@@ -60,30 +59,13 @@ void EnemyBehavior::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (!registry.all_of<TransformComponent>(entity)) return;
 
 	ownerId_ = static_cast<uint32_t>(entity);
-void EnemyBehavior::Update(SceneObject& obj, GameScene* scene, float dt) {
-	// ここに毎フレームの挙動を記述
-
-	// 自身の情報を常に最新に
-	pOwner_ = &obj;
 	pCurrentScene_ = scene;
 
 	if (registry.all_of<HealthComponent>(entity)) {
 		auto& hc = registry.get<HealthComponent>(entity);
 		if (hc.isDead) return;
 		if (hc.hitStopTimer > 0.0f) return; // ヒットストップ中は動きを止める
-
-	// 既存のターゲットを失ったときなどに改めて検索
-	if (target_ == nullptr) {
-		SearchTarget(obj, scene);
 	}
-	
-	// ★修正: 物理システムに任せるため、Kinematic 強制設定を削除
-	/*
-	if (registry.all_of<RigidbodyComponent>(entity)) {
-		auto& rb = registry.get<RigidbodyComponent>(entity);
-		if (!rb.isKinematic) rb.isKinematic = true;
-	}
-	*/
 
 	// ターゲットが実在するか確認
 	bool targetExists = false;
@@ -98,14 +80,7 @@ void EnemyBehavior::Update(SceneObject& obj, GameScene* scene, float dt) {
 		SearchTarget(entity, scene);
 	}
 
-	// 周囲情報のスキャンとA*（負荷が高いため頻度を下げる）
-	scanTimer_ += dt;
-	if (scanTimer_ > 0.1f) { // 0.2秒ごとに実施
-		scanTimer_ = 0.0f;
-
-		// 周囲の情報をスキャン
-		ScanSurround(obj, scene);
-
+	// ヒット中（無敵時間中）はスキャンと移動を停止
 	bool isHit = false;
 	if (registry.all_of<HealthComponent>(entity)) {
 		if (registry.get<HealthComponent>(entity).invincibleTime > 0.0f) isHit = true;
@@ -121,7 +96,6 @@ void EnemyBehavior::Update(SceneObject& obj, GameScene* scene, float dt) {
 
 		Move(entity, scene, dt);
 	}
-	// Debug(); // Removed redundant debug UI
 }
 
 void EnemyBehavior::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
@@ -131,20 +105,16 @@ void EnemyBehavior::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
 void EnemyBehavior::OnEditorUI() {
 #if defined(USE_IMGUI) && !defined(NDEBUG)
 	// 敵の移動タイプ(地面や空中)
-	// ライトの種類を選べるようにする
 	int typeNum = static_cast<int>(type_);
 	const char* types[] = {"Walk", "Fly"};
 	if (ImGui::Combo("Enemy Type", &typeNum, types, IM_ARRAYSIZE(types))) {
-		// 選ばれた番号をそのまま enum にキャストして戻せばOK！
 		type_ = static_cast<MoveType>(typeNum);
 	}
 
 	// 追うオブジェクトのタグを設定
-	// ライトの種類を選べるようにする
 	int targetNum = static_cast<int>(targetType_);
 	const char* targetTypes[] = {"Player", "Core", "Defender"};
 	if (ImGui::Combo("Target", &targetNum, targetTypes, IM_ARRAYSIZE(targetTypes))) {
-		// 選ばれた番号をそのまま enum にキャストして戻せばOK！
 		targetType_ = static_cast<TargetType>(targetNum);
 
 		// タグ名を更新(シーンを動かしたときにすぐに検索できるように)
@@ -196,13 +166,9 @@ void EnemyBehavior::SearchTarget(entt::entity entity, GameScene* scene) {
 			float dx = targetTc.translate.x - myTc.translate.x;
 			float dz = targetTc.translate.z - myTc.translate.z;
 			float distSq = dx * dx + dz * dz;	// 軽量化のために平方根は取らない
-			float dx = objects[i].GetTransform().translate.x - obj.GetTransform().translate.x;
-			float dz = objects[i].GetTransform().translate.z - obj.GetTransform().translate.z;
-			float distSq = dx * dx + dz * dz; // 軽量化のために平方根は取らない
 
 			// priorityごとの対応
-			if (priority_ == TargetPriority::Near) {	// Near
-			if (priority_ == Near) { // Near
+			if (priority_ == TargetPriority::Near) {
 				if (distSq < bestDistance) {
 					bestDistance = distSq;
 					bestTarget = e;
@@ -245,8 +211,6 @@ void EnemyBehavior::Move(entt::entity entity, GameScene* scene, float dt) {
 
 	// 移動方向の計算
 	float vx = 0, vz = 0;
-	float dirX = 0.0f;
-	float dirZ = 0.0f;
 	if (distance > 0.1f) {
 		float dirX = diffX / distance;
 		float dirZ = diffZ / distance;
@@ -269,22 +233,6 @@ void EnemyBehavior::Move(entt::entity entity, GameScene* scene, float dt) {
 		vx = 0;
 		vz = 0;
 	}
-	// ★修正: tc.translate を直接書き換えるのではなく、PhysicsSystem に任せるためにここでは何もしない
-	/*
-	else {
-		tc.translate.x = nextX;
-		tc.translate.z = nextZ;
-		dirX = diffX / distance;
-		dirZ = diffZ / distance;
-
-		obj.translate.x += dirX * speed_ * dt;
-		obj.translate.z += dirZ * speed_ * dt;
-	} else if (path_.size() > 1) {
-		// 目的地にほぼ着いたら、座標をマスの中心に強制セットしてズレをリセット
-		obj.translate.x = nextPos.x;
-		obj.translate.z = nextPos.z;
-	}
-	*/
 
 	// 2. 垂直移動と重力の計算
 	if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
@@ -294,55 +242,6 @@ void EnemyBehavior::Move(entt::entity entity, GameScene* scene, float dt) {
 			// 重力を適用
 			rb.velocity.y -= 9.8f * dt;
 			tc.translate.y += rb.velocity.y * dt;
-	// 他の敵と重ならないための処理
-	float separationX = 0.0f;
-	float separationZ = 0.0f;
-	auto& allObjects = scene->GetObjects();
-
-	for (size_t i = 0; i < allObjects.size(); ++i) {
-		// 自分自身、または「Enemy」タグを持っていないものは無視 
-		if (&allObjects[i].id == &obj.id || HasTag(allObjects[i], "Enemy")) {
-			continue;
-		}
-
-		// 他の敵との距離を計算
-		float vx = obj.translate.x - allObjects[i].translate.x;
-		float vz = obj.translate.z - allObjects[i].translate.z;
-		float distSq = vx * vx + vz * vz;
-
-		// 一定範囲内にいたら、離れる方向の力を蓄積
-		if (distSq < separationRadius_ * separationRadius_ && distSq > 0.0001f) {
-			float d = std::sqrt(distSq);
-			separationX += (vx / d) * (separationRadius_ - d); // 近いほど強く押し戻す
-			separationZ += (vz / d) * (separationRadius_ - d);
-		}
-	}
-
-	// 最終的な移動方向に合成
-	float finalDirX = dirX + separationX * separationWeight_;
-	float finalDirZ = dirZ + separationZ * separationWeight_;
-
-	// 正規化(斜め移動が速くならないように)
-	float finalLength = std::sqrt(finalDirX * finalDirX + finalDirZ * finalDirZ);
-	if (finalLength > 0.01f) {
-		obj.translate.x += (finalDirX / finalLength) * speed_ * dt;
-		obj.translate.z += (finalDirZ / finalLength) * speed_ * dt;
-	}
-
-	// 現在のXZ座標から地面の高さを取得 (負荷が高いため頻度を下げる)
-	// scanTimer_ が 0.0f にリセットされた直後のフレーム（0.2秒に1回）のみ実行
-	if (scanTimer_ <= dt) {
-		float newHeight = scene->GetHeightAt(obj.translate.x, obj.translate.z, obj.id);
-		// 0.0は「ヒットせず」の可能性があるため、前回の値を保持するガードを入れる
-		if (newHeight != 0.0f || groundHeight_ == 0.0f) {
-			groundHeight_ = newHeight;
-		}
-	}
-
-	// type別Y座標の対応
-	if (type_ == Fly) {
-		float baseHeight = 9.0f;                    // 基準とする高さ
-		float targetY = groundHeight_ + baseHeight; // 本来あるべき高さの目標値
 
 			// 地面スナップ (埋まり防止オフセット 1.0f)
 			float floorY = groundHeight_ + 1.0f;
@@ -364,24 +263,13 @@ void EnemyBehavior::Move(entt::entity entity, GameScene* scene, float dt) {
 		// ここでは AI が望む速度（vx, vz）をセットする。
 		rb.velocity.x = vx;
 		rb.velocity.z = vz;
-}
-		// 補間用の値
-		float interpolationSpeed = 5.0f;
-		obj.translate.y += (targetY - obj.translate.y) * interpolationSpeed * dt;
+	}
 
-		// sin波を使ってふわふわさせる
-		totalTime_ += dt;
-
-		float hoverRange = 0.5f; // 揺れ幅
-		float hoverSpeed = 2.0f; // 揺れのスピード
-
-	// 目標地点に十分近い場合の補正 (Velocityベース移動の場合はスキップするか、微調整)
+	// 目標地点に十分近い場合の補正
 	if (distance <= 0.1f && path_.size() > 1) {
 		// tc.translate.x = nextPos.x;
 		// tc.translate.z = nextPos.z;
 	}
-		// 基準の高さに揺れの高さを足す
-		obj.translate.y += (std::sin(totalTime_ * hoverSpeed) * hoverRange) * dt * 10.0f;
 
 	// 現在のXZ座標から地面の高さを取得 (負荷軽減のため頻度を制限)
 	if (scanTimer_ <= dt) {
@@ -393,14 +281,15 @@ void EnemyBehavior::Move(entt::entity entity, GameScene* scene, float dt) {
 }
 
 void EnemyBehavior::ScanSurround(entt::entity entity, GameScene* scene) {
-	myPos_ = scene->GetRegistry().get<TransformComponent>(entity).translate;
+	auto& registry = scene->GetRegistry();
+	myPos_ = registry.get<TransformComponent>(entity).translate;
 
 	// 自分の位置をスナップ（基準座標）
 	float snappedX = std::floor(myPos_.x / cellLength_) * cellLength_;
 	float snappedZ = std::floor(myPos_.z / cellLength_) * cellLength_;
 
 	// 自分が立っている場所の地面の高さを基準にする
-	float currentGroundHeight = scene->GetHeightAt(myPos_.x, myPos_.z, obj.id);
+	float currentGroundHeight = scene->GetHeightAt(myPos_.x, myPos_.z, myPos_.y + 1.0f, static_cast<uint32_t>(entity));
 
 	// グリッドの初期化
 	for (int z = 0; z < GRID_SIZE; ++z) {
@@ -416,7 +305,7 @@ void EnemyBehavior::ScanSurround(entt::entity entity, GameScene* scene) {
 				float cellWorldZ = snappedZ + (z - GRID_SIZE / 2) * cellLength_;
 
 				// その場所の地面の高さを取得
-				float cellHeight = scene->GetHeightAt(cellWorldX, cellWorldZ, obj.id);
+				float cellHeight = scene->GetHeightAt(cellWorldX, cellWorldZ, myPos_.y + 1.0f, static_cast<uint32_t>(entity));
 
 				// 自分の位置からそのマスまでの距離を計算する
 				float dx = (float)(x - GRID_SIZE / 2);
@@ -440,7 +329,6 @@ void EnemyBehavior::ScanSurround(entt::entity entity, GameScene* scene) {
 	}
 
 	float enemyRadius = 1.0f;
-	auto objectView = scene->GetRegistry().view<TransformComponent>();
 
 	// 壁オブジェクトを事前に抽出（計算量を減らすため、二重ループを避ける）
 	struct WallInfo {
@@ -448,12 +336,11 @@ void EnemyBehavior::ScanSurround(entt::entity entity, GameScene* scene) {
 	};
 	std::vector<WallInfo> walls;
 	
-	auto wallView = scene->GetRegistry().view<TagComponent, TransformComponent>();
+	auto wallView = registry.view<TagComponent, TransformComponent>();
 	for (auto e : wallView) {
-		if (wallView.get<TagComponent>(e).tag == "Wall") {
+		const auto& tag = wallView.get<TagComponent>(e).tag;
+		if (tag == "Wall" || tag == "Canon" || tag == "Pipe" || tag == "BulletTank") {
 			auto& tc = wallView.get<TransformComponent>(e);
-	for (const auto& o : objects) {
-		if (HasTag(o, "Wall") || HasTag(o, "Canon") || HasTag(o, "Pipe") || HasTag(o, "BulletTank")) {
 			WallInfo w;
 			w.minX = tc.translate.x - tc.scale.x - enemyRadius;
 			w.maxX = tc.translate.x + tc.scale.x + enemyRadius;
@@ -644,15 +531,13 @@ void EnemyBehavior::CalculatePath(int startX, int startZ, int targetX, int targe
 		}
 	}
 }
+
 void EnemyBehavior::Debug() {
 /*
 #ifndef NDEBUG
 #ifdef USE_IMGUI
 	ImGui::Begin("Enemy Debug");
-	ImGui::Text("Health: %.1f", health.health);
-	ImGui::Text("Is Dead: %s", (health.isDead ? "Yes" : "No"));
 	ImGui::Text("State: %d", (int)state_);
-	if (target_) ImGui::Text("Target: %s", target_->GetName().c_str());
 	ImGui::Text("GroundHeight : %f", groundHeight_);
 	ImGui::Text("Move Type : %s", (type_ == Fly ? "Fly" : "Walk"));
 
