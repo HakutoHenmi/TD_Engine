@@ -11,6 +11,8 @@ public:
 
 private:
 	float speed_ = 30.0f;
+	float lifeTime_ = 0.0f;    // 生存時間
+	float maxLifeTime_ = 3.0f; // 何秒で消すか
 };
 
 } // namespace Game
