@@ -38,35 +38,46 @@ private:
             GetModuleFileNameA(NULL, buffer, MAX_PATH);
             std::filesystem::path exeDir = std::filesystem::path(buffer).parent_path();
             
+            // Phase 1: .sln ファイルを最優先で探す (最も信頼性が高い)
             std::filesystem::path current = exeDir;
             bool found = false;
-            for (int i = 0; i < 6; ++i) {
-                // 1. 直下に .sln があるか確認
+            for (int i = 0; i < 8; ++i) {
                 if (std::filesystem::exists(current / "DirectXGame_New.sln")) {
                     rootPath = current.string();
                     found = true;
                     break;
                 }
-                // 2. [追加] 子フォルダに TD_Engine があり、その中に .sln があるか確認 (並列フォルダ対策)
                 if (std::filesystem::exists(current / "TD_Engine" / "DirectXGame_New.sln")) {
                     rootPath = (current / "TD_Engine").string();
                     found = true;
                     break;
                 }
-                
-                // 3. [追加] .sln が見つからない場合、Resources/shaders フォルダを探す (本番/配布環境)
-                if (std::filesystem::exists(current / "Resources" / "shaders")) {
-                    rootPath = current.string();
-                    found = true;
-                    break; // 最も近い一致で確定する（上位フォルダの誤検出を防ぐ）
-                }
-
-                if (current.has_parent_path()) {
+                if (current.has_parent_path() && current.parent_path() != current) {
                     current = current.parent_path();
                 } else {
                     break;
                 }
             }
+            
+            // Phase 2: .sln が見つからない場合、Resources/shaders を探す (配布環境用)
+            // ※ ビルド出力ディレクトリの不完全なResourcesを避けるため、
+            //    Toonシェーダーなど実際のゲームシェーダーが存在するかを確認する
+            if (!found) {
+                current = exeDir;
+                for (int i = 0; i < 8; ++i) {
+                    if (std::filesystem::exists(current / "Resources" / "shaders" / "ToonPS.hlsl")) {
+                        rootPath = current.string();
+                        found = true;
+                        break;
+                    }
+                    if (current.has_parent_path() && current.parent_path() != current) {
+                        current = current.parent_path();
+                    } else {
+                        break;
+                    }
+                }
+            }
+            
             if (!found) {
                 rootPath = exeDir.string();
             }
