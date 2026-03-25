@@ -48,25 +48,38 @@ private:
     static std::string GetRootPath() {
         static std::string rootPath = "";
         if (rootPath.empty()) {
-            // ★ Unicode版を使用 (日本語パス「デスクトップ」等の文字化け防止)
+            // Unicode版を使用 (日本語パス「デスクトップ」等の文字化け防止)
             wchar_t buffer[MAX_PATH];
             GetModuleFileNameW(NULL, buffer, MAX_PATH);
             std::filesystem::path exeDir = std::filesystem::path(buffer).parent_path();
             
-            // Phase 1: プロジェクトファイル (.sln / .vcxproj) を最優先で探す
+            // ビルド出力ディレクトリに含まれがちな名前
+            auto IsBuildFolder = [](const std::string& name) {
+                std::string lower = name;
+                std::transform(lower.begin(), lower.end(), lower.begin(), 
+                    [](unsigned char c){ return (char)std::tolower(c); });
+                return lower == "generated" || lower == "outputs" || lower == "development" ||
+                       lower == "bin" || lower == "obj" || lower == "x64" || lower == "debug" || lower == "release";
+            };
+
+            // Phase 1: プロジェクトファイル (.sln / .vcxproj / .git) を最優先で探す
             std::filesystem::path current = exeDir;
             bool found = false;
             for (int i = 0; i < 10; ++i) {
-                if (HasProjectFile(current)) {
-                    rootPath = current.string();
-                    found = true;
-                    break;
-                }
-                // 子フォルダ TD_Engine 内のチェック (並列フォルダ対策)
-                if (std::filesystem::exists(current / "TD_Engine") && HasProjectFile(current / "TD_Engine")) {
-                    rootPath = (current / "TD_Engine").string();
-                    found = true;
-                    break;
+                // ビルドフォルダ自体はルートパスの候補にしない（ソースディレクトリを見つけるため）
+                if (!IsBuildFolder(current.filename().string())) {
+                    if (HasProjectFile(current) || std::filesystem::exists(current / ".git")) {
+                        rootPath = current.string();
+                        found = true;
+                        break;
+                    }
+                    // 子フォルダ TD_Engine 内のチェック (並列フォルダ対策)
+                    if (std::filesystem::exists(current / "TD_Engine") && 
+                        (HasProjectFile(current / "TD_Engine") || std::filesystem::exists(current / "TD_Engine" / ".git"))) {
+                        rootPath = (current / "TD_Engine").string();
+                        found = true;
+                        break;
+                    }
                 }
                 if (current.has_parent_path() && current.parent_path() != current) {
                     current = current.parent_path();
@@ -75,13 +88,11 @@ private:
                 }
             }
             
-            // Phase 2: プロジェクトファイルが見つからない場合、
-            //          完全な Resources を持つディレクトリを探す (配布環境用)
+            // Phase 2: 配布環境用フォールバック (Resources/shaders/ToonPS.hlsl の存在を確認)
             if (!found) {
                 current = exeDir;
                 for (int i = 0; i < 10; ++i) {
-                    // ビルド出力の不完全 Resources を除外するため、
-                    // ゲーム必須ファイル (Toonシェーダー) の存在を確認
+                    // ここではビルドフォルダ内でも、完全なリソースがあれば許容する
                     if (std::filesystem::exists(current / "Resources" / "shaders" / "ToonPS.hlsl")) {
                         rootPath = current.string();
                         found = true;
@@ -99,7 +110,7 @@ private:
                 rootPath = exeDir.string();
             }
             
-            // デバッグ出力: 解決されたルートパスをログに表示
+            // デバッグ出力
             OutputDebugStringA(("[PathUtils] Root path resolved to: " + rootPath + "\n").c_str());
         }
         return rootPath;
