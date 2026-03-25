@@ -63,6 +63,12 @@
     <ClCompile Include="Game\Scripts\PhaseSystemScript.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Scripts\IScript.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Scripts\CommunicationTestScript.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
@@ -158,6 +164,12 @@
       <Filter>Scripts</Filter>
     </ClInclude>
     <ClInclude Include="Game\Scripts\ExperienceOrbScript.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Scripts\CommunicationTestScript.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Scripts\ScriptUtils.h">
       <Filter>Scripts</Filter>
     </ClInclude>
   </ItemGroup>
