@@ -31,23 +31,39 @@ public:
     }
 
 private:
+    // プロジェクト指標ファイルの存在チェック (.sln or .vcxproj)
+    static bool HasProjectFile(const std::filesystem::path& dir) {
+        try {
+            // 固定名チェック (高速)
+            if (std::filesystem::exists(dir / "DirectXGame_New.sln")) return true;
+            if (std::filesystem::exists(dir / "DirectXGameApp.vcxproj")) return true;
+            // 任意の .sln ファイル (フォールバック)
+            for (auto& entry : std::filesystem::directory_iterator(dir)) {
+                if (entry.path().extension() == ".sln") return true;
+            }
+        } catch (...) {}
+        return false;
+    }
+
     static std::string GetRootPath() {
         static std::string rootPath = "";
         if (rootPath.empty()) {
-            char buffer[MAX_PATH];
-            GetModuleFileNameA(NULL, buffer, MAX_PATH);
+            // ★ Unicode版を使用 (日本語パス「デスクトップ」等の文字化け防止)
+            wchar_t buffer[MAX_PATH];
+            GetModuleFileNameW(NULL, buffer, MAX_PATH);
             std::filesystem::path exeDir = std::filesystem::path(buffer).parent_path();
             
-            // Phase 1: .sln ファイルを最優先で探す (最も信頼性が高い)
+            // Phase 1: プロジェクトファイル (.sln / .vcxproj) を最優先で探す
             std::filesystem::path current = exeDir;
             bool found = false;
-            for (int i = 0; i < 8; ++i) {
-                if (std::filesystem::exists(current / "DirectXGame_New.sln")) {
+            for (int i = 0; i < 10; ++i) {
+                if (HasProjectFile(current)) {
                     rootPath = current.string();
                     found = true;
                     break;
                 }
-                if (std::filesystem::exists(current / "TD_Engine" / "DirectXGame_New.sln")) {
+                // 子フォルダ TD_Engine 内のチェック (並列フォルダ対策)
+                if (std::filesystem::exists(current / "TD_Engine") && HasProjectFile(current / "TD_Engine")) {
                     rootPath = (current / "TD_Engine").string();
                     found = true;
                     break;
@@ -59,12 +75,13 @@ private:
                 }
             }
             
-            // Phase 2: .sln が見つからない場合、Resources/shaders を探す (配布環境用)
-            // ※ ビルド出力ディレクトリの不完全なResourcesを避けるため、
-            //    Toonシェーダーなど実際のゲームシェーダーが存在するかを確認する
+            // Phase 2: プロジェクトファイルが見つからない場合、
+            //          完全な Resources を持つディレクトリを探す (配布環境用)
             if (!found) {
                 current = exeDir;
-                for (int i = 0; i < 8; ++i) {
+                for (int i = 0; i < 10; ++i) {
+                    // ビルド出力の不完全 Resources を除外するため、
+                    // ゲーム必須ファイル (Toonシェーダー) の存在を確認
                     if (std::filesystem::exists(current / "Resources" / "shaders" / "ToonPS.hlsl")) {
                         rootPath = current.string();
                         found = true;
@@ -81,6 +98,9 @@ private:
             if (!found) {
                 rootPath = exeDir.string();
             }
+            
+            // デバッグ出力: 解決されたルートパスをログに表示
+            OutputDebugStringA(("[PathUtils] Root path resolved to: " + rootPath + "\n").c_str());
         }
         return rootPath;
     }
