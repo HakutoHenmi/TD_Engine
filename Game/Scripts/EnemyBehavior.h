@@ -103,12 +103,14 @@ private: // メンバ変数
 	float groundHeight_ = 0.0f;	// FlyTypeが地面の高さを取るため
 	DirectX::XMFLOAT3 targetPos_ = {}; // 移動速度
 	float totalTime_ = 0.0f;
-	float speed_ = 5.0f;
+	float speed_ = 2.0f;
+	float separationRadius_ = 1.5f; // 近づきすぎないための半径
+	float separationWeight_ = 2.0f; // 離れる力の強さ
 	float scanTimer_ = 0.0f; // ★追加: 走査の頻度を下げるためのタイマー
-	bool showDebugGrid_ = false; // ★追加: 重いデバッグ表示を制御
+	bool showDebugGrid_ = true; // ★追加: 重いデバッグ表示を制御
 
 	// グリッド関連
-	static const int GRID_SIZE = 21; // 21*21にして自分を真ん中に置いた20メートル四方のグリッドに
+	static const int GRID_SIZE = 21; // 21*21にして自分を真ん中に置いた20メートル四方のグリッドに(可変)
 	float cellLength_ = 2.0f;        // グリッドのセル一つの大きさ
 
 	float KChinkoRadius_ = 5.0f;
