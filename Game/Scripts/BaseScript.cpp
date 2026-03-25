@@ -2,7 +2,9 @@
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
-#include "../../externals/imgui/imgui.h" // ★追加
+#ifdef USE_IMGUI
+#include "../../externals/imgui/imgui.h"
+#endif
 #include <cmath>
 
 namespace Game {
@@ -124,10 +126,12 @@ void BaseScript::Update(entt::entity entity, GameScene* scene, float dt) {
 void BaseScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 void BaseScript::OnEditorUI() {
+#if defined(USE_IMGUI) && !defined(NDEBUG)
 	ImGui::DragFloat("Rotation Speed", &rotationSpeed_, 0.1f);
 	ImGui::DragFloat("Attack Interval", &attackInterval_, 0.1f, 0.1f, 10.0f);
 	ImGui::DragFloat("Damage", &damage_, 1.0f, 0.0f, 1000.0f);
 	ImGui::DragFloat("Attack Range", &attackRange_, 1.0f, 1.0f, 100.0f);
+#endif
 }
 
 std::string BaseScript::SerializeParameters() {
