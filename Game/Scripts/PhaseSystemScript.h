@@ -27,9 +27,11 @@ public:
 	static void SetPreparation(bool prep) { isPreparation_ = prep; }
 
 private:
-	inline static bool isPreparation_ = false;
+	inline static bool isPreparation_ = true;
+	int currentPhase_ = 0;
 
 	bool preKeyP_ = false; // 初期化しておく
+	bool prekeySpace_ = false;
 	bool preKey1_ = false;
 	bool preKey2_ = false;
 	bool preKey3_ = false;

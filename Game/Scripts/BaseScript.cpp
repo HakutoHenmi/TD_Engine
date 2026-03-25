@@ -2,7 +2,9 @@
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
-#include "../../externals/imgui/imgui.h" // ★追加
+#ifdef USE_IMGUI
+#include "../../externals/imgui/imgui.h"
+#endif
 #include <cmath>
 
 namespace Game {
@@ -12,8 +14,32 @@ static bool HasTag(entt::registry& registry, entt::entity entity, const char* ta
 	return registry.get<TagComponent>(entity).tag == tagName;
 }
 
-void BaseScript::Start(entt::entity /*entity*/, GameScene* /*scene*/) {
+void BaseScript::Start(entt::entity entity, GameScene* scene) {
 	attackTimer_ = 0.0f; // クールダウン初期化
+
+	// 敵からダメージを受けるためのコンポーネントを追加
+	if (!scene || !scene->GetRegistry().valid(entity)) return;
+	auto& registry = scene->GetRegistry();
+
+	if (!registry.all_of<HealthComponent>(entity)) {
+		auto& hc = registry.emplace<HealthComponent>(entity);
+		hc.hp = 100.0f;
+		hc.maxHp = 100.0f;
+	}
+
+	if (!registry.all_of<HurtboxComponent>(entity)) {
+		auto& hurtbox = registry.emplace<HurtboxComponent>(entity);
+		hurtbox.tag = "Core";
+		hurtbox.enabled = true;
+
+		if (registry.all_of<BoxColliderComponent>(entity)) {
+			hurtbox.center = registry.get<BoxColliderComponent>(entity).center;
+			hurtbox.size = registry.get<BoxColliderComponent>(entity).size;
+		} else if (registry.all_of<TransformComponent>(entity)) {
+			auto& tc = registry.get<TransformComponent>(entity);
+			hurtbox.size = { tc.scale.x * 2.0f, tc.scale.y * 2.0f, tc.scale.z * 2.0f };
+		}
+	}
 }
 
 void BaseScript::Update(entt::entity entity, GameScene* scene, float dt) {
@@ -90,9 +116,6 @@ void BaseScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	hb.tag = "Bullet";
 	hb.size = {0.2f, 0.2f, 0.2f};
 
-	auto& hc = registry.emplace<HealthComponent>(bullet);
-	hc.hp = 1.0f;
-	hc.maxHp = 1.0f;
 
 	auto& sc = registry.emplace<ScriptComponent>(bullet);
 	sc.scripts.push_back({ "BulletScript", "", nullptr });
@@ -107,10 +130,12 @@ void BaseScript::Update(entt::entity entity, GameScene* scene, float dt) {
 void BaseScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 void BaseScript::OnEditorUI() {
+#if defined(USE_IMGUI) && !defined(NDEBUG)
 	ImGui::DragFloat("Rotation Speed", &rotationSpeed_, 0.1f);
 	ImGui::DragFloat("Attack Interval", &attackInterval_, 0.1f, 0.1f, 10.0f);
 	ImGui::DragFloat("Damage", &damage_, 1.0f, 0.0f, 1000.0f);
 	ImGui::DragFloat("Attack Range", &attackRange_, 1.0f, 1.0f, 100.0f);
+#endif
 }
 
 std::string BaseScript::SerializeParameters() {

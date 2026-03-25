@@ -1953,7 +1953,7 @@ Renderer::MeshHandle Renderer::LoadObjMesh(const std::string& objFilePath) {
 	auto model = std::make_shared<Model>();
 
 	// 作成した一時コマンドリストを渡す
-	if (!model->Load(dev_, cmd.Get(), objFilePath)) {
+	if (!model->Load(dev_, cmd.Get(), unifiedPath)) {
 		return 0;
 	}
 

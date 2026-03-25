@@ -5,6 +5,7 @@
 #include "../Scripts/IScript.h" // ★追加
 #include "../../Engine/WindowDX.h"
 #include "../../externals/imgui/imgui.h"
+#include "../Scenes/GameScene.h" // ★追加
 #include <unordered_map>
 #include <set>
 #include <algorithm>
@@ -86,81 +87,115 @@ void UISystem::Draw(entt::registry& registry, GameContext& ctx) {
 
     WorldRect screen = { 0, 0, (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH };
     renderRecursive(renderRecursive, entt::null, screen);
+}
 
-    // --- ★追加: ワールド空間UI（HPバー、ダメージ数字）の描画 ---
-    if (ctx.isPlaying && ctx.camera) {
-        ImDrawList* drawList = ImGui::GetBackgroundDrawList();
-        if (!drawList) return;
+// ★追加: ワールド空間UI（HPバー）の描画パス
+void UISystem::DrawUI(entt::registry& registry, GameContext& ctx) {
+    if (!ctx.camera) return;
 
-        auto viewHealth = registry.view<HealthComponent, TransformComponent>();
-        for (auto e : viewHealth) {
-            auto& hc = viewHealth.get<HealthComponent>(e);
-            auto& tc = viewHealth.get<TransformComponent>(e);
-            
-            const WorldSpaceUIComponent* uiComp = nullptr;
-            if (registry.all_of<WorldSpaceUIComponent>(e)) {
-                uiComp = &registry.get<WorldSpaceUIComponent>(e);
-            }
+    // OS画面全体に対して描画するため GetForegroundDrawList を使用
+#ifdef USE_IMGUI
+    ImDrawList* drawList = ImGui::GetForegroundDrawList(); 
+    if (!drawList) return;
+#else
+    (void)registry;
+    return;
+#endif
 
-            // 1. HPバーの描画
-            if (hc.enabled && !hc.isDead) {
-                bool shouldShow = (!uiComp || uiComp->showHealthBar);
+    auto viewHealth = registry.view<HealthComponent>();
+    for (auto e : viewHealth) {
+        auto& hc = viewHealth.get<HealthComponent>(e);
+        
+        const WorldSpaceUIComponent* uiComp = registry.try_get<WorldSpaceUIComponent>(e);
 
-                // HPが満タンでない、かつコンポーネント設定で許可されている場合に表示
-                if (shouldShow && hc.hp < hc.maxHp) {
-                    float sx, sy;
-                    DirectX::XMFLOAT3 pos = tc.translate;
-                    float barW = 60.0f;
-                    float barH = 6.0f;
+        // 1. HPバーの描画
+        if (hc.enabled && !hc.isDead) {
+            bool shouldShow = (!uiComp || uiComp->showHealthBar);
 
-                    if (uiComp) {
-                        pos.x += uiComp->offset.x;
-                        pos.y += uiComp->offset.y;
-                        pos.z += uiComp->offset.z;
-                        barW = uiComp->barWidth;
-                        barH = uiComp->barHeight;
-                    } else {
-                        // コンポーネントがない場合のデフォルト位置
-                        pos.y += tc.scale.y * 1.2f + 0.5f;
-                    }
+            if (shouldShow) {
+                float sx, sy;
+                
+                // 親子関係を考慮しワールド行列から正確な位置を取得
+                Engine::Matrix4x4 wm = ctx.scene->GetWorldMatrix(static_cast<int>(e));
+                DirectX::XMMATRIX worldMat = DirectX::XMLoadFloat4x4(reinterpret_cast<const DirectX::XMFLOAT4X4*>(&wm));
+                
+                // 行列から情報を抽出
+                DirectX::XMVECTOR scale, rot, trans;
+                DirectX::XMMatrixDecompose(&scale, &rot, &trans, worldMat);
+                DirectX::XMFLOAT3 basePos;
+                DirectX::XMStoreFloat3(&basePos, trans);
+                
+                float barW = 60.0f;
+                float barH = 6.0f;
+                DirectX::XMFLOAT3 pos = basePos;
 
-                    if (WorldToScreen(pos, *ctx.camera, sx, sy)) {
-                        float curW = barW * (hc.hp / hc.maxHp);
-                        
-                        ImVec2 pMin(sx - barW * 0.5f, sy - barH * 0.5f);
-                        ImVec2 pMax(sx + barW * 0.5f, sy + barH * 0.5f);
-                        
-                        // 背景（赤）
-                        drawList->AddRectFilled(pMin, pMax, IM_COL32(200, 50, 50, 200));
-                        // 前景（緑）
-                        drawList->AddRectFilled(pMin, ImVec2(pMin.x + curW, pMax.y), IM_COL32(50, 200, 50, 255));
-                        // 枠
-                        drawList->AddRect(pMin, pMax, IM_COL32(0, 0, 0, 255));
-                    }
+                // 頭上の高さを動的に計算（Colliderの大きさに合わせる）
+                float heightOffset = 1.0f;
+                if (registry.all_of<BoxColliderComponent>(e)) {
+                    auto& bc = registry.get<BoxColliderComponent>(e);
+                    // 中心高さ + 半分 に スケールを掛ける
+                    float yBasis = (bc.center.y + bc.size.y * 0.5f) * std::abs(DirectX::XMVectorGetY(scale));
+                    heightOffset = yBasis + 0.3f;
+                } else if (registry.all_of<TransformComponent>(e)) {
+                    heightOffset = registry.get<TransformComponent>(e).scale.y + 0.5f;
+                }
+
+                if (uiComp) {
+                    pos.x += uiComp->offset.x;
+                    pos.y += heightOffset + uiComp->offset.y - 1.2f; 
+                    pos.z += uiComp->offset.z;
+                    barW = uiComp->barWidth;
+                    barH = uiComp->barHeight;
+                } else {
+                    pos.y += heightOffset;
+                }
+
+                // 最新のViewport（画像描画位置）を使用して投影
+                if (WorldToScreenWithView(pos, *ctx.camera, ctx.viewportOffset, ctx.viewportSize, sx, sy)) {
+                    float hpRate = hc.hp / (hc.maxHp > 0 ? hc.maxHp : 1.0f);
+                    float curW = barW * std::clamp(hpRate, 0.0f, 1.0f);
+                    
+                    ImVec2 pMin(sx - barW * 0.5f, sy - barH * 0.5f);
+                    ImVec2 pMax(sx + barW * 0.5f, sy + barH * 0.5f);
+                    
+                    // 背景
+                    drawList->AddRectFilled(pMin, pMax, IM_COL32(40, 40, 40, 180));
+                    // HP残量
+                    drawList->AddRectFilled(pMin, ImVec2(pMin.x + curW, pMax.y), IM_COL32(50, 230, 50, 255));
+                    // 枠
+                    drawList->AddRect(pMin, pMax, IM_COL32(255, 255, 255, 200));
                 }
             }
         }
-
-        // ダメージ数値などは EditorState や一時データではなく、変数コンポーネントがあれば処理（一旦保留）
     }
 }
 
 bool UISystem::WorldToScreen(const DirectX::XMFLOAT3& worldPos, const Engine::Camera& camera, float& screenX, float& screenY) {
+    return WorldToScreenWithView(worldPos, camera, {0, 0}, {(float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH}, screenX, screenY);
+}
+
+bool UISystem::WorldToScreenWithView(const DirectX::XMFLOAT3& worldPos, const Engine::Camera& camera, const DirectX::XMFLOAT2& viewOffset, const DirectX::XMFLOAT2& viewSize, float& screenX, float& screenY) {
     DirectX::XMVECTOR p = DirectX::XMLoadFloat3(&worldPos);
-    DirectX::XMMATRIX viewProj = camera.View() * camera.Proj();
     
-    DirectX::XMVECTOR clipPos = DirectX::XMVector3TransformCoord(p, viewProj);
+    // DirectXの標準関数を使用して投影
+    DirectX::XMMATRIX view = camera.View();
+    DirectX::XMMATRIX proj = camera.Proj();
+    DirectX::XMMATRIX world = DirectX::XMMatrixIdentity();
+
+    // XMVector3Project は ビューポート(x, y, w, h, minZ, maxZ) を受け取る
+    DirectX::XMVECTOR screenPos = DirectX::XMVector3Project(p, 0, 0, viewSize.x, viewSize.y, 0.0f, 1.0f, proj, view, world);
     
-    DirectX::XMFLOAT3 clip;
-    DirectX::XMStoreFloat3(&clip, clipPos);
+    DirectX::XMFLOAT3 sp;
+    DirectX::XMStoreFloat3(&sp, screenPos);
 
-    // 画面外（カメラの後ろなど）の判定
-    if (clip.z < 0.0f || clip.z > 1.0f) return false;
-    if (clip.x < -1.1f || clip.x > 1.1f || clip.y < -1.1f || clip.y > 1.1f) return false;
+    // デバッグ投影結果の妥当性チェック
+    DirectX::XMMATRIX vp = view * proj;
+    DirectX::XMVECTOR clipPos = DirectX::XMVector3TransformCoord(p, vp);
+    float cz = DirectX::XMVectorGetZ(clipPos);
+    if (cz < 0.0f || cz > 1.0f) return false;
 
-    // NDC (-1~1) -> Screen (0~Pixels)
-    screenX = (clip.x + 1.0f) * 0.5f * (float)Engine::WindowDX::kW;
-    screenY = (1.0f - clip.y) * 0.5f * (float)Engine::WindowDX::kH;
+    screenX = viewOffset.x + sp.x;
+    screenY = viewOffset.y + sp.y;
     
     return true;
 }
@@ -217,6 +252,7 @@ void UISystem::RenderNodeWithRect(entt::entity entity, entt::registry& registry,
 }
 
 void UISystem::DrawTextW(entt::entity /*entity*/, entt::registry& /*registry*/, const UITextComponent& text, float worldX, float worldY, float worldW, float worldH, Engine::Renderer* /*renderer*/) {
+#ifdef USE_IMGUI
     ImDrawList* drawList = ImGui::GetBackgroundDrawList();
     if (!drawList) return;
 
@@ -228,6 +264,9 @@ void UISystem::DrawTextW(entt::entity /*entity*/, entt::registry& /*registry*/, 
 
     ImU32 color = ImGui::GetColorU32(ImVec4(text.color.x, text.color.y, text.color.z, text.color.w));
     drawList->AddText(ImGui::GetFont(), text.fontSize, pos, color, text.text.c_str());
+#else
+    (void)text; (void)worldX; (void)worldY; (void)worldW; (void)worldH;
+#endif
 }
 
 void UISystem::ProcessButton(entt::entity entity, entt::registry& registry, UIButtonComponent& btn, float worldX, float worldY, float worldW, float worldH, GameContext& ctx) {

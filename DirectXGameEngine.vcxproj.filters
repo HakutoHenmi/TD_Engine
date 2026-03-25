@@ -76,6 +76,7 @@
     <ClCompile Include="Engine\JobSystem.cpp">
       <Filter>ECS</Filter>
     </ClCompile>
+    <ClCompile Include="Engine\QuadTree.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="externals\imgui\imgui.h">
@@ -192,6 +193,7 @@
     <ClInclude Include="Engine\JobSystem.h">
       <Filter>ECS</Filter>
     </ClInclude>
+    <ClInclude Include="Engine\QuadTree.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />
@@ -218,5 +220,8 @@
     <Filter Include="ECS">
       <UniqueIdentifier>{e7ac4f9b-6dbb-430b-9685-5b871c4c8104}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="assessment.md" />
   </ItemGroup>
 </Project>

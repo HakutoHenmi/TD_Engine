@@ -5,7 +5,9 @@
 #include <cmath>
 #include <cstdlib> // rand()用
 #include <iostream>
+#ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
+#endif
 #include "../../Engine/ThirdParty/nlohmann/json.hpp"
 
 using json = nlohmann::json;
@@ -77,7 +79,7 @@ void EnemyAIScript::Update(entt::entity entity, GameScene* scene, float dt) {
 void EnemyAIScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 void EnemyAIScript::OnEditorUI() {
-#ifndef NDEBUG
+#if defined(USE_IMGUI) && !defined(NDEBUG)
 	ImGui::SliderFloat("移動速度", &speed_, 0.0f, 20.0f, "%.1f m/s");
 	ImGui::SliderFloat("索敵範囲", &sightRange_, 0.0f, 200.0f, "%.1f m");
 #endif
