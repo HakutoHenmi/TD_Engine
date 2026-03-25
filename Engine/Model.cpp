@@ -2,7 +2,7 @@
 #include "Renderer.h"
 #include "WindowDX.h"
 #include "PathUtils.h"
-
+#include <fstream>
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
@@ -23,14 +23,7 @@ using namespace DirectX;
 
 namespace Engine {
 
-static std::wstring ToWide(const std::string& s) {
-	if (s.empty())
-		return {};
-	int n = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, nullptr, 0);
-	std::wstring w(n - 1, 0);
-	MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, w.data(), n);
-	return w;
-}
+// ToWide function replaced by PathUtils::FromUTF8
 
 static void SplitPath(const std::string& full, std::string& dir, std::string& file) {
 	size_t p = full.find_last_of("/\\");
@@ -211,15 +204,20 @@ ComPtr<ID3D12Resource> Model::UploadTextureData(ID3D12Resource* tex, const Direc
 }
 
 bool Model::Load(ID3D12Device* device, ID3D12GraphicsCommandList* cmd, const std::string& objPath) {
-	std::string dir, file;
-	SplitPath(objPath, dir, file);
+	// Use wide string path to read file into memory for Assimp (Windows Unicode support)
+	std::wstring wpath = PathUtils::FromUTF8(objPath);
+	std::ifstream fileStream(wpath, std::ios::binary | std::ios::ate);
+	if (!fileStream.is_open()) return false;
+
+	std::streamsize size = fileStream.tellg();
+	fileStream.seekg(0, std::ios::beg);
+	std::vector<char> buffer((size_t)size);
+	if (!fileStream.read(buffer.data(), size)) return false;
+
 	Assimp::Importer importer;
-
-	// ★修正: 自動変換(ConvertToLeftHanded)を削除。
-	// 代わりに FlipWindingOrder と FlipUVs を使用し、座標は手動で反転する
 	const unsigned int flags = aiProcess_FlipWindingOrder | aiProcess_FlipUVs | aiProcess_Triangulate | aiProcess_LimitBoneWeights;
+	const aiScene* scene = importer.ReadFileFromMemory(buffer.data(), buffer.size(), flags);
 
-	const aiScene* scene = importer.ReadFile((dir + "/" + file).c_str(), flags);
 	if (!scene || !scene->mRootNode)
 		return false;
 
@@ -300,6 +298,7 @@ bool Model::Load(ID3D12Device* device, ID3D12GraphicsCommandList* cmd, const std
 
 		// パスが見つかった場合のみ設定する
 		if (str.length > 0) {
+			std::string dir = std::filesystem::path(objPath).parent_path().string();
 			data_.material.textureFilePath = dir + "/" + str.C_Str();
 		}
 	}
@@ -321,7 +320,7 @@ bool Model::Load(ID3D12Device* device, ID3D12GraphicsCommandList* cmd, const std
 
 	if (!data_.material.textureFilePath.empty()) {
 		ScratchImage mip;
-		std::wstring widePath = PathUtils::GetUnifiedPathW(ToWide(data_.material.textureFilePath));
+		std::wstring widePath = PathUtils::GetUnifiedPathW(PathUtils::FromUTF8(data_.material.textureFilePath));
 		if (SUCCEEDED(LoadFromWICFile(widePath.c_str(), WIC_FLAGS_FORCE_SRGB, nullptr, mip))) {
 			tex_ = CreateTextureResource(device, mip.GetMetadata());
 			upload_ = UploadTextureData(tex_.Get(), mip, device, cmd);

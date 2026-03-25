@@ -560,7 +560,7 @@ void EditorUI::SaveScene(GameScene* scene, const std::string& path) {
 
 	std::string absPath = GetUnifiedProjectPath(targetPath);
 	OutputDebugStringA(("[EditorUI] Saving scene to: " + absPath + "\n").c_str());
-	std::ofstream f(absPath);
+	std::ofstream f(Engine::PathUtils::FromUTF8(absPath));
 	if (!f.is_open()) { LogError("Save failed: " + absPath); return; }
 	f << SaveToMemory(scene);
 	f.close();
@@ -571,42 +571,45 @@ void EditorUI::SaveScene(GameScene* scene, const std::string& path) {
 
 
 static std::string OpenFileDialog(const char* filter) {
-	OPENFILENAMEA ofn;
-	CHAR szFile[260] = {0};
-	ZeroMemory(&ofn, sizeof(OPENFILENAMEA));
-	ofn.lStructSize = sizeof(OPENFILENAMEA);
+	OPENFILENAMEW ofn;
+	WCHAR szFile[260] = {0};
+	std::wstring wfilter = Engine::PathUtils::FromUTF8(filter);
+	ZeroMemory(&ofn, sizeof(OPENFILENAMEW));
+	ofn.lStructSize = sizeof(OPENFILENAMEW);
 	ofn.hwndOwner = nullptr;
 	ofn.lpstrFile = szFile;
-	ofn.nMaxFile = sizeof(szFile);
-	ofn.lpstrFilter = filter;
+	ofn.nMaxFile = sizeof(szFile) / sizeof(WCHAR);
+	ofn.lpstrFilter = wfilter.c_str();
 	ofn.nFilterIndex = 1;
 	ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
-	if (GetOpenFileNameA(&ofn) == TRUE) return ofn.lpstrFile;
+	if (GetOpenFileNameW(&ofn) == TRUE) return Engine::PathUtils::ToUTF8(ofn.lpstrFile);
 	return "";
 }
 
 static std::string SaveFileDialog(const char* filter, const char* defExt) {
-	OPENFILENAMEA ofn;
-	CHAR szFile[260] = {0};
-	ZeroMemory(&ofn, sizeof(OPENFILENAMEA));
-	ofn.lStructSize = sizeof(OPENFILENAMEA);
+	OPENFILENAMEW ofn;
+	WCHAR szFile[260] = {0};
+	std::wstring wfilter = Engine::PathUtils::FromUTF8(filter);
+	std::wstring wdefExt = Engine::PathUtils::FromUTF8(defExt);
+	ZeroMemory(&ofn, sizeof(OPENFILENAMEW));
+	ofn.lStructSize = sizeof(OPENFILENAMEW);
 	ofn.hwndOwner = nullptr;
 	ofn.lpstrFile = szFile;
-	ofn.nMaxFile = sizeof(szFile);
-	ofn.lpstrFilter = filter;
+	ofn.nMaxFile = sizeof(szFile) / sizeof(WCHAR);
+	ofn.lpstrFilter = wfilter.c_str();
 	ofn.nFilterIndex = 1;
-	ofn.lpstrDefExt = defExt;
+	ofn.lpstrDefExt = wdefExt.c_str();
 	ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
-	if (GetSaveFileNameA(&ofn) == TRUE) return ofn.lpstrFile;
+	if (GetSaveFileNameW(&ofn) == TRUE) return Engine::PathUtils::ToUTF8(ofn.lpstrFile);
 	return "";
 }
 
 static void LoadSceneInternal(GameScene* scene, const std::string& path, bool append) {
 	if (!scene) return;
 	std::string absPath = EditorUI::GetUnifiedProjectPath(path);
-	std::ifstream f(absPath);
+	std::ifstream f(Engine::PathUtils::FromUTF8(absPath));
 	if (!f.is_open()) {
-		absPath = path; f.open(absPath);
+		absPath = path; f.open(Engine::PathUtils::FromUTF8(absPath));
 		if (!f.is_open()) { EditorUI::LogError("Load failed: " + absPath); return; }
 	}
 	json j;
@@ -634,9 +637,9 @@ void EditorUI::LoadFromMemory(GameScene* scene, const std::string& data) {
 std::vector<entt::entity> EditorUI::LoadPrefab(GameScene* scene, const std::string& path) {
 	if (!scene) return {};
 	std::string absPath = GetUnifiedProjectPath(path);
-	std::ifstream f(absPath);
+	std::ifstream f(Engine::PathUtils::FromUTF8(absPath));
 	if (!f.is_open()) {
-		absPath = path; f.open(absPath);
+		absPath = path; f.open(Engine::PathUtils::FromUTF8(absPath));
 		if (!f.is_open()) { LogError("Prefab load failed: " + absPath); return {}; }
 	}
 	json j;

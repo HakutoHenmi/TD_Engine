@@ -1879,7 +1879,7 @@ Renderer::TextureHandle Renderer::LoadTexture2D(const std::string& filePath, boo
 		return it->second;
 
 	DirectX::ScratchImage img;
-	std::wstring wpath(unifiedPath.begin(), unifiedPath.end());
+	std::wstring wpath = PathUtils::FromUTF8(unifiedPath);
 	HRESULT hr = DirectX::LoadFromWICFile(wpath.c_str(), DirectX::WIC_FLAGS_NONE, nullptr, img);
 	if (FAILED(hr))
 		return 0;
