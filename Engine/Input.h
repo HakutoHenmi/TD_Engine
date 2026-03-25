@@ -49,6 +49,7 @@ private:
 	float absMouseX_ = 0.0f; // ★追加
 	float absMouseY_ = 0.0f; // ★追加
 	float wheel_ = 0.0f;
+	HWND hwnd_ = nullptr; // ★追加
 
 	static Input* instance_;
 };

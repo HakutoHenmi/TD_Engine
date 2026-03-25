@@ -2,6 +2,8 @@
 #include "Scenes/GameScene.h"
 #include <iostream>
 #include <Windows.h> // OutputDebugStringA
+#include "PhaseSystemScript.h"
+#include "PreparationCamera.h"
 
 // ★ 個別のスクリプトの include はもう不要です！
 
@@ -17,8 +19,9 @@ ScriptEngine* ScriptEngine::GetInstance() {
 }
 
 void ScriptEngine::Initialize() {
-	// ★変更: マクロによってプログラム起動時に自動登録されるため、
-	// ここでの手動登録処理はすべて削除して空にします。
+	// ★変更: マクロによる自動登録に加え、リリースビルドでのリンク漏れ防止のため明示的に登録
+	RegisterScript("PhaseSystemScript", []() { return std::make_shared<PhaseSystemScript>(); });
+	RegisterScript("PreparationCamera", []() { return std::make_shared<PreparationCamera>(); });
 }
 
 void ScriptEngine::Shutdown() {
