@@ -1258,10 +1258,109 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 	ImGui::End();
 }
 
+std::vector<std::string> EditorUI::GetAssetsInDir(const std::string& root, const std::vector<std::string>& extensions) {
+	std::vector<std::string> assets;
+	std::string absRoot = GetUnifiedProjectPath(root);
+	if (!fs::exists(Engine::PathUtils::FromUTF8(absRoot))) return assets;
+
+	for (const auto& entry : fs::recursive_directory_iterator(Engine::PathUtils::FromUTF8(absRoot))) {
+		if (entry.is_regular_file()) {
+			std::string ext = entry.path().extension().string();
+			std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+			
+			bool match = false;
+			for (const auto& targetExt : extensions) {
+				if (ext == targetExt) { match = true; break; }
+			}
+			
+			if (match) {
+				std::string path = Engine::PathUtils::ToUTF8(entry.path().wstring());
+				std::replace(path.begin(), path.end(), '\\', '/');
+				
+				// Make relative to Resources/ for consistent storage
+				size_t pos = path.find("/Resources/");
+				if (pos != std::string::npos) {
+					path = path.substr(pos + 1); // Skip leading slash if any
+				} else {
+					pos = path.find("Resources/");
+					if (pos != std::string::npos) path = path.substr(pos);
+				}
+				assets.push_back(path);
+			}
+		}
+	}
+	return assets;
+}
+
+bool EditorUI::AssetField(const char* label, std::string& path, const std::vector<std::string>& extensions) {
+	bool modified = false;
+	ImGui::PushID(label);
+	
+	char buf[256];
+	strcpy_s(buf, path.c_str());
+	
+	float buttonSize = ImGui::GetFrameHeight();
+	ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - buttonSize - ImGui::GetStyle().ItemSpacing.x);
+	
+	if (ImGui::InputText(label, buf, sizeof(buf))) {
+		path = buf;
+		modified = true;
+	}
+
+	// Drag & Drop
+	if (ImGui::BeginDragDropTarget()) {
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROJECT_ASSET")) {
+			std::string droppedPath = (const char*)payload->Data;
+			std::replace(droppedPath.begin(), droppedPath.end(), '\\', '/');
+			
+			std::string ext = fs::path(Engine::PathUtils::FromUTF8(droppedPath)).extension().string();
+			std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+			
+			bool valid = false;
+			for (const auto& e : extensions) { if (ext == e) { valid = true; break; } }
+			
+			if (valid) {
+				path = droppedPath;
+				modified = true;
+			}
+		}
+		ImGui::EndDragDropTarget();
+	}
+
+	ImGui::SameLine();
+	if (ImGui::Button("...")) {
+		ImGui::OpenPopup("AssetDropdown");
+	}
+
+	if (ImGui::BeginPopup("AssetDropdown")) {
+		static std::vector<std::string> assetList;
+		if (ImGui::IsWindowAppearing()) {
+			assetList = GetAssetsInDir("Resources", extensions);
+		}
+
+		if (ImGui::Selectable("(None)", path.empty())) {
+			path = "";
+			modified = true;
+		}
+
+		for (const auto& a : assetList) {
+			if (ImGui::Selectable(a.c_str(), path == a)) {
+				path = a;
+				modified = true;
+			}
+		}
+		ImGui::EndPopup();
+	}
+
+	ImGui::PopID();
+	return modified;
+}
+
 void EditorUI::ShowInspector(GameScene* scene) {
 	// Removed ImGui::Begin("Inspector") to support tab embedding
 	auto selected = scene->GetSelectedEntity();
 	if (scene && selected != entt::null && scene->GetRegistry().valid(selected)) {
+		ImGui::PushID((int)selected);
 		auto entity = selected;
 		auto& registry = scene->GetRegistry();
 
@@ -1337,38 +1436,12 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				if (ImGui::CollapsingHeader("Mesh Renderer", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##MR", &cp->enabled);
 					
-					char modelBuf[256]; strcpy_s(modelBuf, cp->modelPath.c_str());
-					if (ImGui::InputText("Model Path", modelBuf, sizeof(modelBuf))) {
-						cp->modelPath = modelBuf;
+					if (AssetField("Model Path", cp->modelPath, {".obj", ".fbx", ".gltf"})) {
 						cp->modelHandle = Engine::Renderer::GetInstance()->LoadObjMesh(cp->modelPath);
 					}
-					if (ImGui::BeginDragDropTarget()) {
-						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROJECT_ASSET")) {
-							std::string path = (const char*)payload->Data;
-							std::replace(path.begin(), path.end(), '\\', '/'); // 正規化
-							if (path.find(".obj") != std::string::npos || path.find(".fbx") != std::string::npos || path.find(".gltf") != std::string::npos) {
-								cp->modelPath = path;
-								cp->modelHandle = Engine::Renderer::GetInstance()->LoadObjMesh(cp->modelPath);
-							}
-						}
-						ImGui::EndDragDropTarget();
-					}
 
-					char texBuf[256]; strcpy_s(texBuf, cp->texturePath.c_str());
-					if (ImGui::InputText("Texture Path", texBuf, sizeof(texBuf))) {
-						cp->texturePath = texBuf;
+					if (AssetField("Texture Path", cp->texturePath, {".png", ".jpg"})) {
 						cp->textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(cp->texturePath);
-					}
-					if (ImGui::BeginDragDropTarget()) {
-						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROJECT_ASSET")) {
-							std::string path = (const char*)payload->Data;
-							std::replace(path.begin(), path.end(), '\\', '/'); // 正規化
-							if (path.find(".png") != std::string::npos || path.find(".jpg") != std::string::npos) {
-								cp->texturePath = path;
-								cp->textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(cp->texturePath);
-							}
-						}
-						ImGui::EndDragDropTarget();
 					}
 					ImGui::ColorEdit4("Base Color", &cp->color.x);
 					ImGui::DragFloat2("UV Tiling", &cp->uvTiling.x, 0.01f);
@@ -1388,17 +1461,8 @@ void EditorUI::ShowInspector(GameScene* scene) {
 			if (auto* gmc = registry.try_get<GpuMeshColliderComponent>(entity)) {
 				if (ImGui::CollapsingHeader("GpuMeshCollider", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##GMC", &gmc->enabled);
-					ImGui::Text("Mesh Path: %s", gmc->meshPath.c_str());
-					if (ImGui::BeginDragDropTarget()) {
-						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROJECT_ASSET")) {
-							std::string path = (const char*)payload->Data;
-							std::replace(path.begin(), path.end(), '\\', '/'); // 正規化
-							if (path.find(".obj") != std::string::npos || path.find(".fbx") != std::string::npos) {
-								gmc->meshPath = path;
-								gmc->meshHandle = Engine::Renderer::GetInstance()->LoadObjMesh(gmc->meshPath);
-							}
-						}
-						ImGui::EndDragDropTarget();
+					if (AssetField("Mesh Path", gmc->meshPath, {".obj", ".fbx"})) {
+						gmc->meshHandle = Engine::Renderer::GetInstance()->LoadObjMesh(gmc->meshPath);
 					}
 					ImGui::Checkbox("Is Trigger", &gmc->isTrigger);
 					if (ImGui::Button("Remove##GMC")) registry.remove<GpuMeshColliderComponent>(entity);
@@ -1424,7 +1488,9 @@ void EditorUI::ShowInspector(GameScene* scene) {
 			if (auto* as = registry.try_get<AudioSourceComponent>(entity)) {
 				if (ImGui::CollapsingHeader("AudioSource", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##AS", &as->enabled);
-					ImGui::Text("File: %s", as->soundPath.c_str());
+					if (AssetField("Sound File", as->soundPath, {".wav", ".mp3"})) {
+						as->soundHandle = Engine::Audio::GetInstance()->Load(as->soundPath);
+					}
 					ImGui::DragFloat("Volume", &as->volume, 0.01f, 0, 1);
 					ImGui::Checkbox("Loop", &as->loop);
 					ImGui::Checkbox("Play on Start", &as->playOnStart);
@@ -1530,7 +1596,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 			if (auto* pe = registry.try_get<ParticleEmitterComponent>(entity)) {
 				if (ImGui::CollapsingHeader("ParticleEmitter", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##PE", &pe->enabled);
-					ImGui::Text("Asset: %s", pe->assetPath.c_str());
+					AssetField("Asset", pe->assetPath, {".json"});
 					if (ImGui::Button("Remove##PE")) registry.remove<ParticleEmitterComponent>(entity);
 				}
 			}
@@ -1571,7 +1637,9 @@ void EditorUI::ShowInspector(GameScene* scene) {
 			if (auto* img = registry.try_get<UIImageComponent>(entity)) {
 				if (ImGui::CollapsingHeader("UIImage", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##IMG", &img->enabled);
-					ImGui::Text("Texture: %s", img->texturePath.c_str());
+					if (AssetField("Texture", img->texturePath, {".png", ".jpg"})) {
+						img->textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(img->texturePath);
+					}
 					ImGui::ColorEdit4("Color", &img->color.x);
 					if (ImGui::Button("Remove##IMG")) registry.remove<UIImageComponent>(entity);
 				}
@@ -1597,6 +1665,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					ImGui::Checkbox("Enabled##RIV", &riv->enabled);
 					ImGui::DragFloat("Width", &riv->width, 0.1f);
 					ImGui::DragFloat("Speed", &riv->flowSpeed, 0.1f);
+					AssetField("Texture", riv->texturePath, {".png", ".jpg"});
 					if (ImGui::Button("Remove##RIV")) registry.remove<RiverComponent>(entity);
 				}
 			}
@@ -1702,6 +1771,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 			if (ImGui::MenuItem("Variables")) std::ignore = registry.get_or_emplace<VariableComponent>(entity);
 			ImGui::EndPopup();
 		}
+		ImGui::PopID();
 	} else {
 		ImGui::Text("No Selection");
 	}
