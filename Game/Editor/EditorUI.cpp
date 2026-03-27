@@ -208,6 +208,8 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 					auto& c = reg.get_or_emplace<UIImageComponent>(entity);
 					c.enabled = en; c.texturePath = comp.value("texturePath", "");
 					if (comp.contains("color")) c.color = {comp["color"][0], comp["color"][1], comp["color"][2], comp["color"][3]};
+					// ★追加: UIImageもテクスチャをロードするように修正
+					if (!c.texturePath.empty()) c.textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(c.texturePath);
 				} else if (type == "UIText") {
 					auto& c = reg.get_or_emplace<UITextComponent>(entity);
 					c.enabled = en; c.text = comp.value("text", ""); c.fontSize = comp.value("fontSize", 24.0f);
@@ -607,15 +609,27 @@ static std::string SaveFileDialog(const char* filter, const char* defExt) {
 static void LoadSceneInternal(GameScene* scene, const std::string& path, bool append) {
 	if (!scene) return;
 	std::string absPath = EditorUI::GetUnifiedProjectPath(path);
+	OutputDebugStringA(("[EditorUI] LoadSceneInternal: " + absPath + "\n").c_str());
+
 	std::ifstream f(Engine::PathUtils::FromUTF8(absPath));
 	if (!f.is_open()) {
 		absPath = path; f.open(Engine::PathUtils::FromUTF8(absPath));
-		if (!f.is_open()) { EditorUI::LogError("Load failed: " + absPath); return; }
+		if (!f.is_open()) {
+			EditorUI::LogError("Load failed: " + absPath);
+			MessageBoxA(NULL, ("Failed to open scene file:\n" + absPath).c_str(), "Load Error", MB_OK | MB_ICONERROR);
+			return;
+		}
 	}
 	json j;
-	try { f >> j; } catch (...) { EditorUI::LogError("JSON Syntax Error: " + path); return; }
-	RestoreSceneFromJson(scene, j, append);
-	EditorUI::Log((append ? "Scene appended: " : "Scene loaded: ") + absPath);
+	try {
+		f >> j;
+		RestoreSceneFromJson(scene, j, append);
+		EditorUI::Log((append ? "Scene appended: " : "Scene loaded: ") + absPath);
+	} catch (const std::exception& e) {
+		std::string msg = "JSON Parse Error in " + absPath + ": " + std::string(e.what());
+		EditorUI::LogError(msg);
+		MessageBoxA(NULL, msg.c_str(), "JSON Error", MB_OK | MB_ICONERROR);
+	}
 }
 
 void EditorUI::LoadScene(GameScene* scene, const std::string& path) {
@@ -671,7 +685,16 @@ std::vector<entt::entity> EditorUI::LoadPrefab(GameScene* scene, const std::stri
 }
 
 std::string EditorUI::GetUnifiedProjectPath(const std::string& path) {
-	return Engine::PathUtils::GetUnifiedPath(path);
+	if (path.empty()) return "";
+	// ★修正: UTF-8文字列を直接 fs::path に渡すと Windows で文字化けするため FromUTF8 を経由
+	if (std::filesystem::path(Engine::PathUtils::FromUTF8(path)).is_absolute()) return path;
+
+	// Engine::PathUtils を通じてルートを取得
+	std::string root = Engine::PathUtils::GetRootPath();
+	std::filesystem::path combined = std::filesystem::path(Engine::PathUtils::FromUTF8(root)) / Engine::PathUtils::FromUTF8(path);
+	std::string res = Engine::PathUtils::ToUTF8(combined.wstring());
+	std::replace(res.begin(), res.end(), '\\', '/');
+	return res;
 }
 
 void EditorUI::Initialize(Engine::Renderer* renderer) {

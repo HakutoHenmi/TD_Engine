@@ -99,6 +99,11 @@ public:
         return wstr;
     }
 
+    // For backward compatibility (deprecated: use GetAssetsPath or GetUnifiedPath)
+    static std::string GetRootPath() {
+        return ToUTF8(GetRootPathInternal().wstring());
+    }
+
 private:
     static bool HasProjectFile(const std::filesystem::path& dir) {
         try {
@@ -171,11 +176,7 @@ private:
         rootPath = exeDir;
         return rootPath;
     }
-
-    // For backward compatibility (deprecated: use GetAssetsPath or GetUnifiedPath)
-    static std::string GetRootPath() {
-        return ToUTF8(GetRootPathInternal().wstring());
-    }
 };
+
 
 } // namespace Engine

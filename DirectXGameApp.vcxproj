@@ -189,6 +189,7 @@ exit /b 0
     <ClCompile Include="Game\Scenes\TitleScene.cpp" />
     <ClCompile Include="Game\Scripts\BaseScript.cpp" />
     <ClCompile Include="Game\Scripts\BulletScript.cpp" />
+    <ClCompile Include="Game\Scripts\BulletTank.cpp" />
     <ClCompile Include="Game\Scripts\Canon.cpp" />
     <ClCompile Include="Game\Scripts\EnemyAIScript.cpp" />
     <ClCompile Include="Game\Scripts\ExperienceHopper.cpp" />
@@ -218,6 +219,7 @@ exit /b 0
     <ClInclude Include="Game\ObjectTypes.h" />
     <ClInclude Include="Game\Scripts\BaseScript.h" />
     <ClInclude Include="Game\Scripts\BulletScript.h" />
+    <ClInclude Include="Game\Scripts\BulletTank.h" />
     <ClInclude Include="Game\Scripts\Canon.h" />
     <ClInclude Include="Game\Scripts\EnemyAIScript.h" />
     <ClInclude Include="Game\Scripts\ExperienceHopper.h" />

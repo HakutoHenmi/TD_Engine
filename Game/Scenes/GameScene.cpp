@@ -1,6 +1,7 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#include "../../Engine/PathUtils.h"
 #include "GameScene.h"
 #include "../Editor/EditorUI.h"
 #include "../Scripts/ScriptEngine.h"
@@ -36,14 +37,21 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 
 	bool loaded = false;
 	// ★ リリース構成等での自動ロード
-	std::string scenePath = EditorUI::GetUnifiedProjectPath("Resources/scene.json");
-	if (std::filesystem::exists(scenePath)) {
-		OutputDebugStringA(("[GameScene] " + scenePath + " found. Loading...\n").c_str());
-		EditorUI::LoadScene(this, scenePath);
-		isPlaying_ = true; // リリース/起動時はプレイ状態から開始する
-		loaded = true;
-	} else {
-		OutputDebugStringA(("[GameScene] " + scenePath + " NOT found.\n").c_str());
+	try {
+		std::string scenePath = EditorUI::GetUnifiedProjectPath("Resources/scene.json");
+		// ★修正: UTF-8文字列をFromUTF8経由でfs::pathに変換し、日本語パスに対応
+		if (std::filesystem::exists(Engine::PathUtils::FromUTF8(scenePath))) {
+			OutputDebugStringA(("[GameScene] " + scenePath + " found. Loading...\n").c_str());
+			EditorUI::LoadScene(this, scenePath);
+			isPlaying_ = true; // リリース/起動時はプレイ状態から開始する
+			loaded = true;
+		} else {
+			OutputDebugStringA(("[GameScene] " + scenePath + " NOT found.\n").c_str());
+		}
+	} catch (const std::exception& e) {
+		std::string msg = "[GameScene] EXCEPTION during scene load: " + std::string(e.what()) + "\n";
+		OutputDebugStringA(msg.c_str());
+		MessageBoxA(NULL, msg.c_str(), "Scene Load Error", MB_OK | MB_ICONERROR);
 	}
 
 	// 既にオブジェクトが存在する場合（リスタート時）やロード失敗時は最低限の内容を作成
@@ -428,7 +436,11 @@ bool GameScene::RayCast(const Engine::Vector3& origin, const Engine::Vector3& di
 }
 
 Engine::Matrix4x4 GameScene::GetWorldMatrix(int entityId) const {
-	entt::entity e = static_cast<entt::entity>(entityId);
+	return GetWorldMatrixRecursive(static_cast<entt::entity>(entityId), 0);
+}
+
+Engine::Matrix4x4 GameScene::GetWorldMatrixRecursive(entt::entity e, int depth) const {
+	if (depth > 32) return Engine::Matrix4x4::Identity(); // 無限再帰ガード
 	if (!registry_.valid(e) || !registry_.all_of<TransformComponent>(e)) return Engine::Matrix4x4::Identity();
 	
 	const auto& tc = registry_.get<TransformComponent>(e);
@@ -438,7 +450,7 @@ Engine::Matrix4x4 GameScene::GetWorldMatrix(int entityId) const {
 	const auto& hc = registry_.get<HierarchyComponent>(e);
 	if (hc.parentId == entt::null || !registry_.valid(hc.parentId)) return local;
 
-	return Engine::Matrix4x4::Multiply(local, GetWorldMatrix(static_cast<int>(hc.parentId)));
+	return Engine::Matrix4x4::Multiply(local, GetWorldMatrixRecursive(hc.parentId, depth + 1));
 }
 
 void GameScene::Draw() {

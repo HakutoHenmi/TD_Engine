@@ -3,6 +3,7 @@
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
+#include "../../Engine/PathUtils.h"
 #include <cfloat>
 #include <cmath>
 #include <fstream>
@@ -250,9 +251,10 @@ bool PhaseSystemScript::IsPrefabPath(const std::string& path) const {
 
 bool PhaseSystemScript::ExtractPrefabRenderPaths(const std::string& prefabPath, std::string& outModelPath, std::string& outTexturePath) const {
 	std::string absPath = EditorUI::GetUnifiedProjectPath(prefabPath);
-	std::ifstream f(absPath);
+	// ★修正: UTF-8パスをFromUTF8経由でワイドパスに変換してオープン
+	std::ifstream f(Engine::PathUtils::FromUTF8(absPath));
 	if (!f.is_open()) {
-		f.open(prefabPath);
+		f.open(Engine::PathUtils::FromUTF8(prefabPath));
 		if (!f.is_open()) return false;
 	}
 
