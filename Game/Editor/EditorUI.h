@@ -92,6 +92,10 @@ private:
 	static void ShowConsole();
 	static void ShowPlayModeMonitor(GameScene* scene); // ★追加
 	static void DrawSelectionGizmo(Engine::Renderer* renderer, GameScene* scene);
+
+	// ★追加: アセット選択用ヘルパー
+	static std::vector<std::string> GetAssetsInDir(const std::string& root, const std::vector<std::string>& extensions);
+	static bool AssetField(const char* label, std::string& path, const std::vector<std::string>& extensions);
 };
 
 } // namespace Game
