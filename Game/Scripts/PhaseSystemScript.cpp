@@ -21,6 +21,12 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	(void)entity;
 	(void)scene;
 	isPreparation_ = true;
+
+	// スキルツリーの初期化
+	if (auto* renderer = Engine::Renderer::GetInstance()) {
+		skillTree_.Init(renderer);
+		skillTree_.LoadFromJson("Resources/skills.json", renderer);
+	}
 }
 
 void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) {
@@ -44,7 +50,39 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	bool keyP = input->Trigger(DIK_P) || (GetAsyncKeyState('P') & 0x8001);
 	bool keySpace = input->Trigger(DIK_SPACE) || (GetAsyncKeyState(VK_SPACE) & 0x8001);
 
+	// ★ スキルツリーの入力処理 (準備フェーズ中のみ)
+	bool keyN = input->Trigger(DIK_N) || (GetAsyncKeyState('N') & 0x8001);
+
 	if (isPreparation_) {
+		// Nキーでスキルツリーの開閉
+		if (keyN && !preKeyN_) {
+			skillTree_.Toggle();
+		}
+
+		// スキルツリーが開いている間はスキルツリーの更新のみ
+		if (skillTree_.IsOpen()) {
+			float mx = 0, my = 0;
+			float tW = (float)Engine::WindowDX::kW;
+			float tH = (float)Engine::WindowDX::kH;
+
+#if defined(USE_IMGUI) && !defined(NDEBUG)
+			ImVec2 mousePos = ImGui::GetMousePos();
+			ImVec2 gameMin = EditorUI::GetGameImageMin();
+			ImVec2 gameMax = EditorUI::GetGameImageMax();
+			float viewW = gameMax.x - gameMin.x;
+			float viewH = gameMax.y - gameMin.y;
+			if (viewW > 0 && viewH > 0) {
+				mx = (mousePos.x - gameMin.x) * (tW / viewW);
+				my = (mousePos.y - gameMin.y) * (tH / viewH);
+			}
+#else
+			input->GetMousePos(mx, my);
+#endif
+			skillTree_.Update(renderer, tW, tH, mx, my);
+			preKeyN_ = keyN;
+			return; // 設置モードの入力を抑制
+		}
+
 		if (key1) {
 			selectedObjPath_ = "Resources/BulletTank.prefab";
 			isPlacementMode_ = true;
@@ -68,6 +106,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		if (keySpace) {
 			isPreparation_ = false;
 			isPlacementMode_ = false;
+			skillTree_.Close(); // フェーズ移行時にスキルツリーを閉じる
 			currentPhase_++;
 
 			std::string enemyPrefabPath = "Resources/EnemySpawner" + std::to_string(currentPhase_) + ".prefab";
@@ -90,6 +129,8 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		}
 		isPlacementMode_ = false;
 	}
+
+	preKeyN_ = keyN;
 }
 
 void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPath) {
