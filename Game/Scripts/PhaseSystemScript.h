@@ -1,5 +1,6 @@
 #pragma once
 #include "IScript.h"
+#include "SkillTree.h"
 #include "../../externals/entt/entt.hpp"
 
 struct ImVec2; // 前方宣言
@@ -40,6 +41,10 @@ private:
 	std::string previewObjPath_;
 	uint32_t previewModelHandle_ = 0;
 	uint32_t previewTextureHandle_ = 0;
+
+	// スキルツリー
+	SkillTree skillTree_;
+	bool preKeyN_ = false;
 };
 
 } // namespace Game

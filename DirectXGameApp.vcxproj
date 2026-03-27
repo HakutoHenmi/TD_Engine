@@ -87,7 +87,7 @@
       <AdditionalIncludeDirectories>$(SolutionDir)externals\DirectXTex\DirectXTex;$(ProjectDir)externals\DirectXTex;$(SolutionDir)externals\DirectXTex\Include;$(ProjectDir)externals\assimp\include;$(ProjectDir)externals\imgui;$(ProjectDir)Engine;$(ProjectDir)Game;$(ProjectDir)Game\Scenes;$(ProjectDir)Game\Editor;$(ProjectDir)Engine\ThirdParty;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 /wd4865 %(AdditionalOptions)</AdditionalOptions>
       <TreatWarningAsError>true</TreatWarningAsError>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
@@ -121,7 +121,7 @@ exit /b 0
       <Optimization>MinSpace</Optimization>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 /wd4865 %(AdditionalOptions)</AdditionalOptions>
       <TreatWarningAsError>true</TreatWarningAsError>
     </ClCompile>
     <Link>
@@ -156,7 +156,7 @@ exit /b 0
       <Optimization>Disabled</Optimization>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 /wd4865 %(AdditionalOptions)</AdditionalOptions>
       <TreatWarningAsError>true</TreatWarningAsError>
       <WholeProgramOptimization>false</WholeProgramOptimization>
     </ClCompile>
@@ -206,6 +206,7 @@ exit /b 0
     <ClCompile Include="Game\Scripts\EnemySpawnerScript.cpp" />
     <ClCompile Include="Game\Scripts\IScript.cpp" />
     <ClCompile Include="Game\Scripts\CommunicationTestScript.cpp" />
+    <ClCompile Include="Game\Scripts\SkillTree.cpp" />
     <!-- ★追加 -->
     <ClCompile Include="Game\Systems\UISystem.cpp" />
     <ClCompile Include="Game\Systems\RiverSystem.cpp" />
@@ -237,6 +238,7 @@ exit /b 0
     <ClInclude Include="Game\Scripts\EnemySpawnerScript.h" />
     <ClInclude Include="Game\Scripts\CommunicationTestScript.h" />
     <ClInclude Include="Game\Scripts\ScriptUtils.h" />
+    <ClInclude Include="Game\Scripts\SkillTree.h" />
     <!-- ★追加 -->
     <ClInclude Include="Game\Systems\UISystem.h" />
     <ClInclude Include="Game\Systems\ISystem.h" />
