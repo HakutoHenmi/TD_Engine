@@ -113,8 +113,16 @@ private:
         static std::filesystem::path rootPath;
         if (!rootPath.empty()) return rootPath;
 
-        wchar_t buffer[MAX_PATH];
-        GetModuleFileNameW(NULL, buffer, MAX_PATH);
+        // Use larger buffer to handle long paths (Windows max is 32767)
+        wchar_t buffer[32768];
+        DWORD length = GetModuleFileNameW(NULL, buffer, 32768);
+        if (length == 0 || length >= 32768) {
+            // Fallback to current directory if failed
+            rootPath = std::filesystem::current_path();
+            return rootPath;
+        }
+        buffer[length] = L'\0'; // Ensure null-termination
+        
         std::filesystem::path exeDir = std::filesystem::path(buffer).parent_path();
         
         auto IsBuildFolder = [](const std::wstring& name) {
@@ -128,16 +136,18 @@ private:
         std::filesystem::path current = exeDir;
         for (int i = 0; i < 10; ++i) {
             if (!IsBuildFolder(current.filename().wstring())) {
-                if (HasProjectFile(current) || std::filesystem::exists(current / ".git")) {
-                    rootPath = current;
-                    return rootPath;
-                }
-                // Check child "TD_Engine" folder
-                if (std::filesystem::exists(current / "TD_Engine") && 
-                    (HasProjectFile(current / "TD_Engine") || std::filesystem::exists(current / "TD_Engine" / ".git"))) {
-                    rootPath = current / "TD_Engine";
-                    return rootPath;
-                }
+                try {
+                    if (HasProjectFile(current) || std::filesystem::exists(current / ".git")) {
+                        rootPath = current;
+                        return rootPath;
+                    }
+                    // Check child "TD_Engine" folder
+                    if (std::filesystem::exists(current / "TD_Engine") && 
+                        (HasProjectFile(current / "TD_Engine") || std::filesystem::exists(current / "TD_Engine" / ".git"))) {
+                        rootPath = current / "TD_Engine";
+                        return rootPath;
+                    }
+                } catch (...) {}
             }
             if (current.has_parent_path() && current.parent_path() != current) {
                 current = current.parent_path();
@@ -147,10 +157,12 @@ private:
         // Phase 2: Fallback search for Resources folder
         current = exeDir;
         for (int i = 0; i < 10; ++i) {
-            if (std::filesystem::exists(current / "Resources")) {
-                rootPath = current;
-                return rootPath;
-            }
+            try {
+                if (std::filesystem::exists(current / "Resources")) {
+                    rootPath = current;
+                    return rootPath;
+                }
+            } catch (...) {}
             if (current.has_parent_path() && current.parent_path() != current) {
                 current = current.parent_path();
             } else break;

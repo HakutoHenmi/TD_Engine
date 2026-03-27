@@ -298,8 +298,10 @@ bool Model::Load(ID3D12Device* device, ID3D12GraphicsCommandList* cmd, const std
 
 		// パスが見つかった場合のみ設定する
 		if (str.length > 0) {
-			std::string dir = std::filesystem::path(objPath).parent_path().string();
-			data_.material.textureFilePath = dir + "/" + str.C_Str();
+			std::filesystem::path fullPath(PathUtils::FromUTF8(objPath));
+			std::filesystem::path dir = fullPath.parent_path();
+			std::filesystem::path texPath = dir / str.C_Str();
+			data_.material.textureFilePath = PathUtils::ToUTF8(texPath.wstring());
 		}
 	}
 	// ★★★ 修正終わり ★★★
