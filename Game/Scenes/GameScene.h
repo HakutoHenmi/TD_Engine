@@ -43,7 +43,8 @@ public:
 	bool IsPlaying() const { return isPlaying_; } // Alias for backward compatibility
 	void SetIsPlaying(bool play);
 	Engine::Renderer* GetRenderer() const { return renderer_; }
-	Engine::Matrix4x4 GetWorldMatrix(int index) const; // Remove inline definition to stop recursion
+	Engine::Matrix4x4 GetWorldMatrix(int index) const; 
+	Engine::Matrix4x4 GetWorldMatrixRecursive(entt::entity entity, int depth) const;
 	Engine::Camera& GetCamera() { return camera_; }
 	entt::entity GetSelectedEntity() const { return selectedEntity_; }
 	void SetSelectedEntity(entt::entity entity) { selectedEntity_ = entity; }
