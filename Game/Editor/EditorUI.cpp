@@ -32,7 +32,7 @@ using json = nlohmann::json;
 namespace Game {
 namespace fs = std::filesystem;
 
-std::string EditorUI::currentScenePath = "Resources/scene.json";
+std::string EditorUI::currentScenePath = "Resources/Scenes/scene.json";
 
 // シーン復元ヘルパー (ID保持とヒエラルキー解決)
 static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const json& j, bool append) {
@@ -733,7 +733,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	// Global Shortcuts
 	if (!io.WantTextInput) {
 		if (io.KeyCtrl) {
-			if (ImGui::IsKeyPressed(ImGuiKey_S)) SaveScene(gameScene, "Resources/scene.json");
+			if (ImGui::IsKeyPressed(ImGuiKey_S)) SaveScene(gameScene, "Resources/Scenes/scene.json");
 			if (ImGui::IsKeyPressed(ImGuiKey_Z)) Undo();
 			if (ImGui::IsKeyPressed(ImGuiKey_Y)) Redo();
 			if (ImGui::IsKeyPressed(ImGuiKey_N)) {
@@ -758,7 +758,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				gameScene->GetRegistry().clear();
 				gameScene->GetSelectedEntities().clear();
 				gameScene->SetSelectedEntity(entt::null);
-				currentScenePath = "Resources/scene.json";
+				currentScenePath = "Resources/Scenes/scene.json";
 			}
 			ImGui::Separator();
 			if (ImGui::MenuItem("Open Scene", "Ctrl+O")) {
@@ -780,15 +780,21 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Scenes")) {
-			for (const auto& entry : fs::directory_iterator(GetUnifiedProjectPath("Resources"))) {
-				if (entry.path().extension() == ".json") {
-					std::string fileName = entry.path().filename().string();
-					std::string fullPath = "Resources/" + fileName;
-					bool selected = (currentScenePath == fullPath);
-					if (ImGui::MenuItem(fileName.c_str(), nullptr, selected)) {
-						LoadScene(gameScene, fullPath);
+			std::string sceneDir = "Resources/Scenes";
+			std::string absSceneDir = GetUnifiedProjectPath(sceneDir);
+			if (fs::exists(Engine::PathUtils::FromUTF8(absSceneDir))) {
+				for (const auto& entry : fs::directory_iterator(Engine::PathUtils::FromUTF8(absSceneDir))) {
+					if (entry.path().extension() == ".json") {
+						std::string fileName = entry.path().filename().string();
+						std::string fullPath = sceneDir + "/" + fileName;
+						bool selected = (currentScenePath == fullPath);
+						if (ImGui::MenuItem(fileName.c_str(), nullptr, selected)) {
+							LoadScene(gameScene, fullPath);
+						}
 					}
 				}
+			} else {
+				ImGui::TextDisabled("No Scenes found in %s", sceneDir.c_str());
 			}
 			ImGui::EndMenu();
 		}
@@ -945,7 +951,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				auto& mr = gameScene->GetRegistry().emplace<MeshRendererComponent>(e);
 				mr.modelPath = sPath;
 				mr.modelHandle = renderer->LoadObjMesh(sPath);
-				mr.texturePath = "Resources/white1x1.png";
+				mr.texturePath = "Resources/Textures/white1x1.png";
 				mr.textureHandle = renderer->LoadTexture2D(mr.texturePath);
 				gameScene->SetSelectedEntity(e);
 			}
@@ -1215,18 +1221,18 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 			if (ImGui::MenuItem("Create Cube")) {
 				auto e = scene->CreateEntity("Cube");
 				auto& mr = registry.emplace<MeshRendererComponent>(e);
-				mr.modelPath = "Resources/cube/cube.obj";
+				mr.modelPath = "Resources/Models/cube/cube.obj";
 				mr.modelHandle = Engine::Renderer::GetInstance()->LoadObjMesh(mr.modelPath);
-				mr.texturePath = "Resources/white1x1.png";
+				mr.texturePath = "Resources/Textures/white1x1.png";
 				mr.textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(mr.texturePath);
 				scene->SetSelectedEntity(e);
 			}
 			if (ImGui::MenuItem("Create Sphere")) {
 				auto e = scene->CreateEntity("Sphere");
 				auto& mr = registry.emplace<MeshRendererComponent>(e);
-				mr.modelPath = "Resources/sphere/sphere.obj";
+				mr.modelPath = "Resources/Models/player_ball/ball.obj";
 				mr.modelHandle = Engine::Renderer::GetInstance()->LoadObjMesh(mr.modelPath);
-				mr.texturePath = "Resources/white1x1.png";
+				mr.texturePath = "Resources/Textures/white1x1.png";
 				mr.textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(mr.texturePath);
 				scene->SetSelectedEntity(e);
 			}
@@ -1246,9 +1252,9 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 			if (ImGui::MenuItem("Create Cube")) {
 				auto e = scene->CreateEntity("Cube");
 				auto& mr = registry.emplace<MeshRendererComponent>(e);
-				mr.modelPath = "Resources/cube/cube.obj";
+				mr.modelPath = "Resources/Models/cube/cube.obj";
 				mr.modelHandle = Engine::Renderer::GetInstance()->LoadObjMesh(mr.modelPath);
-				mr.texturePath = "Resources/white1x1.png";
+				mr.texturePath = "Resources/Textures/white1x1.png";
 				mr.textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(mr.texturePath);
 				scene->SetSelectedEntity(e);
 			}
@@ -1376,7 +1382,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 		ImGui::SameLine();
 		if (ImGui::Button("Save Prefab")) {
 			std::string name = (registry.all_of<NameComponent>(entity) ? registry.get<NameComponent>(entity).name : "object");
-			std::string p = "Resources/" + name + ".prefab";
+			std::string p = "Resources/Prefabs/" + name + ".prefab";
 			std::string fullPath = GetUnifiedProjectPath(p);
 			std::ofstream f(fullPath);
 			if (f.is_open()) {
@@ -1938,3 +1944,4 @@ void EditorUI::ScreenToWorldRay(float screenX, float screenY, float imageW, floa
 }
 
 } // namespace Game
+

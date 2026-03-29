@@ -1,4 +1,4 @@
-#include "BaseScript.h"
+﻿#include "BaseScript.h"
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
@@ -106,8 +106,8 @@ void BaseScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
 		auto& bMr = registry.emplace<MeshRendererComponent>(bullet);
-		bMr.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
-		bMr.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
+		bMr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+		bMr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 	}
 
 	auto& hb = registry.emplace<HitboxComponent>(bullet);

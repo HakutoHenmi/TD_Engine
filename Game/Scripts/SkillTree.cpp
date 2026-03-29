@@ -1,4 +1,4 @@
-#include "SkillTree.h"
+﻿#include "SkillTree.h"
 #include "../../Engine/Renderer.h"
 #include "../../Engine/Input.h"
 #include "../../Engine/WindowDX.h"
@@ -18,10 +18,10 @@ void SkillTree::Init(Engine::Renderer* renderer) {
 	if (initialized_ || !renderer) return;
 
 	// テクスチャの読み込み (白テクスチャを使い回し、色で区別)
-	texBg_            = renderer->LoadTexture2D("Resources/white1x1.png");
-	texNodeLocked_    = renderer->LoadTexture2D("Resources/white1x1.png");
-	texNodeUnlocked_  = renderer->LoadTexture2D("Resources/white1x1.png");
-	texLine_          = renderer->LoadTexture2D("Resources/white1x1.png");
+	texBg_            = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+	texNodeLocked_    = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+	texNodeUnlocked_  = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+	texLine_          = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 
 	initialized_ = true;
 }
@@ -495,3 +495,4 @@ void SkillTree::GetNodeScreenPos(const SkillNode& node, float screenW, float scr
 }
 
 } // namespace Game
+

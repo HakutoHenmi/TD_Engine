@@ -25,7 +25,7 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	// スキルツリーの初期化
 	if (auto* renderer = Engine::Renderer::GetInstance()) {
 		skillTree_.Init(renderer);
-		skillTree_.LoadFromJson("Resources/skills.json", renderer);
+		skillTree_.LoadFromJson("Resources/Scenes/skills.json", renderer);
 	}
 }
 
@@ -84,17 +84,17 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		}
 
 		if (key1) {
-			selectedObjPath_ = "Resources/BulletTank.prefab";
+			selectedObjPath_ = "Resources/Prefabs/BulletTank.prefab";
 			isPlacementMode_ = true;
 		}
 
 		if (key2) {
-			selectedObjPath_ = "Resources/Pipe.prefab";
+			selectedObjPath_ = "Resources/Prefabs/Pipe.prefab";
 			isPlacementMode_ = true;
 		}
 
 		if (key3) {
-			selectedObjPath_ = "Resources/Canon.prefab";
+			selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
 			isPlacementMode_ = true;
 		}
 		if (input->IsMouseTrigger(1) && isPlacementMode_) {
@@ -109,7 +109,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			skillTree_.Close(); // フェーズ移行時にスキルツリーを閉じる
 			currentPhase_++;
 
-			std::string enemyPrefabPath = "Resources/EnemySpawner" + std::to_string(currentPhase_) + ".prefab";
+			std::string enemyPrefabPath = "Resources/Prefabs/EnemySpawner" + std::to_string(currentPhase_) + ".prefab";
 			std::vector<entt::entity> spawnedEnemies = EditorUI::LoadPrefab(scene, enemyPrefabPath);
 
 			auto& registry = scene->GetRegistry();
@@ -263,7 +263,7 @@ void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vec
 		return;
 
 	std::string previewModelPath = objPath;
-	std::string previewTexturePath = "Resources/white1x1.png";
+	std::string previewTexturePath = "Resources/Textures/white1x1.png";
 	if (IsPrefabPath(objPath)) {
 		ExtractPrefabRenderPaths(objPath, previewModelPath, previewTexturePath);
 	}
@@ -396,7 +396,7 @@ void PhaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector
 		previewObjPath_ = objPath;
 	}
 	if (previewTextureHandle_ == 0) {
-		previewTextureHandle_ = renderer->LoadTexture2D("Resources/white1x1.png");
+		previewTextureHandle_ = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 	}
 
 	entt::entity newEntity = scene->CreateEntity((objPath.find("cylinder") != std::string::npos || objPath.find("Cylinder") != std::string::npos) ? "PlacedCylinder" : "PlacedCube");
@@ -409,7 +409,7 @@ void PhaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector
 	mr.modelHandle = previewModelHandle_;
 	mr.textureHandle = previewTextureHandle_;
 	mr.modelPath = objPath;
-	mr.texturePath = "Resources/white1x1.png";
+	mr.texturePath = "Resources/Textures/white1x1.png";
 	mr.shaderName = "Toon";
 }
 
@@ -418,3 +418,4 @@ void PhaseSystemScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/)
 REGISTER_SCRIPT(PhaseSystemScript);
 
 } // namespace Game
+
