@@ -1,4 +1,4 @@
-#include "ParticleEmitter.h"
+﻿#include "ParticleEmitter.h"
 #include <fstream>
 #include <cstdlib>
 
@@ -26,7 +26,7 @@ void ParticleEmitter::Initialize(Renderer& renderer, const std::string& name) {
 
 void ParticleEmitter::ApplySystemSettings() {
 	if (!renderer_) return;
-	particleSystem_.Initialize(*renderer_, 1000, "Resources/plane.obj", params.texturePath, true, params.useBillboard);
+	particleSystem_.Initialize(*renderer_, 1000, "Resources/Models/plane.obj", params.texturePath, true, params.useBillboard);
 	currentTexturePath_ = params.texturePath;
 	currentBillboard_ = params.useBillboard;
 }
@@ -244,3 +244,4 @@ bool ParticleEmitter::LoadFromJson(const std::string& path) {
 }
 
 } // namespace Engine
+

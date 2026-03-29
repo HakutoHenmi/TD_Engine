@@ -156,28 +156,31 @@ void EnemyBehavior::SearchTarget(entt::entity entity, GameScene* scene) {
 	entt::entity bestTarget = entt::null;
 	float bestDistance = (priority_ == TargetPriority::Near) ? FLT_MAX : -1.0f;
 
-	auto view = scene->GetRegistry().view<TagComponent, TransformComponent>();
 	auto& myTc = scene->GetRegistry().get<TransformComponent>(entity);
+	auto& registry = scene->GetRegistry();
 
-	for (auto e : view) {
-		if (view.get<TagComponent>(e).tag == targetName_) {
-			// 距離を計算
-			auto& targetTc = view.get<TransformComponent>(e);
-			float dx = targetTc.translate.x - myTc.translate.x;
-			float dz = targetTc.translate.z - myTc.translate.z;
-			float distSq = dx * dx + dz * dz;	// 軽量化のために平方根は取らない
+	// ★ 高速タグ検索を利用
+	const auto& targets = scene->GetEntitiesByTag(targetName_);
 
-			// priorityごとの対応
-			if (priority_ == TargetPriority::Near) {
-				if (distSq < bestDistance) {
-					bestDistance = distSq;
-					bestTarget = e;
-				}
-			} else { // Far
-				if (distSq > bestDistance) {
-					bestDistance = distSq;
-					bestTarget = e;
-				}
+	for (auto e : targets) {
+		if (!registry.valid(e) || !registry.all_of<TransformComponent>(e)) continue;
+
+		// 距離を計算
+		auto& targetTc = registry.get<TransformComponent>(e);
+		float dx = targetTc.translate.x - myTc.translate.x;
+		float dz = targetTc.translate.z - myTc.translate.z;
+		float distSq = dx * dx + dz * dz;	// 軽量化のために平方根は取らない
+
+		// priorityごとの対応
+		if (priority_ == TargetPriority::Near) {
+			if (distSq < bestDistance) {
+				bestDistance = distSq;
+				bestTarget = e;
+			}
+		} else { // Far
+			if (distSq > bestDistance) {
+				bestDistance = distSq;
+				bestTarget = e;
 			}
 		}
 	}
@@ -336,11 +339,14 @@ void EnemyBehavior::ScanSurround(entt::entity entity, GameScene* scene) {
 	};
 	std::vector<WallInfo> walls;
 	
-	auto wallView = registry.view<TagComponent, TransformComponent>();
-	for (auto e : wallView) {
-		const auto& tag = wallView.get<TagComponent>(e).tag;
-		if (tag == "Wall" || tag == "Canon" || tag == "Pipe" || tag == "BulletTank") {
-			auto& tc = wallView.get<TransformComponent>(e);
+	// ★ 高速タグ検索で対象を抽出
+	static const std::string wallTags[] = {"Wall", "Canon", "Pipe", "BulletTank"};
+	for (const auto& tagName : wallTags) {
+		const auto& entities = scene->GetEntitiesByTag(tagName);
+		for (auto e : entities) {
+			if (!registry.valid(e) || !registry.all_of<TransformComponent>(e)) continue;
+			
+			auto& tc = registry.get<TransformComponent>(e);
 			WallInfo w;
 			w.minX = tc.translate.x - tc.scale.x - enemyRadius;
 			w.maxX = tc.translate.x + tc.scale.x + enemyRadius;

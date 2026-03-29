@@ -22,14 +22,14 @@ private:
 	float attackTimer_ = 0.0f;
 	float rotationSpeed_ = 1.0f; // タワーの回転速度（ラジアン/秒）
 
-	int objectCount = 0;
-	int pipeCount = 0;
-	int enemyCount = 0;
-
-	int connectedTankCount;
+	int connectedTankCount = 0;
+	int connectedCanonCount = 0;
+	float connectionCheckTimer_ = 0.0f; // 負荷分散用タイマー
+	bool isConnectedToTank_ = false;
 
 private:
 	void Debug(bool connected);
+    void UpdateConnection(entt::entity entity, GameScene* scene);
 };
 
 } // namespace Game

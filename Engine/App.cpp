@@ -1,4 +1,4 @@
-#include "App.h"
+﻿#include "App.h"
 #include <Windows.h>
 #include "JobSystem.h"
 
@@ -22,7 +22,7 @@ bool App::Initialize(HINSTANCE hInst, int cmdShow) {
 	audio_.Initialize();
 
 #ifdef USE_IMGUI
-	if (!imgui_.Initialize(hwnd_, dx_, dx_.SRV(), dx_.SRV_CPU(0), dx_.SRV_GPU(0), 18.0f, "Resources/fonts/Huninn/Huninn-Regular.ttf")) {
+	if (!imgui_.Initialize(hwnd_, dx_, dx_.SRV(), dx_.SRV_CPU(0), dx_.SRV_GPU(0), 18.0f, "Resources/Textures/fonts/Huninn/Huninn-Regular.ttf")) {
 		return false;
 	}
 #endif
