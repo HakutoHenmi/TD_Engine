@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "ParticleEmitter.h"
 #include <string>
 
@@ -18,7 +18,7 @@ public:
 	ParticleEmitter* targetEmitter = nullptr;
 
 private:
-	char filePathBuf_[256] = "Resources/particle.json";
+	char filePathBuf_[256] = "Resources/Scenes/particle.json";
 
 	// ★追加: プレビュー用のレンダーターゲットとカメラ
 	Renderer::CustomRenderTarget previewTarget_;
@@ -29,3 +29,4 @@ private:
 };
 
 } // namespace Engine
+

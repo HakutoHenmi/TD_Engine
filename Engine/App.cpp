@@ -22,7 +22,7 @@ bool App::Initialize(HINSTANCE hInst, int cmdShow) {
 	audio_.Initialize();
 
 #ifdef USE_IMGUI
-	if (!imgui_.Initialize(hwnd_, dx_, dx_.SRV(), dx_.SRV_CPU(0), dx_.SRV_GPU(0), 18.0f, "Resources/fonts/Huninn/Huninn-Regular.ttf")) {
+	if (!imgui_.Initialize(hwnd_, dx_, dx_.SRV(), dx_.SRV_CPU(0), dx_.SRV_GPU(0), 18.0f, "Resources/Textures/fonts/Huninn/Huninn-Regular.ttf")) {
 		return false;
 	}
 #endif
@@ -61,6 +61,11 @@ void App::Run() {
 			break;
 
 		input_.Update();
+
+		// ★追加: フルスクリーン切り替え (F11 or Alt+Enter)
+		if (input_.Trigger(DIK_F11) || (input_.Down(DIK_LALT) && input_.Trigger(DIK_RETURN))) {
+			dx_.ToggleFullscreen();
+		}
 
 		dx_.BeginFrame();
 		const float clearColor[] = {0.1f, 0.25f, 0.5f, 1.0f};

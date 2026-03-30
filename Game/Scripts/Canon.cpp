@@ -4,6 +4,8 @@
 #include "ScriptEngine.h"
 #include <cmath>
 #include <vector>
+#include <unordered_set>
+#include <algorithm>
 
 #ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
@@ -35,206 +37,89 @@ static bool IsConnectedSphere(entt::registry& registry, entt::entity a, entt::en
 	return dist <= connectRange;
 }
 
-// すでに訪問したか
-static bool IsAlreadyVisited(const std::vector<entt::entity>& visitedObjects, entt::entity entity) {
-	for (auto v : visitedObjects) {
-		if (v == entity)
-			return true;
-	}
-	return false;
-}
-
 // パイプから再帰的に接続をたどって、BulletTankに繋がっているか
-static bool IsPipeConnectedToBulletTankRecursive(entt::registry& registry, entt::entity currentPipe, std::vector<entt::entity>& visitedObjects, float connectRange) {
-	visitedObjects.push_back(currentPipe);
+static bool IsPipeConnectedToBulletTankRecursive(
+    entt::registry& registry,
+    entt::entity currentPipe,
+    std::unordered_set<entt::entity>& visitedObjects,
+    const std::vector<entt::entity>& allPipes,
+    const std::vector<entt::entity>& allTanks,
+    float connectRange)
+{
+    visitedObjects.insert(currentPipe);
 
-	auto view = registry.view<TransformComponent>();
-	for (auto other : view) {
-		if (other == currentPipe)
-			continue;
-		if (!IsConnectedSphere(registry, currentPipe, other, connectRange))
-			continue;
+    // パイプのリスト内だけで検索
+    for (auto other : allPipes) {
+        if (other == currentPipe || visitedObjects.count(other)) continue;
+        if (!IsConnectedSphere(registry, currentPipe, other, connectRange)) continue;
 
-		if (HasTag(registry, other, "BulletTank"))
-			return true;
+        if (IsPipeConnectedToBulletTankRecursive(registry, other, visitedObjects, allPipes, allTanks, connectRange)) {
+            return true;
+        }
+    }
 
-		if (HasTag(registry, other, "Pipe")) {
-			if (IsAlreadyVisited(visitedObjects, other))
-				continue;
-			if (IsPipeConnectedToBulletTankRecursive(registry, other, visitedObjects, connectRange)) {
-				return true;
-			}
-		}
-	}
-	return false;
+    // 周囲にタンクがあるか確認
+    for (auto tank : allTanks) {
+        if (IsConnectedSphere(registry, currentPipe, tank, connectRange)) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
-// 大砲がBulletTankに繋がっているか
-static bool IsCanonConnectedToBulletTank(entt::registry& registry, entt::entity canonEntity) {
-	const float connectRange = 2.5f;
+static void CollectConnectedBulletTanks(
+    entt::registry& registry,
+    entt::entity currentPipe,
+    std::unordered_set<entt::entity>& visitedPipes,
+    std::unordered_set<entt::entity>& foundTanks,
+    const std::vector<entt::entity>& allPipes,
+    const std::vector<entt::entity>& allTanks,
+    float connectRange)
+{
+    visitedPipes.insert(currentPipe);
 
-	auto view = registry.view<TransformComponent>();
-	for (auto other : view) {
-		if (!HasTag(registry, other, "Pipe"))
-			continue;
-		if (!IsConnectedSphere(registry, canonEntity, other, connectRange))
-			continue;
+    // 近くのタンクを探す
+    for (auto tank : allTanks) {
+        if (IsConnectedSphere(registry, currentPipe, tank, connectRange)) {
+            foundTanks.insert(tank);
+        }
+    }
 
-		std::vector<entt::entity> visitedObjects;
-		if (IsPipeConnectedToBulletTankRecursive(registry, other, visitedObjects, connectRange)) {
-			return true;
-		}
-	}
-	return false;
+    // 接続されているパイプを再帰的に探索
+    for (auto other : allPipes) {
+        if (other == currentPipe || visitedPipes.count(other)) continue;
+        if (IsConnectedSphere(registry, currentPipe, other, connectRange)) {
+            CollectConnectedBulletTanks(registry, other, visitedPipes, foundTanks, allPipes, allTanks, connectRange);
+        }
+    }
 }
 
-static void CollectConnectedBulletTanks(entt::registry& registry, entt::entity currentPipe, std::vector<entt::entity>& visitedPipes, std::vector<entt::entity>& foundTanks, float connectRange) {
-	visitedPipes.push_back(currentPipe);
+static void CollectConnectedCanons(
+    entt::registry& registry,
+    entt::entity currentPipe,
+    std::unordered_set<entt::entity>& visitedPipes,
+    std::unordered_set<entt::entity>& foundCanons,
+    const std::vector<entt::entity>& allPipes,
+    const std::vector<entt::entity>& allCanons,
+    float connectRange)
+{
+    visitedPipes.insert(currentPipe);
 
-	auto view = registry.view<TransformComponent>();
+    // 近くの大砲を探す
+    for (auto canon : allCanons) {
+        if (IsConnectedSphere(registry, currentPipe, canon, connectRange)) {
+            foundCanons.insert(canon);
+        }
+    }
 
-	for (auto other : view) {
-
-		if (other == currentPipe)
-			continue;
-		if (!IsConnectedSphere(registry, currentPipe, other, connectRange))
-			continue;
-
-		// Tank見つけた
-		if (HasTag(registry, other, "BulletTank")) {
-
-			bool alreadyAdded = false;
-
-			for (auto t : foundTanks) {
-				if (t == other) {
-					alreadyAdded = true;
-					break;
-				}
-			}
-
-			if (!alreadyAdded) {
-				foundTanks.push_back(other);
-			}
-		}
-
-		// Pipeなら再帰
-		if (HasTag(registry, other, "Pipe")) {
-
-			bool visited = false;
-
-			for (auto v : visitedPipes) {
-				if (v == other) {
-					visited = true;
-					break;
-				}
-			}
-
-			if (!visited) {
-				CollectConnectedBulletTanks(registry, other, visitedPipes, foundTanks, connectRange);
-			}
-		}
-	}
-}
-static void CollectConnectedCanons(entt::registry& registry, entt::entity currentPipe, std::vector<entt::entity>& visitedPipes, std::vector<entt::entity>& foundCanons, float connectRange) {
-	visitedPipes.push_back(currentPipe);
-
-	auto view = registry.view<TransformComponent>();
-
-	for (auto other : view) {
-
-		if (other == currentPipe)
-			continue;
-		if (!IsConnectedSphere(registry, currentPipe, other, connectRange))
-			continue;
-
-		if (HasTag(registry, other, "Canon")) {
-
-			bool alreadyAdded = false;
-
-			for (entt::entity canonEntity : foundCanons) {
-				if (canonEntity == other) {
-					alreadyAdded = true;
-					break;
-				}
-			}
-
-			if (!alreadyAdded) {
-				foundCanons.push_back(other);
-			}
-		}
-
-		if (HasTag(registry, other, "Pipe")) {
-
-			bool visited = false;
-
-			for (entt::entity visitedPipe : visitedPipes) {
-				if (visitedPipe == other) {
-					visited = true;
-					break;
-				}
-			}
-
-			if (!visited) {
-				CollectConnectedCanons(registry, other, visitedPipes, foundCanons, connectRange);
-			}
-		}
-	}
-}
-
-static int CountConnectedCanons(entt::registry& registry, entt::entity canon) {
-	const float connectRange = 2.5f;
-
-	std::vector<entt::entity> foundCanons;
-
-	auto view = registry.view<TransformComponent>();
-
-	for (auto other : view) {
-
-		if (!HasTag(registry, other, "Pipe"))
-			continue;
-		if (!IsConnectedSphere(registry, canon, other, connectRange))
-			continue;
-
-		std::vector<entt::entity> visitedPipes;
-
-		CollectConnectedCanons(registry, other, visitedPipes, foundCanons, connectRange);
-	}
-
-	bool selfExists = false;
-
-	for (entt::entity canonEntity : foundCanons) {
-		if (canonEntity == canon) {
-			selfExists = true;
-			break;
-		}
-	}
-
-	if (!selfExists) {
-		foundCanons.push_back(canon);
-	}
-
-	return (int)foundCanons.size();
-}
-static int CountConnectedBulletTanks(entt::registry& registry, entt::entity canon) {
-	const float connectRange = 2.5f;
-
-	std::vector<entt::entity> foundTanks;
-
-	auto view = registry.view<TransformComponent>();
-
-	for (auto other : view) {
-
-		if (!HasTag(registry, other, "Pipe"))
-			continue;
-		if (!IsConnectedSphere(registry, canon, other, connectRange))
-			continue;
-
-		std::vector<entt::entity> visitedPipes;
-
-		CollectConnectedBulletTanks(registry, other, visitedPipes, foundTanks, connectRange);
-	}
-
-	return (int)foundTanks.size();
+    // 接続されているパイプを再帰的に探索
+    for (auto other : allPipes) {
+        if (other == currentPipe || visitedPipes.count(other)) continue;
+        if (IsConnectedSphere(registry, currentPipe, other, connectRange)) {
+            CollectConnectedCanons(registry, other, visitedPipes, foundCanons, allPipes, allCanons, connectRange);
+        }
+    }
 }
 
 void Canon::Start(entt::entity /*entity*/, GameScene* /*scene*/) { attackTimer_ = 0.0f; }
@@ -244,42 +129,28 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	auto& registry = scene->GetRegistry();
 
-	objectCount = 0;
-	pipeCount = 0;
-	enemyCount = 0;
-
-	auto allView = registry.view<TransformComponent>();
-	for (auto other : allView) {
-		objectCount += 1;
-		if (HasTag(registry, other, "Pipe"))
-			pipeCount += 1;
-		if (HasTag(registry, other, "Enemy"))
-			enemyCount += 1;
+	// 接続チェックを一定時間ごとに実行 (0.5秒おき)
+	connectionCheckTimer_ -= dt;
+	if (connectionCheckTimer_ <= 0.0f) {
+		connectionCheckTimer_ = 0.5f;
+		UpdateConnection(entity, scene);
 	}
 
-	 connectedTankCount = CountConnectedBulletTanks(registry, entity);
-	int connectedCanonCount = CountConnectedCanons(registry, entity);
-
 	float powerRate = 0.0f;
-
 	if (connectedCanonCount > 0) {
 		powerRate = (float)connectedTankCount / (float)connectedCanonCount;
 	}
 
 	float currentAttackInterval = attackInterval_;
-
 	if (powerRate > 0.0f) {
 		currentAttackInterval = attackInterval_ / powerRate;
 	}
-	bool connected = false;
-	if (connectedTankCount > 0) {
-		connected = true;
-	}
-	Debug(connected);
+
+	Debug(isConnectedToTank_);
 
 	if (attackTimer_ > 0.0f)
 		attackTimer_ -= dt;
-	if (!connected)
+	if (!isConnectedToTank_)
 		return;
 
 	// 一番近い Enemy を探す
@@ -290,12 +161,13 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	auto& canonTc = registry.get<TransformComponent>(entity);
 
-	auto enemyView = registry.view<TagComponent, TransformComponent>();
-	for (auto other : enemyView) {
-		if (enemyView.get<TagComponent>(other).tag != "Enemy")
+	// ★ 高速タグ検索を利用
+	const auto& enemies = scene->GetEntitiesByTag("Enemy");
+	for (auto other : enemies) {
+		if (!registry.valid(other) || !registry.all_of<TransformComponent>(other))
 			continue;
 
-		auto& otherTc = enemyView.get<TransformComponent>(other);
+		auto& otherTc = registry.get<TransformComponent>(other);
 		float dx = otherTc.translate.x - canonTc.translate.x;
 		float dy = otherTc.translate.y - canonTc.translate.y;
 		float dz = otherTc.translate.z - canonTc.translate.z;
@@ -358,8 +230,8 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
 		auto& bMr = registry.emplace<MeshRendererComponent>(bullet);
-		bMr.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
-		bMr.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
+		bMr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+		bMr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 		// SceneObjectでいうmeshRenderers[0]の代わり
 	}
 
@@ -390,17 +262,49 @@ void Canon::OnEditorUI() {
 #endif
 }
 
+void Canon::UpdateConnection(entt::entity entity, GameScene* scene) {
+    auto& registry = scene->GetRegistry();
+    const float connectRange = 2.5f;
+
+    // ★ 1. 高速タグ検索を利用してリストを取得 (O(1))
+    const auto& allPipes = scene->GetEntitiesByTag("Pipe");
+    const auto& allTanks = scene->GetEntitiesByTag("BulletTank");
+    const auto& allCanons = scene->GetEntitiesByTag("Canon");
+
+    // 2. 接続されているタンクを探す
+    std::unordered_set<entt::entity> foundTanks;
+    std::unordered_set<entt::entity> visitedPipesForTanks;
+
+    for (auto pipe : allPipes) {
+        if (IsConnectedSphere(registry, entity, pipe, connectRange)) {
+            CollectConnectedBulletTanks(registry, pipe, visitedPipesForTanks, foundTanks, allPipes, allTanks, connectRange);
+        }
+    }
+    connectedTankCount = (int)foundTanks.size();
+    isConnectedToTank_ = (connectedTankCount > 0);
+
+    // 3. 接続されている大砲を探す
+    std::unordered_set<entt::entity> foundCanons;
+    std::unordered_set<entt::entity> visitedPipesForCanons;
+
+    for (auto pipe : allPipes) {
+        if (IsConnectedSphere(registry, entity, pipe, connectRange)) {
+            CollectConnectedCanons(registry, pipe, visitedPipesForCanons, foundCanons, allPipes, allCanons, connectRange);
+        }
+    }
+    // 自分自身を含める
+    foundCanons.insert(entity);
+    connectedCanonCount = (int)foundCanons.size();
+}
+
 void Canon::Debug(bool connected) {
 	(void)connected;
 #ifndef NDEBUG
-	
-
 #ifdef USE_IMGUI
 	ImGui::Begin("Canon Debug");
-	ImGui::Text("Objects: %d", objectCount);
-	ImGui::Text("Pipes  : %d", pipeCount);
-	ImGui::Text("Enemies: %d", enemyCount);
-	ImGui::Text("Canon connected to tank: %d", connectedTankCount);
+	ImGui::Text("Canon connected to tank: %s", isConnectedToTank_ ? "YES" : "NO");
+	ImGui::Text("Connected Tanks: %d", connectedTankCount);
+	ImGui::Text("Connected Canons: %d", connectedCanonCount);
 	ImGui::End();
 #endif
 #endif

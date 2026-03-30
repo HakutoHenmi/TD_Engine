@@ -1,5 +1,6 @@
-#pragma once
+﻿#pragma once
 #include "IScript.h"
+#include "SkillTree.h"
 #include "../../externals/entt/entt.hpp"
 
 struct ImVec2; // 前方宣言
@@ -36,10 +37,14 @@ private:
 	bool preKey2_ = false;
 	bool preKey3_ = false;
 	bool isPlacementMode_ = false;
-	std::string selectedObjPath_ = "Resources/cube/cube.obj";
+	std::string selectedObjPath_ = "Resources/Models/cube/cube.obj";
 	std::string previewObjPath_;
 	uint32_t previewModelHandle_ = 0;
 	uint32_t previewTextureHandle_ = 0;
+
+	// スキルツリー
+	SkillTree skillTree_;
+	bool preKeyN_ = false;
 };
 
 } // namespace Game
