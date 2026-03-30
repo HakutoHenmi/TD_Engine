@@ -1,4 +1,4 @@
-﻿#include "App.h"
+#include "App.h"
 #include <Windows.h>
 #include "JobSystem.h"
 
@@ -61,6 +61,11 @@ void App::Run() {
 			break;
 
 		input_.Update();
+
+		// ★追加: フルスクリーン切り替え (F11 or Alt+Enter)
+		if (input_.Trigger(DIK_F11) || (input_.Down(DIK_LALT) && input_.Trigger(DIK_RETURN))) {
+			dx_.ToggleFullscreen();
+		}
 
 		dx_.BeginFrame();
 		const float clearColor[] = {0.1f, 0.25f, 0.5f, 1.0f};

@@ -16,7 +16,8 @@
 #include "../Systems/RiverSystem.h" // ★追加
 #include "../Systems/ScriptSystem.h"
 #include "../Systems/UISystem.h"
-#include "Audio.h"
+#include "../../Engine/SceneManager.h"
+#include "../../Engine/Audio.h"
 #include "imgui.h"
 #include <Windows.h> // OutputDebugStringA
 #include <algorithm>
@@ -24,10 +25,18 @@
 
 namespace Game {
 
-void GameScene::Initialize(Engine::WindowDX* dx) {
+GameScene::~GameScene() {
+	// ★追加: 破棄時にシグナルを解除し、安全にレジストリをクリアする
+	registry_.on_construct<TagComponent>().disconnect<&GameScene::OnTagAdded>(this);
+	registry_.on_destroy<TagComponent>().disconnect<&GameScene::OnTagRemoved>(this);
+	registry_.clear();
+}
+
+void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& params) {
 	dx_ = dx;
 	renderer_ = Engine::Renderer::GetInstance();
 	eventSystem_.Clear(); // ★追加: イベントリスナーをクリア
+	playTime_ = 0.0f;
 	camera_.Initialize();
 	// ★追加: 明示的にプロジェクションを設定 (1920x1080のアスペクト比)
 	camera_.SetProjection(0.7854f, (float)Engine::WindowDX::kW / (float)Engine::WindowDX::kH, 0.1f, 1000.0f);
@@ -38,7 +47,7 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 	bool loaded = false;
 	// ★ リリース構成等での自動ロード
 	try {
-		std::string scenePath = EditorUI::GetUnifiedProjectPath("Resources/Scenes/scene.json");
+		std::string scenePath = params.stagePath.empty() ? EditorUI::GetUnifiedProjectPath("Resources/Scenes/scene.json") : params.stagePath;
 		// ★修正: UTF-8文字列をFromUTF8経由でfs::pathに変換し、日本語パスに対応
 		if (std::filesystem::exists(Engine::PathUtils::FromUTF8(scenePath))) {
 			OutputDebugStringA(("[GameScene] " + scenePath + " found. Loading...\n").c_str());
@@ -179,6 +188,36 @@ void GameScene::Update() {
 
 	// コンテキストを更新
 	ctx_.dt = dt;
+	if (isPlaying_) playTime_ += dt;
+
+	// ★ 勝利/敗北判定 (テスト用)
+	if (isPlaying_) {
+		bool win = Engine::Input::GetInstance()->Trigger(DIK_G);
+		bool loss = Engine::Input::GetInstance()->Trigger(DIK_J);
+
+		// プレイヤーの生存確認 (Viewを直接参照して同期ズレを防ぐ)
+		auto playerView = registry_.view<TagComponent, HealthComponent>();
+		for (auto entity : playerView) {
+			if (playerView.get<TagComponent>(entity).tag == "Player") {
+				if (playerView.get<HealthComponent>(entity).hp <= 0) {
+					loss = true;
+					break;
+				}
+			}
+		}
+
+		if (win || loss) {
+			Engine::SceneParameters res;
+			res.isWin = win;
+			res.score = win ? 1500 : 300;
+			res.clearTime = playTime_;
+			Engine::SceneManager::GetInstance()->RequestChange("Result", res);
+			isPlaying_ = false;
+			// 修正: 即座に return せず、以降のガード (!isPlaying_) でシステムをスキップさせつつ、
+			// フレーム末尾のクリーンアップ処理（pendingDestroys等）まで到達させる
+		}
+	}
+
 	ctx_.camera = &camera_;
 	ctx_.renderer = renderer_;
 	ctx_.input = Engine::Input::GetInstance();
@@ -196,7 +235,7 @@ void GameScene::Update() {
 
 	// Animation（エンジン固有処理のため残留）
 	auto animView = registry_.view<AnimatorComponent, MeshRendererComponent>();
-	if (animView.begin() != animView.end()) {
+	if (isPlaying_ && animView.begin() != animView.end()) {
 		std::vector<entt::entity> animEntities(animView.begin(), animView.end());
 		Engine::JobSystem::Dispatch((uint32_t)animEntities.size(), 64, [&](uint32_t i) {
 			auto entity = animEntities[i];
@@ -232,6 +271,8 @@ void GameScene::Update() {
 
 	// ★ 全Systemを順に実行
 	for (auto& system : systems_) {
+		// リザルト遷移中などはシステムを動かさない (エンティティが削除されている可能性があるため)
+		if (!isPlaying_) break;
 		system->Update(registry_, ctx_);
 	}
 
@@ -526,8 +567,8 @@ Engine::Matrix4x4 GameScene::GetWorldMatrix(int entityId) const {
 
 Engine::Matrix4x4 GameScene::GetWorldMatrixRecursive(entt::entity e, int depth) const {
 	if (depth > 32) return Engine::Matrix4x4::Identity();
-	uint32_t id = static_cast<uint32_t>(e);
-	auto it = matrixCache_.find(id);
+	
+	auto it = matrixCache_.find(e);
 	if (it != matrixCache_.end()) return it->second;
 
 	if (!registry_.valid(e) || !registry_.all_of<TransformComponent>(e)) return Engine::Matrix4x4::Identity();
@@ -541,7 +582,7 @@ Engine::Matrix4x4 GameScene::GetWorldMatrixRecursive(entt::entity e, int depth) 
 			world = Engine::Matrix4x4::Multiply(local, GetWorldMatrixRecursive(hc.parentId, depth + 1));
 		}
 	}
-	matrixCache_[id] = world;
+	matrixCache_[e] = world;
 	return world;
 }
 
@@ -699,6 +740,7 @@ void GameScene::Draw() {
 
 extern GizmoMode currentGizmoMode;
 void GameScene::DrawUI() {
+	if (!isPlaying_) return;
 	for (auto& sys : systems_) {
 		sys->DrawUI(registry_, ctx_);
 	}
@@ -1044,6 +1086,16 @@ void GameScene::SetIsPlaying(bool play) {
 			}
 		}
 		sceneSnapshot_ = "";
+
+		// ★追加: 川のメッシュなど、動的メッシュの再生成
+		auto riverView = registry_.view<RiverComponent, TransformComponent>();
+		for (auto entity : riverView) {
+			auto& rv = riverView.get<RiverComponent>(entity);
+			if (rv.enabled && rv.meshHandle == 0) {
+				auto& tc = riverView.get<TransformComponent>(entity);
+				RiverSystem::BuildRiverMesh(rv, renderer_, registry_, tc.translate);
+			}
+		}
 		
 		// ペンディングデータのクリア
 		std::lock_guard<std::mutex> lock(spawnMutex_);

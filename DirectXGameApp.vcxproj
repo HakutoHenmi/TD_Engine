@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -185,6 +185,8 @@ exit /b 0
     <ClCompile Include="Game\main.cpp" />
     <ClCompile Include="Game\Scenes\GameScene.cpp" />
     <ClCompile Include="Game\Scenes\TitleScene.cpp" />
+    <ClCompile Include="Game\Scenes\SelectScene.cpp" />
+    <ClCompile Include="Game\Scenes\ResultScene.cpp" />
     <ClCompile Include="Game\Scripts\BaseScript.cpp" />
     <ClCompile Include="Game\Scripts\BulletScript.cpp" />
     <ClCompile Include="Game\Scripts\BulletTank.cpp" />
@@ -214,6 +216,8 @@ exit /b 0
     <ClInclude Include="Game\Editor\EnemySpawnerEditor.h" />
     <ClInclude Include="Game\Scenes\GameScene.h" />
     <ClInclude Include="Game\Scenes\TitleScene.h" />
+    <ClInclude Include="Game\Scenes\SelectScene.h" />
+    <ClInclude Include="Game\Scenes\ResultScene.h" />
     <ClInclude Include="Game\ObjectTypes.h" />
     <ClInclude Include="Game\Scripts\BaseScript.h" />
     <ClInclude Include="Game\Scripts\BulletScript.h" />

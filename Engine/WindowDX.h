@@ -53,6 +53,8 @@ public:
 	D3D12_GPU_DESCRIPTOR_HANDLE SRV_GPU(int offset) const;
 
 	HWND GetHwnd() const { return hwnd_; }
+	void ToggleFullscreen();
+	bool IsFullscreen() const { return isFullscreen_; }
 
 private:
 	bool InitWindow_(HINSTANCE hInst, int cmdShow, HWND& outHwnd);
@@ -66,6 +68,10 @@ private:
 	HWND hwnd_ = nullptr;
 	HINSTANCE hInst_ = nullptr;
 	WNDCLASSEX wc_{};
+
+	bool isFullscreen_ = false;
+	RECT windowedRect_ = { 0, 0, (LONG)kW, (LONG)kH };
+	LONG windowedStyle_ = 0;
 
 	Microsoft::WRL::ComPtr<IDXGIFactory7> factory_;
 	Microsoft::WRL::ComPtr<ID3D12Device> dev_;

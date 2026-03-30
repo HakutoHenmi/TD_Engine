@@ -19,7 +19,8 @@ namespace Game {
 
 class GameScene : public Engine::IScene {
 public:
-    void Initialize(Engine::WindowDX* dx) override;
+    ~GameScene() override;
+    void Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& params) override;
     void Update() override;
     void Draw() override;
     void DrawUI() override; // ★追加: ワールド空間UI用
@@ -85,7 +86,7 @@ private:
 	void OnTagRemoved(entt::registry& reg, entt::entity entity);
 
 	// 行列計算キャッシュ (FPS向上用)
-	mutable std::unordered_map<uint32_t, Engine::Matrix4x4> matrixCache_;
+	mutable std::unordered_map<entt::entity, Engine::Matrix4x4> matrixCache_;
 	mutable uint64_t matrixFrameCount_ = 0;
 	void ClearMatrixCache() const { matrixCache_.clear(); matrixFrameCount_++; }
 
@@ -98,6 +99,8 @@ private:
 
     // パーティクルエディター
     Engine::ParticleEditor particleEditor_;
+
+    float playTime_ = 0.0f; // クリアタイム計測用
 
     friend class EditorUI;
     friend class PipeEditor;
