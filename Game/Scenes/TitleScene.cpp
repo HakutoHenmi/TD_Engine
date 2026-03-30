@@ -1,11 +1,12 @@
 #include "TitleScene.h"
-#include "SceneManager.h"
+#include "../../Engine/SceneManager.h"
 #include "../Editor/EditorUI.h"
 #include "imgui.h"
 
 namespace Game {
 
-void TitleScene::Initialize(Engine::WindowDX* dx) {
+void TitleScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& params) {
+	(void)params;
 	dx_ = dx;
 	renderer_ = Engine::Renderer::GetInstance();
 
@@ -20,7 +21,7 @@ void TitleScene::Initialize(Engine::WindowDX* dx) {
 void TitleScene::Update() {
 	// Simple logic to switch to Game scene
 	if (Engine::Input::GetInstance()->Trigger(DIK_SPACE)) {
-		Engine::SceneManager::GetInstance()->RequestChange("Game");
+		Engine::SceneManager::GetInstance()->RequestChange("Select");
 	}
 }
 
