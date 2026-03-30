@@ -17,7 +17,7 @@ void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	lifeTime_ += dt;
 
 	if (lifeTime_ >= maxLifeTime_) {
-		registry.destroy(entity); // 自分を削除
+		scene->DestroyObject(static_cast<uint32_t>(entity)); // 自分を削除
 		return;
 	}
 	// 3次元的な前進処理 (回転 y:自動, x:仰角)

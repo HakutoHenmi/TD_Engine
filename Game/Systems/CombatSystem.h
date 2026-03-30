@@ -106,6 +106,10 @@ public:
 							hc.hitStopTimer = 0.1f;  // 0.1秒間停止
 
 							ApplyKnockback(registry, attackerEntity, defenderEntity);
+
+							if (aTag == "Bullet" && ctx.scene) {
+								ctx.scene->DestroyObject(static_cast<uint32_t>(attackerEntity));
+							}
 						}
 					}
 				}
@@ -150,6 +154,10 @@ public:
 							hc.hitStopTimer = 0.1f;  // 0.1秒間停止
 
 							ApplyKnockback(registry, attackerEntity, defenderEntity);
+
+							if (aTag == "Bullet" && ctx.scene) {
+								ctx.scene->DestroyObject(static_cast<uint32_t>(attackerEntity));
+							}
 						}
 					}
 				}

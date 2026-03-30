@@ -554,6 +554,59 @@ std::string EditorUI::SaveToMemory(GameScene* scene) {
 	return ss.str();
 }
 
+static std::string s_clipboardJson;
+
+static void ExecuteCopy(GameScene* scene) {
+	if (!scene) return;
+	auto ent = scene->GetSelectedEntity();
+	if (ent == entt::null || !scene->GetRegistry().valid(ent)) return;
+	s_clipboardJson = SerializeEntity(scene->GetRegistry(), ent);
+	EditorUI::Log("Copied Entity to Clipboard.");
+}
+
+static void ExecutePaste(GameScene* scene) {
+	if (!scene || s_clipboardJson.empty()) return;
+	try {
+		json j = json::parse("{\"objects\": [" + s_clipboardJson + "]}");
+		auto createdEnts = RestoreSceneFromJson(scene, j, true);
+		if (!createdEnts.empty()) {
+			auto e = createdEnts[0];
+			auto& reg = scene->GetRegistry();
+			if (reg.all_of<NameComponent>(e)) {
+				auto& nc = reg.get<NameComponent>(e);
+				nc.name = GenerateCopyName(nc.name, reg);
+			}
+			if (reg.all_of<TransformComponent>(e)) {
+				auto& tc = reg.get<TransformComponent>(e);
+				tc.translate.x += 0.5f;
+				tc.translate.y += 0.5f;
+				tc.translate.z -= 0.5f;
+			}
+			scene->SetSelectedEntity(e);
+			scene->GetSelectedEntities() = {e};
+			
+			std::string snap = s_clipboardJson;
+			uint32_t id = static_cast<uint32_t>(e);
+			EditorUI::PushUndo({"Paste Entity", 
+				[scene, id]() { scene->DestroyObject(id); },
+				[scene, snap]() {
+					try {
+						json j2 = json::parse("{\"objects\": [" + snap + "]}");
+						RestoreSceneFromJson(scene, j2, true);
+					} catch (...) {}
+				}
+			});
+			EditorUI::Log("Pasted Entity: " + (reg.all_of<NameComponent>(e) ? reg.get<NameComponent>(e).name : "Unknown"));
+		}
+	} catch (...) { EditorUI::LogError("Failed to paste entity"); }
+}
+
+static void ExecuteDuplicate(GameScene* scene) {
+	if (!scene) return;
+	ExecuteCopy(scene);
+	ExecutePaste(scene);
+}
+
 void EditorUI::SaveScene(GameScene* scene, const std::string& path) {
 	if (!scene) return;
 	std::string targetPath = path;
@@ -745,6 +798,9 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				std::string path = OpenFileDialog("JSON Files (*.json)\0*.json\0All Files (*.*)\0*.*\0");
 				if (!path.empty()) LoadScene(gameScene, path);
 			}
+			if (ImGui::IsKeyPressed(ImGuiKey_C)) ExecuteCopy(gameScene);
+			if (ImGui::IsKeyPressed(ImGuiKey_V)) ExecutePaste(gameScene);
+			if (ImGui::IsKeyPressed(ImGuiKey_D)) ExecuteDuplicate(gameScene);
 		} else {
 			if (ImGui::IsKeyPressed(ImGuiKey_W)) currentGizmoMode = GizmoMode::Translate;
 			if (ImGui::IsKeyPressed(ImGuiKey_E)) currentGizmoMode = GizmoMode::Rotate;
@@ -801,6 +857,10 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 		if (ImGui::BeginMenu("Edit")) {
 			if (ImGui::MenuItem("Undo", "Ctrl+Z")) Undo();
 			if (ImGui::MenuItem("Redo", "Ctrl+Y")) Redo();
+			ImGui::Separator();
+			if (ImGui::MenuItem("Copy", "Ctrl+C")) ExecuteCopy(gameScene);
+			if (ImGui::MenuItem("Paste", "Ctrl+V", false, !s_clipboardJson.empty())) ExecutePaste(gameScene);
+			if (ImGui::MenuItem("Duplicate", "Ctrl+D")) ExecuteDuplicate(gameScene);
 			ImGui::Separator();
 			if (ImGui::MenuItem("Translate", "W", currentGizmoMode == GizmoMode::Translate)) currentGizmoMode = GizmoMode::Translate;
 			if (ImGui::MenuItem("Rotate", "E", currentGizmoMode == GizmoMode::Rotate)) currentGizmoMode = GizmoMode::Rotate;
@@ -1203,6 +1263,10 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 					scene->DestroyObject(id);
 					if (scene->GetSelectedEntity() == entity) scene->SetSelectedEntity(entt::null);
 				}
+				ImGui::Separator();
+				if (ImGui::MenuItem("Copy", "Ctrl+C")) ExecuteCopy(scene);
+				if (ImGui::MenuItem("Paste", "Ctrl+V", false, !s_clipboardJson.empty())) ExecutePaste(scene);
+				if (ImGui::MenuItem("Duplicate", "Ctrl+D")) ExecuteDuplicate(scene);
 				ImGui::EndPopup();
 			}
 
