@@ -2,10 +2,10 @@
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
-#include <cmath>
-#include <vector>
-#include <unordered_set>
 #include <algorithm>
+#include <cmath>
+#include <unordered_set>
+#include <vector>
 
 #ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
@@ -13,123 +13,120 @@
 
 namespace Game {
 
-// タグ走査
 static bool HasTag(entt::registry& registry, entt::entity entity, const char* tagName) {
-	if (!registry.valid(entity) || !registry.all_of<TagComponent>(entity))
+	if (!registry.valid(entity)) {
 		return false;
+	}
+
+	if (!registry.all_of<TagComponent>(entity)) {
+		return false;
+	}
+
 	return registry.get<TagComponent>(entity).tag == tagName;
 }
 
-// 球体接続判定
 static bool IsConnectedSphere(entt::registry& registry, entt::entity a, entt::entity b, float connectRange) {
-	if (!registry.valid(a) || !registry.all_of<TransformComponent>(a) || !registry.valid(b) || !registry.all_of<TransformComponent>(b))
+	if (!registry.valid(a)) {
 		return false;
+	}
 
-	const auto& posA = registry.get<TransformComponent>(a).translate;
-	const auto& posB = registry.get<TransformComponent>(b).translate;
+	if (!registry.valid(b)) {
+		return false;
+	}
 
-	float dx = posB.x - posA.x;
-	float dy = posB.y - posA.y;
-	float dz = posB.z - posA.z;
+	if (!registry.all_of<TransformComponent>(a)) {
+		return false;
+	}
 
-	float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+	if (!registry.all_of<TransformComponent>(b)) {
+		return false;
+	}
 
-	return dist <= connectRange;
-}
+	const TransformComponent& transformA = registry.get<TransformComponent>(a);
+	const TransformComponent& transformB = registry.get<TransformComponent>(b);
 
-// パイプから再帰的に接続をたどって、BulletTankに繋がっているか
-static bool IsPipeConnectedToBulletTankRecursive(
-    entt::registry& registry,
-    entt::entity currentPipe,
-    std::unordered_set<entt::entity>& visitedObjects,
-    const std::vector<entt::entity>& allPipes,
-    const std::vector<entt::entity>& allTanks,
-    float connectRange)
-{
-    visitedObjects.insert(currentPipe);
+	float diffX = transformB.translate.x - transformA.translate.x;
+	float diffY = transformB.translate.y - transformA.translate.y;
+	float diffZ = transformB.translate.z - transformA.translate.z;
 
-    // パイプのリスト内だけで検索
-    for (auto other : allPipes) {
-        if (other == currentPipe || visitedObjects.count(other)) continue;
-        if (!IsConnectedSphere(registry, currentPipe, other, connectRange)) continue;
+	float distance = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
 
-        if (IsPipeConnectedToBulletTankRecursive(registry, other, visitedObjects, allPipes, allTanks, connectRange)) {
-            return true;
-        }
-    }
+	if (distance <= connectRange) {
+		return true;
+	}
 
-    // 周囲にタンクがあるか確認
-    for (auto tank : allTanks) {
-        if (IsConnectedSphere(registry, currentPipe, tank, connectRange)) {
-            return true;
-        }
-    }
-
-    return false;
+	return false;
 }
 
 static void CollectConnectedBulletTanks(
-    entt::registry& registry,
-    entt::entity currentPipe,
-    std::unordered_set<entt::entity>& visitedPipes,
-    std::unordered_set<entt::entity>& foundTanks,
-    const std::vector<entt::entity>& allPipes,
-    const std::vector<entt::entity>& allTanks,
-    float connectRange)
-{
-    visitedPipes.insert(currentPipe);
+    entt::registry& registry, entt::entity currentPipe, std::unordered_set<entt::entity>& visitedPipes, std::unordered_set<entt::entity>& foundTanks, const std::vector<entt::entity>& allPipes,
+    const std::vector<entt::entity>& allTanks, float connectRange) {
+	visitedPipes.insert(currentPipe);
 
-    // 近くのタンクを探す
-    for (auto tank : allTanks) {
-        if (IsConnectedSphere(registry, currentPipe, tank, connectRange)) {
-            foundTanks.insert(tank);
-        }
-    }
+	for (entt::entity tank : allTanks) {
+		if (IsConnectedSphere(registry, currentPipe, tank, connectRange)) {
+			foundTanks.insert(tank);
+		}
+	}
 
-    // 接続されているパイプを再帰的に探索
-    for (auto other : allPipes) {
-        if (other == currentPipe || visitedPipes.count(other)) continue;
-        if (IsConnectedSphere(registry, currentPipe, other, connectRange)) {
-            CollectConnectedBulletTanks(registry, other, visitedPipes, foundTanks, allPipes, allTanks, connectRange);
-        }
-    }
+	for (entt::entity otherPipe : allPipes) {
+		if (otherPipe == currentPipe) {
+			continue;
+		}
+
+		if (visitedPipes.count(otherPipe) > 0) {
+			continue;
+		}
+
+		if (!IsConnectedSphere(registry, currentPipe, otherPipe, connectRange)) {
+			continue;
+		}
+
+		CollectConnectedBulletTanks(registry, otherPipe, visitedPipes, foundTanks, allPipes, allTanks, connectRange);
+	}
 }
 
 static void CollectConnectedCanons(
-    entt::registry& registry,
-    entt::entity currentPipe,
-    std::unordered_set<entt::entity>& visitedPipes,
-    std::unordered_set<entt::entity>& foundCanons,
-    const std::vector<entt::entity>& allPipes,
-    const std::vector<entt::entity>& allCanons,
-    float connectRange)
-{
-    visitedPipes.insert(currentPipe);
+    entt::registry& registry, entt::entity currentPipe, std::unordered_set<entt::entity>& visitedPipes, std::unordered_set<entt::entity>& foundCanons, const std::vector<entt::entity>& allPipes,
+    const std::vector<entt::entity>& allCanons, float connectRange) {
+	visitedPipes.insert(currentPipe);
 
-    // 近くの大砲を探す
-    for (auto canon : allCanons) {
-        if (IsConnectedSphere(registry, currentPipe, canon, connectRange)) {
-            foundCanons.insert(canon);
-        }
-    }
+	for (entt::entity canon : allCanons) {
+		if (IsConnectedSphere(registry, currentPipe, canon, connectRange)) {
+			foundCanons.insert(canon);
+		}
+	}
 
-    // 接続されているパイプを再帰的に探索
-    for (auto other : allPipes) {
-        if (other == currentPipe || visitedPipes.count(other)) continue;
-        if (IsConnectedSphere(registry, currentPipe, other, connectRange)) {
-            CollectConnectedCanons(registry, other, visitedPipes, foundCanons, allPipes, allCanons, connectRange);
-        }
-    }
+	for (entt::entity otherPipe : allPipes) {
+		if (otherPipe == currentPipe) {
+			continue;
+		}
+
+		if (visitedPipes.count(otherPipe) > 0) {
+			continue;
+		}
+
+		if (!IsConnectedSphere(registry, currentPipe, otherPipe, connectRange)) {
+			continue;
+		}
+
+		CollectConnectedCanons(registry, otherPipe, visitedPipes, foundCanons, allPipes, allCanons, connectRange);
+	}
 }
 
 void Canon::Start(entt::entity /*entity*/, GameScene* /*scene*/) { attackTimer_ = 0.0f; }
 
 void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
-	if (!scene || !scene->GetRegistry().valid(entity))
+	if (!scene) {
 		return;
-	auto& registry = scene->GetRegistry();
+	}
 
-	// 接続チェックを一定時間ごとに実行 (0.5秒おき)
+	entt::registry& registry = scene->GetRegistry();
+
+	if (!registry.valid(entity)) {
+		return;
+	}
+
 	connectionCheckTimer_ -= dt;
 	if (connectionCheckTimer_ <= 0.0f) {
 		connectionCheckTimer_ = 0.5f;
@@ -137,41 +134,54 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 
 	float powerRate = 0.0f;
+
 	if (connectedCanonCount > 0) {
-		powerRate = (float)connectedTankCount / (float)connectedCanonCount;
+		powerRate = static_cast<float>(connectedTankCount) / static_cast<float>(connectedCanonCount);
 	}
 
 	float currentAttackInterval = attackInterval_;
+
 	if (powerRate > 0.0f) {
 		currentAttackInterval = attackInterval_ / powerRate;
 	}
 
 	Debug(isConnectedToTank_);
 
-	if (attackTimer_ > 0.0f)
+	if (attackTimer_ > 0.0f) {
 		attackTimer_ -= dt;
-	if (!isConnectedToTank_)
-		return;
+	}
 
-	// 一番近い Enemy を探す
+	if (!isConnectedToTank_) {
+		return;
+	}
+
+	if (!registry.all_of<TransformComponent>(entity)) {
+		return;
+	}
+
+	TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
+
 	entt::entity target = entt::null;
 	float bestDistance = attackRange_;
 
-	if (!registry.all_of<TransformComponent>(entity))
-		return;
-	auto& canonTc = registry.get<TransformComponent>(entity);
+	const std::vector<entt::entity>& enemies = scene->GetEntitiesByTag("Enemy");
 
-	// ★ 高速タグ検索を利用
-	const auto& enemies = scene->GetEntitiesByTag("Enemy");
-	for (auto other : enemies) {
-		if (!registry.valid(other) || !registry.all_of<TransformComponent>(other))
+	for (entt::entity other : enemies) {
+		if (!registry.valid(other)) {
 			continue;
+		}
 
-		auto& otherTc = registry.get<TransformComponent>(other);
-		float dx = otherTc.translate.x - canonTc.translate.x;
-		float dy = otherTc.translate.y - canonTc.translate.y;
-		float dz = otherTc.translate.z - canonTc.translate.z;
-		float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+		if (!registry.all_of<TransformComponent>(other)) {
+			continue;
+		}
+
+		TransformComponent& enemyTransform = registry.get<TransformComponent>(other);
+
+		float diffX = enemyTransform.translate.x - canonTransform.translate.x;
+		float diffY = enemyTransform.translate.y - canonTransform.translate.y;
+		float diffZ = enemyTransform.translate.z - canonTransform.translate.z;
+
+		float distance = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
 
 		if (distance < bestDistance) {
 			bestDistance = distance;
@@ -179,70 +189,68 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 		}
 	}
 
-	if (target == entt::null)
+	if (target == entt::null) {
 		return;
+	}
 
-	auto& targetTc = registry.get<TransformComponent>(target);
-	float toX = targetTc.translate.x - canonTc.translate.x;
-	float toZ = targetTc.translate.z - canonTc.translate.z;
+	TransformComponent& targetTransform = registry.get<TransformComponent>(target);
 
-	if (std::fabs(toX) < 0.0001f && std::fabs(toZ) < 0.0001f)
+	float toX = targetTransform.translate.x - canonTransform.translate.x;
+	float toZ = targetTransform.translate.z - canonTransform.translate.z;
+
+	if (std::fabs(toX) < 0.0001f && std::fabs(toZ) < 0.0001f) {
 		return;
+	}
 
-	// 大砲を敵の方向へ向ける
 	float desiredYaw = std::atan2(toX, toZ);
-	float toY = targetTc.translate.y - canonTc.translate.y;
-	float distXZ = std::sqrt(toX * toX + toZ * toZ);
-	float desiredPitch = std::atan2(toY, distXZ);
+	float toY = targetTransform.translate.y - canonTransform.translate.y;
+	float distanceXZ = std::sqrt(toX * toX + toZ * toZ);
+	float desiredPitch = std::atan2(toY, distanceXZ);
 
-	canonTc.rotate.y = desiredYaw;
-	canonTc.rotate.x = -desiredPitch;
+	canonTransform.rotate.y = desiredYaw;
+	canonTransform.rotate.x = -desiredPitch;
 
-	// クールダウン中なら撃たない（向くだけ）
 	if (attackTimer_ > 0.0f) {
 		return;
 	}
 
-	// =========================
-	// 弾を生成して撃つ (enTT)
-	// =========================
 	entt::entity bullet = registry.create();
 
-	auto& bTag = registry.emplace<TagComponent>(bullet);
-	bTag.tag = "Bullet";
+	TagComponent& bulletTag = registry.emplace<TagComponent>(bullet);
+	bulletTag.tag = "Bullet";
 
-	auto& bTc = registry.emplace<TransformComponent>(bullet);
-	bTc.translate = canonTc.translate;
-	// 大砲の根本（支点）からのオフセット
+	TransformComponent& bulletTransform = registry.emplace<TransformComponent>(bullet);
+	bulletTransform.translate = canonTransform.translate;
+
 	float baseHeight = 0.0f;
-	bTc.translate.y += baseHeight;
+	bulletTransform.translate.y += baseHeight;
 
 	float muzzleOffset = 2.5f;
-	float cosX = std::cos(canonTc.rotate.x);
-	float sinX = std::sin(canonTc.rotate.x);
+	float cosX = std::cos(canonTransform.rotate.x);
+	float sinX = std::sin(canonTransform.rotate.x);
 
-	bTc.translate.x += std::sin(canonTc.rotate.y) * cosX * muzzleOffset;
-	bTc.translate.y += -sinX * muzzleOffset;
-	bTc.translate.z += std::cos(canonTc.rotate.y) * cosX * muzzleOffset;
-	bTc.rotate = canonTc.rotate;
-	bTc.scale = {0.3f, 0.3f, 0.3f};
+	bulletTransform.translate.x += std::sin(canonTransform.rotate.y) * cosX * muzzleOffset;
+	bulletTransform.translate.y += -sinX * muzzleOffset;
+	bulletTransform.translate.z += std::cos(canonTransform.rotate.y) * cosX * muzzleOffset;
+
+	bulletTransform.rotate = canonTransform.rotate;
+	bulletTransform.scale = {0.3f, 0.3f, 0.3f};
 
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
-		auto& bMr = registry.emplace<MeshRendererComponent>(bullet);
-		bMr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
-		bMr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-		// SceneObjectでいうmeshRenderers[0]の代わり
+		MeshRendererComponent& bulletMeshRenderer = registry.emplace<MeshRendererComponent>(bullet);
+		bulletMeshRenderer.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+		bulletMeshRenderer.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 	}
 
-	auto& bHitbox = registry.emplace<HitboxComponent>(bullet);
-	bHitbox.isActive = true;
-	bHitbox.damage = damage_;
-	bHitbox.tag = "Bullet";
-	bHitbox.size = {1.0f, 1.0f, 1.0f}; // スケール 0.3f と合わせて 0.3m の立方体にする
+	HitboxComponent& bulletHitbox = registry.emplace<HitboxComponent>(bullet);
+	bulletHitbox.isActive = true;
+	bulletHitbox.damage = damage_;
+	bulletHitbox.tag = "Bullet";
+	bulletHitbox.size = {1.0f, 1.0f, 1.0f};
 
-	auto& bScript = registry.emplace<ScriptComponent>(bullet);
-	bScript.scripts.push_back({"BulletScript", "", nullptr});
+	ScriptComponent& bulletScriptComponent = registry.emplace<ScriptComponent>(bullet);
+	bulletScriptComponent.scripts.push_back({"BulletScript", "", nullptr});
 
 	attackTimer_ = currentAttackInterval;
 }
@@ -259,46 +267,59 @@ void Canon::OnEditorUI() {
 	ImGui::Text("Status (Debug)");
 	ImGui::Text("Rotation: %.2f", rotationSpeed_);
 	ImGui::Text("Connected Tanks: %d", connectedTankCount);
+	ImGui::Text("Connected Canons: %d", connectedCanonCount);
 #endif
 }
 
 void Canon::UpdateConnection(entt::entity entity, GameScene* scene) {
-    auto& registry = scene->GetRegistry();
-    const float connectRange = 2.5f;
+	if (!scene) {
+		return;
+	}
 
-    // ★ 1. 高速タグ検索を利用してリストを取得 (O(1))
-    const auto& allPipes = scene->GetEntitiesByTag("Pipe");
-    const auto& allTanks = scene->GetEntitiesByTag("BulletTank");
-    const auto& allCanons = scene->GetEntitiesByTag("Canon");
+	entt::registry& registry = scene->GetRegistry();
+	float connectRange = 2.5f;
 
-    // 2. 接続されているタンクを探す
-    std::unordered_set<entt::entity> foundTanks;
-    std::unordered_set<entt::entity> visitedPipesForTanks;
+	const std::vector<entt::entity>& allPipes = scene->GetEntitiesByTag("Pipe");
+	const std::vector<entt::entity>& allTanks = scene->GetEntitiesByTag("BulletTank");
+	const std::vector<entt::entity>& allCanons = scene->GetEntitiesByTag("Canon");
 
-    for (auto pipe : allPipes) {
-        if (IsConnectedSphere(registry, entity, pipe, connectRange)) {
-            CollectConnectedBulletTanks(registry, pipe, visitedPipesForTanks, foundTanks, allPipes, allTanks, connectRange);
-        }
-    }
-    connectedTankCount = (int)foundTanks.size();
-    isConnectedToTank_ = (connectedTankCount > 0);
+	std::unordered_set<entt::entity> foundTanks;
+	std::unordered_set<entt::entity> visitedPipesForTanks;
 
-    // 3. 接続されている大砲を探す
-    std::unordered_set<entt::entity> foundCanons;
-    std::unordered_set<entt::entity> visitedPipesForCanons;
+	for (entt::entity pipe : allPipes) {
+		if (!IsConnectedSphere(registry, entity, pipe, connectRange)) {
+			continue;
+		}
 
-    for (auto pipe : allPipes) {
-        if (IsConnectedSphere(registry, entity, pipe, connectRange)) {
-            CollectConnectedCanons(registry, pipe, visitedPipesForCanons, foundCanons, allPipes, allCanons, connectRange);
-        }
-    }
-    // 自分自身を含める
-    foundCanons.insert(entity);
-    connectedCanonCount = (int)foundCanons.size();
+		CollectConnectedBulletTanks(registry, pipe, visitedPipesForTanks, foundTanks, allPipes, allTanks, connectRange);
+	}
+
+	connectedTankCount = static_cast<int>(foundTanks.size());
+
+	if (connectedTankCount > 0) {
+		isConnectedToTank_ = true;
+	} else {
+		isConnectedToTank_ = false;
+	}
+
+	std::unordered_set<entt::entity> foundCanons;
+	std::unordered_set<entt::entity> visitedPipesForCanons;
+
+	for (entt::entity pipe : allPipes) {
+		if (!IsConnectedSphere(registry, entity, pipe, connectRange)) {
+			continue;
+		}
+
+		CollectConnectedCanons(registry, pipe, visitedPipesForCanons, foundCanons, allPipes, allCanons, connectRange);
+	}
+
+	foundCanons.insert(entity);
+	connectedCanonCount = static_cast<int>(foundCanons.size());
 }
 
 void Canon::Debug(bool connected) {
 	(void)connected;
+
 #ifndef NDEBUG
 #ifdef USE_IMGUI
 	ImGui::Begin("Canon Debug");
