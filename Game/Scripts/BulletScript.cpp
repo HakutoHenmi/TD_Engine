@@ -75,7 +75,9 @@ void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	lifeTime_ += dt;
 
 	if (lifeTime_ >= maxLifeTime_) {
-		registry.destroy(entity);
+
+		scene->DestroyObject(static_cast<uint32_t>(entity)); // 自分を削除
+
 		return;
 	}
 
