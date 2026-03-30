@@ -69,6 +69,10 @@
     <ClCompile Include="Game\Scripts\CommunicationTestScript.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Scenes\SelectScene.cpp" />
+    <ClCompile Include="Game\Scenes\ResultScene.cpp" />
+    <ClCompile Include="Game\Scripts\BulletTank.cpp" />
+    <ClCompile Include="Game\Scripts\SkillTree.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
@@ -172,6 +176,10 @@
     <ClInclude Include="Game\Scripts\ScriptUtils.h">
       <Filter>Scripts</Filter>
     </ClInclude>
+    <ClInclude Include="Game\Scenes\SelectScene.h" />
+    <ClInclude Include="Game\Scenes\ResultScene.h" />
+    <ClInclude Include="Game\Scripts\BulletTank.h" />
+    <ClInclude Include="Game\Scripts\SkillTree.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">

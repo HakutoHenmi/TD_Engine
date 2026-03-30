@@ -3,10 +3,57 @@
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
 #include <cmath>
+#include <vector>
 
 namespace Game {
 
-void BulletScript::Start(entt::entity /*entity*/, GameScene* /*scene*/) {}
+static entt::entity FindNearestEnemy(entt::registry& registry, GameScene* scene, entt::entity bulletEntity, float searchRange) {
+	if (!scene) {
+		return entt::null;
+	}
+
+	if (!registry.valid(bulletEntity)) {
+		return entt::null;
+	}
+
+	if (!registry.all_of<TransformComponent>(bulletEntity)) {
+		return entt::null;
+	}
+
+	TransformComponent& bulletTransform = registry.get<TransformComponent>(bulletEntity);
+
+	entt::entity nearestEnemy = entt::null;
+	float bestDistance = searchRange;
+
+	const std::vector<entt::entity>& enemies = scene->GetEntitiesByTag("Enemy");
+
+	for (entt::entity enemy : enemies) {
+		if (!registry.valid(enemy)) {
+			continue;
+		}
+
+		if (!registry.all_of<TransformComponent>(enemy)) {
+			continue;
+		}
+
+		TransformComponent& enemyTransform = registry.get<TransformComponent>(enemy);
+
+		float diffX = enemyTransform.translate.x - bulletTransform.translate.x;
+		float diffY = enemyTransform.translate.y - bulletTransform.translate.y;
+		float diffZ = enemyTransform.translate.z - bulletTransform.translate.z;
+
+		float distance = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
+
+		if (distance < bestDistance) {
+			bestDistance = distance;
+			nearestEnemy = enemy;
+		}
+	}
+
+	return nearestEnemy;
+}
+
+void BulletScript::Start(entt::entity /*entity*/, GameScene* /*scene*/) { lifeTime_ = 0.0f; }
 
 void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (!scene) {
@@ -33,6 +80,16 @@ void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 
 	if (!registry.valid(target_)) {
+		target_ = FindNearestEnemy(registry, scene, entity, homingSearchRange_);
+	}
+
+	if (registry.valid(target_)) {
+		if (!registry.all_of<TransformComponent>(target_)) {
+			target_ = entt::null;
+		}
+	}
+
+	if (!registry.valid(target_)) {
 		float cosX = std::cos(bulletTransform.rotate.x);
 		float moveX = std::sin(bulletTransform.rotate.y) * cosX * speed_ * dt;
 		float moveY = -std::sin(bulletTransform.rotate.x) * speed_ * dt;
@@ -41,10 +98,6 @@ void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		bulletTransform.translate.x += moveX;
 		bulletTransform.translate.y += moveY;
 		bulletTransform.translate.z += moveZ;
-		return;
-	}
-
-	if (!registry.all_of<TransformComponent>(target_)) {
 		return;
 	}
 
@@ -69,7 +122,8 @@ void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	bulletTransform.translate.z += directionZ * speed_ * dt;
 
 	float yaw = std::atan2(directionX, directionZ);
-	float pitch = std::atan2(-directionY, std::sqrt(directionX * directionX + directionZ * directionZ));
+	float horizontalLength = std::sqrt(directionX * directionX + directionZ * directionZ);
+	float pitch = std::atan2(-directionY, horizontalLength);
 
 	bulletTransform.rotate.y = yaw;
 	bulletTransform.rotate.x = pitch;

@@ -13,9 +13,12 @@ public:
 
 private:
 	entt::entity target_ = entt::null;
+
 	float speed_ = 30.0f;
 	float lifeTime_ = 0.0f;
 	float maxLifeTime_ = 3.0f;
+
+	float homingSearchRange_ = 100.0f;
 };
 
 } // namespace Game
