@@ -1,72 +1,89 @@
-﻿#include "BaseScript.h"
+#include "BaseScript.h"
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
+
 #ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
 #endif
+
 #include <cmath>
+#include <sstream>
 
 namespace Game {
 
-static bool HasTag(entt::registry& registry, entt::entity entity, const char* tagName) {
-	if (!registry.valid(entity) || !registry.all_of<TagComponent>(entity)) return false;
-	return registry.get<TagComponent>(entity).tag == tagName;
-}
-
 void BaseScript::Start(entt::entity entity, GameScene* scene) {
-	attackTimer_ = 0.0f; // クールダウン初期化
+	attackTimer_ = 0.0f;
 
-	// 敵からダメージを受けるためのコンポーネントを追加
-	if (!scene || !scene->GetRegistry().valid(entity)) return;
-	auto& registry = scene->GetRegistry();
+	if (!scene) {
+		return;
+	}
+
+	entt::registry& registry = scene->GetRegistry();
+
+	if (!registry.valid(entity)) {
+		return;
+	}
 
 	if (!registry.all_of<HealthComponent>(entity)) {
-		auto& hc = registry.emplace<HealthComponent>(entity);
-		hc.hp = 100.0f;
-		hc.maxHp = 100.0f;
+		HealthComponent& healthComponent = registry.emplace<HealthComponent>(entity);
+		healthComponent.hp = 100.0f;
+		healthComponent.maxHp = 100.0f;
 	}
 
 	if (!registry.all_of<HurtboxComponent>(entity)) {
-		auto& hurtbox = registry.emplace<HurtboxComponent>(entity);
-		hurtbox.tag = "Core";
-		hurtbox.enabled = true;
+		HurtboxComponent& hurtboxComponent = registry.emplace<HurtboxComponent>(entity);
+		hurtboxComponent.tag = "Core";
+		hurtboxComponent.enabled = true;
 
 		if (registry.all_of<BoxColliderComponent>(entity)) {
-			hurtbox.center = registry.get<BoxColliderComponent>(entity).center;
-			hurtbox.size = registry.get<BoxColliderComponent>(entity).size;
+			hurtboxComponent.center = registry.get<BoxColliderComponent>(entity).center;
+			hurtboxComponent.size = registry.get<BoxColliderComponent>(entity).size;
 		} else if (registry.all_of<TransformComponent>(entity)) {
-			auto& tc = registry.get<TransformComponent>(entity);
-			hurtbox.size = { tc.scale.x * 2.0f, tc.scale.y * 2.0f, tc.scale.z * 2.0f };
+			TransformComponent& transformComponent = registry.get<TransformComponent>(entity);
+			hurtboxComponent.size = {transformComponent.scale.x * 2.0f, transformComponent.scale.y * 2.0f, transformComponent.scale.z * 2.0f};
 		}
 	}
 }
 
 void BaseScript::Update(entt::entity entity, GameScene* scene, float dt) {
-	if (!scene || !scene->GetRegistry().valid(entity) || !scene->GetRegistry().all_of<TransformComponent>(entity)) return;
-	auto& registry = scene->GetRegistry();
-	auto& baseTc = registry.get<TransformComponent>(entity);
+	if (!scene) {
+		return;
+	}
 
-	// タワーを回転させる
-	baseTc.rotate.y += rotationSpeed_ * dt;
+	entt::registry& registry = scene->GetRegistry();
 
-	// 発射クールダウン
+	if (!registry.valid(entity)) {
+		return;
+	}
+
+	if (!registry.all_of<TransformComponent>(entity)) {
+		return;
+	}
+
+	TransformComponent& baseTransform = registry.get<TransformComponent>(entity);
+
 	if (attackTimer_ > 0.0f) {
 		attackTimer_ -= dt;
 	}
 
-	// 一番近いEnemyを探す（範囲内）
 	entt::entity target = entt::null;
 	float bestDistance = attackRange_;
 
 	auto enemyView = registry.view<TagComponent, TransformComponent>();
-	for (auto other : enemyView) {
-		if (enemyView.get<TagComponent>(other).tag != "Enemy") continue;
+	for (entt::entity other : enemyView) {
+		TagComponent& tagComponent = enemyView.get<TagComponent>(other);
+		if (tagComponent.tag != "Enemy") {
+			continue;
+		}
 
-		auto& otherTc = enemyView.get<TransformComponent>(other);
-		float dx = otherTc.translate.x - baseTc.translate.x;
-		float dz = otherTc.translate.z - baseTc.translate.z;
-		float distance = std::sqrt(dx * dx + dz * dz);
+		TransformComponent& enemyTransform = enemyView.get<TransformComponent>(other);
+
+		float differenceX = enemyTransform.translate.x - baseTransform.translate.x;
+		float differenceY = enemyTransform.translate.y - baseTransform.translate.y;
+		float differenceZ = enemyTransform.translate.z - baseTransform.translate.z;
+
+		float distance = std::sqrt(differenceX * differenceX + differenceY * differenceY + differenceZ * differenceZ);
 
 		if (distance < bestDistance) {
 			bestDistance = distance;
@@ -74,57 +91,68 @@ void BaseScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		}
 	}
 
-	// ターゲットがいなければ何もしない
-	if (target == entt::null) return;
+	if (target == entt::null) {
+		baseTransform.rotate.y += rotationSpeed_ * dt;
+		return;
+	}
 
-	// クールダウン終わってたら撃つ
-	if (attackTimer_ > 0.0f) return;
+	TransformComponent& targetTransform = registry.get<TransformComponent>(target);
 
-	// 弾を生成して撃つ (enTT)
-	auto& targetTc = registry.get<TransformComponent>(target);
+	float toX = targetTransform.translate.x - baseTransform.translate.x;
+	float toY = targetTransform.translate.y - baseTransform.translate.y;
+	float toZ = targetTransform.translate.z - baseTransform.translate.z;
 
-	entt::entity bullet = registry.create();
-	auto& bTag = registry.emplace<TagComponent>(bullet);
-	bTag.tag = "Bullet";
-
-	auto& bTc = registry.emplace<TransformComponent>(bullet);
-	bTc.translate = baseTc.translate;
-	bTc.translate.y += 2.0f;
-
-	float toX = targetTc.translate.x - baseTc.translate.x;
-	float toZ = targetTc.translate.z - baseTc.translate.z;
-
-	if (std::fabs(toX) < 0.0001f && std::fabs(toZ) < 0.0001f) return;
+	if (std::fabs(toX) < 0.0001f && std::fabs(toZ) < 0.0001f) {
+		return;
+	}
 
 	float desiredYaw = std::atan2(toX, toZ);
-	bTc.translate.x += std::sin(desiredYaw) * 1.5f;
-	bTc.translate.z += std::cos(desiredYaw) * 1.5f;
-	bTc.rotate = baseTc.rotate;
-	bTc.rotate.y = desiredYaw;
-	bTc.scale = {0.2f, 0.2f, 0.2f};
+	float distanceXZ = std::sqrt(toX * toX + toZ * toZ);
+	float desiredPitch = std::atan2(toY, distanceXZ);
+
+	baseTransform.rotate.y = desiredYaw;
+	baseTransform.rotate.x = -desiredPitch;
+
+	if (attackTimer_ > 0.0f) {
+		return;
+	}
+
+	entt::entity bullet = registry.create();
+
+	TagComponent& bulletTag = registry.emplace<TagComponent>(bullet);
+	bulletTag.tag = "Bullet";
+
+	TransformComponent& bulletTransform = registry.emplace<TransformComponent>(bullet);
+	bulletTransform.translate = baseTransform.translate;
+
+	float muzzleOffset = 1.5f;
+	float cosX = std::cos(baseTransform.rotate.x);
+	float sinX = std::sin(baseTransform.rotate.x);
+
+	bulletTransform.translate.x += std::sin(baseTransform.rotate.y) * cosX * muzzleOffset;
+	bulletTransform.translate.y += -sinX * muzzleOffset;
+	bulletTransform.translate.z += std::cos(baseTransform.rotate.y) * cosX * muzzleOffset;
+
+	bulletTransform.rotate = baseTransform.rotate;
+	bulletTransform.scale = {0.2f, 0.2f, 0.2f};
 
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
-		auto& bMr = registry.emplace<MeshRendererComponent>(bullet);
-		bMr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
-		bMr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+		MeshRendererComponent& meshRenderer = registry.emplace<MeshRendererComponent>(bullet);
+		meshRenderer.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+		meshRenderer.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 	}
 
-	auto& hb = registry.emplace<HitboxComponent>(bullet);
-	hb.isActive = true;
-	hb.damage = damage_;
-	hb.tag = "Bullet";
-	hb.size = {0.2f, 0.2f, 0.2f};
+	HitboxComponent& hitboxComponent = registry.emplace<HitboxComponent>(bullet);
+	hitboxComponent.isActive = true;
+	hitboxComponent.damage = damage_;
+	hitboxComponent.tag = "Bullet";
+	hitboxComponent.size = {0.2f, 0.2f, 0.2f};
 
-
-	auto& sc = registry.emplace<ScriptComponent>(bullet);
-	sc.scripts.push_back({ "BulletScript", "", nullptr });
+	ScriptComponent& scriptComponent = registry.emplace<ScriptComponent>(bullet);
+	scriptComponent.scripts.push_back({"BulletScript", "", nullptr});
 
 	attackTimer_ = attackInterval_;
-
-
-	
-
 }
 
 void BaseScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
@@ -139,26 +167,36 @@ void BaseScript::OnEditorUI() {
 }
 
 std::string BaseScript::SerializeParameters() {
-	std::stringstream ss;
-	ss << "rotationSpeed=" << rotationSpeed_ << ";";
-	ss << "attackInterval=" << attackInterval_ << ";";
-	ss << "damage=" << damage_ << ";";
-	ss << "attackRange=" << attackRange_ << ";";
-	return ss.str();
+	std::stringstream stringStream;
+	stringStream << "rotationSpeed=" << rotationSpeed_ << ";";
+	stringStream << "attackInterval=" << attackInterval_ << ";";
+	stringStream << "damage=" << damage_ << ";";
+	stringStream << "attackRange=" << attackRange_ << ";";
+	return stringStream.str();
 }
 
 void BaseScript::DeserializeParameters(const std::string& data) {
-	std::stringstream ss(data);
+	std::stringstream stringStream(data);
 	std::string item;
-	while (std::getline(ss, item, ';')) {
-		size_t pos = item.find('=');
-		if (pos == std::string::npos) continue;
-		std::string key = item.substr(0, pos);
-		std::string val = item.substr(pos + 1);
-		if (key == "rotationSpeed") rotationSpeed_ = std::stof(val);
-		else if (key == "attackInterval") attackInterval_ = std::stof(val);
-		else if (key == "damage") damage_ = std::stof(val);
-		else if (key == "attackRange") attackRange_ = std::stof(val);
+
+	while (std::getline(stringStream, item, ';')) {
+		size_t position = item.find('=');
+		if (position == std::string::npos) {
+			continue;
+		}
+
+		std::string key = item.substr(0, position);
+		std::string value = item.substr(position + 1);
+
+		if (key == "rotationSpeed") {
+			rotationSpeed_ = std::stof(value);
+		} else if (key == "attackInterval") {
+			attackInterval_ = std::stof(value);
+		} else if (key == "damage") {
+			damage_ = std::stof(value);
+		} else if (key == "attackRange") {
+			attackRange_ = std::stof(value);
+		}
 	}
 }
 
