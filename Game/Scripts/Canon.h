@@ -14,20 +14,20 @@ public:
 	void OnEditorUI() override;
 
 private:
-	// 大砲性能
-	float attackRange_ = 50.0f;    // 攻撃範囲
-	float attackInterval_ = 1.0f; // 攻撃間隔（秒）
-	float damage_ = 10.0f;        // ダメージ量
-	                              // クールダウン
+	float attackRange_ = 50.0f;
+	float attackInterval_ = 1.0f;
+	float damage_ = 10.0f;
 	float attackTimer_ = 0.0f;
-	float rotationSpeed_ = 1.0f; // タワーの回転速度（ラジアン/秒）
+	float rotationSpeed_ = 1.0f;
 
-		int objectCount = 0;
-	int pipeCount = 0;
-	int enemyCount = 0;
+	int connectedTankCount = 0;
+	int connectedCanonCount = 0;
+	float connectionCheckTimer_ = 0.0f;
+	bool isConnectedToTank_ = false;
 
 private:
 	void Debug(bool connected);
+	void UpdateConnection(entt::entity entity, GameScene* scene);
 };
 
 } // namespace Game

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 // ===============================
 //  ImGuiLayer : ImGui初期化/描画/エディターレイアウト
 // ===============================
@@ -17,7 +17,7 @@ class ImGuiLayer {
 public:
 	bool Initialize(
 	    HWND hwnd, WindowDX& dx, ID3D12DescriptorHeap* srvHeap, D3D12_CPU_DESCRIPTOR_HANDLE fontCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE fontGpuHandle, float jpFontSize = 15.0f,
-	    const char* jpFontPath = "Resources/fonts/Huninn/Huninn-Regular.ttf");
+	    const char* jpFontPath = "Resources/Textures/fonts/Huninn/Huninn-Regular.ttf");
 
 	void NewFrame(WindowDX& dx);
 

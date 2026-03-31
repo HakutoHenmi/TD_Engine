@@ -1,4 +1,4 @@
-#include "ExperienceHopper.h"
+﻿#include "ExperienceHopper.h"
 #include "ScriptEngine.h"
 #include "Scenes/GameScene.h"
 #include "ObjectTypes.h"
@@ -103,8 +103,8 @@ void ExperienceHopper::Update(entt::entity entity, GameScene* scene, float dt) {
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
 		auto& oMr = registry.emplace<MeshRendererComponent>(orb);
-		oMr.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
-		oMr.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
+		oMr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+		oMr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 		
 		auto& oGmc = registry.emplace<GpuMeshColliderComponent>(orb);
 		oGmc.meshHandle = oMr.modelHandle;

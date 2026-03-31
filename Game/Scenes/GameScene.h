@@ -8,10 +8,9 @@
 #include "EventSystem.h" // ★追加: イベントシステム
 #include "../ObjectTypes.h"
 #include "../Systems/ISystem.h"
-#include <vector>
-#include <set>
-#include <memory>
 #include <mutex>
+#include <unordered_map>
+#include <string>
 #include "../../externals/entt/entt.hpp"
 #include "../../Engine/ParticleEmitter.h"
 #include "../../Engine/ParticleEditor.h"
@@ -20,7 +19,8 @@ namespace Game {
 
 class GameScene : public Engine::IScene {
 public:
-    void Initialize(Engine::WindowDX* dx) override;
+    ~GameScene() override;
+    void Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& params) override;
     void Update() override;
     void Draw() override;
     void DrawUI() override; // ★追加: ワールド空間UI用
@@ -43,7 +43,8 @@ public:
 	bool IsPlaying() const { return isPlaying_; } // Alias for backward compatibility
 	void SetIsPlaying(bool play);
 	Engine::Renderer* GetRenderer() const { return renderer_; }
-	Engine::Matrix4x4 GetWorldMatrix(int index) const; // Remove inline definition to stop recursion
+	Engine::Matrix4x4 GetWorldMatrix(int index) const; 
+	Engine::Matrix4x4 GetWorldMatrixRecursive(entt::entity entity, int depth) const;
 	Engine::Camera& GetCamera() { return camera_; }
 	entt::entity GetSelectedEntity() const { return selectedEntity_; }
 	void SetSelectedEntity(entt::entity entity) { selectedEntity_ = entity; }
@@ -58,6 +59,11 @@ public:
 	float GetHeightAt(float x, float z, float startY = 1000.0f, uint32_t excludeId = 0);
 	// ★追加: 汎用レイキャスト (壁判定などに使用)
 	bool RayCast(const Engine::Vector3& origin, const Engine::Vector3& direction, float maxDist, uint32_t excludeId, float& outDist);
+	
+	// ★追加: 高速タグ検索システム
+	const std::vector<entt::entity>& GetEntitiesByTag(const std::string& tag);
+	void SetTag(entt::entity entity, const std::string& tag);
+	void SyncTag(entt::entity entity); // ★追加: 手動同期用
 
 private:
     Engine::WindowDX* dx_ = nullptr;
@@ -72,6 +78,17 @@ private:
     entt::registry pendingSpawns_;
     std::vector<entt::entity> pendingDestroys_;
     std::mutex spawnMutex_; // ★追加: マルチスレッドから安全にスポーン・破棄登録を行えるようにする
+	
+	// タグ検索キャッシュ
+	std::unordered_map<std::string, std::vector<entt::entity>> tagCache_;
+	std::vector<entt::entity> pendingTagSync_; // ★追加: 生成直後の同期待ち
+	void OnTagAdded(entt::registry& reg, entt::entity entity);
+	void OnTagRemoved(entt::registry& reg, entt::entity entity);
+
+	// 行列計算キャッシュ (FPS向上用)
+	mutable std::unordered_map<entt::entity, Engine::Matrix4x4> matrixCache_;
+	mutable uint64_t matrixFrameCount_ = 0;
+	void ClearMatrixCache() const { matrixCache_.clear(); matrixFrameCount_++; }
 
 	std::string sceneSnapshot_; // ★追加: Play開始時のシリアライズ文字列
 	std::string initialSceneSnapshot_; // ★追加: 起動（JSONロード）直後の状態
@@ -82,6 +99,8 @@ private:
 
     // パーティクルエディター
     Engine::ParticleEditor particleEditor_;
+
+    float playTime_ = 0.0f; // クリアタイム計測用
 
     friend class EditorUI;
     friend class PipeEditor;

@@ -2,19 +2,70 @@
 #include <string>
 #include <filesystem>
 #include <windows.h>
+#include <shlobj.h>
+#include <knownfolders.h>
 #include <algorithm>
 
 namespace Engine {
 
 class PathUtils {
 public:
+    /**
+     * @brief Unity's Application.dataPath equivalent. Returns the path to the "Resources" folder.
+     * @return Absolute path in UTF-8.
+     */
+    static std::string GetAssetsPath() {
+        std::filesystem::path root = GetRootPathInternal();
+        return ToUTF8((root / "Resources").wstring());
+    }
+
+    /**
+     * @brief Unity's Application.streamingAssetsPath equivalent. 
+     * @return Absolute path in UTF-8.
+     */
+    static std::string GetStreamingAssetsPath() {
+        std::filesystem::path root = GetRootPathInternal();
+        return ToUTF8((root / "Resources" / "StreamingAssets").wstring());
+    }
+
+    /**
+     * @brief Unity's Application.persistentDataPath equivalent.
+     * Returns %APPDATA%/Local/TD_Engine.
+     * @return Absolute path in UTF-8.
+     */
+    static std::string GetPersistentDataPath() {
+        wchar_t* localAppData = nullptr;
+        // Windows standard: AppData/Local
+        if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, NULL, &localAppData))) {
+            std::filesystem::path p(localAppData);
+            CoTaskMemFree(localAppData);
+            p /= "TD_Engine";
+            if (!std::filesystem::exists(p)) {
+                std::filesystem::create_directories(p);
+            }
+            return ToUTF8(p.wstring());
+        }
+        // Fallback to exe directory/SaveData if AppData fails
+        std::filesystem::path fallback = GetRootPathInternal() / "SaveData";
+        if (!std::filesystem::exists(fallback)) {
+            std::filesystem::create_directories(fallback);
+        }
+        return ToUTF8(fallback.wstring());
+    }
+
+    /**
+     * @brief Path from either absolute or relative (from root) path.
+     * Ensures result is absolute and uses '/' separators.
+     * @param relPath Path string (UTF-8).
+     * @return Absolute path in UTF-8.
+     */
     static std::string GetUnifiedPath(const std::string& relPath) {
         if (relPath.empty()) return "";
-        std::filesystem::path p(relPath);
-        if (p.is_absolute()) return relPath;
-        std::string root = GetRootPath();
-        std::filesystem::path finalPath = std::filesystem::path(root) / relPath;
-        std::string result = finalPath.string();
+        std::filesystem::path p = FromUTF8(relPath);
+        if (p.is_absolute()) return ToUTF8(p.wstring());
+        
+        std::filesystem::path finalPath = GetRootPathInternal() / p;
+        std::string result = ToUTF8(finalPath.wstring());
         std::replace(result.begin(), result.end(), '\\', '/');
         return result;
     }
@@ -23,98 +74,109 @@ public:
         if (relPath.empty()) return L"";
         std::filesystem::path p(relPath);
         if (p.is_absolute()) return relPath;
-        std::string root = GetRootPath();
-        std::filesystem::path finalPath = std::filesystem::path(root) / relPath;
+        
+        std::filesystem::path finalPath = GetRootPathInternal() / p;
         std::wstring result = finalPath.wstring();
         std::replace(result.begin(), result.end(), L'\\', L'/');
         return result;
     }
 
+    // --- Utility: UTF-8 <-> Wide String ---
+
+    static std::string ToUTF8(const std::wstring& wstr) {
+        if (wstr.empty()) return "";
+        int size = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, nullptr, 0, nullptr, nullptr);
+        std::string str(size - 1, 0);
+        WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, &str[0], size, nullptr, nullptr);
+        return str;
+    }
+
+    static std::wstring FromUTF8(const std::string& str) {
+        if (str.empty()) return L"";
+        int size = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
+        std::wstring wstr(size - 1, 0);
+        MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, &wstr[0], size);
+        return wstr;
+    }
+
+    // For backward compatibility (deprecated: use GetAssetsPath or GetUnifiedPath)
+    static std::string GetRootPath() {
+        return ToUTF8(GetRootPathInternal().wstring());
+    }
+
 private:
-    // プロジェクト指標ファイルの存在チェック (.sln or .vcxproj)
     static bool HasProjectFile(const std::filesystem::path& dir) {
         try {
-            // 固定名チェック (高速)
             if (std::filesystem::exists(dir / "DirectXGame_New.sln")) return true;
+            if (std::filesystem::exists(dir / "TD_Engine.sln")) return true;
             if (std::filesystem::exists(dir / "DirectXGameApp.vcxproj")) return true;
-            // 任意の .sln ファイル (フォールバック)
-            for (auto& entry : std::filesystem::directory_iterator(dir)) {
-                if (entry.path().extension() == ".sln") return true;
-            }
         } catch (...) {}
         return false;
     }
 
-    static std::string GetRootPath() {
-        static std::string rootPath = "";
-        if (rootPath.empty()) {
-            // Unicode版を使用 (日本語パス「デスクトップ」等の文字化け防止)
-            wchar_t buffer[MAX_PATH];
-            GetModuleFileNameW(NULL, buffer, MAX_PATH);
-            std::filesystem::path exeDir = std::filesystem::path(buffer).parent_path();
-            
-            // ビルド出力ディレクトリに含まれがちな名前
-            auto IsBuildFolder = [](const std::string& name) {
-                std::string lower = name;
-                std::transform(lower.begin(), lower.end(), lower.begin(), 
-                    [](unsigned char c){ return (char)std::tolower(c); });
-                return lower == "generated" || lower == "outputs" || lower == "development" ||
-                       lower == "bin" || lower == "obj" || lower == "x64" || lower == "debug" || lower == "release";
-            };
+    static std::filesystem::path GetRootPathInternal() {
+        static std::filesystem::path rootPath;
+        if (!rootPath.empty()) return rootPath;
 
-            // Phase 1: プロジェクトファイル (.sln / .vcxproj / .git) を最優先で探す
-            std::filesystem::path current = exeDir;
-            bool found = false;
-            for (int i = 0; i < 10; ++i) {
-                // ビルドフォルダ自体はルートパスの候補にしない（ソースディレクトリを見つけるため）
-                if (!IsBuildFolder(current.filename().string())) {
+        // Use larger buffer to handle long paths (Windows max is 32767)
+        wchar_t buffer[32768];
+        DWORD length = GetModuleFileNameW(NULL, buffer, 32768);
+        if (length == 0 || length >= 32768) {
+            // Fallback to current directory if failed
+            rootPath = std::filesystem::current_path();
+            return rootPath;
+        }
+        buffer[length] = L'\0'; // Ensure null-termination
+        
+        std::filesystem::path exeDir = std::filesystem::path(buffer).parent_path();
+        
+        auto IsBuildFolder = [](const std::wstring& name) {
+            std::wstring lower = name;
+            std::transform(lower.begin(), lower.end(), lower.begin(), ::towlower);
+            return lower == L"generated" || lower == L"outputs" || lower == L"development" ||
+                   lower == L"bin" || lower == L"obj" || lower == L"x64" || lower == L"debug" || lower == L"release";
+        };
+
+        // Phase 1: Search for project marker up to 10 levels
+        std::filesystem::path current = exeDir;
+        for (int i = 0; i < 10; ++i) {
+            if (!IsBuildFolder(current.filename().wstring())) {
+                try {
                     if (HasProjectFile(current) || std::filesystem::exists(current / ".git")) {
-                        rootPath = current.string();
-                        found = true;
-                        break;
+                        rootPath = current;
+                        return rootPath;
                     }
-                    // 子フォルダ TD_Engine 内のチェック (並列フォルダ対策)
+                    // Check child "TD_Engine" folder
                     if (std::filesystem::exists(current / "TD_Engine") && 
                         (HasProjectFile(current / "TD_Engine") || std::filesystem::exists(current / "TD_Engine" / ".git"))) {
-                        rootPath = (current / "TD_Engine").string();
-                        found = true;
-                        break;
+                        rootPath = current / "TD_Engine";
+                        return rootPath;
                     }
-                }
-                if (current.has_parent_path() && current.parent_path() != current) {
-                    current = current.parent_path();
-                } else {
-                    break;
-                }
+                } catch (...) {}
             }
-            
-            // Phase 2: 配布環境用フォールバック (Resources/shaders/ToonPS.hlsl の存在を確認)
-            if (!found) {
-                current = exeDir;
-                for (int i = 0; i < 10; ++i) {
-                    // ここではビルドフォルダ内でも、完全なリソースがあれば許容する
-                    if (std::filesystem::exists(current / "Resources" / "shaders" / "ToonPS.hlsl")) {
-                        rootPath = current.string();
-                        found = true;
-                        break;
-                    }
-                    if (current.has_parent_path() && current.parent_path() != current) {
-                        current = current.parent_path();
-                    } else {
-                        break;
-                    }
-                }
-            }
-            
-            if (!found) {
-                rootPath = exeDir.string();
-            }
-            
-            // デバッグ出力
-            OutputDebugStringA(("[PathUtils] Root path resolved to: " + rootPath + "\n").c_str());
+            if (current.has_parent_path() && current.parent_path() != current) {
+                current = current.parent_path();
+            } else break;
         }
+        
+        // Phase 2: Fallback search for Resources folder
+        current = exeDir;
+        for (int i = 0; i < 10; ++i) {
+            try {
+                if (std::filesystem::exists(current / "Resources")) {
+                    rootPath = current;
+                    return rootPath;
+                }
+            } catch (...) {}
+            if (current.has_parent_path() && current.parent_path() != current) {
+                current = current.parent_path();
+            } else break;
+        }
+        
+        rootPath = exeDir;
         return rootPath;
     }
 };
+
 
 } // namespace Engine

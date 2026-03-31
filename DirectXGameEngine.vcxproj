@@ -177,6 +177,7 @@
     <ClInclude Include="Engine\Input.h" />
     <ClInclude Include="Engine\IScene.h" />
     <ClInclude Include="Engine\Matrix4x4.h" />
+    <ClInclude Include="Engine\SceneParameters.h" />
     <ClInclude Include="Engine\Model.h" />
     <ClInclude Include="Engine\Particle.h" />
     <ClInclude Include="Engine\ParticleEmitter.h" />

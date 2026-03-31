@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <string>
 #include <vector>
 
@@ -36,10 +36,10 @@ struct Particle {
 
 class ParticleSystem {
 public:
-	// texturePath は任意。存在する png を指定してください（例: "Resources/uvChecker.png"）
+	// texturePath は任意。存在する png を指定してください（例: "Resources/Textures/uvChecker.png"）
 	// ★変更: useBillboard 引数を追加（デフォルトtrue）
 	void Initialize(
-	    Renderer& renderer, size_t maxCount = 1000, const std::string& meshPath = "Resources/plane.obj", const std::string& texturePath = "Resources/uvChecker.png", bool sRGB = true,
+	    Renderer& renderer, size_t maxCount = 1000, const std::string& meshPath = "Resources/Models/plane.obj", const std::string& texturePath = "Resources/Textures/uvChecker.png", bool sRGB = true,
 	    bool useBillboard = true);
 
 	void Update(float dt);

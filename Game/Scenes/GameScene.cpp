@@ -1,6 +1,7 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#include "../../Engine/PathUtils.h"
 #include "GameScene.h"
 #include "../Editor/EditorUI.h"
 #include "../Scripts/ScriptEngine.h"
@@ -15,7 +16,8 @@
 #include "../Systems/RiverSystem.h" // ★追加
 #include "../Systems/ScriptSystem.h"
 #include "../Systems/UISystem.h"
-#include "Audio.h"
+#include "../../Engine/SceneManager.h"
+#include "../../Engine/Audio.h"
 #include "imgui.h"
 #include <Windows.h> // OutputDebugStringA
 #include <algorithm>
@@ -23,10 +25,18 @@
 
 namespace Game {
 
-void GameScene::Initialize(Engine::WindowDX* dx) {
+GameScene::~GameScene() {
+	// ★追加: 破棄時にシグナルを解除し、安全にレジストリをクリアする
+	registry_.on_construct<TagComponent>().disconnect<&GameScene::OnTagAdded>(this);
+	registry_.on_destroy<TagComponent>().disconnect<&GameScene::OnTagRemoved>(this);
+	registry_.clear();
+}
+
+void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& params) {
 	dx_ = dx;
 	renderer_ = Engine::Renderer::GetInstance();
 	eventSystem_.Clear(); // ★追加: イベントリスナーをクリア
+	playTime_ = 0.0f;
 	camera_.Initialize();
 	// ★追加: 明示的にプロジェクションを設定 (1920x1080のアスペクト比)
 	camera_.SetProjection(0.7854f, (float)Engine::WindowDX::kW / (float)Engine::WindowDX::kH, 0.1f, 1000.0f);
@@ -36,14 +46,21 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 
 	bool loaded = false;
 	// ★ リリース構成等での自動ロード
-	std::string scenePath = EditorUI::GetUnifiedProjectPath("Resources/scene.json");
-	if (std::filesystem::exists(scenePath)) {
-		OutputDebugStringA(("[GameScene] " + scenePath + " found. Loading...\n").c_str());
-		EditorUI::LoadScene(this, scenePath);
-		isPlaying_ = true; // リリース/起動時はプレイ状態から開始する
-		loaded = true;
-	} else {
-		OutputDebugStringA(("[GameScene] " + scenePath + " NOT found.\n").c_str());
+	try {
+		std::string scenePath = params.stagePath.empty() ? EditorUI::GetUnifiedProjectPath("Resources/Scenes/scene.json") : params.stagePath;
+		// ★修正: UTF-8文字列をFromUTF8経由でfs::pathに変換し、日本語パスに対応
+		if (std::filesystem::exists(Engine::PathUtils::FromUTF8(scenePath))) {
+			OutputDebugStringA(("[GameScene] " + scenePath + " found. Loading...\n").c_str());
+			EditorUI::LoadScene(this, scenePath);
+			isPlaying_ = true; // リリース/起動時はプレイ状態から開始する
+			loaded = true;
+		} else {
+			OutputDebugStringA(("[GameScene] " + scenePath + " NOT found.\n").c_str());
+		}
+	} catch (const std::exception& e) {
+		std::string msg = "[GameScene] EXCEPTION during scene load: " + std::string(e.what()) + "\n";
+		OutputDebugStringA(msg.c_str());
+		MessageBoxA(NULL, msg.c_str(), "Scene Load Error", MB_OK | MB_ICONERROR);
 	}
 
 	// 既にオブジェクトが存在する場合（リスタート時）やロード失敗時は最低限の内容を作成
@@ -57,10 +74,10 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 		registry_.emplace<NameComponent>(plane, "Plane");
 		
 		auto& mesh = registry_.emplace<MeshRendererComponent>(plane);
-		mesh.modelHandle = renderer_->LoadObjMesh("Resources/plane.obj");
-		mesh.textureHandle = renderer_->LoadTexture2D("Resources/white1x1.png");
-		mesh.modelPath = "Resources/plane.obj";
-		mesh.texturePath = "Resources/white1x1.png";
+		mesh.modelHandle = renderer_->LoadObjMesh("Resources/Models/plane.obj");
+		mesh.textureHandle = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
+		mesh.modelPath = "Resources/Models/plane.obj";
+		mesh.texturePath = "Resources/Textures/white1x1.png";
 		
 		registry_.emplace<TransformComponent>(plane, DirectX::XMFLOAT3{0, 0, 0}, DirectX::XMFLOAT3{0, 0, 0}, DirectX::XMFLOAT3{20, 1, 20});
 
@@ -128,6 +145,19 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 			RiverSystem::BuildRiverMesh(rv, renderer_, registry_, tc.translate);
 		}
 	}
+
+	// ★追加: タグシステムの初期化
+	tagCache_.clear();
+	auto tagInitView = registry_.view<TagComponent>();
+	for (auto entity : tagInitView) {
+		const auto& tag = tagInitView.get<TagComponent>(entity).tag;
+		tagCache_[tag].push_back(entity);
+	}
+	// リスナー登録
+	registry_.on_construct<TagComponent>().disconnect<&GameScene::OnTagAdded>(this);
+	registry_.on_construct<TagComponent>().connect<&GameScene::OnTagAdded>(this);
+	registry_.on_destroy<TagComponent>().disconnect<&GameScene::OnTagRemoved>(this);
+	registry_.on_destroy<TagComponent>().connect<&GameScene::OnTagRemoved>(this);
 }
 
 // =====================================================
@@ -136,6 +166,18 @@ void GameScene::Initialize(Engine::WindowDX* dx) {
 void GameScene::Update() {
 	if (!renderer_)
 		return;
+
+	// ★追加: 行列キャッシュを毎フレームクリア
+	ClearMatrixCache();
+
+	// ★追加: タグの遅延同期（生成直後にタグが設定されるケースに対応）
+	if (!pendingTagSync_.empty()) {
+		std::vector<entt::entity> list = std::move(pendingTagSync_);
+		for (auto e : list) {
+			if (registry_.valid(e)) SyncTag(e);
+		}
+	}
+
 	static auto last = std::chrono::steady_clock::now();
 	auto now = std::chrono::steady_clock::now();
 	float dt = std::chrono::duration<float>(now - last).count();
@@ -146,12 +188,42 @@ void GameScene::Update() {
 
 	// コンテキストを更新
 	ctx_.dt = dt;
+	if (isPlaying_) playTime_ += dt;
+
+	// ★ 勝利/敗北判定 (テスト用)
+	if (isPlaying_) {
+		bool win = Engine::Input::GetInstance()->Trigger(DIK_G);
+		bool loss = Engine::Input::GetInstance()->Trigger(DIK_J);
+
+		// プレイヤーの生存確認 (Viewを直接参照して同期ズレを防ぐ)
+		auto playerView = registry_.view<TagComponent, HealthComponent>();
+		for (auto entity : playerView) {
+			if (playerView.get<TagComponent>(entity).tag == "Player") {
+				if (playerView.get<HealthComponent>(entity).hp <= 0) {
+					loss = true;
+					break;
+				}
+			}
+		}
+
+		if (win || loss) {
+			Engine::SceneParameters res;
+			res.isWin = win;
+			res.score = win ? 1500 : 300;
+			res.clearTime = playTime_;
+			Engine::SceneManager::GetInstance()->RequestChange("Result", res);
+			isPlaying_ = false;
+			// 修正: 即座に return せず、以降のガード (!isPlaying_) でシステムをスキップさせつつ、
+			// フレーム末尾のクリーンアップ処理（pendingDestroys等）まで到達させる
+		}
+	}
+
 	ctx_.camera = &camera_;
 	ctx_.renderer = renderer_;
 	ctx_.input = Engine::Input::GetInstance();
 	ctx_.isPlaying = isPlaying_;
-	ctx_.scene = this; // ★追加
-	ctx_.eventSystem = &eventSystem_; // ★追加: イベントシステム
+	ctx_.scene = this;
+	ctx_.eventSystem = &eventSystem_;
 	ctx_.pendingSpawns = &pendingSpawns_;
 
 	// viewportのデフォルト設定（フルスクリーン想定）
@@ -163,7 +235,7 @@ void GameScene::Update() {
 
 	// Animation（エンジン固有処理のため残留）
 	auto animView = registry_.view<AnimatorComponent, MeshRendererComponent>();
-	if (animView.begin() != animView.end()) {
+	if (isPlaying_ && animView.begin() != animView.end()) {
 		std::vector<entt::entity> animEntities(animView.begin(), animView.end());
 		Engine::JobSystem::Dispatch((uint32_t)animEntities.size(), 64, [&](uint32_t i) {
 			auto entity = animEntities[i];
@@ -199,6 +271,8 @@ void GameScene::Update() {
 
 	// ★ 全Systemを順に実行
 	for (auto& system : systems_) {
+		// リザルト遷移中などはシステムを動かさない (エンティティが削除されている可能性があるため)
+		if (!isPlaying_) break;
 		system->Update(registry_, ctx_);
 	}
 
@@ -311,6 +385,66 @@ void GameScene::DestroyObject(uint32_t id) {
 	std::lock_guard<std::mutex> lock(spawnMutex_);
 	// IDをそのままentt::entityとして扱う（ダウンキャスト）
 	pendingDestroys_.push_back(static_cast<entt::entity>(id));
+}
+
+// ★追加: タグシステムの実装
+const std::vector<entt::entity>& GameScene::GetEntitiesByTag(const std::string& tag) {
+	static const std::vector<entt::entity> emptyList;
+	auto it = tagCache_.find(tag);
+	if (it == tagCache_.end()) return emptyList;
+	return it->second;
+}
+
+void GameScene::SyncTag(entt::entity entity) {
+	if (!registry_.valid(entity) || !registry_.all_of<TagComponent>(entity)) return;
+	const auto& tag = registry_.get<TagComponent>(entity).tag;
+	
+	// すでにある程度管理されているか確認し、重複を防ぐ
+	auto& list = tagCache_[tag];
+	if (std::find(list.begin(), list.end(), entity) == list.end()) {
+		list.push_back(entity);
+	}
+}
+
+void GameScene::SetTag(entt::entity entity, const std::string& tag) {
+	auto& reg = GetRegistry();
+	
+	// すでにタグがある場合は古いキャッシュから削除
+	if (reg.all_of<TagComponent>(entity)) {
+		const auto& oldTag = reg.get<TagComponent>(entity).tag;
+		if (oldTag == tag) return; // 変更なし
+
+		auto it = tagCache_.find(oldTag);
+		if (it != tagCache_.end()) {
+			auto& oldList = it->second;
+			oldList.erase(std::remove(oldList.begin(), oldList.end(), entity), oldList.end());
+		}
+		reg.get<TagComponent>(entity).tag = tag;
+	} else {
+		// 新規付与
+		reg.emplace<TagComponent>(entity).tag = tag;
+	}
+
+	// 新しいキャッシュに追加
+	tagCache_[tag].push_back(entity);
+}
+
+void GameScene::OnTagAdded(entt::registry& reg, entt::entity entity) {
+	// 生成時はまだタグが設定されていない("Untagged")可能性があるため、保留リストに入れる
+	(void)reg;
+	pendingTagSync_.push_back(entity);
+}
+
+void GameScene::OnTagRemoved(entt::registry& reg, entt::entity entity) {
+	// Componentが削除される際、キャッシュからも消す
+	if (reg.all_of<TagComponent>(entity)) {
+		const auto& tag = reg.get<TagComponent>(entity).tag;
+		auto it = tagCache_.find(tag);
+		if (it != tagCache_.end()) {
+			auto& list = it->second;
+			list.erase(std::remove(list.begin(), list.end(), entity), list.end());
+		}
+	}
 }
 
 // ★追加: 名前でオブジェクトを検索
@@ -428,17 +562,28 @@ bool GameScene::RayCast(const Engine::Vector3& origin, const Engine::Vector3& di
 }
 
 Engine::Matrix4x4 GameScene::GetWorldMatrix(int entityId) const {
-	entt::entity e = static_cast<entt::entity>(entityId);
-	if (!registry_.valid(e) || !registry_.all_of<TransformComponent>(e)) return Engine::Matrix4x4::Identity();
-	
-	const auto& tc = registry_.get<TransformComponent>(e);
-	Engine::Matrix4x4 local = tc.GetTransform().ToMatrix();
-	
-	if (!registry_.all_of<HierarchyComponent>(e)) return local;
-	const auto& hc = registry_.get<HierarchyComponent>(e);
-	if (hc.parentId == entt::null || !registry_.valid(hc.parentId)) return local;
+	return GetWorldMatrixRecursive(static_cast<entt::entity>(entityId), 0);
+}
 
-	return Engine::Matrix4x4::Multiply(local, GetWorldMatrix(static_cast<int>(hc.parentId)));
+Engine::Matrix4x4 GameScene::GetWorldMatrixRecursive(entt::entity e, int depth) const {
+	if (depth > 32) return Engine::Matrix4x4::Identity();
+	
+	auto it = matrixCache_.find(e);
+	if (it != matrixCache_.end()) return it->second;
+
+	if (!registry_.valid(e) || !registry_.all_of<TransformComponent>(e)) return Engine::Matrix4x4::Identity();
+	const auto& tc = registry_.get<TransformComponent>(e);
+	Engine::Matrix4x4 local = tc.ToMatrix();
+	
+	Engine::Matrix4x4 world = local;
+	if (registry_.all_of<HierarchyComponent>(e)) {
+		const auto& hc = registry_.get<HierarchyComponent>(e);
+		if (hc.parentId != entt::null && registry_.valid(hc.parentId)) {
+			world = Engine::Matrix4x4::Multiply(local, GetWorldMatrixRecursive(hc.parentId, depth + 1));
+		}
+	}
+	matrixCache_[e] = world;
+	return world;
 }
 
 void GameScene::Draw() {
@@ -448,6 +593,7 @@ void GameScene::Draw() {
 	// ★★★ GPU負荷テスト: Hキーで大量オブジェクト生成 ★★★
 	{
 		static int stressTestGridSize = 0;
+		if (!isPlaying_) stressTestGridSize = 0; // Stop時にリセット
 		static bool prevH = false;
 		bool currH = (GetAsyncKeyState('H') & 0x8000) != 0;
 		if (currH && !prevH) {
@@ -458,8 +604,8 @@ void GameScene::Draw() {
 		prevH = currH;
 
 		if (stressTestGridSize > 0) {
-			uint32_t cubeModel = renderer_->LoadObjMesh("Resources/cube/cube.obj");
-			uint32_t whiteTex = renderer_->LoadTexture2D("Resources/white1x1.png");
+			uint32_t cubeModel = renderer_->LoadObjMesh("Resources/Models/cube/cube.obj");
+			uint32_t whiteTex = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
 
 			float spacing = 2.0f;
 			float startOffset = -(stressTestGridSize / 2.0f) * spacing;
@@ -490,13 +636,13 @@ void GameScene::Draw() {
 	}
 #endif
 
-	// ★追加: プレイヤーの位置を Renderer に同期（草のインタラクション用）
-	auto nameView = registry_.view<NameComponent, TransformComponent>();
-	for (auto entity : nameView) {
-		if (nameView.get<NameComponent>(entity).name == "Player") {
-			auto& tc = nameView.get<TransformComponent>(entity);
+	// ★ 高速タグ検索を用いてプレイヤー位置を同期（O(N) -> O(1)）
+	const auto& players = GetEntitiesByTag("Player");
+	if (!players.empty()) {
+		entt::entity playerEntity = players[0];
+		if (registry_.valid(playerEntity) && registry_.all_of<TransformComponent>(playerEntity)) {
+			auto& tc = registry_.get<TransformComponent>(playerEntity);
 			renderer_->SetPlayerPos(Engine::Vector3{tc.translate.x, tc.translate.y, tc.translate.z});
-			break;
 		}
 	}
 
@@ -594,6 +740,7 @@ void GameScene::Draw() {
 
 extern GizmoMode currentGizmoMode;
 void GameScene::DrawUI() {
+	if (!isPlaying_) return;
 	for (auto& sys : systems_) {
 		sys->DrawUI(registry_, ctx_);
 	}
@@ -933,9 +1080,27 @@ void GameScene::SetIsPlaying(bool play) {
 				OutputDebugStringA(("[GameScene] Restored selection for " + std::to_string(selectedEntities_.size()) + " entities.\n").c_str());
 			}
 		} else {
-			OutputDebugStringA("[GameScene] ERROR: Memory snapshot is empty on STOP!\n");
+			OutputDebugStringA("[GameScene] ERROR: Memory snapshot is empty on STOP! Falling back to initial state.\n");
+			if (!initialSceneSnapshot_.empty()) {
+				EditorUI::LoadFromMemory(this, initialSceneSnapshot_);
+			}
 		}
 		sceneSnapshot_ = "";
+
+		// ★追加: 川のメッシュなど、動的メッシュの再生成
+		auto riverView = registry_.view<RiverComponent, TransformComponent>();
+		for (auto entity : riverView) {
+			auto& rv = riverView.get<RiverComponent>(entity);
+			if (rv.enabled && rv.meshHandle == 0) {
+				auto& tc = riverView.get<TransformComponent>(entity);
+				RiverSystem::BuildRiverMesh(rv, renderer_, registry_, tc.translate);
+			}
+		}
+		
+		// ペンディングデータのクリア
+		std::lock_guard<std::mutex> lock(spawnMutex_);
+		pendingDestroys_.clear();
+		pendingSpawns_.clear();
 	}
 }
 

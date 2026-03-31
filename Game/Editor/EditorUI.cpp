@@ -32,7 +32,7 @@ using json = nlohmann::json;
 namespace Game {
 namespace fs = std::filesystem;
 
-std::string EditorUI::currentScenePath = "Resources/scene.json";
+std::string EditorUI::currentScenePath = "Resources/Scenes/scene.json";
 
 // シーン復元ヘルパー (ID保持とヒエラルキー解決)
 static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const json& j, bool append) {
@@ -208,6 +208,8 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 					auto& c = reg.get_or_emplace<UIImageComponent>(entity);
 					c.enabled = en; c.texturePath = comp.value("texturePath", "");
 					if (comp.contains("color")) c.color = {comp["color"][0], comp["color"][1], comp["color"][2], comp["color"][3]};
+					// ★追加: UIImageもテクスチャをロードするように修正
+					if (!c.texturePath.empty()) c.textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(c.texturePath);
 				} else if (type == "UIText") {
 					auto& c = reg.get_or_emplace<UITextComponent>(entity);
 					c.enabled = en; c.text = comp.value("text", ""); c.fontSize = comp.value("fontSize", 24.0f);
@@ -552,6 +554,59 @@ std::string EditorUI::SaveToMemory(GameScene* scene) {
 	return ss.str();
 }
 
+static std::string s_clipboardJson;
+
+static void ExecuteCopy(GameScene* scene) {
+	if (!scene) return;
+	auto ent = scene->GetSelectedEntity();
+	if (ent == entt::null || !scene->GetRegistry().valid(ent)) return;
+	s_clipboardJson = SerializeEntity(scene->GetRegistry(), ent);
+	EditorUI::Log("Copied Entity to Clipboard.");
+}
+
+static void ExecutePaste(GameScene* scene) {
+	if (!scene || s_clipboardJson.empty()) return;
+	try {
+		json j = json::parse("{\"objects\": [" + s_clipboardJson + "]}");
+		auto createdEnts = RestoreSceneFromJson(scene, j, true);
+		if (!createdEnts.empty()) {
+			auto e = createdEnts[0];
+			auto& reg = scene->GetRegistry();
+			if (reg.all_of<NameComponent>(e)) {
+				auto& nc = reg.get<NameComponent>(e);
+				nc.name = GenerateCopyName(nc.name, reg);
+			}
+			if (reg.all_of<TransformComponent>(e)) {
+				auto& tc = reg.get<TransformComponent>(e);
+				tc.translate.x += 0.5f;
+				tc.translate.y += 0.5f;
+				tc.translate.z -= 0.5f;
+			}
+			scene->SetSelectedEntity(e);
+			scene->GetSelectedEntities() = {e};
+			
+			std::string snap = s_clipboardJson;
+			uint32_t id = static_cast<uint32_t>(e);
+			EditorUI::PushUndo({"Paste Entity", 
+				[scene, id]() { scene->DestroyObject(id); },
+				[scene, snap]() {
+					try {
+						json j2 = json::parse("{\"objects\": [" + snap + "]}");
+						RestoreSceneFromJson(scene, j2, true);
+					} catch (...) {}
+				}
+			});
+			EditorUI::Log("Pasted Entity: " + (reg.all_of<NameComponent>(e) ? reg.get<NameComponent>(e).name : "Unknown"));
+		}
+	} catch (...) { EditorUI::LogError("Failed to paste entity"); }
+}
+
+static void ExecuteDuplicate(GameScene* scene) {
+	if (!scene) return;
+	ExecuteCopy(scene);
+	ExecutePaste(scene);
+}
+
 void EditorUI::SaveScene(GameScene* scene, const std::string& path) {
 	if (!scene) return;
 	std::string targetPath = path;
@@ -560,7 +615,7 @@ void EditorUI::SaveScene(GameScene* scene, const std::string& path) {
 
 	std::string absPath = GetUnifiedProjectPath(targetPath);
 	OutputDebugStringA(("[EditorUI] Saving scene to: " + absPath + "\n").c_str());
-	std::ofstream f(absPath);
+	std::ofstream f(Engine::PathUtils::FromUTF8(absPath));
 	if (!f.is_open()) { LogError("Save failed: " + absPath); return; }
 	f << SaveToMemory(scene);
 	f.close();
@@ -571,48 +626,63 @@ void EditorUI::SaveScene(GameScene* scene, const std::string& path) {
 
 
 static std::string OpenFileDialog(const char* filter) {
-	OPENFILENAMEA ofn;
-	CHAR szFile[260] = {0};
-	ZeroMemory(&ofn, sizeof(OPENFILENAMEA));
-	ofn.lStructSize = sizeof(OPENFILENAMEA);
+	OPENFILENAMEW ofn;
+	WCHAR szFile[260] = {0};
+	std::wstring wfilter = Engine::PathUtils::FromUTF8(filter);
+	ZeroMemory(&ofn, sizeof(OPENFILENAMEW));
+	ofn.lStructSize = sizeof(OPENFILENAMEW);
 	ofn.hwndOwner = nullptr;
 	ofn.lpstrFile = szFile;
-	ofn.nMaxFile = sizeof(szFile);
-	ofn.lpstrFilter = filter;
+	ofn.nMaxFile = sizeof(szFile) / sizeof(WCHAR);
+	ofn.lpstrFilter = wfilter.c_str();
 	ofn.nFilterIndex = 1;
 	ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
-	if (GetOpenFileNameA(&ofn) == TRUE) return ofn.lpstrFile;
+	if (GetOpenFileNameW(&ofn) == TRUE) return Engine::PathUtils::ToUTF8(ofn.lpstrFile);
 	return "";
 }
 
 static std::string SaveFileDialog(const char* filter, const char* defExt) {
-	OPENFILENAMEA ofn;
-	CHAR szFile[260] = {0};
-	ZeroMemory(&ofn, sizeof(OPENFILENAMEA));
-	ofn.lStructSize = sizeof(OPENFILENAMEA);
+	OPENFILENAMEW ofn;
+	WCHAR szFile[260] = {0};
+	std::wstring wfilter = Engine::PathUtils::FromUTF8(filter);
+	std::wstring wdefExt = Engine::PathUtils::FromUTF8(defExt);
+	ZeroMemory(&ofn, sizeof(OPENFILENAMEW));
+	ofn.lStructSize = sizeof(OPENFILENAMEW);
 	ofn.hwndOwner = nullptr;
 	ofn.lpstrFile = szFile;
-	ofn.nMaxFile = sizeof(szFile);
-	ofn.lpstrFilter = filter;
+	ofn.nMaxFile = sizeof(szFile) / sizeof(WCHAR);
+	ofn.lpstrFilter = wfilter.c_str();
 	ofn.nFilterIndex = 1;
-	ofn.lpstrDefExt = defExt;
+	ofn.lpstrDefExt = wdefExt.c_str();
 	ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
-	if (GetSaveFileNameA(&ofn) == TRUE) return ofn.lpstrFile;
+	if (GetSaveFileNameW(&ofn) == TRUE) return Engine::PathUtils::ToUTF8(ofn.lpstrFile);
 	return "";
 }
 
 static void LoadSceneInternal(GameScene* scene, const std::string& path, bool append) {
 	if (!scene) return;
 	std::string absPath = EditorUI::GetUnifiedProjectPath(path);
-	std::ifstream f(absPath);
+	OutputDebugStringA(("[EditorUI] LoadSceneInternal: " + absPath + "\n").c_str());
+
+	std::ifstream f(Engine::PathUtils::FromUTF8(absPath));
 	if (!f.is_open()) {
-		absPath = path; f.open(absPath);
-		if (!f.is_open()) { EditorUI::LogError("Load failed: " + absPath); return; }
+		absPath = path; f.open(Engine::PathUtils::FromUTF8(absPath));
+		if (!f.is_open()) {
+			EditorUI::LogError("Load failed: " + absPath);
+			MessageBoxA(NULL, ("Failed to open scene file:\n" + absPath).c_str(), "Load Error", MB_OK | MB_ICONERROR);
+			return;
+		}
 	}
 	json j;
-	try { f >> j; } catch (...) { EditorUI::LogError("JSON Syntax Error: " + path); return; }
-	RestoreSceneFromJson(scene, j, append);
-	EditorUI::Log((append ? "Scene appended: " : "Scene loaded: ") + absPath);
+	try {
+		f >> j;
+		RestoreSceneFromJson(scene, j, append);
+		EditorUI::Log((append ? "Scene appended: " : "Scene loaded: ") + absPath);
+	} catch (const std::exception& e) {
+		std::string msg = "JSON Parse Error in " + absPath + ": " + std::string(e.what());
+		EditorUI::LogError(msg);
+		MessageBoxA(NULL, msg.c_str(), "JSON Error", MB_OK | MB_ICONERROR);
+	}
 }
 
 void EditorUI::LoadScene(GameScene* scene, const std::string& path) {
@@ -634,9 +704,9 @@ void EditorUI::LoadFromMemory(GameScene* scene, const std::string& data) {
 std::vector<entt::entity> EditorUI::LoadPrefab(GameScene* scene, const std::string& path) {
 	if (!scene) return {};
 	std::string absPath = GetUnifiedProjectPath(path);
-	std::ifstream f(absPath);
+	std::ifstream f(Engine::PathUtils::FromUTF8(absPath));
 	if (!f.is_open()) {
-		absPath = path; f.open(absPath);
+		absPath = path; f.open(Engine::PathUtils::FromUTF8(absPath));
 		if (!f.is_open()) { LogError("Prefab load failed: " + absPath); return {}; }
 	}
 	json j;
@@ -668,7 +738,16 @@ std::vector<entt::entity> EditorUI::LoadPrefab(GameScene* scene, const std::stri
 }
 
 std::string EditorUI::GetUnifiedProjectPath(const std::string& path) {
-	return Engine::PathUtils::GetUnifiedPath(path);
+	if (path.empty()) return "";
+	// ★修正: UTF-8文字列を直接 fs::path に渡すと Windows で文字化けするため FromUTF8 を経由
+	if (std::filesystem::path(Engine::PathUtils::FromUTF8(path)).is_absolute()) return path;
+
+	// Engine::PathUtils を通じてルートを取得
+	std::string root = Engine::PathUtils::GetRootPath();
+	std::filesystem::path combined = std::filesystem::path(Engine::PathUtils::FromUTF8(root)) / Engine::PathUtils::FromUTF8(path);
+	std::string res = Engine::PathUtils::ToUTF8(combined.wstring());
+	std::replace(res.begin(), res.end(), '\\', '/');
+	return res;
 }
 
 void EditorUI::Initialize(Engine::Renderer* renderer) {
@@ -707,7 +786,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	// Global Shortcuts
 	if (!io.WantTextInput) {
 		if (io.KeyCtrl) {
-			if (ImGui::IsKeyPressed(ImGuiKey_S)) SaveScene(gameScene, "Resources/scene.json");
+			if (ImGui::IsKeyPressed(ImGuiKey_S)) SaveScene(gameScene, "Resources/Scenes/scene.json");
 			if (ImGui::IsKeyPressed(ImGuiKey_Z)) Undo();
 			if (ImGui::IsKeyPressed(ImGuiKey_Y)) Redo();
 			if (ImGui::IsKeyPressed(ImGuiKey_N)) {
@@ -719,6 +798,9 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				std::string path = OpenFileDialog("JSON Files (*.json)\0*.json\0All Files (*.*)\0*.*\0");
 				if (!path.empty()) LoadScene(gameScene, path);
 			}
+			if (ImGui::IsKeyPressed(ImGuiKey_C)) ExecuteCopy(gameScene);
+			if (ImGui::IsKeyPressed(ImGuiKey_V)) ExecutePaste(gameScene);
+			if (ImGui::IsKeyPressed(ImGuiKey_D)) ExecuteDuplicate(gameScene);
 		} else {
 			if (ImGui::IsKeyPressed(ImGuiKey_W)) currentGizmoMode = GizmoMode::Translate;
 			if (ImGui::IsKeyPressed(ImGuiKey_E)) currentGizmoMode = GizmoMode::Rotate;
@@ -732,7 +814,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				gameScene->GetRegistry().clear();
 				gameScene->GetSelectedEntities().clear();
 				gameScene->SetSelectedEntity(entt::null);
-				currentScenePath = "Resources/scene.json";
+				currentScenePath = "Resources/Scenes/scene.json";
 			}
 			ImGui::Separator();
 			if (ImGui::MenuItem("Open Scene", "Ctrl+O")) {
@@ -754,21 +836,31 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Scenes")) {
-			for (const auto& entry : fs::directory_iterator(GetUnifiedProjectPath("Resources"))) {
-				if (entry.path().extension() == ".json") {
-					std::string fileName = entry.path().filename().string();
-					std::string fullPath = "Resources/" + fileName;
-					bool selected = (currentScenePath == fullPath);
-					if (ImGui::MenuItem(fileName.c_str(), nullptr, selected)) {
-						LoadScene(gameScene, fullPath);
+			std::string sceneDir = "Resources/Scenes";
+			std::string absSceneDir = GetUnifiedProjectPath(sceneDir);
+			if (fs::exists(Engine::PathUtils::FromUTF8(absSceneDir))) {
+				for (const auto& entry : fs::directory_iterator(Engine::PathUtils::FromUTF8(absSceneDir))) {
+					if (entry.path().extension() == ".json") {
+						std::string fileName = entry.path().filename().string();
+						std::string fullPath = sceneDir + "/" + fileName;
+						bool selected = (currentScenePath == fullPath);
+						if (ImGui::MenuItem(fileName.c_str(), nullptr, selected)) {
+							LoadScene(gameScene, fullPath);
+						}
 					}
 				}
+			} else {
+				ImGui::TextDisabled("No Scenes found in %s", sceneDir.c_str());
 			}
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Edit")) {
 			if (ImGui::MenuItem("Undo", "Ctrl+Z")) Undo();
 			if (ImGui::MenuItem("Redo", "Ctrl+Y")) Redo();
+			ImGui::Separator();
+			if (ImGui::MenuItem("Copy", "Ctrl+C")) ExecuteCopy(gameScene);
+			if (ImGui::MenuItem("Paste", "Ctrl+V", false, !s_clipboardJson.empty())) ExecutePaste(gameScene);
+			if (ImGui::MenuItem("Duplicate", "Ctrl+D")) ExecuteDuplicate(gameScene);
 			ImGui::Separator();
 			if (ImGui::MenuItem("Translate", "W", currentGizmoMode == GizmoMode::Translate)) currentGizmoMode = GizmoMode::Translate;
 			if (ImGui::MenuItem("Rotate", "E", currentGizmoMode == GizmoMode::Rotate)) currentGizmoMode = GizmoMode::Rotate;
@@ -919,7 +1011,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				auto& mr = gameScene->GetRegistry().emplace<MeshRendererComponent>(e);
 				mr.modelPath = sPath;
 				mr.modelHandle = renderer->LoadObjMesh(sPath);
-				mr.texturePath = "Resources/white1x1.png";
+				mr.texturePath = "Resources/Textures/white1x1.png";
 				mr.textureHandle = renderer->LoadTexture2D(mr.texturePath);
 				gameScene->SetSelectedEntity(e);
 			}
@@ -1171,6 +1263,10 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 					scene->DestroyObject(id);
 					if (scene->GetSelectedEntity() == entity) scene->SetSelectedEntity(entt::null);
 				}
+				ImGui::Separator();
+				if (ImGui::MenuItem("Copy", "Ctrl+C")) ExecuteCopy(scene);
+				if (ImGui::MenuItem("Paste", "Ctrl+V", false, !s_clipboardJson.empty())) ExecutePaste(scene);
+				if (ImGui::MenuItem("Duplicate", "Ctrl+D")) ExecuteDuplicate(scene);
 				ImGui::EndPopup();
 			}
 
@@ -1189,18 +1285,18 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 			if (ImGui::MenuItem("Create Cube")) {
 				auto e = scene->CreateEntity("Cube");
 				auto& mr = registry.emplace<MeshRendererComponent>(e);
-				mr.modelPath = "Resources/cube/cube.obj";
+				mr.modelPath = "Resources/Models/cube/cube.obj";
 				mr.modelHandle = Engine::Renderer::GetInstance()->LoadObjMesh(mr.modelPath);
-				mr.texturePath = "Resources/white1x1.png";
+				mr.texturePath = "Resources/Textures/white1x1.png";
 				mr.textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(mr.texturePath);
 				scene->SetSelectedEntity(e);
 			}
 			if (ImGui::MenuItem("Create Sphere")) {
 				auto e = scene->CreateEntity("Sphere");
 				auto& mr = registry.emplace<MeshRendererComponent>(e);
-				mr.modelPath = "Resources/sphere/sphere.obj";
+				mr.modelPath = "Resources/Models/player_ball/ball.obj";
 				mr.modelHandle = Engine::Renderer::GetInstance()->LoadObjMesh(mr.modelPath);
-				mr.texturePath = "Resources/white1x1.png";
+				mr.texturePath = "Resources/Textures/white1x1.png";
 				mr.textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(mr.texturePath);
 				scene->SetSelectedEntity(e);
 			}
@@ -1220,9 +1316,9 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 			if (ImGui::MenuItem("Create Cube")) {
 				auto e = scene->CreateEntity("Cube");
 				auto& mr = registry.emplace<MeshRendererComponent>(e);
-				mr.modelPath = "Resources/cube/cube.obj";
+				mr.modelPath = "Resources/Models/cube/cube.obj";
 				mr.modelHandle = Engine::Renderer::GetInstance()->LoadObjMesh(mr.modelPath);
-				mr.texturePath = "Resources/white1x1.png";
+				mr.texturePath = "Resources/Textures/white1x1.png";
 				mr.textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(mr.texturePath);
 				scene->SetSelectedEntity(e);
 			}
@@ -1232,10 +1328,109 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 	ImGui::End();
 }
 
+std::vector<std::string> EditorUI::GetAssetsInDir(const std::string& root, const std::vector<std::string>& extensions) {
+	std::vector<std::string> assets;
+	std::string absRoot = GetUnifiedProjectPath(root);
+	if (!fs::exists(Engine::PathUtils::FromUTF8(absRoot))) return assets;
+
+	for (const auto& entry : fs::recursive_directory_iterator(Engine::PathUtils::FromUTF8(absRoot))) {
+		if (entry.is_regular_file()) {
+			std::string ext = entry.path().extension().string();
+			std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+			
+			bool match = false;
+			for (const auto& targetExt : extensions) {
+				if (ext == targetExt) { match = true; break; }
+			}
+			
+			if (match) {
+				std::string path = Engine::PathUtils::ToUTF8(entry.path().wstring());
+				std::replace(path.begin(), path.end(), '\\', '/');
+				
+				// Make relative to Resources/ for consistent storage
+				size_t pos = path.find("/Resources/");
+				if (pos != std::string::npos) {
+					path = path.substr(pos + 1); // Skip leading slash if any
+				} else {
+					pos = path.find("Resources/");
+					if (pos != std::string::npos) path = path.substr(pos);
+				}
+				assets.push_back(path);
+			}
+		}
+	}
+	return assets;
+}
+
+bool EditorUI::AssetField(const char* label, std::string& path, const std::vector<std::string>& extensions) {
+	bool modified = false;
+	ImGui::PushID(label);
+	
+	char buf[256];
+	strcpy_s(buf, path.c_str());
+	
+	float buttonSize = ImGui::GetFrameHeight();
+	ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - buttonSize - ImGui::GetStyle().ItemSpacing.x);
+	
+	if (ImGui::InputText(label, buf, sizeof(buf))) {
+		path = buf;
+		modified = true;
+	}
+
+	// Drag & Drop
+	if (ImGui::BeginDragDropTarget()) {
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROJECT_ASSET")) {
+			std::string droppedPath = (const char*)payload->Data;
+			std::replace(droppedPath.begin(), droppedPath.end(), '\\', '/');
+			
+			std::string ext = fs::path(Engine::PathUtils::FromUTF8(droppedPath)).extension().string();
+			std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+			
+			bool valid = false;
+			for (const auto& e : extensions) { if (ext == e) { valid = true; break; } }
+			
+			if (valid) {
+				path = droppedPath;
+				modified = true;
+			}
+		}
+		ImGui::EndDragDropTarget();
+	}
+
+	ImGui::SameLine();
+	if (ImGui::Button("...")) {
+		ImGui::OpenPopup("AssetDropdown");
+	}
+
+	if (ImGui::BeginPopup("AssetDropdown")) {
+		static std::vector<std::string> assetList;
+		if (ImGui::IsWindowAppearing()) {
+			assetList = GetAssetsInDir("Resources", extensions);
+		}
+
+		if (ImGui::Selectable("(None)", path.empty())) {
+			path = "";
+			modified = true;
+		}
+
+		for (const auto& a : assetList) {
+			if (ImGui::Selectable(a.c_str(), path == a)) {
+				path = a;
+				modified = true;
+			}
+		}
+		ImGui::EndPopup();
+	}
+
+	ImGui::PopID();
+	return modified;
+}
+
 void EditorUI::ShowInspector(GameScene* scene) {
 	// Removed ImGui::Begin("Inspector") to support tab embedding
 	auto selected = scene->GetSelectedEntity();
 	if (scene && selected != entt::null && scene->GetRegistry().valid(selected)) {
+		ImGui::PushID((int)selected);
 		auto entity = selected;
 		auto& registry = scene->GetRegistry();
 
@@ -1251,7 +1446,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 		ImGui::SameLine();
 		if (ImGui::Button("Save Prefab")) {
 			std::string name = (registry.all_of<NameComponent>(entity) ? registry.get<NameComponent>(entity).name : "object");
-			std::string p = "Resources/" + name + ".prefab";
+			std::string p = "Resources/Prefabs/" + name + ".prefab";
 			std::string fullPath = GetUnifiedProjectPath(p);
 			std::ofstream f(fullPath);
 			if (f.is_open()) {
@@ -1311,38 +1506,12 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				if (ImGui::CollapsingHeader("Mesh Renderer", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##MR", &cp->enabled);
 					
-					char modelBuf[256]; strcpy_s(modelBuf, cp->modelPath.c_str());
-					if (ImGui::InputText("Model Path", modelBuf, sizeof(modelBuf))) {
-						cp->modelPath = modelBuf;
+					if (AssetField("Model Path", cp->modelPath, {".obj", ".fbx", ".gltf"})) {
 						cp->modelHandle = Engine::Renderer::GetInstance()->LoadObjMesh(cp->modelPath);
 					}
-					if (ImGui::BeginDragDropTarget()) {
-						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROJECT_ASSET")) {
-							std::string path = (const char*)payload->Data;
-							std::replace(path.begin(), path.end(), '\\', '/'); // 正規化
-							if (path.find(".obj") != std::string::npos || path.find(".fbx") != std::string::npos || path.find(".gltf") != std::string::npos) {
-								cp->modelPath = path;
-								cp->modelHandle = Engine::Renderer::GetInstance()->LoadObjMesh(cp->modelPath);
-							}
-						}
-						ImGui::EndDragDropTarget();
-					}
 
-					char texBuf[256]; strcpy_s(texBuf, cp->texturePath.c_str());
-					if (ImGui::InputText("Texture Path", texBuf, sizeof(texBuf))) {
-						cp->texturePath = texBuf;
+					if (AssetField("Texture Path", cp->texturePath, {".png", ".jpg"})) {
 						cp->textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(cp->texturePath);
-					}
-					if (ImGui::BeginDragDropTarget()) {
-						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROJECT_ASSET")) {
-							std::string path = (const char*)payload->Data;
-							std::replace(path.begin(), path.end(), '\\', '/'); // 正規化
-							if (path.find(".png") != std::string::npos || path.find(".jpg") != std::string::npos) {
-								cp->texturePath = path;
-								cp->textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(cp->texturePath);
-							}
-						}
-						ImGui::EndDragDropTarget();
 					}
 					ImGui::ColorEdit4("Base Color", &cp->color.x);
 					ImGui::DragFloat2("UV Tiling", &cp->uvTiling.x, 0.01f);
@@ -1362,17 +1531,8 @@ void EditorUI::ShowInspector(GameScene* scene) {
 			if (auto* gmc = registry.try_get<GpuMeshColliderComponent>(entity)) {
 				if (ImGui::CollapsingHeader("GpuMeshCollider", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##GMC", &gmc->enabled);
-					ImGui::Text("Mesh Path: %s", gmc->meshPath.c_str());
-					if (ImGui::BeginDragDropTarget()) {
-						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROJECT_ASSET")) {
-							std::string path = (const char*)payload->Data;
-							std::replace(path.begin(), path.end(), '\\', '/'); // 正規化
-							if (path.find(".obj") != std::string::npos || path.find(".fbx") != std::string::npos) {
-								gmc->meshPath = path;
-								gmc->meshHandle = Engine::Renderer::GetInstance()->LoadObjMesh(gmc->meshPath);
-							}
-						}
-						ImGui::EndDragDropTarget();
+					if (AssetField("Mesh Path", gmc->meshPath, {".obj", ".fbx"})) {
+						gmc->meshHandle = Engine::Renderer::GetInstance()->LoadObjMesh(gmc->meshPath);
 					}
 					ImGui::Checkbox("Is Trigger", &gmc->isTrigger);
 					if (ImGui::Button("Remove##GMC")) registry.remove<GpuMeshColliderComponent>(entity);
@@ -1398,7 +1558,9 @@ void EditorUI::ShowInspector(GameScene* scene) {
 			if (auto* as = registry.try_get<AudioSourceComponent>(entity)) {
 				if (ImGui::CollapsingHeader("AudioSource", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##AS", &as->enabled);
-					ImGui::Text("File: %s", as->soundPath.c_str());
+					if (AssetField("Sound File", as->soundPath, {".wav", ".mp3"})) {
+						as->soundHandle = Engine::Audio::GetInstance()->Load(as->soundPath);
+					}
 					ImGui::DragFloat("Volume", &as->volume, 0.01f, 0, 1);
 					ImGui::Checkbox("Loop", &as->loop);
 					ImGui::Checkbox("Play on Start", &as->playOnStart);
@@ -1504,7 +1666,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 			if (auto* pe = registry.try_get<ParticleEmitterComponent>(entity)) {
 				if (ImGui::CollapsingHeader("ParticleEmitter", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##PE", &pe->enabled);
-					ImGui::Text("Asset: %s", pe->assetPath.c_str());
+					AssetField("Asset", pe->assetPath, {".json"});
 					if (ImGui::Button("Remove##PE")) registry.remove<ParticleEmitterComponent>(entity);
 				}
 			}
@@ -1545,7 +1707,9 @@ void EditorUI::ShowInspector(GameScene* scene) {
 			if (auto* img = registry.try_get<UIImageComponent>(entity)) {
 				if (ImGui::CollapsingHeader("UIImage", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##IMG", &img->enabled);
-					ImGui::Text("Texture: %s", img->texturePath.c_str());
+					if (AssetField("Texture", img->texturePath, {".png", ".jpg"})) {
+						img->textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(img->texturePath);
+					}
 					ImGui::ColorEdit4("Color", &img->color.x);
 					if (ImGui::Button("Remove##IMG")) registry.remove<UIImageComponent>(entity);
 				}
@@ -1571,6 +1735,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					ImGui::Checkbox("Enabled##RIV", &riv->enabled);
 					ImGui::DragFloat("Width", &riv->width, 0.1f);
 					ImGui::DragFloat("Speed", &riv->flowSpeed, 0.1f);
+					AssetField("Texture", riv->texturePath, {".png", ".jpg"});
 					if (ImGui::Button("Remove##RIV")) registry.remove<RiverComponent>(entity);
 				}
 			}
@@ -1676,6 +1841,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 			if (ImGui::MenuItem("Variables")) std::ignore = registry.get_or_emplace<VariableComponent>(entity);
 			ImGui::EndPopup();
 		}
+		ImGui::PopID();
 	} else {
 		ImGui::Text("No Selection");
 	}
@@ -1842,3 +2008,4 @@ void EditorUI::ScreenToWorldRay(float screenX, float screenY, float imageW, floa
 }
 
 } // namespace Game
+

@@ -1,4 +1,4 @@
-#include "PipeEditor.h"
+﻿#include "PipeEditor.h"
 #include "EditorUI.h"
 #include "../../externals/imgui/imgui.h"
 #include <cmath>
@@ -26,7 +26,7 @@ void DefaultPipeBehavior::OnGeneratePipe(entt::registry& registry, entt::entity 
     tc.rotate = {euler.x - 3.14159265f * 0.5f, euler.y, euler.z}; // シリンダーを倒すためにPitchから90度減算
 
     auto& mr = registry.emplace_or_replace<MeshRendererComponent>(outPipe);
-    mr.modelPath = "Resources/Cylinder/cylinder.obj";
+    mr.modelPath = "Resources/Models/Cylinder/cylinder.obj";
     if (renderer) mr.modelHandle = renderer->LoadObjMesh(mr.modelPath);
     mr.shaderName = "Toon"; 
 }
@@ -38,7 +38,7 @@ void DefaultPipeBehavior::OnGenerateJoint(entt::registry& registry, entt::entity
     tc.scale = { 1.0f, 1.0f, 1.0f };
     
     auto& mr = registry.emplace_or_replace<MeshRendererComponent>(outJoint);
-    mr.modelPath = "Resources/player_ball/ball.obj";
+    mr.modelPath = "Resources/Models/player_ball/ball.obj";
     if (renderer) mr.modelHandle = renderer->LoadObjMesh(mr.modelPath);
     mr.shaderName = "Toon"; 
 }
@@ -253,3 +253,4 @@ void PipeEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* renderer, con
 }
 
 } // namespace Game
+

@@ -29,8 +29,8 @@ public:
 public:
 	void Register(const std::string& name, Factory factory);
 
-	bool Change(const std::string& name);
-	void RequestChange(const std::string& name);
+	bool Change(const std::string& name, const SceneParameters& params = {});
+	void RequestChange(const std::string& name, const SceneParameters& params = {});
 
 	void Update();
 	void Draw();
@@ -52,6 +52,7 @@ private:
 	std::unique_ptr<IScene> current_;
 	std::string currentName_;
 	std::string pendingNext_;
+	SceneParameters pendingParams_;
 	WindowDX* dx_ = nullptr;
 
 	static SceneManager* instance_;

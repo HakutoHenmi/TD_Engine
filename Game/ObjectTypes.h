@@ -158,6 +158,7 @@ struct AnimatorComponent : public Component {
 struct TagComponent : public Component {
 	std::string tag = "Untagged";
 	TagComponent() { type = ComponentType::Tag; }
+	TagComponent(const std::string& t) : tag(t) { type = ComponentType::Tag; }
 };
 
 // ★追加: プレイヤー入力 (意思)

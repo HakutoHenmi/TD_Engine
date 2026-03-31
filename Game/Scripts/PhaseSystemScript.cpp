@@ -3,6 +3,7 @@
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
+#include "../../Engine/PathUtils.h"
 #include <cfloat>
 #include <cmath>
 #include <fstream>
@@ -20,6 +21,12 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	(void)entity;
 	(void)scene;
 	isPreparation_ = true;
+
+	// スキルツリーの初期化
+	if (auto* renderer = Engine::Renderer::GetInstance()) {
+		skillTree_.Init(renderer);
+		skillTree_.LoadFromJson("Resources/Scenes/skills.json", renderer);
+	}
 }
 
 void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) {
@@ -43,19 +50,51 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	bool keyP = input->Trigger(DIK_P) || (GetAsyncKeyState('P') & 0x8001);
 	bool keySpace = input->Trigger(DIK_SPACE) || (GetAsyncKeyState(VK_SPACE) & 0x8001);
 
+	// ★ スキルツリーの入力処理 (準備フェーズ中のみ)
+	bool keyN = input->Trigger(DIK_N) || (GetAsyncKeyState('N') & 0x8001);
+
 	if (isPreparation_) {
+		// Nキーでスキルツリーの開閉
+		if (keyN && !preKeyN_) {
+			skillTree_.Toggle();
+		}
+
+		// スキルツリーが開いている間はスキルツリーの更新のみ
+		if (skillTree_.IsOpen()) {
+			float mx = 0, my = 0;
+			float tW = (float)Engine::WindowDX::kW;
+			float tH = (float)Engine::WindowDX::kH;
+
+#if defined(USE_IMGUI) && !defined(NDEBUG)
+			ImVec2 mousePos = ImGui::GetMousePos();
+			ImVec2 gameMin = EditorUI::GetGameImageMin();
+			ImVec2 gameMax = EditorUI::GetGameImageMax();
+			float viewW = gameMax.x - gameMin.x;
+			float viewH = gameMax.y - gameMin.y;
+			if (viewW > 0 && viewH > 0) {
+				mx = (mousePos.x - gameMin.x) * (tW / viewW);
+				my = (mousePos.y - gameMin.y) * (tH / viewH);
+			}
+#else
+			input->GetMousePos(mx, my);
+#endif
+			skillTree_.Update(renderer, tW, tH, mx, my);
+			preKeyN_ = keyN;
+			return; // 設置モードの入力を抑制
+		}
+
 		if (key1) {
-			selectedObjPath_ = "Resources/BulletTank.prefab";
+			selectedObjPath_ = "Resources/Prefabs/BulletTank.prefab";
 			isPlacementMode_ = true;
 		}
 
 		if (key2) {
-			selectedObjPath_ = "Resources/Pipe.prefab";
+			selectedObjPath_ = "Resources/Prefabs/Pipe.prefab";
 			isPlacementMode_ = true;
 		}
 
 		if (key3) {
-			selectedObjPath_ = "Resources/Canon.prefab";
+			selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
 			isPlacementMode_ = true;
 		}
 		if (input->IsMouseTrigger(1) && isPlacementMode_) {
@@ -67,9 +106,10 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		if (keySpace) {
 			isPreparation_ = false;
 			isPlacementMode_ = false;
+			skillTree_.Close(); // フェーズ移行時にスキルツリーを閉じる
 			currentPhase_++;
 
-			std::string enemyPrefabPath = "Resources/EnemySpawner" + std::to_string(currentPhase_) + ".prefab";
+			std::string enemyPrefabPath = "Resources/Prefabs/EnemySpawner" + std::to_string(currentPhase_) + ".prefab";
 			std::vector<entt::entity> spawnedEnemies = EditorUI::LoadPrefab(scene, enemyPrefabPath);
 
 			auto& registry = scene->GetRegistry();
@@ -89,6 +129,8 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		}
 		isPlacementMode_ = false;
 	}
+
+	preKeyN_ = keyN;
 }
 
 void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPath) {
@@ -221,7 +263,7 @@ void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vec
 		return;
 
 	std::string previewModelPath = objPath;
-	std::string previewTexturePath = "Resources/white1x1.png";
+	std::string previewTexturePath = "Resources/Textures/white1x1.png";
 	if (IsPrefabPath(objPath)) {
 		ExtractPrefabRenderPaths(objPath, previewModelPath, previewTexturePath);
 	}
@@ -250,9 +292,10 @@ bool PhaseSystemScript::IsPrefabPath(const std::string& path) const {
 
 bool PhaseSystemScript::ExtractPrefabRenderPaths(const std::string& prefabPath, std::string& outModelPath, std::string& outTexturePath) const {
 	std::string absPath = EditorUI::GetUnifiedProjectPath(prefabPath);
-	std::ifstream f(absPath);
+	// ★修正: UTF-8パスをFromUTF8経由でワイドパスに変換してオープン
+	std::ifstream f(Engine::PathUtils::FromUTF8(absPath));
 	if (!f.is_open()) {
-		f.open(prefabPath);
+		f.open(Engine::PathUtils::FromUTF8(prefabPath));
 		if (!f.is_open()) return false;
 	}
 
@@ -353,7 +396,7 @@ void PhaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector
 		previewObjPath_ = objPath;
 	}
 	if (previewTextureHandle_ == 0) {
-		previewTextureHandle_ = renderer->LoadTexture2D("Resources/white1x1.png");
+		previewTextureHandle_ = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 	}
 
 	entt::entity newEntity = scene->CreateEntity((objPath.find("cylinder") != std::string::npos || objPath.find("Cylinder") != std::string::npos) ? "PlacedCylinder" : "PlacedCube");
@@ -366,7 +409,7 @@ void PhaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector
 	mr.modelHandle = previewModelHandle_;
 	mr.textureHandle = previewTextureHandle_;
 	mr.modelPath = objPath;
-	mr.texturePath = "Resources/white1x1.png";
+	mr.texturePath = "Resources/Textures/white1x1.png";
 	mr.shaderName = "Toon";
 }
 
@@ -375,3 +418,4 @@ void PhaseSystemScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/)
 REGISTER_SCRIPT(PhaseSystemScript);
 
 } // namespace Game
+

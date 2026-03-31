@@ -1,4 +1,5 @@
 #include "Audio.h"
+#include "PathUtils.h"
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
@@ -58,10 +59,8 @@ void Audio::Shutdown() {
 
 // std::string 版 Load
 uint32_t Audio::Load(const std::string& path) {
-	// ワイド文字に変換
-	int size_needed = MultiByteToWideChar(CP_UTF8, 0, &path[0], (int)path.size(), NULL, 0);
-	std::wstring wpath(size_needed, 0);
-	MultiByteToWideChar(CP_UTF8, 0, &path[0], (int)path.size(), &wpath[0], size_needed);
+	// ★修正: GetUnifiedPath を使用して絶対パスを解決し、ワイド文字に変換
+	std::wstring wpath = Engine::PathUtils::FromUTF8(Engine::PathUtils::GetUnifiedPath(path));
 
 	SoundData newSound = {};
 	if (LoadViaMF(wpath, newSound)) {
