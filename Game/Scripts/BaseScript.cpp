@@ -70,14 +70,11 @@ void BaseScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	entt::entity target = entt::null;
 	float bestDistance = attackRange_;
 
-	auto enemyView = registry.view<TagComponent, TransformComponent>();
-	for (entt::entity other : enemyView) {
-		TagComponent& tagComponent = enemyView.get<TagComponent>(other);
-		if (tagComponent.tag != "Enemy") {
-			continue;
-		}
-
-		TransformComponent& enemyTransform = enemyView.get<TransformComponent>(other);
+	const auto& enemies = scene->GetEntitiesByTag("Enemy");
+	for (auto other : enemies) {
+		if (!registry.valid(other) || !registry.all_of<TransformComponent>(other)) continue;
+		
+		auto& enemyTransform = registry.get<TransformComponent>(other);
 
 		float differenceX = enemyTransform.translate.x - baseTransform.translate.x;
 		float differenceY = enemyTransform.translate.y - baseTransform.translate.y;

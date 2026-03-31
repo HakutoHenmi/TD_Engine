@@ -1186,23 +1186,21 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				
 				float minD = FLT_MAX;
 				entt::entity hitE = entt::null;
-				auto v = gameScene->GetRegistry().view<MeshRendererComponent, TransformComponent>();
-				for (auto e : v) {
-					auto& mr = v.get<MeshRendererComponent>(e);
-					if (mr.modelHandle == 0) continue;
+				gameScene->GetRegistry().view<MeshRendererComponent, TransformComponent>().each([&](entt::entity e, const MeshRendererComponent& mr, [[maybe_unused]] const TransformComponent& tc) {
+					if (mr.modelHandle == 0) return;
 					auto* m = renderer->GetModel(mr.modelHandle);
-					if (!m) continue;
+					if (!m) return;
 
 					float d; Engine::Vector3 p;
 					// ロックされているオブジェクトはピッキング（クリック選択）させない
 					if (auto* esc = gameScene->GetRegistry().try_get<EditorStateComponent>(e)) {
-						if (esc->locked) continue;
+						if (esc->locked) return;
 					}
 
 					if (m->RayCast(rayOrig, rayDir, gameScene->GetWorldMatrix(static_cast<int>(e)), d, p)) {
 						if (d < minD) { minD = d; hitE = e; }
 					}
-				}
+				});
 				if (hitE != entt::null) {
 					gameScene->SetSelectedEntity(hitE);
 				} else {
@@ -1513,6 +1511,24 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					if (AssetField("Texture Path", cp->texturePath, {".png", ".jpg"})) {
 						cp->textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(cp->texturePath);
 					}
+
+					// Shader Dropdown
+					const auto& shaders = Engine::Renderer::GetInstance()->GetShaderNames();
+					std::string currentShader = cp->shaderName.empty() ? "Default" : cp->shaderName;
+					if (ImGui::BeginCombo("Shader", currentShader.c_str())) {
+						for (size_t i = 0; i < shaders.size(); ++i) {
+							const auto& sName = shaders[i];
+							ImGui::PushID((int)i);
+							bool isSelected = (currentShader == sName);
+							if (ImGui::Selectable(sName.c_str(), isSelected)) {
+								cp->shaderName = sName;
+							}
+							if (isSelected) ImGui::SetItemDefaultFocus();
+							ImGui::PopID();
+						}
+						ImGui::EndCombo();
+					}
+
 					ImGui::ColorEdit4("Base Color", &cp->color.x);
 					ImGui::DragFloat2("UV Tiling", &cp->uvTiling.x, 0.01f);
 					ImGui::DragFloat2("UV Offset", &cp->uvOffset.x, 0.01f);

@@ -137,14 +137,11 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	}
 
 	// ★追加: 川の初期メッシュ生成
-	auto riverView = registry_.view<RiverComponent, TransformComponent>();
-	for (auto entity : riverView) {
-		auto& rv = riverView.get<RiverComponent>(entity);
+	registry_.view<RiverComponent, TransformComponent>().each([&](RiverComponent& rv, TransformComponent& tc) {
 		if (rv.enabled && rv.meshHandle == 0) {
-			auto& tc = riverView.get<TransformComponent>(entity);
 			RiverSystem::BuildRiverMesh(rv, renderer_, registry_, tc.translate);
 		}
-	}
+	});
 
 	// ★追加: タグシステムの初期化
 	tagCache_.clear();
@@ -196,10 +193,11 @@ void GameScene::Update() {
 		bool loss = Engine::Input::GetInstance()->Trigger(DIK_J);
 
 		// プレイヤーの生存確認 (Viewを直接参照して同期ズレを防ぐ)
-		auto playerView = registry_.view<TagComponent, HealthComponent>();
-		for (auto entity : playerView) {
-			if (playerView.get<TagComponent>(entity).tag == "Player") {
-				if (playerView.get<HealthComponent>(entity).hp <= 0) {
+		// プレイヤーの生存確認
+		const auto& players = GetEntitiesByTag("Player");
+		for (auto entity : players) {
+			if (registry_.valid(entity) && registry_.all_of<HealthComponent>(entity)) {
+				if (registry_.get<HealthComponent>(entity).hp <= 0) {
 					loss = true;
 					break;
 				}
@@ -239,8 +237,8 @@ void GameScene::Update() {
 		std::vector<entt::entity> animEntities(animView.begin(), animView.end());
 		Engine::JobSystem::Dispatch((uint32_t)animEntities.size(), 64, [&](uint32_t i) {
 			auto entity = animEntities[i];
-			auto& anim = animView.get<AnimatorComponent>(entity);
-			auto& meshWrapper = animView.get<MeshRendererComponent>(entity);
+			auto& anim = registry_.get<AnimatorComponent>(entity);
+			auto& meshWrapper = registry_.get<MeshRendererComponent>(entity);
 
 			if (anim.enabled && anim.isPlaying) {
 				anim.time += dt * 60.0f * anim.speed;
@@ -691,7 +689,9 @@ void GameScene::Draw() {
 					renderer_->DrawSkinnedMesh(
 					    mr.modelHandle, mr.textureHandle, world, bonePalette, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w});
 				} else {
-					if (mr.shaderName == "Toon" || mr.shaderName == "ToonSkinning") {
+					if (mr.shaderName == "Toon" || mr.shaderName == "ToonSkinning" ||
+					    mr.shaderName == "Hologram" || mr.shaderName == "EmissiveGlow" ||
+					    mr.shaderName == "ForceField" || mr.shaderName == "Dissolve") {
 						renderer_->DrawMesh(mr.modelHandle, mr.textureHandle, world, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w}, mr.shaderName);
 					} else {
 						renderer_->DrawMeshInstanced(
@@ -1088,14 +1088,11 @@ void GameScene::SetIsPlaying(bool play) {
 		sceneSnapshot_ = "";
 
 		// ★追加: 川のメッシュなど、動的メッシュの再生成
-		auto riverView = registry_.view<RiverComponent, TransformComponent>();
-		for (auto entity : riverView) {
-			auto& rv = riverView.get<RiverComponent>(entity);
+		registry_.view<RiverComponent, TransformComponent>().each([&](RiverComponent& rv, TransformComponent& tc) {
 			if (rv.enabled && rv.meshHandle == 0) {
-				auto& tc = riverView.get<TransformComponent>(entity);
 				RiverSystem::BuildRiverMesh(rv, renderer_, registry_, tc.translate);
 			}
-		}
+		});
 		
 		// ペンディングデータのクリア
 		std::lock_guard<std::mutex> lock(spawnMutex_);

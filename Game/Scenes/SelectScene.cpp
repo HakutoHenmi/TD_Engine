@@ -125,9 +125,9 @@ void SelectScene::Update() {
 	if (ctx_.input->IsMouseTrigger(0)) {
 		auto view = registry_.view<UIButtonComponent, NameComponent>();
 		for (auto e : view) {
-			auto& btn = view.get<UIButtonComponent>(e);
+			auto& btn = registry_.get<UIButtonComponent>(e);
 			if (btn.isHovered) {
-				const auto& name = view.get<NameComponent>(e).name;
+				const auto& name = registry_.get<NameComponent>(e).name;
 				if (name.find("StageButton_") != std::string::npos) {
 					if (registry_.all_of<VariableComponent>(e)) {
 						std::string path = registry_.get<VariableComponent>(e).GetString("Path");

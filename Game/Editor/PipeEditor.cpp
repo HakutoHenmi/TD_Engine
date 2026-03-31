@@ -1,4 +1,4 @@
-﻿#include "PipeEditor.h"
+#include "PipeEditor.h"
 #include "EditorUI.h"
 #include "../../externals/imgui/imgui.h"
 #include <cmath>
@@ -108,11 +108,9 @@ void PipeEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* renderer, con
         bool hitTerrain = false;
 
         auto& registry = scene->GetRegistry();
-        auto view = registry.view<NameComponent, TransformComponent>();
-        for (auto e : view) {
-            auto& nameC = view.get<NameComponent>(e);
+        registry.view<NameComponent, TransformComponent>().each([&](entt::entity e, const NameComponent& nameC, const TransformComponent& tc) {
             bool isTerrain = (nameC.name.find("Terrain") != std::string::npos) || (nameC.name.find("Floor") != std::string::npos);
-            if (!isTerrain) continue;
+            if (!isTerrain) return;
 
             Engine::Model* model = nullptr;
             if (registry.all_of<GpuMeshColliderComponent>(e)) {
@@ -124,7 +122,7 @@ void PipeEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* renderer, con
             }
             if (model) {
                 float d; Engine::Vector3 hp;
-                if (model->RayCast(rayOrig, rayDir, view.get<TransformComponent>(e).GetTransform().ToMatrix(), d, hp)) {
+                if (model->RayCast(rayOrig, rayDir, tc.GetTransform().ToMatrix(), d, hp)) {
                     if (d < bestDist) {
                         bestDist = d;
                         hitPoint = hp;
@@ -132,7 +130,7 @@ void PipeEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* renderer, con
                     }
                 }
             }
-        }
+        });
 
         if (hasPipeStart_ && !hitTerrain) {
             float height = pipeStartNode_.y + 0.5f;
@@ -174,16 +172,14 @@ void PipeEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* renderer, con
                 float bestZDist = nodeSnapThreshold_;
                 float snapX = endNode.x;
                 float snapZ = endNode.z;
-                for (auto e : view) {
-                    auto& nameC = view.get<NameComponent>(e);
+                registry.view<NameComponent, TransformComponent>().each([&]([[maybe_unused]] entt::entity e, const NameComponent& nameC, const TransformComponent& tc) {
                     if (nameC.name == "PipeJoint" || nameC.name == "_PreviewJoint") {
-                        auto& tc = view.get<TransformComponent>(e);
                         float distX = std::abs(tc.translate.x - endNode.x);
                         float distZ = std::abs(tc.translate.z - endNode.z);
                         if (distX < bestXDist) { bestXDist = distX; snapX = tc.translate.x; }
                         if (distZ < bestZDist) { bestZDist = distZ; snapZ = tc.translate.z; }
                     }
-                }
+                });
                 endNode.x = snapX;
                 endNode.z = snapZ;
             }
