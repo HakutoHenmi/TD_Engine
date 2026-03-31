@@ -233,8 +233,11 @@ void GameScene::Update() {
 
 	// Animation（エンジン固有処理のため残留）
 	auto animView = registry_.view<AnimatorComponent, MeshRendererComponent>();
-	if (isPlaying_ && animView.begin() != animView.end()) {
-		std::vector<entt::entity> animEntities(animView.begin(), animView.end());
+	if (isPlaying_ && !animView.empty()) {
+		std::vector<entt::entity> animEntities;
+		animView.each([&](entt::entity entity, auto&, auto&) {
+			animEntities.push_back(entity);
+		});
 		Engine::JobSystem::Dispatch((uint32_t)animEntities.size(), 64, [&](uint32_t i) {
 			auto entity = animEntities[i];
 			auto& anim = registry_.get<AnimatorComponent>(entity);
