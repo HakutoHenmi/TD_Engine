@@ -320,8 +320,7 @@ bool PhaseSystemScript::ExtractPrefabRenderPaths(const std::string& prefabPath, 
 }
 
 bool PhaseSystemScript::IsPlacementBlocked(GameScene* scene, const Engine::Vector3& hitPoint) const {
-	constexpr float kBlockRadius = 1.0f;
-	constexpr float kBlockRadiusSq = kBlockRadius * kBlockRadius;
+    constexpr float kBlockHalfExtent = 2.0f; // 2x2 square
 
 	auto& registry = scene->GetRegistry();
 	auto view = registry.view<TransformComponent>();
@@ -345,8 +344,7 @@ bool PhaseSystemScript::IsPlacementBlocked(GameScene* scene, const Engine::Vecto
 		const auto& tc = view.get<TransformComponent>(entity);
 		const float dx = tc.translate.x - hitPoint.x;
 		const float dz = tc.translate.z - hitPoint.z;
-		const float distSq = dx * dx + dz * dz;
-		if (distSq < kBlockRadiusSq) {
+     if (std::abs(dx) < kBlockHalfExtent && std::abs(dz) < kBlockHalfExtent) {
 			return true;
 		}
 	}
