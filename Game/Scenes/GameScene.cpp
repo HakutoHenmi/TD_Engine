@@ -233,7 +233,7 @@ void GameScene::Update() {
 
 	// Animation（エンジン固有処理のため残留）
 	auto animView = registry_.view<AnimatorComponent, MeshRendererComponent>();
-	if (isPlaying_ && !animView.empty()) {
+	if (isPlaying_ && animView.begin() != animView.end()) {
 		std::vector<entt::entity> animEntities;
 		animView.each([&](entt::entity entity, auto&, auto&) {
 			animEntities.push_back(entity);
