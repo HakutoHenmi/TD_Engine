@@ -15,6 +15,9 @@
 #include "../../Engine/Input.h"
 #include "../../Engine/WindowDX.h"
 
+//Button UI
+#include "CannonButton.h"
+
 namespace Game {
 
 void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
@@ -83,7 +86,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			return; // 設置モードの入力を抑制
 		}
 
-		if (key1) {
+		if (key1 || CannonButton::IsButtonPressed()) {
 			selectedObjPath_ = "Resources/Prefabs/BulletTank.prefab";
 			isPlacementMode_ = true;
 		}
@@ -117,7 +120,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				if (registry.all_of<TransformComponent>(spawnedEntity)) {
 					auto& tc = registry.get<TransformComponent>(spawnedEntity);
 					if (!registry.all_of<HierarchyComponent>(spawnedEntity) || registry.get<HierarchyComponent>(spawnedEntity).parentId == entt::null) {
-						tc.translate = {-50.0f, 10.0f, 0.0f};
+						tc.translate = {-50.0f, 20.0f, 50.0f};
 					}
 				}
 			}
