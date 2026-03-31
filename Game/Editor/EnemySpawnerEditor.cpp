@@ -26,10 +26,7 @@ void EnemySpawnerEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* rende
 
     // ========== 全スポナープレビュー描画 (ゲーム停止中は常に表示) ==========
     auto& registry = scene->GetRegistry();
-    auto spawnerView = registry.view<ScriptComponent, TransformComponent>();
-	for (auto entity : spawnerView) {
-        auto& sc = spawnerView.get<ScriptComponent>(entity);
-        auto& tc = spawnerView.get<TransformComponent>(entity);
+    registry.view<ScriptComponent, TransformComponent>().each([&](entt::entity entity, ScriptComponent& sc, TransformComponent& tc) {
         for (auto& entry : sc.scripts) {
             if (!entry.instance && !entry.scriptPath.empty() && !scene->IsPlaying()) {
                 entry.instance = ScriptEngine::GetInstance()->CreateScript(entry.scriptPath);
@@ -44,7 +41,7 @@ void EnemySpawnerEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* rende
                 }
             }
         }
-    }
+    });
 
     // ========== 配置モードでなければここで終了 ==========
     if (!spawnerMode_) return;
@@ -70,8 +67,7 @@ void EnemySpawnerEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* rende
         Engine::Vector3 hitPoint = {0, 0, 0};
         bool hitTerrain = false;
 
-        auto view = scene->GetRegistry().view<NameComponent, TransformComponent>();
-        for (auto e : view) {
+        scene->GetRegistry().view<NameComponent, TransformComponent>().each([&]([[maybe_unused]] entt::entity e, [[maybe_unused]] const NameComponent& nc, const TransformComponent& tc) {
             Engine::Model* model = nullptr;
             if (scene->GetRegistry().all_of<GpuMeshColliderComponent>(e)) {
                 model = renderer->GetModel(scene->GetRegistry().get<GpuMeshColliderComponent>(e).meshHandle);
@@ -82,7 +78,7 @@ void EnemySpawnerEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* rende
             }
             if (model) {
                 float dist; Engine::Vector3 hp;
-                if (model->RayCast(rayOrig, rayDir, view.get<TransformComponent>(e).GetTransform().ToMatrix(), dist, hp)) {
+                if (model->RayCast(rayOrig, rayDir, tc.GetTransform().ToMatrix(), dist, hp)) {
                     if (dist < bestDist) {
                         bestDist = dist;
                         hitPoint = hp;
@@ -90,7 +86,7 @@ void EnemySpawnerEditor::UpdateAndDraw(GameScene* scene, Engine::Renderer* rende
                     }
                 }
             }
-        }
+        });
 
         if (hitTerrain) {
             // ヒットした位置にスポナーオブジェクトを生成

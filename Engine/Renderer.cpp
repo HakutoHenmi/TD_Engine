@@ -527,8 +527,9 @@ void Renderer::FlushDrawCalls() {
 				if (sName == "Particle") sName = "ParticleInstanced";
 				else if (sName == "ParticleAdditive") sName = "ParticleAdditiveInstanced";
 			}
-			// ★修正: Toon/ToonSkinningはインスタンス描画非対応のためデフォルトにフォールバック
-			if (sName == "Toon" || sName == "ToonSkinning" || sName == "ToonOutline" || sName == "ToonSkinningOutline") {
+			// ★修正: Toon系や新しく追加したリッチシェーダーはインスタンス描画非対応のためデフォルトにフォールバック
+			if (sName == "Toon" || sName == "ToonSkinning" || sName == "ToonOutline" || sName == "ToonSkinningOutline" ||
+				sName == "Hologram" || sName == "EmissiveGlow" || sName == "ForceField" || sName == "Dissolve") {
 				sName = defaultShaderName;
 			}
 
@@ -1826,8 +1827,32 @@ float4 main(PSIn i) : SV_TARGET { return i.color; }
 		}
 
 		// シェーダー名リストに追加 (エディタのドロップダウンに表示される)
-		shaderNames_.push_back("Toon");
-		shaderNames_.push_back("ToonSkinning");
+		// ※CreatePSO や CreatePSO_Transparent 内部で重複チェック付きで push_back されるため、明示的な処理は不要です。
+
+		// ★追加: リッチシェーダー
+		auto vsEmissive = CompileShaderFromFile(L"Resources/shaders/EmissiveGlowVS.hlsl", "main", "vs_5_0");
+		auto psEmissive = CompileShaderFromFile(L"Resources/shaders/EmissiveGlowPS.hlsl", "main", "ps_5_0");
+		if (vsEmissive && psEmissive) {
+			CreatePSO("EmissiveGlow", vsEmissive.Get(), psEmissive.Get());
+		}
+
+		auto vsHologram = CompileShaderFromFile(L"Resources/shaders/HologramVS.hlsl", "main", "vs_5_0");
+		auto psHologram = CompileShaderFromFile(L"Resources/shaders/HologramPS.hlsl", "main", "ps_5_0");
+		if (vsHologram && psHologram) {
+			CreatePSO_Transparent("Hologram", vsHologram.Get(), psHologram.Get(), false);
+		}
+
+		auto vsForceField = CompileShaderFromFile(L"Resources/shaders/ForceFieldVS.hlsl", "main", "vs_5_0");
+		auto psForceField = CompileShaderFromFile(L"Resources/shaders/ForceFieldPS.hlsl", "main", "ps_5_0");
+		if (vsForceField && psForceField) {
+			CreatePSO_Transparent("ForceField", vsForceField.Get(), psForceField.Get(), true);
+		}
+
+		auto vsDissolve = CompileShaderFromFile(L"Resources/shaders/DissolveVS.hlsl", "main", "vs_5_0");
+		auto psDissolve = CompileShaderFromFile(L"Resources/shaders/DissolvePS.hlsl", "main", "ps_5_0");
+		if (vsDissolve && psDissolve) {
+			CreatePSO("Dissolve", vsDissolve.Get(), psDissolve.Get());
+		}
 	}
 
 	// ★追加: 川用シェーダー
@@ -2424,6 +2449,16 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 		if (psCopy) {
 			pso.PS = { psCopy->GetBufferPointer(), psCopy->GetBufferSize() };
 			dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoCopy_));
+		}
+
+		// ★追加: Rich PostProcess パイプライン
+		auto psRich = CompileShaderFromFile(L"Resources/shaders/RichPostProcess.hlsl", "main", "ps_5_0");
+		if (psRich) {
+			pso.PS = { psRich->GetBufferPointer(), psRich->GetBufferSize() };
+			Microsoft::WRL::ComPtr<ID3D12PipelineState> psoRich;
+			if (SUCCEEDED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoRich)))) {
+				pipelines_["Rich"] = psoRich;
+			}
 		}
 	}
 

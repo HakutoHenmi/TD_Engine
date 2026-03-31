@@ -122,9 +122,9 @@ void ResultScene::Update() {
 	if (ctx_.input->IsMouseTrigger(0)) {
 		auto view = registry_.view<UIButtonComponent, NameComponent>();
 		for (auto e : view) {
-			auto& btn = view.get<UIButtonComponent>(e);
+			auto& btn = registry_.get<UIButtonComponent>(e);
 			if (btn.isHovered) {
-				const auto& name = view.get<NameComponent>(e).name;
+				const auto& name = registry_.get<NameComponent>(e).name;
 				if (name == "ToSelectButton") {
 					Engine::SceneManager::GetInstance()->RequestChange("Select");
 					return;
