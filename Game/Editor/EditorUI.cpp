@@ -545,7 +545,10 @@ std::string EditorUI::SaveToMemory(GameScene* scene) {
 
 	auto& registry = scene->GetRegistry();
 	auto view = registry.view<NameComponent>();
-	std::vector<entt::entity> sortedEntities(view.begin(), view.end());
+	std::vector<entt::entity> sortedEntities;
+	view.each([&](entt::entity e, auto&) {
+		sortedEntities.push_back(e);
+	});
 	for (size_t i = 0; i < sortedEntities.size(); ++i) {
 		if (i > 0) ss << ",\n";
 		ss << SerializeEntity(registry, sortedEntities[i]);
