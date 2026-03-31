@@ -69,15 +69,6 @@ private:
 	// オブジェクトの移動処理
 	void Move(entt::entity entity, GameScene* scene, float dt);
 
-	// オブジェクトの周囲をチェックする関数
-	void ScanSurround(entt::entity entity, GameScene* scene);
-
-	// targetの方向をグリッドに直してA*アルゴリズムを実行する
-	void AStar();
-
-	// A*アルゴリズムでルートを計算する関数
-	void CalculatePath(int startX, int startZ, int targetX, int targetZ);
-
 	// デバッグ情報表示
 	void Debug();
 
@@ -108,20 +99,6 @@ private: // メンバ変数
 	float separationWeight_ = 2.0f; // 離れる力の強さ
 	float scanTimer_ = 0.0f; // ★追加: 走査の頻度を下げるためのタイマー
 	bool showDebugGrid_ = true; // ★追加: 重いデバッグ表示を制御
-
-	// グリッド関連
-	static const int GRID_SIZE = 21; // 21*21にして自分を真ん中に置いた20メートル四方のグリッドに(可変)
-	float cellLength_ = 2.0f;        // グリッドのセル一つの大きさ
-
-	float KChinkoRadius_ = 5.0f;
-
-	// マップ探索用
-	Node localGrid_[GRID_SIZE][GRID_SIZE];
-
-	// 実際のルート探索に必要な変数
-	std::vector<Node*> openList_;
-	std::vector<Node*> closedList_;
-	std::vector<DirectX::XMFLOAT3> path_; // 最終的な移動ルート
 };
 
 } // namespace Game
