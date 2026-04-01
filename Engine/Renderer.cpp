@@ -13,6 +13,9 @@
 #include <DirectXTex.h>
 #include <d3dcompiler.h>
 #include <d3dx12.h>
+#ifdef _MSC_VER
+#pragma warning(disable: 4865)
+#endif
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -399,6 +402,8 @@ void Renderer::FlushDrawCalls() {
 	D3D12_GPU_DESCRIPTOR_HANDLE defaultSrv = textures_[0].srvGpu;
 
 	for (const auto& dc : drawCalls_) {
+		if (dc.shaderName == "Distortion") continue; // 空間のゆがみは EndFrame で別途描画
+
 		auto* model = GetModel(dc.mesh);
 		if (!model) continue;
 
@@ -430,7 +435,7 @@ void Renderer::FlushDrawCalls() {
 					else if (i > 0 && (i - 1) < (int)dc.extraTex.size() && dc.extraTex[i - 1] < textures_.size())
 						texObj = &textures_[dc.extraTex[i - 1]];
 
-					if (texObj->res) {
+					if (texObj && texObj->res) {
 						D3D12_RESOURCE_DESC resDesc = texObj->res->GetDesc();
 						D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
 						srvDesc.Format = resDesc.Format;
@@ -529,7 +534,7 @@ void Renderer::FlushDrawCalls() {
 			}
 			// ★修正: Toon系や新しく追加したリッチシェーダーはインスタンス描画非対応のためデフォルトにフォールバック
 			if (sName == "Toon" || sName == "ToonSkinning" || sName == "ToonOutline" || sName == "ToonSkinningOutline" ||
-				sName == "Hologram" || sName == "EmissiveGlow" || sName == "ForceField" || sName == "Dissolve") {
+				sName == "Hologram" || sName == "EmissiveGlow" || sName == "ForceField" || sName == "Dissolve" || sName == "Distortion") {
 				sName = defaultShaderName;
 			}
 
@@ -655,7 +660,7 @@ void Renderer::EndFrame() {
 		list_->SetGraphicsRootSignature(rootSig3D_.Get());
 		
 		for (const auto& dc : drawCalls_) {
-			if (dc.isParticle || dc.shaderName == "Particle" || dc.shaderName == "ParticleAdditive" || dc.shaderName == "2D") continue;
+			if (dc.isParticle || dc.shaderName == "Particle" || dc.shaderName == "ParticleAdditive" || dc.shaderName == "2D" || dc.shaderName == "Distortion") continue;
 
 			auto* model = GetModel(dc.mesh);
 			if (!model) continue;
@@ -724,8 +729,92 @@ void Renderer::EndFrame() {
 	list_->RSSetViewports(1, &viewport_);
 	list_->RSSetScissorRects(1, &scissor_);
 
+	// Distortionオブジェクトの事前抽出（FlushDrawCallsでクリアされるため）
+	std::vector<DrawCall> distortionCalls;
+	for (const auto& dc : drawCalls_) {
+		if (dc.shaderName == "Distortion") distortionCalls.push_back(dc);
+	}
+
 	FlushDrawCalls();
 	
+	// ★追加: 空間のゆがみ (Distortion) パス
+	if (!distortionCalls.empty()) {
+		// 1. 現在のシーン (ppSceneColor_) を backdropColor_ にコピー
+		if (ppSceneColor_ && backdropColor_) {
+			auto b1 = CD3DX12_RESOURCE_BARRIER::Transition(ppSceneColor_.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+			auto b2 = CD3DX12_RESOURCE_BARRIER::Transition(backdropColor_.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+			D3D12_RESOURCE_BARRIER bars[] = { b1, b2 };
+			list_->ResourceBarrier(2, bars);
+
+			list_->CopyResource(backdropColor_.Get(), ppSceneColor_.Get());
+
+			auto b3 = CD3DX12_RESOURCE_BARRIER::Transition(ppSceneColor_.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+			auto b4 = CD3DX12_RESOURCE_BARRIER::Transition(backdropColor_.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			D3D12_RESOURCE_BARRIER bars2[] = { b3, b4 };
+			list_->ResourceBarrier(2, bars2);
+			ppSceneState_ = D3D12_RESOURCE_STATE_RENDER_TARGET; // ★状態を更新
+		}
+
+		// 2. Distortionオブジェクトのみを描画
+		if (ppSceneColor_ && backdropColor_) {
+			list_->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
+			list_->SetGraphicsRootSignature(rootSigDistortion_.Get()); 
+			list_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			
+			for (auto& dc : distortionCalls) {
+				auto* model = GetModel(dc.mesh);
+				if (!model) continue;
+
+				if (pipelines_.count("Distortion")) {
+					list_->SetPipelineState(pipelines_["Distortion"].Get());
+				} else {
+					continue;
+				}
+
+				list_->SetGraphicsRootConstantBufferView(0, cbFrameAddr_);
+				
+				uint32_t sIdx = AllocateDynamicSrvIndex(2);
+				if (sIdx != UINT32_MAX) {
+					D3D12_CPU_DESCRIPTOR_HANDLE dest = window_->SRV_CPU((int)sIdx);
+					dev_->CopyDescriptorsSimple(1, dest, backdropSrvCpu_, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+					dest.ptr += srvInc_;
+					if (dc.tex < textures_.size() && textures_[dc.tex].res) {
+						dev_->CopyDescriptorsSimple(1, dest, textures_[dc.tex].srvCpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+					} else {
+						dev_->CopyDescriptorsSimple(1, dest, textures_[0].srvCpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+					}
+					list_->SetGraphicsRootDescriptorTable(2, window_->SRV_GPU((int)sIdx));
+
+					// ★追加: b1 (CBObj) のバインド
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4324)
+#endif
+					struct alignas(256) CBObj { Matrix4x4 world; float color[4]; };
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+					CBObj ocb{}; ocb.world = dc.worldMatrix; 
+					ocb.color[0]=dc.color.x; ocb.color[1]=dc.color.y; ocb.color[2]=dc.color.z; ocb.color[3]=dc.color.w;
+					uint32_t oOff = upload_[fi].Allocate(sizeof(CBObj), 256);
+					if (oOff != UINT32_MAX) {
+						std::memcpy(upload_[fi].mapped + oOff, &ocb, sizeof(CBObj));
+						list_->SetGraphicsRootConstantBufferView(1, upload_[fi].buffer->GetGPUVirtualAddress() + oOff);
+					}
+
+					// ★修正: model->Draw(list_) はデフォルトで RootIndex 3 を使うが、
+					// rootSigDistortion_ には index 3 が存在しないため D3D12 Device Removal が起きる。
+					// そのため手動で描画コマンドを積む。
+					auto vbv = model->GetVBV();
+					auto ibv = model->GetIBV();
+					list_->IASetVertexBuffers(0, 1, &vbv);
+					list_->IASetIndexBuffer(&ibv);
+					list_->DrawIndexedInstanced(model->GetIndexCount(), 1, 0, 0, 0);
+				}
+			}
+		}
+	}
+
 	// --- 1. sceneBaseColor_ (ppSceneColor_) をShaderResourceStateに遷移 ---
 	if (ppSceneState_ != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
 		auto b = CD3DX12_RESOURCE_BARRIER::Transition(ppSceneColor_.Get(), ppSceneState_, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -1083,6 +1172,8 @@ bool Renderer::CreateShaderPipelineTransparent(const std::string& shaderName, co
 }
 
 bool Renderer::InitPipelines() {
+	ComPtr<ID3DBlob> shaderBlob, shaderError;
+
 	// ★共通 RootSignature (3D用)
 	{
 		CD3DX12_DESCRIPTOR_RANGE rangeSRV;
@@ -1113,10 +1204,11 @@ bool Renderer::InitPipelines() {
 		CD3DX12_ROOT_SIGNATURE_DESC rsDesc;
 		rsDesc.Init(_countof(params), params, 2, samp, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
-		ComPtr<ID3DBlob> sig, err;
-		if (FAILED(D3D12SerializeRootSignature(&rsDesc, D3D_ROOT_SIGNATURE_VERSION_1, &sig, &err)))
+		if (FAILED(D3D12SerializeRootSignature(&rsDesc, D3D_ROOT_SIGNATURE_VERSION_1, &shaderBlob, &shaderError))) {
+			if (shaderError) OutputDebugStringA((const char*)shaderError->GetBufferPointer());
 			return false;
-		if (FAILED(dev_->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(), IID_PPV_ARGS(&rootSig3D_))))
+		}
+		if (FAILED(dev_->CreateRootSignature(0, shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize(), IID_PPV_ARGS(&rootSig3D_))))
 			return false;
 	}
 
@@ -1145,9 +1237,35 @@ bool Renderer::InitPipelines() {
 		CD3DX12_ROOT_SIGNATURE_DESC rsDesc;
 		rsDesc.Init(_countof(params), params, 2, samp, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
-		ComPtr<ID3DBlob> sig, err;
-		if (SUCCEEDED(D3D12SerializeRootSignature(&rsDesc, D3D_ROOT_SIGNATURE_VERSION_1, &sig, &err))) {
-			dev_->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(), IID_PPV_ARGS(&rootSigTerrain_));
+		if (FAILED(D3D12SerializeRootSignature(&rsDesc, D3D_ROOT_SIGNATURE_VERSION_1, &shaderBlob, &shaderError))) {
+			if (shaderError) OutputDebugStringA((const char*)shaderError->GetBufferPointer());
+			return false;
+		}
+		if (FAILED(dev_->CreateRootSignature(0, shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize(), IID_PPV_ARGS(&rootSigTerrain_)))) {
+			return false;
+		}
+	}
+
+	// ★追加: 空間のゆがみ用 RootSignature (t0:Backdrop, t1:DistortionMap)
+	{
+		CD3DX12_DESCRIPTOR_RANGE rangeSRVs;
+		rangeSRVs.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 0); // t0, t1
+
+		CD3DX12_ROOT_PARAMETER params[3]{};
+		params[0].InitAsConstantBufferView(0);                                        // b0: CBFrame
+		params[1].InitAsConstantBufferView(1);                                        // b1: CBObj
+		params[2].InitAsDescriptorTable(1, &rangeSRVs, D3D12_SHADER_VISIBILITY_PIXEL); // t0, t1: Textures
+
+		CD3DX12_STATIC_SAMPLER_DESC samp(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
+		CD3DX12_ROOT_SIGNATURE_DESC rsDesc;
+		rsDesc.Init(_countof(params), params, 1, &samp, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+		if (FAILED(D3D12SerializeRootSignature(&rsDesc, D3D_ROOT_SIGNATURE_VERSION_1, &shaderBlob, &shaderError))) {
+			if (shaderError) OutputDebugStringA((const char*)shaderError->GetBufferPointer());
+			return false;
+		}
+		if (FAILED(dev_->CreateRootSignature(0, shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize(), IID_PPV_ARGS(&rootSigDistortion_)))) {
+			return false;
 		}
 	}
 
@@ -1566,10 +1684,9 @@ float4 main(VSIn v, uint instanceID : SV_InstanceID) : SV_POSITION {
 		CD3DX12_STATIC_SAMPLER_DESC samp(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
 		CD3DX12_ROOT_SIGNATURE_DESC rsDesc;
 		rsDesc.Init(_countof(params), params, 1, &samp, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-		ComPtr<ID3DBlob> sig, err;
-		if (FAILED(D3D12SerializeRootSignature(&rsDesc, D3D_ROOT_SIGNATURE_VERSION_1, &sig, &err)))
+		if (FAILED(D3D12SerializeRootSignature(&rsDesc, D3D_ROOT_SIGNATURE_VERSION_1, &shaderBlob, &shaderError)))
 			return false;
-		if (FAILED(dev_->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(), IID_PPV_ARGS(&rootSig2D_))))
+		if (FAILED(dev_->CreateRootSignature(0, shaderBlob->GetBufferPointer(), shaderBlob->GetBufferSize(), IID_PPV_ARGS(&rootSig2D_))))
 			return false;
 
 		D3D12_INPUT_ELEMENT_DESC layout[] = {
@@ -1887,6 +2004,38 @@ float4 main(PSIn i) : SV_TARGET { return i.color; }
 			if (SUCCEEDED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&riverPso)))) {
 				pipelines_["River"] = riverPso;
 				shaderNames_.push_back("River");
+			}
+		}
+	}
+
+	// ★追加: 空間のゆがみ (Distortion) シェーダーの登録
+	{
+		auto vs = CompileShaderFromFile(L"Resources/shaders/Distortion.hlsl", "main", "vs_5_0");
+		auto ps = CompileShaderFromFile(L"Resources/shaders/Distortion.hlsl", "ps_main", "ps_5_0");
+		if (vs && ps) {
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
+			psoDesc.pRootSignature = rootSigDistortion_.Get();
+			psoDesc.VS = { vs->GetBufferPointer(), vs->GetBufferSize() };
+			psoDesc.PS = { ps->GetBufferPointer(), ps->GetBufferSize() };
+			psoDesc.SampleMask = UINT_MAX;
+			psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+			
+			// 背景サンプリングのため不透明描画
+			psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+			psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+			psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO; // 深度は書かない
+			
+			psoDesc.InputLayout = { skinLayout, _countof(skinLayout) };
+			psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			psoDesc.NumRenderTargets = 1;
+			psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+			psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+			psoDesc.SampleDesc.Count = 1;
+
+			Microsoft::WRL::ComPtr<ID3D12PipelineState> pso;
+			if (SUCCEEDED(dev_->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pso)))) {
+				pipelines_["Distortion"] = pso;
+				shaderNames_.push_back("Distortion");
 			}
 		}
 	}
@@ -2362,13 +2511,15 @@ bool Renderer::InitPostProcess_() {
 		std::memcpy(cv.Color, kPPSceneClearColor, sizeof(float) * 4);
 
 		CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_DEFAULT);
-		dev_->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &cv, IID_PPV_ARGS(&ppSceneColor_));
+		HRESULT hr = dev_->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &cv, IID_PPV_ARGS(&ppSceneColor_));
+		if (FAILED(hr)) return false;
 		ppSceneState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 
 		D3D12_DESCRIPTOR_HEAP_DESC hd{};
 		hd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 		hd.NumDescriptors = 1;
-		dev_->CreateDescriptorHeap(&hd, IID_PPV_ARGS(&ppRtvHeap_));
+		hr = dev_->CreateDescriptorHeap(&hd, IID_PPV_ARGS(&ppRtvHeap_));
+		if (FAILED(hr)) return false;
 		ppRtv_ = ppRtvHeap_->GetCPUDescriptorHandleForHeapStart();
 		dev_->CreateRenderTargetView(ppSceneColor_.Get(), nullptr, ppRtv_);
 
@@ -2480,13 +2631,15 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 		std::memcpy(cv.Color, kFinalSceneClearColor, sizeof(float) * 4);
 
 		CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_DEFAULT);
-		dev_->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &cv, IID_PPV_ARGS(&finalSceneColor_));
+		HRESULT hr = dev_->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &cv, IID_PPV_ARGS(&finalSceneColor_));
+		if (FAILED(hr)) return false;
 		finalSceneState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 
 		D3D12_DESCRIPTOR_HEAP_DESC hd{};
 		hd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 		hd.NumDescriptors = 16; // ★修正: カスタムレンダーターゲット用に増やす
-		dev_->CreateDescriptorHeap(&hd, IID_PPV_ARGS(&finalRtvHeap_));
+		hr = dev_->CreateDescriptorHeap(&hd, IID_PPV_ARGS(&finalRtvHeap_));
+		if (FAILED(hr)) return false;
 		finalRtv_ = finalRtvHeap_->GetCPUDescriptorHandleForHeapStart();
 		dev_->CreateRenderTargetView(finalSceneColor_.Get(), nullptr, finalRtv_);
 
@@ -2499,6 +2652,74 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 		srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srv.Texture2D.MipLevels = 1;
 		dev_->CreateShaderResourceView(finalSceneColor_.Get(), &srv, cpu);
+	}
+
+	// ★追加: Distortion用バックドロップテクスチャの作成
+	{
+		const UINT W = Engine::WindowDX::kW;
+		const UINT H = Engine::WindowDX::kH;
+		D3D12_RESOURCE_DESC rd = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, W, H, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+		CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_DEFAULT);
+		D3D12_CLEAR_VALUE cv = { DXGI_FORMAT_R8G8B8A8_UNORM, {0,0,0,1} };
+		HRESULT hr = dev_->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &cv, IID_PPV_ARGS(&backdropColor_));
+		if (FAILED(hr)) {
+			// 歪み用バックドロップの生成失敗は致命的ではないが警告を出す
+			OutputDebugStringA("[Renderer] Failed to create backdropColor_ for Distortion pass.\n");
+		}
+		
+		uint32_t sIdx = AllocateSrvIndex();
+		backdropSrv_ = window_->SRV_GPU((int)sIdx);
+		backdropSrvCpu_ = window_->SRV_CPU((int)sIdx);
+		D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
+		srv.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srv.Texture2D.MipLevels = 1;
+		dev_->CreateShaderResourceView(backdropColor_.Get(), &srv, window_->SRV_CPU((int)sIdx));
+	}
+
+	// ★追加: Distortion PSOの作成
+	{
+		auto vs = CompileShaderFromFile(L"Resources/shaders/Distortion.hlsl", "main", "vs_5_0");
+		auto ps = CompileShaderFromFile(L"Resources/shaders/Distortion.hlsl", "ps_main", "ps_5_0");
+		if (vs && ps) {
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
+			psoDesc.pRootSignature = rootSigDistortion_.Get(); // 専用RootSig
+			psoDesc.VS = { vs->GetBufferPointer(), vs->GetBufferSize() };
+			psoDesc.PS = { ps->GetBufferPointer(), ps->GetBufferSize() };
+			
+			D3D12_INPUT_ELEMENT_DESC layout[] = {
+				{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }, // XMFLOAT4
+				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }, // XMFLOAT2
+				{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }, // XMFLOAT3
+				{ "WEIGHTS",  0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 36, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }, // Weights
+				{ "BONES",    0, DXGI_FORMAT_R32G32B32A32_UINT,  0, 52, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }, // Indices
+			};
+			psoDesc.InputLayout = { layout, _countof(layout) };
+			psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+			psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+			
+			// 透明ブレンド設定
+			auto& rt = psoDesc.BlendState.RenderTarget[0];
+			rt.BlendEnable = TRUE;
+			rt.SrcBlend = D3D12_BLEND_SRC_ALPHA;
+			rt.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+			rt.BlendOp = D3D12_BLEND_OP_ADD;
+			
+			psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+			psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO; // 歪み自体は深度を書かない
+			
+			psoDesc.SampleMask = UINT_MAX;
+			psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			psoDesc.NumRenderTargets = 1;
+			psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+			psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+			psoDesc.SampleDesc.Count = 1;
+
+			if (SUCCEEDED(dev_->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelines_["Distortion"])))) {
+				OutputDebugStringA("[Renderer] Distortion PSO created.\n");
+			}
+		}
 	}
 
 	return true;

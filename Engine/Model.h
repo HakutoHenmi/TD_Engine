@@ -122,6 +122,7 @@ public:
 	// ゲッター
 	const ModelData& GetData() const { return data_; }
 	UINT GetVertexCount() const { return static_cast<UINT>(data_.vertices.size()); }
+	uint32_t GetIndexCount() const { return indexCount_; } // 追加
 
 	const D3D12_VERTEX_BUFFER_VIEW& GetVBV() const { return vbv_; }
 	const D3D12_INDEX_BUFFER_VIEW& GetIBV() const { return ibv_; } // 追加

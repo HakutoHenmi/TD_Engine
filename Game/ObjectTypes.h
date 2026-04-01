@@ -51,7 +51,8 @@ enum class ComponentType {
 	RectTransform, UIImage, UIText, UIButton, // ★追加: UIコンポーネント
 	River, // ★追加: 川コンポーネント
 	Variable, // ★追加: 汎用変数
-	WorldSpaceUI // ★追加: ワールド空間UI
+	WorldSpaceUI, // ★追加: ワールド空間UI
+	Motion // ★追加: モーションエディタ用
 };
 struct Component { 
 	ComponentType type = ComponentType::MeshRenderer; 
@@ -389,6 +390,29 @@ struct VariableComponent : public Component {
 	}
 	void SetString(const std::string& key, const std::string& val) {
 		strings[key] = val;
+	}
+};
+
+// ★追加: モーションエディタ用コンポーネント
+struct MotionComponent : public Component {
+	struct Keyframe {
+		float time = 0.0f;
+		DirectX::XMFLOAT3 translate = {0, 0, 0};
+		DirectX::XMFLOAT3 rotate = {0, 0, 0};
+		DirectX::XMFLOAT3 scale = {1, 1, 1};
+	};
+	std::vector<Keyframe> keyframes;
+	float currentTime = 0.0f;
+	float totalDuration = 1.0f;
+	bool isPlaying = false;
+	bool loop = true;
+	int selectedKeyframe = -1; // エディタ用
+
+	MotionComponent() { 
+		type = ComponentType::Motion; 
+		// 初期値として2点追加
+		keyframes.push_back({0.0f, {0,0,0}, {0,0,0}, {1,1,1}});
+		keyframes.push_back({1.0f, {5,0,0}, {0,0,0}, {1,1,1}});
 	}
 };
 

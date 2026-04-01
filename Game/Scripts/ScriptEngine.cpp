@@ -20,6 +20,7 @@
 #include "ExperienceMiner.h"
 #include "ExperienceHopper.h"
 #include "CommunicationTestScript.h"
+#include "HitDistortionScript.h" // ★追加
 
 namespace Game {
 
@@ -52,6 +53,7 @@ void ScriptEngine::Initialize() {
 	RegisterScript("ExperienceMiner", []() { return std::make_shared<ExperienceMiner>(); });
 	RegisterScript("ExperienceHopper", []() { return std::make_shared<ExperienceHopper>(); });
 	RegisterScript("CommunicationTestScript", []() { return std::make_shared<CommunicationTestScript>(); });
+	RegisterScript("HitDistortionScript", []() { return std::make_shared<HitDistortionScript>(); }); // ★追加
 }
 
 void ScriptEngine::Shutdown() {

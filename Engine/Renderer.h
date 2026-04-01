@@ -408,6 +408,8 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSig3D_;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSigTerrain_; // ★追加: 地形用
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSigDistortion_; // ★追加
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSigPP_;
 
 	// ★追加: コンピュート用
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSigCompute_;
@@ -458,7 +460,11 @@ private:
 	D3D12_GPU_DESCRIPTOR_HANDLE finalSrvGpu_{};
 	D3D12_RESOURCE_STATES finalSceneState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 
-	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSigPP_;
+	Microsoft::WRL::ComPtr<ID3D12Resource> backdropColor_;
+	D3D12_CPU_DESCRIPTOR_HANDLE backdropRtv_{};
+	D3D12_CPU_DESCRIPTOR_HANDLE backdropSrvCpu_{};
+	D3D12_GPU_DESCRIPTOR_HANDLE backdropSrv_{};
+
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoPP_;
 
 	// ★追加: 最終テクスチャをバックバッファにそのままコピーして映すパイプライン

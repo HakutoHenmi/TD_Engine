@@ -1,6 +1,7 @@
-#pragma once
 #include "ISystem.h"
 #include <cmath>
+#include <algorithm>
+#include "../Engine/Input.h" // ★追加
 
 namespace Game {
 
@@ -13,6 +14,16 @@ public:
 		for (auto entity : view) {
 			auto& ct = view.get<CameraTargetComponent>(entity);
 			if (!ct.enabled) continue;
+
+			// ★追加: マウスホイールによるズーム
+			auto* inputIns = ::Engine::Input::GetInstance();
+			if (inputIns) {
+				float wheel = inputIns->GetMouseWheelDelta();
+				if (std::abs(wheel) > 0.001f) {
+					ct.distance -= wheel * 0.005f; // 感度調整
+					ct.distance = std::clamp(ct.distance, 3.0f, 20.0f); // 範囲制限
+				}
+			}
 
 			auto& tc = view.get<TransformComponent>(entity);
 			DirectX::XMFLOAT3 targetPos = tc.translate;

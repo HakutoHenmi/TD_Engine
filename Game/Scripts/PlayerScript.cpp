@@ -1,4 +1,4 @@
-﻿#include "PlayerScript.h"
+#include "PlayerScript.h"
 #ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
 #endif
@@ -124,7 +124,23 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		isSubscribed_ = true;
 	}
 
-	if (PhaseSystemScript::IsPreparation()) {
+	// PhaseSystemScriptがシーンに存在するか確認
+	bool hasPhaseSystem = false;
+	{
+		auto scView = scene->GetRegistry().view<ScriptComponent>();
+		for (auto e : scView) {
+			auto& sc = scView.get<ScriptComponent>(e);
+			for (auto& entry : sc.scripts) {
+				if (entry.scriptPath == "PhaseSystemScript") {
+					hasPhaseSystem = true;
+					break;
+				}
+			}
+			if (hasPhaseSystem) break;
+		}
+	}
+
+	if (hasPhaseSystem && PhaseSystemScript::IsPreparation()) {
 		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) scene->GetRegistry().get<CameraTargetComponent>(entity).enabled = false;
 		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))  scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = false;
 	} else {
@@ -252,7 +268,7 @@ void PlayerScript::UpdateAttack(entt::entity /*entity*/, GameScene* /*scene*/, f
 	}
 }
 
-void PlayerScript::UpdateSword(entt::entity entity, GameScene* scene, float /*dt*/) {
+void PlayerScript::UpdateSword(entt::entity entity, GameScene* scene, float dt) {
 	entt::entity sword = entt::null;
 	auto view = scene->GetRegistry().view<NameComponent>();
 	for (auto e : view) {
@@ -387,6 +403,52 @@ void PlayerScript::UpdateSword(entt::entity entity, GameScene* scene, float /*dt
 			sprintf_s(buf, "[PlayerScript] Hitbox ON: pos(%.1f, %.1f, %.1f)\n", 
 				swordTc.translate.x, swordTc.translate.y, swordTc.translate.z);
 			OutputDebugStringA(buf);
+		}
+	}
+
+	// ★修正: 剣の軌跡 (DrawLine3Dベース)
+	if (isAttacking_ && currentPhase_ == AttackPhase::Swing) {
+		float totalRotY = swordTc.rotate.y;
+		float totalRotX = swordTc.rotate.x;
+		float bladeLen = 1.6f;
+		float dX = std::sin(totalRotY) * std::cos(totalRotX);
+		float dY = -std::sin(totalRotX);
+		float dZ = std::cos(totalRotY) * std::cos(totalRotX);
+		TrailPoint tp;
+		tp.tip = {
+			swordTc.translate.x + dX * bladeLen,
+			swordTc.translate.y + dY * bladeLen,
+			swordTc.translate.z + dZ * bladeLen
+		};
+		tp.base = {
+			swordTc.translate.x - dX * 0.2f,
+			swordTc.translate.y - dY * 0.2f,
+			swordTc.translate.z - dZ * 0.2f
+		};
+		tp.life = 0.2f;
+		tp.maxLife = 0.2f;
+		trailPoints_.push_back(tp);
+		if (trailPoints_.size() > 30) trailPoints_.pop_front();
+	}
+
+	// 軌跡の減衰と描画
+	for (auto& tp : trailPoints_) tp.life -= dt;
+	while (!trailPoints_.empty() && trailPoints_.front().life <= 0) trailPoints_.pop_front();
+
+	auto* renderer = scene->GetRenderer();
+	if (renderer && trailPoints_.size() >= 2) {
+		for (size_t i = 1; i < trailPoints_.size(); ++i) {
+			float alpha = trailPoints_[i].life / trailPoints_[i].maxLife;
+			Engine::Vector4 col = {0.4f, 0.7f, 1.0f, alpha * 0.9f};
+			// 先端同士を結ぶ線
+			renderer->DrawLine3D(trailPoints_[i-1].tip, trailPoints_[i].tip, col, true);
+			// 根元同士を結ぶ線
+			renderer->DrawLine3D(trailPoints_[i-1].base, trailPoints_[i].base, col, true);
+			// 対角線（面の近似）
+			renderer->DrawLine3D(trailPoints_[i-1].tip, trailPoints_[i].base, col, true);
+			renderer->DrawLine3D(trailPoints_[i-1].base, trailPoints_[i].tip, col, true);
+			// 縦の線（セグメント間の柱）
+			renderer->DrawLine3D(trailPoints_[i].tip, trailPoints_[i].base, col, true);
 		}
 	}
 }
