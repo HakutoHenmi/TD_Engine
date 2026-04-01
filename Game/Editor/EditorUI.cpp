@@ -1018,20 +1018,28 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	float targetIdxY = currentCursorPos.y + cursorPadding.y;
 	ImGui::SetCursorPos(ImVec2(targetIdxX, targetIdxY));
 	
-	// Pick game image region
-	gameImageMin = ImGui::GetCursorScreenPos();
-	gameImageMax = ImVec2(gameImageMin.x + renderW, gameImageMin.y + renderH);
+	// 描画実行
+	ImGui::Image((ImTextureID)renderer->GetGameFinalSRV().ptr, ImVec2(renderW, renderH));
+	
+	// ★修正: 実際に画像が描画された正確なスクリーン座標を取得
+	gameImageMin = ImGui::GetItemRectMin();
+	gameImageMax = ImGui::GetItemRectMax();
 	
 	// ★追加: UISystemなどの座標変換用にコンテキストへ設定
 	auto& gctx = gameScene->GetContext();
 	gctx.viewportOffset = { gameImageMin.x, gameImageMin.y };
 	gctx.viewportSize = { renderW, renderH };
 	
-	// Tool Editors Update & Draw (Overlays)
+	// エディター上のマウス座標を内部解像度(1920x1080)に正確に変換して上書き
+	// ★修正: ピクセル中心(+0.5f)を基準に精密なマッピングを行う
+	ImVec2 mPos_img = ImGui::GetMousePos();
+	gctx.overrideMouseX = (mPos_img.x - gameImageMin.x) * (float)Engine::WindowDX::kW / renderW;
+	gctx.overrideMouseY = (mPos_img.y - gameImageMin.y) * (float)Engine::WindowDX::kH / renderH;
+	gctx.useOverrideMouse = true;
+
+	// Tool Editors Update & Draw (Overlays) - 画像の上にオーバーレイとして描画
 	s_pipeEditor.UpdateAndDraw(gameScene, renderer, gameImageMin, gameImageMax, renderW, renderH);
 	s_spawnerEditor.UpdateAndDraw(gameScene, renderer, gameImageMin, gameImageMax, renderW, renderH);
-
-	ImGui::Image((ImTextureID)renderer->GetGameFinalSRV().ptr, ImVec2(renderW, renderH));
 	
 	// Project to Scene Drop
 	if (ImGui::BeginDragDropTarget()) {
@@ -1234,6 +1242,129 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 							}
 						}
 					}
+				}
+				}
+			}
+			
+			// ★追加: UI Gizmo Logic
+			if (auto* rt = reg.try_get<RectTransformComponent>(selectedEnt)) {
+				ImDrawList* drawList = ImGui::GetWindowDrawList();
+				UISystem::WorldRect wr = UISystem::CalculateWorldRect(selectedEnt, reg, (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH);
+				
+				// 内部解像度 (1920x1080) から実際の表示ピクセルへの変換スケーラー
+				float scaleX = renderW / (float)Engine::WindowDX::kW;
+				float scaleY = renderH / (float)Engine::WindowDX::kH;
+
+				ImVec2 pMin(gameImageMin.x + wr.x * scaleX, gameImageMin.y + wr.y * scaleY);
+				ImVec2 pMax(pMin.x + wr.w * scaleX, pMin.y + wr.h * scaleY);
+				
+				// UI本体の枠 (オレンジ色)
+				drawList->AddRect(pMin, pMax, IM_COL32(255, 140, 0, 255), 0.0f, 0, 2.0f);
+				
+				// UIButton があれば判定エリアも表示 (水色)
+				if (auto* btn = reg.try_get<UIButtonComponent>(selectedEnt)) {
+					float hw = wr.w * btn->hitboxScale.x;
+					float hh = wr.h * btn->hitboxScale.y;
+					float cx = wr.x + wr.w * 0.5f + btn->hitboxOffset.x;
+					float cy = wr.y + wr.h * 0.5f + btn->hitboxOffset.y;
+					float hx = cx - hw * 0.5f;
+					float hy = cy - hh * 0.5f;
+
+					ImVec2 hpMin(gameImageMin.x + hx * scaleX, gameImageMin.y + hy * scaleY);
+					ImVec2 hpMax(hpMin.x + hw * scaleX, hpMin.y + hh * scaleY);
+					drawList->AddRect(hpMin, hpMax, IM_COL32(0, 255, 255, 255), 0.0f, 0, 1.0f);
+
+					// 判定エリア移動ハンドル (中央の丸)
+					ImVec2 hCenter((hpMin.x + hpMax.x) * 0.5f, (hpMin.y + hpMax.y) * 0.5f);
+					drawList->AddCircleFilled(hCenter, 6.0f, IM_COL32(0, 255, 255, 255));
+					
+					ImVec2 mPos = ImGui::GetMousePos();
+					float dx_h = mPos.x - hCenter.x;
+					float dy_h = mPos.y - hCenter.y;
+					float dToHCenter = std::sqrt(dx_h * dx_h + dy_h * dy_h);
+
+					if (dToHCenter < 10.0f) {
+						gizmoHovered = true; // ホバー時もフラグを立てて背面クリックを防止
+						if (!uiDragging && ImGui::IsMouseClicked(0)) {
+							uiDragging = true;
+							uiDragHandle = 10; // 10 = HitboxOffset
+							uiDragStartHitOffset = btn->hitboxOffset;
+						}
+					}
+					
+					// 判定エリア拡縮ハンドル (右下の丸)
+					ImVec2 hScaleHandle = hpMax;
+					drawList->AddCircleFilled(hScaleHandle, 6.0f, IM_COL32(0, 255, 255, 255));
+					float dx_s = mPos.x - hScaleHandle.x;
+					float dy_s = mPos.y - hScaleHandle.y;
+					float dToHScale = std::sqrt(dx_s * dx_s + dy_s * dy_s);
+					if (dToHScale < 10.0f) {
+						gizmoHovered = true;
+						if (!uiDragging && ImGui::IsMouseClicked(0)) {
+							uiDragging = true;
+							uiDragHandle = 11; // 11 = HitboxScale
+							uiDragStartHitScale = btn->hitboxScale;
+						}
+					}
+				}
+
+				// UI本体移動ハンドル (左上)
+				drawList->AddCircleFilled(pMin, 8.0f, IM_COL32(255, 140, 0, 255));
+				
+				ImVec2 mPos = ImGui::GetMousePos();
+				float dx_p = mPos.x - pMin.x;
+				float dy_p = mPos.y - pMin.y;
+				float dToPMin = std::sqrt(dx_p * dx_p + dy_p * dy_p);
+				if (dToPMin < 12.0f) {
+					gizmoHovered = true;
+					if (!uiDragging && ImGui::IsMouseClicked(0)) {
+						uiDragging = true;
+						uiDragHandle = 0; // 0 = Rect Pos
+						uiDragStartPos = rt->pos;
+					}
+				}
+
+				// UI本体拡縮ハンドル (右下)
+				drawList->AddCircleFilled(pMax, 8.0f, IM_COL32(255, 140, 0, 255));
+				float dx_m = mPos.x - pMax.x;
+				float dy_m = mPos.y - pMax.y;
+				float dToPMax = std::sqrt(dx_m * dx_m + dy_m * dy_m);
+				if (dToPMax < 12.0f) {
+					gizmoHovered = true;
+					if (!uiDragging && ImGui::IsMouseClicked(0)) {
+						uiDragging = true;
+						uiDragHandle = 1; // 1 = Rect Size
+						uiDragStartSize = rt->size;
+					}
+				}
+
+				if (uiDragging) {
+					gizmoHovered = true;
+					ImVec2 delta = ImGui::GetMouseDragDelta(0);
+					float dx = delta.x / scaleX;
+					float dy = delta.y / scaleY;
+
+					if (uiDragHandle == 0) { // UI Pos
+						rt->pos.x = uiDragStartPos.x + dx;
+						rt->pos.y = uiDragStartPos.y + dy;
+					} else if (uiDragHandle == 1) { // UI Size
+						rt->size.x = (std::max)(1.0f, uiDragStartSize.x + dx);
+						rt->size.y = (std::max)(1.0f, uiDragStartSize.y + dy);
+					} else if (uiDragHandle == 10) { // Hitbox Offset
+						if (auto* btn = reg.try_get<UIButtonComponent>(selectedEnt)) {
+							btn->hitboxOffset.x = uiDragStartHitOffset.x + dx;
+							btn->hitboxOffset.y = uiDragStartHitOffset.y + dy;
+						}
+					} else if (uiDragHandle == 11) { // Hitbox Scale
+						if (auto* btn = reg.try_get<UIButtonComponent>(selectedEnt)) {
+							btn->hitboxScale.x = (std::max)(0.01f, uiDragStartHitScale.x + dx / wr.w);
+							btn->hitboxScale.y = (std::max)(0.01f, uiDragStartHitScale.y + dy / wr.h);
+						}
+					}
+
+					if (ImGui::IsMouseReleased(0)) {
+						uiDragging = false;
+						uiDragHandle = -1;
 				}
 			}
 		}
@@ -1848,6 +1979,11 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				if (ImGui::CollapsingHeader("UIButton", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##BTN", &btn->enabled);
 					ImGui::Text("Hovered: %s", btn->isHovered ? "Yes" : "No");
+					
+					// ★追加: 判定エリアの個別調整
+					ImGui::DragFloat2("Hitbox Offset", &btn->hitboxOffset.x, 1.0f);
+					ImGui::DragFloat2("Hitbox Scale", &btn->hitboxScale.x, 0.01f, 0.0f, 10.0f);
+					
 					if (ImGui::Button("Remove##BTN")) registry.remove<UIButtonComponent>(entity);
 				}
 			}

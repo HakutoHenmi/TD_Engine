@@ -289,8 +289,18 @@ void UISystem::ProcessButton(entt::entity entity, entt::registry& registry, UIBu
     } else {
         float fmx, fmy;
         ctx.input->GetMousePos(fmx, fmy);
-        mx = fmx;
-        my = fmy;
+        
+        // ★修正: ビューポートオフセットを引いて、内部解像度(1920x1080)に変換
+        float rx = fmx - ctx.viewportOffset.x;
+        float ry = fmy - ctx.viewportOffset.y;
+        
+        if (ctx.viewportSize.x > 0 && ctx.viewportSize.y > 0) {
+            mx = rx * (float)Engine::WindowDX::kW / ctx.viewportSize.x;
+            my = ry * (float)Engine::WindowDX::kH / ctx.viewportSize.y;
+        } else {
+            mx = rx;
+            my = ry;
+        }
     }
 
     // hitboxパラメータを適用した実際の判定矩形を計算

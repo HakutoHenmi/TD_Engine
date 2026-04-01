@@ -229,10 +229,6 @@ void GameScene::Update() {
 	ctx_.eventSystem = &eventSystem_;
 	ctx_.pendingSpawns = &pendingSpawns_;
 
-	// viewportのデフォルト設定（フルスクリーン想定）
-	ctx_.viewportOffset = {0, 0};
-	ctx_.viewportSize = {(float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH};
-
 	// GPU Collision Dispatch（エンジンの汎用 PhysicsSystem.h に移行したため、ここでは何もしない）
 
 	// Animation（エンジン固有処理のため残留）
