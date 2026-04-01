@@ -3,6 +3,11 @@
 #include <queue>
 #include <cstdint>
 
+// 名前空間の前方宣言
+namespace Game {
+	class GameScene;
+}
+
 // 1マスの情報
 struct FlowCell {
 	uint32_t cost;	// 1:平地, 255:壁
