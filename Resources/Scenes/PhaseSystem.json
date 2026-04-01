@@ -9,15 +9,15 @@
     {
       "id": 3145735,
       "parentId": 4294967295,
-      "name": "CannonButton",
+      "name": "InstallationButton",
       "locked": false,
       "translate": [-400, 400, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "CannonButton", "param": ""}]},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": ""}]},
         {"type": "RectTransform", "enabled": true, "pos": [-400,400], "size": [200,200], "anchor": [0.5,0.5]},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/CannonButton.png", "color": [1,1,1,1]},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/InstallationButton.png", "color": [1,1,1,1]},
         {"type": "UIButton", "enabled": true}
       ]
     },

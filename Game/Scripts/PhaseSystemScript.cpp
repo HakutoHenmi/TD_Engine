@@ -16,7 +16,7 @@
 #include "../../Engine/WindowDX.h"
 
 //Button UI
-#include "CannonButton.h"
+#include "InstallationButton.h"
 
 namespace Game {
 
@@ -86,7 +86,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			return; // 設置モードの入力を抑制
 		}
 
-		if (key1 || CannonButton::IsButtonPressed()) {
+		if (key1 || InstallationButton::IsButtonPressed()) {
 			selectedObjPath_ = "Resources/Prefabs/BulletTank.prefab";
 			isPlacementMode_ = true;
 		}

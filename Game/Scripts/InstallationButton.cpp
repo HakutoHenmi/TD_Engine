@@ -1,25 +1,28 @@
-#include "CannonButton.h"
+#include "InstallationButton.h"
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
 #include <cmath>
 #include <iostream>
 
-#include "PhaseSystemScript.h"
 #include "../../Engine/Input.h"
+#include "PhaseSystemScript.h"
 #if defined(USE_IMGUI) && !defined(NDEBUG)
 #include <imgui.h>
 #endif
 
+namespace {
+bool isButtonPressed;
+}
+
 namespace Game {
 
-bool CannonButton::isButtonPressed_ = false;
+bool InstallationButton::isButtonPressed_[ButtonTypesNum] = {};
 
-void CannonButton::Start(entt::entity /*entity*/, GameScene* /*scene*/) { isButtonPressed_ = false; }
+void InstallationButton::Start(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
-void CannonButton::Update(entt::entity entity, GameScene* scene, float dt) {
+void InstallationButton::Update(entt::entity entity, GameScene* scene, float dt) {
 	(void)dt;
-
 
 	if (!scene || !scene->GetRegistry().valid(entity))
 		return;
@@ -27,7 +30,8 @@ void CannonButton::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (!registry.all_of<TransformComponent>(entity))
 		return;
 
-   isButtonPressed_ = scene->GetRegistry().all_of<UIButtonComponent>(entity) && scene->GetRegistry().get<UIButtonComponent>(entity).isPressed;
+	isButtonPressed_[buttonTypes_] = scene->GetRegistry().all_of<UIButtonComponent>(entity) && scene->GetRegistry().get<UIButtonComponent>(entity).isPressed;
+	isButtonPressed = isButtonPressed_[buttonTypes_];
 
 	if (PhaseSystemScript::IsPreparation()) {
 		if (scene->GetRegistry().all_of<UIImageComponent>(entity))
@@ -43,15 +47,17 @@ void CannonButton::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 }
 
-void CannonButton::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
+void InstallationButton::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
-void CannonButton::OnEditorUI() {
+void InstallationButton::OnEditorUI() {
 
-	ImGui::Begin("CannonButton Script");
+	ImGui::Begin("InstallationButton Script");
 	ImGui::Text("isButtonPressed_: %s", isButtonPressed_ ? "true" : "false");
 	ImGui::End();
 }
 
-REGISTER_SCRIPT(CannonButton);
+bool InstallationButton::IsButtonPressed() { return isButtonPressed; }
+
+REGISTER_SCRIPT(InstallationButton);
 
 } // namespace Game
