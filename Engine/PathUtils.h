@@ -5,6 +5,7 @@
 #include <shlobj.h>
 #include <knownfolders.h>
 #include <algorithm>
+#include <vector>
 
 namespace Engine {
 
@@ -114,21 +115,26 @@ private:
         return false;
     }
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:6262)
+#endif
     static std::filesystem::path GetRootPathInternal() {
         static std::filesystem::path rootPath;
         if (!rootPath.empty()) return rootPath;
 
-        // Use larger buffer to handle long paths (Windows max is 32767)
-        wchar_t buffer[32768];
-        DWORD length = GetModuleFileNameW(NULL, buffer, 32768);
-        if (length == 0 || length >= 32768) {
+        // Use vector to allocate on heap to avoid C6262 stack warning
+        const DWORD bufferSize = 32768;
+        std::vector<wchar_t> buffer(bufferSize);
+        DWORD length = GetModuleFileNameW(NULL, buffer.data(), bufferSize);
+        if (length == 0 || length >= bufferSize) {
             // Fallback to current directory if failed
             rootPath = std::filesystem::current_path();
             return rootPath;
         }
         buffer[length] = L'\0'; // Ensure null-termination
         
-        std::filesystem::path exeDir = std::filesystem::path(buffer).parent_path();
+        std::filesystem::path exeDir = std::filesystem::path(buffer.data()).parent_path();
         
         auto IsBuildFolder = [](const std::wstring& name) {
             std::wstring lower = name;
@@ -176,6 +182,9 @@ private:
         rootPath = exeDir;
         return rootPath;
     }
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 };
 
 

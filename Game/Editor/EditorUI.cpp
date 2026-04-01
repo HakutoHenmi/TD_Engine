@@ -7,6 +7,9 @@
 #include "../Systems/UISystem.h"    
 #include "../Scripts/IScript.h"     
 #include "../Scripts/ScriptEngine.h" 
+#ifdef _MSC_VER
+#pragma warning(disable: 4865)
+#endif
 
 #include "Audio.h"
 #include <tuple> // 追加
@@ -217,6 +220,22 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 					reg.get_or_emplace<UIButtonComponent>(entity).enabled = en;
 				} else if (type == "AudioListener") {
 					reg.get_or_emplace<AudioListenerComponent>(entity).enabled = en;
+				} else if (type == "Motion") {
+					auto& c = reg.get_or_emplace<MotionComponent>(entity);
+					c.enabled = en;
+					if (comp.contains("keyframes") && comp["keyframes"].is_array()) {
+						c.keyframes.clear();
+						for (auto& kf : comp["keyframes"]) {
+							MotionComponent::Keyframe k;
+							k.time = kf.value("time", 0.0f);
+							if (kf.contains("translate")) k.translate = {kf["translate"][0], kf["translate"][1], kf["translate"][2]};
+							if (kf.contains("rotate")) k.rotate = {kf["rotate"][0], kf["rotate"][1], kf["rotate"][2]};
+							if (kf.contains("scale")) k.scale = {kf["scale"][0], kf["scale"][1], kf["scale"][2]};
+							c.keyframes.push_back(k);
+						}
+					}
+					c.totalDuration = comp.value("totalDuration", 1.0f);
+					c.loop = comp.value("loop", true);
 				}
 			}
 		}
@@ -522,6 +541,16 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 	if (auto* cp = registry.try_get<AudioListenerComponent>(entity)) {
 		addComma();
 		ss << "        {\"type\": \"AudioListener\", \"enabled\": " << (cp->enabled ? "true" : "false") << "}";
+	}
+	if (auto* cp = registry.try_get<MotionComponent>(entity)) {
+		addComma();
+		ss << "        {\"type\": \"Motion\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"totalDuration\": " << cp->totalDuration << ", \"loop\": " << (cp->loop ? "true" : "false") << ", \"keyframes\": [\n";
+		for (size_t i = 0; i < cp->keyframes.size(); ++i) {
+			auto& kf = cp->keyframes[i];
+			ss << "          {\"time\": " << kf.time << ", \"translate\": [" << kf.translate.x << "," << kf.translate.y << "," << kf.translate.z << "], \"rotate\": [" << kf.rotate.x << "," << kf.rotate.y << "," << kf.rotate.z << "], \"scale\": [" << kf.scale.x << "," << kf.scale.y << "," << kf.scale.z << "]}";
+			if (i < cp->keyframes.size() - 1) ss << ",\n";
+		}
+		ss << "\n        ]}";
 	}
 
 	ss << "\n      ]\n";
@@ -1027,8 +1056,18 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	auto selectedEnt = gameScene->GetSelectedEntity();
 
 	if (!isPlaying && selectedEnt != entt::null && gameScene->GetRegistry().valid(selectedEnt)) {
-		auto& tc = gameScene->GetRegistry().get<TransformComponent>(selectedEnt);
-		DirectX::XMVECTOR objPos3D = DirectX::XMLoadFloat3(&tc.translate);
+		auto& reg = gameScene->GetRegistry();
+		auto* mc = reg.try_get<MotionComponent>(selectedEnt);
+		auto& tc = reg.get<TransformComponent>(selectedEnt);
+		
+		DirectX::XMFLOAT3 currentPos;
+		if (mc && mc->selectedKeyframe >= 0 && mc->selectedKeyframe < (int)mc->keyframes.size()) {
+			currentPos = mc->keyframes[mc->selectedKeyframe].translate;
+		} else {
+			currentPos = tc.translate;
+		}
+
+		DirectX::XMVECTOR objPos3D = DirectX::XMLoadFloat3(&currentPos);
 		DirectX::XMMATRIX view = gameScene->GetCamera().View();
 		DirectX::XMMATRIX proj = gameScene->GetCamera().Proj();
 		
@@ -1085,9 +1124,9 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				gizmoDragging = true;
 				gizmoDragAxis = hoveredAxis;
 				gizmoDragStartMouse = mousePos;
-				gizmoStartTranslate = tc.translate;
-				gizmoStartRotate = tc.rotate;
-				gizmoStartScale = tc.scale;
+				gizmoStartTranslate = currentPos;
+				gizmoStartRotate = {0,0,0}; // Not needed for KFs yet
+				gizmoStartScale = {1,1,1};
 			}
 
 			if (gizmoDragging) {
@@ -1130,18 +1169,22 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 					float sensitivity = (currentGizmoMode == GizmoMode::Rotate) ? 0.02f : 0.05f;
 					if (currentGizmoMode == GizmoMode::Scale) sensitivity = 0.01f;
 
+					auto* targetPos = mc && mc->selectedKeyframe >= 0 ? &mc->keyframes[mc->selectedKeyframe].translate : &reg.get<TransformComponent>(selectedEnt).translate;
+					auto* targetRot = &reg.get<TransformComponent>(selectedEnt).rotate;
+					auto* targetScale = &reg.get<TransformComponent>(selectedEnt).scale;
+
 					if (currentGizmoMode == GizmoMode::Translate) {
-						if (gizmoDragAxis == 0) tc.translate.x += projMovement * sensitivity;
-						if (gizmoDragAxis == 1) tc.translate.y -= projMovement * sensitivity; // Screen Y is inverted
-						if (gizmoDragAxis == 2) tc.translate.z += projMovement * sensitivity;
-					} else if (currentGizmoMode == GizmoMode::Rotate) {
-						if (gizmoDragAxis == 0) tc.rotate.x += projMovement * sensitivity;
-						if (gizmoDragAxis == 1) tc.rotate.y -= projMovement * sensitivity;
-						if (gizmoDragAxis == 2) tc.rotate.z += projMovement * sensitivity;
-					} else if (currentGizmoMode == GizmoMode::Scale) {
-						if (gizmoDragAxis == 0) tc.scale.x += projMovement * sensitivity;
-						if (gizmoDragAxis == 1) tc.scale.y -= projMovement * sensitivity;
-						if (gizmoDragAxis == 2) tc.scale.z += projMovement * sensitivity;
+						if (gizmoDragAxis == 0) targetPos->x += projMovement * sensitivity;
+						if (gizmoDragAxis == 1) targetPos->y -= projMovement * sensitivity; // Screen Y is inverted
+						if (gizmoDragAxis == 2) targetPos->z += projMovement * sensitivity;
+					} else if (currentGizmoMode == GizmoMode::Rotate && !mc) {
+						if (gizmoDragAxis == 0) targetRot->x += projMovement * sensitivity;
+						if (gizmoDragAxis == 1) targetRot->y -= projMovement * sensitivity;
+						if (gizmoDragAxis == 2) targetRot->z += projMovement * sensitivity;
+					} else if (currentGizmoMode == GizmoMode::Scale && !mc) {
+						if (gizmoDragAxis == 0) targetScale->x += projMovement * sensitivity;
+						if (gizmoDragAxis == 1) targetScale->y -= projMovement * sensitivity;
+						if (gizmoDragAxis == 2) targetScale->z += projMovement * sensitivity;
 					}
 				}
 			}
@@ -1164,19 +1207,39 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				drawList->AddRectFilled(ImVec2(endY.x-4, endY.y-4), ImVec2(endY.x+4, endY.y+4), colY);
 				drawList->AddRectFilled(ImVec2(endZ.x-4, endZ.y-4), ImVec2(endZ.x+4, endZ.y+4), colZ);
 			} else { // Rotate
-				drawList->AddCircle(origin, gizmoLen, IM_COL32(200,200,200,100), 32, 1.0f);
+			}
+
+			// Spline Keyframe Picking
+			if (mc && !gizmoHovered) {
+				if (ImGui::IsMouseClicked(0)) {
+					mousePos = ImGui::GetMousePos();
+					float sx = mousePos.x, sy = mousePos.y;
+					
+					view = gameScene->GetCamera().View();
+					proj = gameScene->GetCamera().Proj();
+
+					for (int i = 0; i < (int)mc->keyframes.size(); ++i) {
+						DirectX::XMVECTOR p3D = DirectX::XMLoadFloat3(&mc->keyframes[i].translate);
+						projP = DirectX::XMVector3Project(p3D, 0, 0, renderW, renderH, 0.0f, 1.0f, proj, view, DirectX::XMMatrixIdentity());
+						px = DirectX::XMVectorGetX(projP) + gameImageMin.x;
+						py = DirectX::XMVectorGetY(projP) + gameImageMin.y;
+						pz = DirectX::XMVectorGetZ(projP);
+
+						if (pz > 0.0f && pz < 1.0f) {
+							float dx = sx - px, dy = sy - py;
+							if (std::sqrt(dx*dx + dy*dy) < 15.0f) {
+								mc->selectedKeyframe = i;
+								gizmoHovered = true; // Prevent object picking
+								break;
+							}
+						}
+					}
+				}
 			}
 		}
 	}
 
-	// Hotkeys for Gizmo - Also disabled during PLAY
-	if (!isPlaying && ImGui::IsWindowFocused() && !ImGui::IsAnyItemActive()) {
-		if (ImGui::IsKeyPressed(ImGuiKey_W)) currentGizmoMode = GizmoMode::Translate;
-		if (ImGui::IsKeyPressed(ImGuiKey_E)) currentGizmoMode = GizmoMode::Rotate;
-		if (ImGui::IsKeyPressed(ImGuiKey_R)) currentGizmoMode = GizmoMode::Scale;
-	}
-
-	// Scene Picking - Also disabled during PLAY (optional, but requested "nothing can be done")
+	// Scene Picking - Also disabled during PLAY
 	if (!isPlaying && ImGui::IsItemHovered() && !gizmoHovered) {
 		if (ImGui::IsMouseClicked(0)) {
 			ImVec2 mousePos = ImGui::GetMousePos();
@@ -1594,6 +1657,45 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					ImGui::DragFloat("Max HP", &hp->maxHp, 1.0f, 1, 10000);
 					ImGui::Checkbox("Is Dead", &hp->isDead);
 					if (ImGui::Button("Remove##HP")) registry.remove<HealthComponent>(entity);
+				}
+			}
+			if (auto* mc = registry.try_get<MotionComponent>(entity)) {
+				if (ImGui::CollapsingHeader("Motion Editor", ImGuiTreeNodeFlags_DefaultOpen)) {
+					ImGui::Checkbox("Enabled##MC", &mc->enabled);
+					ImGui::Checkbox("Playing", &mc->isPlaying);
+					ImGui::DragFloat("Current Time", &mc->currentTime, 0.01f, 0, mc->totalDuration);
+					ImGui::DragFloat("Duration", &mc->totalDuration, 0.1f, 0.1f, 100.0f);
+					ImGui::Checkbox("Loop", &mc->loop);
+					
+					if (ImGui::Button("Add Keyframe")) {
+						MotionComponent::Keyframe k;
+						k.time = mc->totalDuration;
+						if (!mc->keyframes.empty()) {
+							k.translate = mc->keyframes.back().translate;
+						}
+						mc->keyframes.push_back(k);
+					}
+					
+					ImGui::Separator();
+					ImGui::Text("Keyframes:");
+					for (int i = 0; i < (int)mc->keyframes.size(); ++i) {
+						char label[32]; sprintf_s(label, "KF %d", i);
+						if (ImGui::Selectable(label, mc->selectedKeyframe == i)) {
+							mc->selectedKeyframe = i;
+						}
+						if (mc->selectedKeyframe == i) {
+							ImGui::Indent();
+							ImGui::DragFloat("Time", &mc->keyframes[i].time, 0.01f, 0, mc->totalDuration);
+							ImGui::DragFloat3("Pos", &mc->keyframes[i].translate.x, 0.1f);
+							if (ImGui::Button("Remove KF")) {
+								mc->keyframes.erase(mc->keyframes.begin() + i);
+								mc->selectedKeyframe = -1;
+							}
+							ImGui::Unindent();
+						}
+					}
+
+					if (ImGui::Button("Remove##MC")) registry.remove<MotionComponent>(entity);
 				}
 			}
 			if (auto* cp = registry.try_get<ScriptComponent>(selected)) {

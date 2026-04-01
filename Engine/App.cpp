@@ -1,6 +1,7 @@
 #include "App.h"
 #include <Windows.h>
 #include "JobSystem.h"
+#include "Time/TimeManager.h" // ★追加
 
 
 namespace Engine {
@@ -66,6 +67,10 @@ void App::Run() {
 		if (input_.Trigger(DIK_F11) || (input_.Down(DIK_LALT) && input_.Trigger(DIK_RETURN))) {
 			dx_.ToggleFullscreen();
 		}
+
+		// ★追加: TimeManagerの更新
+		// 本来は正確なフレーム時間(dt)を計算すべき
+		TimeManager::GetInstance().Update(1.0f / 60.0f);
 
 		dx_.BeginFrame();
 		const float clearColor[] = {0.1f, 0.25f, 0.5f, 1.0f};
