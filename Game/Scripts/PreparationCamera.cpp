@@ -37,10 +37,7 @@ void PreparationCamera::UpdateMovement(entt::entity entity, GameScene* scene, fl
 	if (!registry.all_of<PlayerInputComponent>(entity))
 		return;
 
-	auto& input = registry.get<PlayerInputComponent>(entity);
-	float kPreparationCameraSpeedMul = 2.0f;
-	input.moveDir.x *= kPreparationCameraSpeedMul;
-	input.moveDir.y *= kPreparationCameraSpeedMul;
+	scene->GetRegistry().get<CharacterMovementComponent>(entity).speed = 20.0f; // 毎フレーム少しずつ右に回転させる
 }
 
 void PreparationCamera::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
