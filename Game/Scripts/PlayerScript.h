@@ -4,7 +4,9 @@
 #include <DirectXMath.h>
 #include <Windows.h>
 #include <cmath>
+#include <deque>
 #include "../../externals/entt/entt.hpp"
+#include "../Engine/Matrix4x4.h"
 
 namespace Game {
 
@@ -25,16 +27,16 @@ private:
 	SheatheState sheatheState_ = SheatheState::Back;
 
 	bool isSheathed_ = true;
-	float sheatheTimer_ = 0.0f;           // 最後に攻撃してから納刀するまでのタイマー
-	const float AUTO_SHEATHE_TIME = 3.0f; // 3秒で自動納刀
+	float sheatheTimer_ = 0.0f;
+	const float AUTO_SHEATHE_TIME = 3.0f;
 
-	int comboCount_ = 0;       // 0: なし, 1-3: コンボ段数
-	float attackTimer_ = 0.0f; // 現在のフェーズの残り時間
+	int comboCount_ = 0;
+	float attackTimer_ = 0.0f;
 	bool isAttacking_ = false;
-	bool attackQueued_ = false;      // 先行入力フラグ
-	bool prevAttackKeyDown_ = false; // 前フレームの入力状態
+	bool attackQueued_ = false;
+	bool prevAttackKeyDown_ = false;
 
-	bool isReturning_ = false; // 待機状態への戻り動作中
+	bool isReturning_ = false;
 	float returnTimer_ = 0.0f;
 
 	DirectX::XMFLOAT3 currentSwordRot_ = {0.0f, 0.0f, 0.0f};
@@ -43,7 +45,6 @@ private:
 	DirectX::XMFLOAT3 currentBodyRot_ = {0.0f, 0.0f, 0.0f};
 	DirectX::XMFLOAT3 startBodyRot_ = {0.0f, 0.0f, 0.0f};
 
-	// イージングヘルパー: 0.0-1.0 を引数に取り、初速が早く後半ゆっくりになる
 	float EaseOutCubic(float t) { return 1.0f - std::powf(1.0f - t, 3.0f); }
 	float EaseOutQuint(float t) { return 1.0f - std::powf(1.0f - t, 5.0f); }
 	float EaseOutBack(float t) {
@@ -53,7 +54,6 @@ private:
 	}
 	float EaseOutExpo(float t) { return (t == 1.0f) ? 1.0f : 1.0f - std::powf(2.0f, -10.0f * t); }
 
-	// 剣オブジェクトの名前（ヒエラルキーから探す用）
 	std::string swordName_ = "PlayerSword";
 
 	void UpdateMovement(entt::entity entity, GameScene* /*scene*/, float dt);
@@ -65,6 +65,15 @@ private:
 	int debugSubscribeCount_ = 0;
 	int debugReceiveCount_ = 0;
 	float debugLastValue_ = 0.0f;
+
+	// ★修正: 剣の軌跡 (DrawLine3Dベース)
+	struct TrailPoint {
+		Engine::Vector3 tip;
+		Engine::Vector3 base;
+		float life;
+		float maxLife;
+	};
+	std::deque<TrailPoint> trailPoints_;
 };
 
 } // namespace Game

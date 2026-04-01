@@ -1,8 +1,11 @@
-#pragma once
 #include "ISystem.h"
 #include <cmath>
+#include "../Engine/Time/TimeManager.h" 
+#include "../Scripts/HitDistortionScript.h" // ★追加
+#include "GameScene.h"                     // ★追加
 
 namespace Game {
+
 
 class CombatSystem : public ISystem {
 public:
@@ -90,9 +93,14 @@ public:
 					std::string aTag = registry.all_of<TagComponent>(attackerEntity) ? registry.get<TagComponent>(attackerEntity).tag : "Untagged";
 					std::string dTag = registry.all_of<TagComponent>(defenderEntity) ? registry.get<TagComponent>(defenderEntity).tag : "Untagged";
 					
+					char logStr[256];
+					sprintf_s(logStr, "[Combat] Overlap with %s. tags=(%s -> %s)\n", 
+						registry.all_of<NameComponent>(defenderEntity) ? registry.get<NameComponent>(defenderEntity).name.c_str() : "Unknown", aTag.c_str(), dTag.c_str());
+					OutputDebugStringA(logStr);
+
 					bool skipDamage = false;
-					if (aTag == "PlayerSword" || aTag == "Sword") { if (dTag != "Enemy") skipDamage = true; }
-					if (aTag != "Untagged" && aTag == dTag) skipDamage = true;
+					if (aTag == "PlayerSword" || aTag == "Sword") { if (dTag != "Enemy") { skipDamage = true; OutputDebugStringA("  - SKIPPED: dTag is not Enemy\n"); } }
+					if (aTag != "Untagged" && aTag == dTag) { skipDamage = true; OutputDebugStringA("  - SKIPPED: Tag match\n"); }
 					if (skipDamage) continue;
 
 					if (registry.all_of<HealthComponent>(defenderEntity)) {
@@ -101,9 +109,39 @@ public:
 							hc.hp -= hitbox.damage * hurtbox.damageMultiplier;
 							hc.invincibleTime = 0.5f;
 
+							// ★追加: ヒット演出トリガー (Distortion)
+							if (ctx.scene) {
+								auto hitDistortion = ctx.scene->CreateEntity("HitDistortion_VFX");
+								// ★当たり判定を完全に除去
+								if (registry.all_of<BoxColliderComponent>(hitDistortion)) registry.remove<BoxColliderComponent>(hitDistortion);
+								if (registry.all_of<HurtboxComponent>(hitDistortion)) registry.remove<HurtboxComponent>(hitDistortion);
+								if (registry.all_of<RigidbodyComponent>(hitDistortion)) registry.remove<RigidbodyComponent>(hitDistortion);
+
+								OutputDebugStringA("[Combat] HitDistortion_VFX Created!\n");
+								auto& tc_hit = registry.get<TransformComponent>(hitDistortion); // ★修正: get に変更
+								DirectX::XMStoreFloat3(&tc_hit.translate, dCenter); // 敵の中心で発生
+								tc_hit.scale = { 1, 1, 1 };
+
+								auto& mrc_hit = registry.emplace<MeshRendererComponent>(hitDistortion);
+								mrc_hit.shaderName = "Distortion";
+								mrc_hit.texturePath = "Resources/Textures/normal.png";
+								mrc_hit.modelPath = "Resources/Models/Plane/cube.obj"; // ★修正: 球体から平面に変更
+								
+								// ★修正: ハンドルを明示的にロードしてセット
+								if (ctx.renderer) {
+									mrc_hit.modelHandle = ctx.renderer->LoadObjMesh(mrc_hit.modelPath);
+									mrc_hit.textureHandle = ctx.renderer->LoadTexture2D(mrc_hit.texturePath);
+								}
+								
+								mrc_hit.color = { 1, 1, 1, 2.0f }; // Alpha=2.0 で強力な歪み
+
+								auto& sc_hit = registry.emplace<ScriptComponent>(hitDistortion);
+								sc_hit.scripts.push_back({ "HitDistortionScript", "", std::make_shared<HitDistortionScript>(), false });
+							}
+
 							// ★追加: ヒット演出トリガー
 							hc.hitFlashTimer = 0.2f; // 0.2秒間光る
-							hc.hitStopTimer = 0.1f;  // 0.1秒間停止
+							::Engine::TimeManager::GetInstance().SetHitstop(0.1f); // ★追加
 
 							ApplyKnockback(registry, attackerEntity, defenderEntity);
 
@@ -123,7 +161,8 @@ public:
 				auto& bc = registry.get<BoxColliderComponent>(defenderEntity);
 				if (!bc.enabled) continue;
 
-				::Engine::Matrix4x4 dWorld = ctx.scene->GetWorldMatrix(static_cast<int>(defenderEntity));
+				::Engine::Matrix4x4 dWorld = ::Engine::Matrix4x4::Identity();
+				if (ctx.scene) dWorld = ctx.scene->GetWorldMatrix(static_cast<int>(defenderEntity));
 				DirectX::XMMATRIX dWorldMat = DirectX::XMLoadFloat4x4(reinterpret_cast<const DirectX::XMFLOAT4X4*>(&dWorld));
 				DirectX::XMVECTOR dCenter = DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&bc.center)), dWorldMat);
 				DirectX::XMVECTOR dAxes[3];
@@ -141,7 +180,13 @@ public:
 				if (CheckObbOverlap(aCenter, aAxes, aExtents, dCenter, dAxes, dExtents) && hitbox.isActive) {
 					std::string aTag = registry.all_of<TagComponent>(attackerEntity) ? registry.get<TagComponent>(attackerEntity).tag : "Untagged";
 					std::string dTag = registry.all_of<TagComponent>(defenderEntity) ? registry.get<TagComponent>(defenderEntity).tag : "Untagged";
-					if ((aTag == "PlayerSword" || aTag == "Sword") && dTag != "Enemy") continue;
+					
+					char logStr[256];
+					sprintf_s(logStr, "[Combat] Overlap with BoxCollider(%s). tags=(%s -> %s)\n", 
+						registry.all_of<NameComponent>(defenderEntity) ? registry.get<NameComponent>(defenderEntity).name.c_str() : "Unknown", aTag.c_str(), dTag.c_str());
+					OutputDebugStringA(logStr);
+
+					if ((aTag == "PlayerSword" || aTag == "Sword") && dTag != "Enemy") { OutputDebugStringA("  - SKIPPED: dTag is not Enemy (BoxCollider)\n"); continue; }
 
 					if (registry.all_of<HealthComponent>(defenderEntity)) {
 						auto& hc = registry.get<HealthComponent>(defenderEntity);
@@ -149,9 +194,31 @@ public:
 							hc.hp -= hitbox.damage;
 							hc.invincibleTime = 0.5f;
 
+							// ★追加: ヒット演出トリガー (Distortion)
+							if (ctx.scene) {
+								auto hitDistortion = ctx.scene->CreateEntity("HitDistortion_VFX");
+								OutputDebugStringA("[Combat] HitDistortion_VFX Created! (from BoxCollider)\n");
+								auto& tc_hit = registry.get<TransformComponent>(hitDistortion);
+								DirectX::XMStoreFloat3(&tc_hit.translate, dCenter);
+								tc_hit.scale = { 1, 1, 1 };
+
+								auto& mrc_hit = registry.emplace<MeshRendererComponent>(hitDistortion);
+								mrc_hit.shaderName = "Distortion";
+								mrc_hit.texturePath = "Resources/Textures/normal.png";
+								mrc_hit.modelPath = "Resources/Models/Plane/cube.obj"; // ★修正: 球体から平面に変更
+								if (ctx.renderer) {
+									mrc_hit.modelHandle = ctx.renderer->LoadObjMesh(mrc_hit.modelPath);
+									mrc_hit.textureHandle = ctx.renderer->LoadTexture2D(mrc_hit.texturePath);
+								}
+								mrc_hit.color = { 1, 1, 1, 3.0f };
+
+								auto& sc_hit = registry.emplace<ScriptComponent>(hitDistortion);
+								sc_hit.scripts.push_back({ "HitDistortionScript", "", std::make_shared<HitDistortionScript>(), false });
+							}
+
 							// ★追加: ヒット演出トリガー
 							hc.hitFlashTimer = 0.2f; // 0.2秒間光る
-							hc.hitStopTimer = 0.1f;  // 0.1秒間停止
+							::Engine::TimeManager::GetInstance().SetHitstop(0.1f);
 
 							ApplyKnockback(registry, attackerEntity, defenderEntity);
 
