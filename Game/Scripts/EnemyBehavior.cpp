@@ -54,46 +54,48 @@ void EnemyBehavior::Start(entt::entity entity, GameScene* scene) {
 }
 
 void EnemyBehavior::Update(entt::entity entity, GameScene* scene, float dt) {
-	if (!scene || !scene->GetRegistry().valid(entity)) return;
-	auto& registry = scene->GetRegistry();
-	if (!registry.all_of<TransformComponent>(entity)) return;
+	//if (!scene || !scene->GetRegistry().valid(entity)) return;
+	//auto& registry = scene->GetRegistry();
+	//if (!registry.all_of<TransformComponent>(entity)) return;
 
-	ownerId_ = static_cast<uint32_t>(entity);
-	pCurrentScene_ = scene;
+	//ownerId_ = static_cast<uint32_t>(entity);
+	//pCurrentScene_ = scene;
 
-	if (registry.all_of<HealthComponent>(entity)) {
-		auto& hc = registry.get<HealthComponent>(entity);
-		if (hc.isDead) return;
-		if (hc.hitStopTimer > 0.0f) return; // ヒットストップ中は動きを止める
-	}
+	//if (registry.all_of<HealthComponent>(entity)) {
+	//	auto& hc = registry.get<HealthComponent>(entity);
+	//	if (hc.isDead) return;
+	//	if (hc.hitStopTimer > 0.0f) return; // ヒットストップ中は動きを止める
+	//}
 
-	// ターゲットが実在するか確認
-	bool targetExists = false;
-	if (targetId_ != 0) {
-		entt::entity targetEntity = static_cast<entt::entity>(targetId_);
-		if (registry.valid(targetEntity)) {
-			targetExists = true;
-		}
-	}
-	if (!targetExists) {
-		targetId_ = 0;
-		SearchTarget(entity, scene);
-	}
+	//// ターゲットが実在するか確認
+	//bool targetExists = false;
+	//if (targetId_ != 0) {
+	//	entt::entity targetEntity = static_cast<entt::entity>(targetId_);
+	//	if (registry.valid(targetEntity)) {
+	//		targetExists = true;
+	//	}
+	//}
+	//if (!targetExists) {
+	//	targetId_ = 0;
+	//	SearchTarget(entity, scene);
+	//}
 
-	// ヒット中（無敵時間中）はスキャンと移動を停止
-	bool isHit = false;
-	if (registry.all_of<HealthComponent>(entity)) {
-		if (registry.get<HealthComponent>(entity).invincibleTime > 0.0f) isHit = true;
-	}
+	//// ヒット中（無敵時間中）はスキャンと移動を停止
+	//bool isHit = false;
+	//if (registry.all_of<HealthComponent>(entity)) {
+	//	if (registry.get<HealthComponent>(entity).invincibleTime > 0.0f) isHit = true;
+	//}
 
-	if (!isHit) {
-		scanTimer_ += dt;
-		if (scanTimer_ > 0.2f) {
-			scanTimer_ = 0.0f;
-		}
+	//if (!isHit) {
+	//	scanTimer_ += dt;
+	//	if (scanTimer_ > 0.2f) {
+	//		scanTimer_ = 0.0f;
+	//	}
 
-		Move(entity, scene, dt);
-	}
+	//	Move(entity, scene, dt);
+	//}
+
+	Move(entity, scene, dt);
 }
 
 void EnemyBehavior::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
@@ -146,7 +148,7 @@ void EnemyBehavior::OnEditorUI() {
 #endif
 }
 
-void EnemyBehavior::SearchTarget(entt::entity entity, GameScene* scene) {
+void EnemyBehavior::SearchTarget(entt::entity /*entity*/, GameScene* /*scene*/) {
 	//if (scene == nullptr) {
 	//	return;
 	//}
@@ -182,8 +184,55 @@ void EnemyBehavior::SearchTarget(entt::entity entity, GameScene* scene) {
 	//targetId_ = bestTarget != entt::null ? static_cast<uint32_t>(bestTarget) : 0;
 }
 
-void EnemyBehavior::Move(entt::entity /*entity*/, GameScene* /*scene*/, float /*dt*/) {
-	
+void EnemyBehavior::Move(entt::entity entity, GameScene* scene, float /*dt*/) {
+	auto& registry = scene->GetRegistry();
+	auto& tc = registry.get<TransformComponent>(entity);
+
+	// Navigation取得
+	auto& nav = scene->GetNavigationManager();
+
+	float dirX = 0.0f;
+	float dirZ = 0.0f;
+
+	// 足元の進むべき方向をマネージャーから取得
+	nav.GetDirection(tc.translate.x, tc.translate.z, dirX, dirZ);
+
+	// 物理コンポーネントがあるかチェック
+	if (registry.all_of<RigidbodyComponent>(entity)) {
+		auto& rb = registry.get<RigidbodyComponent>(entity);
+
+		// 移動速度を計算
+		float vx = dirX * speed_;
+		float vz = dirZ * speed_;
+
+		if (type_ == Walk) {
+			// 地面を歩くタイプ
+			rb.velocity.x = vx;
+			rb.velocity.z = vz;
+
+			// 地面の高さに合わせて y 座標を補正（埋まり・浮き防止）
+			//float h = scene->GetHeightAt(tc.translate.x, tc.translate.z, tc.translate.y + 1.0f, static_cast<uint32_t>(entity));
+			//if (h > -9000.0f) {
+			//	tc.translate.y = h + 0.1f; // 少しだけ浮かせて接地させるやんす
+			//}
+			//} else {
+			//	// 飛行タイプ（y軸はふわふわさせるやんす）
+			//	rb.velocity.x = vx;
+			//	rb.velocity.z = vz;
+
+			//	float floatHeight = 5.0f; // 地面から5m上を飛ぶ
+			//	float targetY = groundHeight_ + floatHeight + std::sin(scene->GetContext().playTime * 2.0f) * 0.5f;
+			//	tc.translate.y += (targetY - tc.translate.y) * 2.0f * dt;
+			//}
+
+			// 4. 進んでいる方向を向く（滑らかに回転させるとより『スローンフォール』っぽいやんす！）
+			if (std::abs(vx) > 0.1f || std::abs(vz) > 0.1f) {
+				float targetAngle = std::atan2(vx, vz);
+				// 角度の線形補間（Lerp）を自作エンジン側で持ってればそれを使うのがベストやんす
+				tc.rotate.y = targetAngle;
+			}
+		}
+	}
 }
 
 void EnemyBehavior::Debug() {

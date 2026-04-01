@@ -5,21 +5,6 @@
 #include <string>
 #include <vector>
 
-//*** 二次元マップを探索して最短ルートを進むアルゴリズムにする ***//
-
-struct Node {
-	bool isWall = false;    // Wallタグを持ったオブジェクトがあるか
-	int gridX = 0, gridZ = 0;       // グリッド上の座標
-	float gCost = 0.0f;            // スタートからの距離
-	float hCost = 0.0f;            // ゴールまでの推定距離
-	Node* parent = nullptr; // どのマスからきたか(ルートを逆算する)
-	bool isOpen = false;    // オープンリストに入っているか
-	bool isClosed = false;  // クローズリストに入っているか
-
-	// 最短経路のコストを計算するメソッド
-	float fCost() { return gCost + hCost; }
-};
-
 // 移動のタイプ
 enum MoveType {
 	Walk,

@@ -156,14 +156,20 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	registry_.on_construct<TagComponent>().connect<&GameScene::OnTagAdded>(this);
 	registry_.on_destroy<TagComponent>().disconnect<&GameScene::OnTagRemoved>(this);
 	registry_.on_destroy<TagComponent>().connect<&GameScene::OnTagRemoved>(this);
+
+	// NavigationManagerの初期化
+	flowField_ = std::make_unique<NavigationManager>();
+	flowField_->Initialize(100, 100, 2.0f);
+
+	//ステージロード直後に一度地形を読み込む
+	flowField_->UpdateCostMap(this);
 }
 
 // =====================================================
 // ★ Update: 各Systemに処理を委譲
 // =====================================================
 void GameScene::Update() {
-	if (!renderer_)
-		return;
+	if (!renderer_) return;
 
 	// ★追加: 行列キャッシュを毎フレームクリア
 	ClearMatrixCache();

@@ -130,6 +130,27 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		isPlacementMode_ = false;
 	}
 
+	// フェーズが切り替わった瞬間の検知
+	if (isPreparation_ != preIsPreparation_) {
+		auto& nav = scene->GetNavigationManager();
+
+		if (!isPreparation_) {
+			// 準備から戦闘に切り替わった瞬間
+			// 設置物を反映するためにコストマップを更新
+			nav.UpdateCostMap(scene);
+
+			// 敵が目指すコアをゴールの位置としてフローフィールドを計算
+			auto core = scene->FindObjectByName("Core");
+			if (scene->GetRegistry().valid(core)) {
+				auto& tc = scene->GetRegistry().get<TransformComponent>(core);
+				nav.GenerateFlowField(tc.translate.x, tc.translate.z);
+			}
+		}
+
+		// 状態を同期
+		preIsPreparation_ = isPreparation_;
+	}
+
 	preKeyN_ = keyN;
 }
 

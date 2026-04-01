@@ -17,7 +17,12 @@ struct FlowCell {
 
 class NavigationManager {
 public:
-	// マップの初期化
+	/// <summary>
+	/// マップ情報の初期化
+	/// </summary>
+	/// <param name="width">マップの幅</param>
+	/// <param name="height">マップの奥行</param>
+	/// <param name="cellSize">セル一つ当たりのサイズ</param>
 	void Initialize(int width, int height, float cellSize);
 
 	// 全マスのcostを更新(壁や設備が立って地形が変わったとき用)

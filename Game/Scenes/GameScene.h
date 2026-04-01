@@ -14,6 +14,7 @@
 #include "../../externals/entt/entt.hpp"
 #include "../../Engine/ParticleEmitter.h"
 #include "../../Engine/ParticleEditor.h"
+#include "../EnemySystem/NavigationManager.h"
 
 namespace Game {
 
@@ -65,6 +66,9 @@ public:
 	void SetTag(entt::entity entity, const std::string& tag);
 	void SyncTag(entt::entity entity); // ★追加: 手動同期用
 
+	// flowField_取得
+	NavigationManager& GetNavigationManager() { return *flowField_; }
+
 private:
     Engine::WindowDX* dx_ = nullptr;
     Engine::Renderer* renderer_ = nullptr;
@@ -105,6 +109,10 @@ private:
     friend class EditorUI;
     friend class PipeEditor;
     friend class EnemySpawnerEditor;
+
+
+	//フローフィールド用
+	std::unique_ptr<NavigationManager> flowField_ = nullptr;
 };
 
 } // namespace Game
