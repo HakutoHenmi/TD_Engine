@@ -29,12 +29,15 @@ void PreparationCamera::Update(entt::entity entity, GameScene* scene, float dt) 
 	}
 }
 
-void PreparationCamera::UpdateMovement(entt::entity entity, GameScene* /*scene*/, float dt) {
-	// ※ このメソッドはGameSceneのregistryを使ってentityを操作
-	// scene経由でregistryを取得するが、引数でsceneがunusedの場合は直接使えない
-	// 一旦簡易実装
-	(void)entity;
-	(void)dt;
+void PreparationCamera::UpdateMovement(entt::entity entity, GameScene* scene, float /*dt*/) {
+	if (!scene || !scene->GetRegistry().valid(entity))
+		return;
+
+	auto& registry = scene->GetRegistry();
+	if (!registry.all_of<PlayerInputComponent>(entity))
+		return;
+
+	scene->GetRegistry().get<CharacterMovementComponent>(entity).speed = 20.0f; // 毎フレーム少しずつ右に回転させる
 }
 
 void PreparationCamera::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}

@@ -179,6 +179,7 @@ exit /b 0
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Game\Scripts\InstallationButton.cpp" />
     <ClCompile Include="Game\Editor\EditorUI.cpp" />
     <ClCompile Include="Game\Editor\PipeEditor.cpp" />
     <ClCompile Include="Game\Editor\EnemySpawnerEditor.cpp" />
@@ -212,6 +213,7 @@ exit /b 0
     <ClCompile Include="Game\Systems\RiverSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Game\Scripts\InstallationButton.h" />
     <ClInclude Include="Game\Editor\EditorUI.h" />
     <ClInclude Include="Game\Editor\PipeEditor.h" />
     <ClInclude Include="Game\Editor\EnemySpawnerEditor.h" />

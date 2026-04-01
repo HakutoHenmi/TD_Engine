@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "IScript.h"
 #include "SkillTree.h"
 #include "../../externals/entt/entt.hpp"
