@@ -27,7 +27,7 @@ std::vector<std::string> SceneManager::RegisteredNames() const {
 	return out;
 }
 
-bool SceneManager::Change(const std::string& name) {
+bool SceneManager::Change(const std::string& name, const SceneParameters& params) {
 	auto it = factories_.find(name);
 	if (it == factories_.end()) {
 		OutputDebugStringA("[SceneManager] Change failed: not registered\n");
@@ -39,21 +39,25 @@ bool SceneManager::Change(const std::string& name) {
 
 	if (current_) {
 		OutputDebugStringA("[SceneManager] Initialize scene\n");
-		current_->Initialize(dx_);
+		current_->Initialize(dx_, params);
 	}
 
 	pendingNext_.clear();
+	pendingParams_ = {};
 	return true;
 }
 
-void SceneManager::RequestChange(const std::string& name) { pendingNext_ = name; }
+void SceneManager::RequestChange(const std::string& name, const SceneParameters& params) {
+	pendingNext_ = name;
+	pendingParams_ = params;
+}
 
 void SceneManager::Update() {
 	static int u = 0;
 	if ((++u % 120) == 0)
 		OutputDebugStringA("[SceneManager] Update running\n");
 	if (!pendingNext_.empty()) {
-		Change(pendingNext_);
+		Change(pendingNext_, pendingParams_);
 	}
 
 	if (current_) {

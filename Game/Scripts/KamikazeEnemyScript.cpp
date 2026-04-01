@@ -30,10 +30,10 @@ void KamikazeEnemyScript::Update(entt::entity entity, GameScene* scene, float dt
 	// キャッシュが有効か確認
 	bool found = false;
 	
-	auto playerView = registry.view<TagComponent, TransformComponent>();
-	for(auto p : playerView) {
-		if (playerView.get<TagComponent>(p).tag == "Player") {
-			targetPos = playerView.get<TransformComponent>(p).translate;
+	const auto& players = scene->GetEntitiesByTag("Player");
+	for (auto p : players) {
+		if (registry.valid(p) && registry.all_of<TransformComponent>(p)) {
+			targetPos = registry.get<TransformComponent>(p).translate;
 			found = true;
 			break;
 		}

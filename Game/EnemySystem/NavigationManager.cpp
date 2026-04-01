@@ -149,8 +149,8 @@ void NavigationManager::GetDirection(float worldX, float worldZ, float& outX, fl
 
 	if (x >= 0 && x < width_ && z >= 0 && z < height_) {
 		const auto& cell = grid_[GetIndex(x, z)];
-		outX = grid_[GetIndex(x, z)].dirX;
-		outZ = grid_[GetIndex(x, z)].dirZ;
+		outX = cell.dirX;
+		outZ = cell.dirZ;
 	} else {
 		outX = 0;
 		outZ = 0;

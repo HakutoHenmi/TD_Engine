@@ -1,4 +1,4 @@
-#include "PlayerScript.h"
+﻿#include "PlayerScript.h"
 #ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
 #endif
@@ -54,8 +54,8 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		auto* renderer = scene->GetRenderer();
 		if (renderer) {
 			auto& mr = scene->GetRegistry().emplace<MeshRendererComponent>(sword);
-			mr.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
-			mr.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
+			mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+			mr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 			mr.color = { 0.9f, 0.9f, 0.9f, 1.0f };
 			mr.enabled = true;
 		}
@@ -93,8 +93,8 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 			if (mr.modelHandle == 0) {
 				auto* renderer = scene->GetRenderer();
 				if (renderer) {
-					mr.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
-					mr.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
+					mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+					mr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 				}
 			}
 		}

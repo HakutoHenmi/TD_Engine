@@ -10,8 +10,12 @@ namespace Engine {
 using Microsoft::WRL::ComPtr;
 
 static std::wstring AssetFullPath(const std::wstring& rel) {
-	wchar_t buf[MAX_PATH]{};
-	::GetModuleFileNameW(nullptr, buf, MAX_PATH);
+	wchar_t buf[32768]{};
+	DWORD len = ::GetModuleFileNameW(nullptr, buf, 32768);
+	if (len == 0 || len >= 32768) {
+		return (std::filesystem::current_path() / rel).wstring();
+	}
+	buf[len] = L'\0';
 	std::filesystem::path exeDir = std::filesystem::path(buf).parent_path();
 	return (exeDir / rel).wstring();
 }

@@ -7,7 +7,7 @@ namespace Game {
 
 class TitleScene : public Engine::IScene {
 public:
-	void Initialize(Engine::WindowDX* dx) override;
+	void Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& params) override;
 	void Update() override;
 	void Draw() override;
 	void DrawEditor() override;

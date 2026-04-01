@@ -47,15 +47,14 @@ void EnemyAIScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		auto& myTc = registry.get<TransformComponent>(entity);
 		
 		DirectX::XMFLOAT3 targetPos = {0, 0, 0};
-		// プレイヤーを探す
 		bool found = false;
-
-		auto playerView = registry.view<TagComponent, TransformComponent>();
-		for (auto p : playerView) {
-			if (playerView.get<TagComponent>(p).tag == "Player") {
-				targetPos = playerView.get<TransformComponent>(p).translate;
+		// プレイヤーを高速タグ検索で探す
+		const auto& players = scene->GetEntitiesByTag("Player");
+		if (!players.empty()) {
+			entt::entity p = players[0];
+			if (registry.valid(p) && registry.all_of<TransformComponent>(p)) {
+				targetPos = registry.get<TransformComponent>(p).translate;
 				found = true;
-				break;
 			}
 		}
 

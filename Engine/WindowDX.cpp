@@ -161,6 +161,39 @@ void WindowDX::WaitGPU() {
 	}
 }
 
+void WindowDX::ToggleFullscreen() {
+	if (!hwnd_) return;
+
+	isFullscreen_ = !isFullscreen_;
+
+	if (isFullscreen_) {
+		// ウィンドウ情報をバックアップ
+		windowedStyle_ = GetWindowLong(hwnd_, GWL_STYLE);
+		GetWindowRect(hwnd_, &windowedRect_);
+
+		// ボーダレススタイルに変更
+		SetWindowLong(hwnd_, GWL_STYLE, windowedStyle_ & ~WS_OVERLAPPEDWINDOW);
+
+		// モニター情報を取得してリサイズ
+		MONITORINFO mi = { sizeof(mi) };
+		if (GetMonitorInfo(MonitorFromWindow(hwnd_, MONITOR_DEFAULTTOPRIMARY), &mi)) {
+			SetWindowPos(hwnd_, HWND_TOP,
+				mi.rcMonitor.left, mi.rcMonitor.top,
+				mi.rcMonitor.right - mi.rcMonitor.left,
+				mi.rcMonitor.bottom - mi.rcMonitor.top,
+				SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+		}
+	} else {
+		// 元のスタイルと座標に復元
+		SetWindowLong(hwnd_, GWL_STYLE, windowedStyle_);
+		SetWindowPos(hwnd_, NULL,
+			windowedRect_.left, windowedRect_.top,
+			windowedRect_.right - windowedRect_.left,
+			windowedRect_.bottom - windowedRect_.top,
+			SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+	}
+}
+
 void WindowDX::Shutdown() {
 	WaitGPU();
 

@@ -7,6 +7,7 @@
 // ================================================
 #include <string>
 #include "WindowDX.h"
+#include "SceneParameters.h"
 
 namespace Engine {
 
@@ -16,7 +17,7 @@ public:
 	virtual ~IScene() = default;
 
 	// 初期化（リソース確保・初期状態のセット）
-	virtual void Initialize(WindowDX* dx) = 0;
+	virtual void Initialize(WindowDX* dx, const SceneParameters& params) = 0;
 
 	// 毎フレーム更新（入力処理・状態遷移・ゲームロジック）
 	virtual void Update() = 0;

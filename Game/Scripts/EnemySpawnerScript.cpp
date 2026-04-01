@@ -33,28 +33,17 @@ void EnemySpawnerScript::Start(entt::entity /*entity*/, GameScene* /*scene*/) {
 
 void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, float dt) {
 	// Kを押して今いる敵を消す処理
+	// Kを押して今いる敵を消す処理
 	if (GetAsyncKeyState('K') & 0x8000) {
-		std::vector<entt::entity> toDestroy;
-		auto view = scene->GetRegistry().view<TagComponent>();
-		for (auto e : view) {
-			if (view.get<TagComponent>(e).tag == "Enemy") {
-				toDestroy.push_back(e);
-			}
-		}
+		const auto& enemies = scene->GetEntitiesByTag("Enemy");
+		std::vector<entt::entity> toDestroy(enemies.begin(), enemies.end());
 		for (auto e : toDestroy) {
 			scene->GetRegistry().destroy(e);
 		}
 	}
 
 	if (currentWave_ >= waveCount) {
-		bool hasEnemy = false;
-		auto view = scene->GetRegistry().view<TagComponent>();
-		for (auto e : view) {
-			if (view.get<TagComponent>(e).tag == "Enemy") {
-				hasEnemy = true;
-				break;
-			}
-		}
+		bool hasEnemy = !scene->GetEntitiesByTag("Enemy").empty();
 
 		if (!hasEnemy) {
 			auto& sc = scene->GetRegistry().get<ScriptComponent>(spawnerEntity);
@@ -119,8 +108,8 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 		auto* renderer = Engine::Renderer::GetInstance();
 		if (renderer) {
 			auto& mr = scene->GetRegistry().emplace<MeshRendererComponent>(enemy);
-			mr.modelHandle = renderer->LoadObjMesh("Resources/cube/cube.obj");
-			mr.textureHandle = renderer->LoadTexture2D("Resources/white1x1.png");
+			mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+			mr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 			mr.color = (enemyType == 42) ? DirectX::XMFLOAT4{1.0f, 0.2f, 0.2f, 1.0f} : DirectX::XMFLOAT4{1.0f, 0.4f, 0.2f, 1.0f};
 			mr.shaderName = "Toon";
 			mr.enabled = true;
@@ -143,8 +132,8 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 		hurtbox.tag = "Enemy";
 		hurtbox.enabled = true;
 
-		auto& tagComponent = scene->GetRegistry().emplace<TagComponent>(enemy);
-		tagComponent.tag = "Enemy";
+		// ★ 高速タグシステム経由でタグを設定
+		scene->SetTag(enemy, "Enemy");
 
 		auto& hbComponent = scene->GetRegistry().emplace<HitboxComponent>(enemy);
 		hbComponent.isActive = true;
@@ -406,3 +395,4 @@ void EnemySpawnerScript::DeserializeParameters(const std::string& data) {
 REGISTER_SCRIPT(EnemySpawnerScript)
 
 } // namespace Game
+
