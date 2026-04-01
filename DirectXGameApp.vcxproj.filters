@@ -73,6 +73,7 @@
     <ClCompile Include="Game\Scenes\ResultScene.cpp" />
     <ClCompile Include="Game\Scripts\BulletTank.cpp" />
     <ClCompile Include="Game\Scripts\SkillTree.cpp" />
+    <ClCompile Include="Game\Scripts\InstallationButton.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
@@ -180,6 +181,7 @@
     <ClInclude Include="Game\Scenes\ResultScene.h" />
     <ClInclude Include="Game\Scripts\BulletTank.h" />
     <ClInclude Include="Game\Scripts\SkillTree.h" />
+    <ClInclude Include="Game\Scripts\InstallationButton.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">

@@ -1,175 +1,130 @@
-﻿{
+{
   "settings": {
     "postProcessEnabled": false,
-    "vignette": 0.5,
-    "distortion": 0,
-    "noiseStrength": 0.02,
-    "chromaShift": 0.01,
-    "scanline": 0.1
+    "ambientColor": [0.4, 0.4, 0.45],
+    "vignette": 0,
+    "noiseStrength": 0
   },
   "objects": [
     {
-      "name": "Floor",
+      "id": 3145735,
+      "parentId": 4294967295,
+      "name": "InstallationButton",
+      "locked": false,
+      "translate": [-400, 400, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": ""}]},
+        {"type": "RectTransform", "enabled": true, "pos": [-400,400], "size": [200,200], "anchor": [0.5,0.5]},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/InstallationButton.png", "color": [1,1,1,1]},
+        {"type": "UIButton", "enabled": true}
+      ]
+    },
+    {
+      "id": 3145734,
+      "parentId": 4294967295,
+      "name": "PhysicsSystem",
       "locked": true,
-      "modelPath": "Resources\\Models\\Stages\\karimap.obj",
-      "texturePath": "",
       "translate": [0, 0, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
-      "color": [0.690196, 0.388235, 0.388235, 1],
-      "extraTexturePaths": [],
-      "shaderName": "Default",
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources\\Models\\Stages\\karimap.obj", "texturePath": "Resources\\Textures\\uvChecker.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": ["Resources\\Models\\Terrain\\grass.png", "Resources\\Models\\Terrain\\rock.png", "Resources\\Models\\Terrain\\dirt.png", "Resources\\Textures\\basecolor.jpg", "Resources\\Textures\\white1x1.png"], "lightmapPath": "", "shaderName": "EnhancedTerrain"},
-        {"type": "GpuMeshCollider", "enabled": true, "isTrigger": false, "collisionType": 0, "meshPath": "Resources\\Models\\Stages\\karimap.obj"}
+        {"type": "Script", "enabled": true, "scripts": [{"path": "PhaseSystemScript", "param": ""}]}
       ]
     },
     {
-      "name": "PhaseSystem",
-      "locked": true,
-      "modelPath": "",
-      "texturePath": "Resources/Textures/white1x1.png",
-      "translate": [0, 0, 0],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "color": [1, 1, 1, 1],
-      "extraTexturePaths": [],
-      "shaderName": "Default",
-      "components": [
-        {"type": "Script", "enabled": true, "scriptPath": "PhaseSystemScript"}
-      ]
-    },
-    {
-      "name": "Player",
-      "locked": true,
-      "modelPath": "Resources/Models/cube/cube.obj",
-      "texturePath": "Resources/Textures/white1x1.png",
-      "translate": [3.09682, 8.56993, 1.47985],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "color": [0.2, 0.5, 1, 1],
-      "extraTexturePaths": [],
-      "shaderName": "Default",
-      "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/cube/cube.obj", "texturePath": "Resources/Textures/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"},
-        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
-        {"type": "Rigidbody", "enabled": true, "velocity": [0,0,0], "useGravity": true, "isKinematic": false},
-        {"type": "GpuMeshCollider", "enabled": true, "isTrigger": false, "collisionType": 0, "meshPath": "Resources/Models/cube/cube.obj"},
-        {"type": "PlayerInput", "enabled": true},
-        {"type": "CharacterMovement", "enabled": true, "speed": 7, "jumpPower": 20, "gravity": 9.8},
-        {"type": "CameraTarget", "enabled": false, "distance": 10, "height": 3, "smoothSpeed": 5},
-        {"type": "Health", "enabled": true, "hp": 1000, "maxHp": 1000, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
-        {"type": "Script", "enabled": true, "scriptPath": "PlayerScript"}
-      ]
-    },
-    {
-      "name": "PlayerSword",
-      "locked": true,
-      "modelPath": "",
-      "texturePath": "",
-      "translate": [3.60326, 5.43028, 3.03682],
-      "rotate": [0.0872665, 1.48405, -0.349066],
-      "scale": [0.1, 0.1, 1.6],
-      "color": [0.9, 0.9, 0.9, 1],
-      "extraTexturePaths": [],
-      "shaderName": "Default",
-      "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
-        {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [0.5,0.5,3], "damage": 25, "isActive": true, "tag": "Sword"}
-      ]
-    },
-    {
+      "id": 3145733,
+      "parentId": 3145732,
       "name": "PreparationCamera",
-      "locked": true,
-      "modelPath": "",
-      "texturePath": "Resources/Textures/white1x1.png",
-      "translate": [-0.311719, 18.9937, 0.932228],
-      "rotate": [0, 0, 0],
+      "locked": false,
+      "translate": [2.28225, 40, -2.48776],
+      "rotate": [0, 4.80659, 0],
       "scale": [1, 1, 1],
-      "color": [1, 1, 1, 1],
-      "extraTexturePaths": [],
-      "shaderName": "Default",
       "components": [
+        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,1,1], "isTrigger": false},
         {"type": "Rigidbody", "enabled": true, "velocity": [0,0,0], "useGravity": false, "isKinematic": false},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "PreparationCamera", "param": ""}]},
         {"type": "PlayerInput", "enabled": true},
-        {"type": "CharacterMovement", "enabled": true, "speed": 5, "jumpPower": 6, "gravity": 9.8},
+        {"type": "CharacterMovement", "enabled": true, "speed": 5, "jumpPower": 12, "gravity": 0},
         {"type": "CameraTarget", "enabled": true, "distance": 10, "height": 3, "smoothSpeed": 5},
-        {"type": "Script", "enabled": true, "scriptPath": "PreparationCamera"}
+        {"type": "RectTransform", "enabled": true, "pos": [0,48.1], "size": [100,100], "anchor": [0.5,0.5]}
       ]
     },
     {
+      "id": 3145732,
+      "parentId": 4294967295,
+      "name": "Core",
+      "locked": false,
+      "translate": [40, 28, -40],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/sword.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [0.0926641,0.65318,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "BaseScript", "param": "rotationSpeed=1;attackInterval=1;damage=10;attackRange=30;"}]},
+        {"type": "Health", "enabled": true, "hp": 100, "maxHp": 100, "isDead": false},
+        {"type": "Tag", "enabled": true, "tag": "Defender"}
+      ]
+    },
+    {
+      "id": 3145731,
+      "parentId": 4294967295,
+      "name": "PlayerSword",
+      "locked": false,
+      "translate": [0.763783, 1.80906, -11.6188],
+      "rotate": [0.785398, -14.043, 0.523599],
+      "scale": [0.1, 0.1, 1.6],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "shaderName": "Default", "color": [0.9,0.9,0.9,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "PlayerSword"}
+      ]
+    },
+    {
+      "id": 3145730,
+      "parentId": 4294967295,
       "name": "Sun",
       "locked": true,
-      "modelPath": "",
-      "texturePath": "",
-      "translate": [2.97847, 15.037, 7.07515],
-      "rotate": [0, 0, 0],
+      "translate": [0, 124.807, 0],
+      "rotate": [0.7854, 0.5236, 0],
       "scale": [1, 1, 1],
-      "color": [1, 1, 1, 1],
-      "extraTexturePaths": [],
-      "shaderName": "Default",
       "components": [
         {"type": "DirectionalLight", "enabled": true, "color": [1,0.95,0.8], "intensity": 1.2}
       ]
     },
     {
-      "name": "UI-Gun",
-      "locked": false,
-      "modelPath": "",
-      "texturePath": "Resources/Textures/white1x1.png",
-      "translate": [0.2, 0, 0],
+      "id": 3145729,
+      "parentId": 4294967295,
+      "name": "Player",
+      "locked": true,
+      "translate": [32.3661, 29.309, -32.542],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
-      "color": [1, 1, 1, 1],
-      "extraTexturePaths": [],
-      "shaderName": "Default",
       "components": [
-        {"type": "Tag", "enabled": true, "tag": "GunUI"},
-        {"type": "Script", "enabled": true, "scriptPath": "PreparationUI"},
-        {"type": "RectTransform", "enabled": true, "pos": [1490,800], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources\\Textures\\uvChecker.png", "color": [1,1,1,1]},
-        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0,0,0,1]}
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/cube/cube.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [0.2,0.5,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [2,2,2], "isTrigger": false},
+        {"type": "Rigidbody", "enabled": true, "velocity": [0,0,0], "useGravity": true, "isKinematic": true},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "PlayerScript", "param": ""}]},
+        {"type": "Health", "enabled": true, "hp": 890, "maxHp": 1000, "isDead": false},
+        {"type": "Tag", "enabled": true, "tag": "Player"},
+        {"type": "PlayerInput", "enabled": false},
+        {"type": "CharacterMovement", "enabled": true, "speed": 7, "jumpPower": 20, "gravity": 9.8},
+        {"type": "CameraTarget", "enabled": false, "distance": 10, "height": 3, "smoothSpeed": 5},
+        {"type": "GpuMeshCollider", "enabled": true, "meshPath": "Resources/Models/cube/cube.obj", "isTrigger": false}
       ]
     },
     {
-      "name": "UI-Pipe",
-      "locked": false,
-      "modelPath": "",
-      "texturePath": "Resources/Textures/white1x1.png",
-      "translate": [1.2, 0, 0],
+      "id": 3145728,
+      "parentId": 4294967295,
+      "name": "Floor",
+      "locked": true,
+      "translate": [0, 0, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
-      "color": [1, 1, 1, 1],
-      "extraTexturePaths": [],
-      "shaderName": "Default",
       "components": [
-        {"type": "Tag", "enabled": true, "tag": "PipeUI"},
-        {"type": "Script", "enabled": true, "scriptPath": "PreparationUI"},
-        {"type": "RectTransform", "enabled": true, "pos": [450,800], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources\\Textures\\uvChecker.png", "color": [1,1,1,1]},
-        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1]}
-      ]
-    },
-    {
-      "name": "UI-Tank",
-      "locked": false,
-      "modelPath": "",
-      "texturePath": "Resources/Textures/white1x1.png",
-      "translate": [1.2, 0, 0],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "color": [1, 1, 1, 1],
-      "extraTexturePaths": [],
-      "shaderName": "Default",
-      "components": [
-        {"type": "Tag", "enabled": true, "tag": "TankUI"},
-        {"type": "Script", "enabled": true, "scriptPath": "PreparationUI"},
-        {"type": "RectTransform", "enabled": true, "pos": [970,800], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources\\Textures\\uvChecker.png", "color": [1,1,1,1]},
-        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1]}
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/Stages/kariMap3.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Floor"},
+        {"type": "GpuMeshCollider", "enabled": true, "meshPath": "Resources/Models/Stages/kariMap3.obj", "isTrigger": false}
       ]
     }
   ]
 }
-
-

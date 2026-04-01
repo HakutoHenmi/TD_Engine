@@ -29,12 +29,18 @@ void PreparationCamera::Update(entt::entity entity, GameScene* scene, float dt) 
 	}
 }
 
-void PreparationCamera::UpdateMovement(entt::entity entity, GameScene* /*scene*/, float dt) {
-	// ※ このメソッドはGameSceneのregistryを使ってentityを操作
-	// scene経由でregistryを取得するが、引数でsceneがunusedの場合は直接使えない
-	// 一旦簡易実装
-	(void)entity;
-	(void)dt;
+void PreparationCamera::UpdateMovement(entt::entity entity, GameScene* scene, float /*dt*/) {
+	if (!scene || !scene->GetRegistry().valid(entity))
+		return;
+
+	auto& registry = scene->GetRegistry();
+	if (!registry.all_of<PlayerInputComponent>(entity))
+		return;
+
+	auto& input = registry.get<PlayerInputComponent>(entity);
+	float kPreparationCameraSpeedMul = 2.0f;
+	input.moveDir.x *= kPreparationCameraSpeedMul;
+	input.moveDir.y *= kPreparationCameraSpeedMul;
 }
 
 void PreparationCamera::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}

@@ -4,6 +4,7 @@
 
 namespace Game {
 
+
 class CombatSystem : public ISystem {
 public:
 	void Update(entt::registry& registry, GameContext& ctx) override {
