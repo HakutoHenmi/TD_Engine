@@ -86,17 +86,17 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			return; // 設置モードの入力を抑制
 		}
 
-		if (key1 || InstallationButton::IsButtonPressed()) {
+		if (key1 || InstallationButton::IsButtonPressed(InstallationButton::Tank)) {
 			selectedObjPath_ = "Resources/Prefabs/BulletTank.prefab";
 			isPlacementMode_ = true;
 		}
 
-		if (key2) {
+		if (key2 || InstallationButton::IsButtonPressed(InstallationButton::Pipe)) {
 			selectedObjPath_ = "Resources/Prefabs/Pipe.prefab";
 			isPlacementMode_ = true;
 		}
 
-		if (key3) {
+		if (key3 || InstallationButton::IsButtonPressed(InstallationButton::Cannon)) {
 			selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
 			isPlacementMode_ = true;
 		}

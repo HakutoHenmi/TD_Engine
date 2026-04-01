@@ -17,8 +17,11 @@ public:
 	void Update(entt::entity entity, GameScene* scene, float dt) override;
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
 	void OnEditorUI() override;
+	
+	std::string SerializeParameters() override;
+	void DeserializeParameters(const std::string& data) override;
 
-	static bool IsButtonPressed();
+	static bool IsButtonPressed(ButtonTypes type);
 
 
 	

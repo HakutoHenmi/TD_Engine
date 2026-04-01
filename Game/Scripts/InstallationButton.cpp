@@ -10,12 +10,17 @@
 #if defined(USE_IMGUI) && !defined(NDEBUG)
 #include <imgui.h>
 #endif
+#include "../../Engine/ThirdParty/nlohmann/json.hpp"
 
-namespace {
-bool isButtonPressed;
-}
+using json = nlohmann::json;
+
+
 
 namespace Game {
+
+namespace {
+bool isButtonPressed[InstallationButton::ButtonTypes::ButtonTypesNum];
+}
 
 bool InstallationButton::isButtonPressed_[ButtonTypesNum] = {};
 
@@ -31,7 +36,7 @@ void InstallationButton::Update(entt::entity entity, GameScene* scene, float dt)
 		return;
 
 	isButtonPressed_[buttonTypes_] = scene->GetRegistry().all_of<UIButtonComponent>(entity) && scene->GetRegistry().get<UIButtonComponent>(entity).isPressed;
-	isButtonPressed = isButtonPressed_[buttonTypes_];
+	isButtonPressed[buttonTypes_] = isButtonPressed_[buttonTypes_];
 
 	if (PhaseSystemScript::IsPreparation()) {
 		if (scene->GetRegistry().all_of<UIImageComponent>(entity))
@@ -50,13 +55,38 @@ void InstallationButton::Update(entt::entity entity, GameScene* scene, float dt)
 void InstallationButton::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 void InstallationButton::OnEditorUI() {
+#if defined(USE_IMGUI) && !defined(NDEBUG)
+	ImGui::SeparatorText("Installation Button");
 
-	ImGui::Begin("InstallationButton Script");
-	ImGui::Text("isButtonPressed_: %s", isButtonPressed_ ? "true" : "false");
-	ImGui::End();
+	const char* buttonTypeNames[] = {"Cannon", "Pipe", "Tank"};
+	int currentType = static_cast<int>(buttonTypes_);
+	if (ImGui::Combo("Button Type", &currentType, buttonTypeNames, IM_ARRAYSIZE(buttonTypeNames))) {
+		buttonTypes_ = static_cast<ButtonTypes>(currentType);
+	}
+
+	ImGui::Text("isButtonPressed_: %s", isButtonPressed_[buttonTypes_] ? "true" : "false");
+#endif
 }
 
-bool InstallationButton::IsButtonPressed() { return isButtonPressed; }
+std::string InstallationButton::SerializeParameters() {
+	json j;
+	j["buttonTypes"] = static_cast<int>(buttonTypes_);
+	return j.dump();
+}
+
+void InstallationButton::DeserializeParameters(const std::string& data) {
+	if (data.empty()) return;
+	try {
+		json j = json::parse(data);
+		if (j.contains("buttonTypes")) {
+			buttonTypes_ = static_cast<ButtonTypes>(j["buttonTypes"].get<int>());
+		}
+	} catch (...) {
+		// Log or suppress parse errors
+	}
+}
+
+bool InstallationButton::IsButtonPressed(ButtonTypes type) { return isButtonPressed[type]; }
 
 REGISTER_SCRIPT(InstallationButton);
 
