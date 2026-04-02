@@ -240,6 +240,10 @@ void GameScene::Update() {
 	ctx_.eventSystem = &eventSystem_;
 	ctx_.pendingSpawns = &pendingSpawns_;
 
+	// ★追加: ビューポート情報をデフォルトのウィンドウサイズで初期設定 (エディタ非実行時のレイアウト崩れ防止)
+	ctx_.viewportOffset = { 0.0f, 0.0f };
+	ctx_.viewportSize = { (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH };
+
 	// GPU Collision Dispatch（エンジンの汎用 PhysicsSystem.h に移行したため、ここでは何もしない）
 
 	// Animation（エンジン固有処理のため残留）
