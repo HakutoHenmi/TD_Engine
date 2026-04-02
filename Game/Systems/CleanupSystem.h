@@ -14,7 +14,7 @@ public:
 		auto bulletView = registry.view<TagComponent, TransformComponent, HealthComponent>();
 		for (auto entity : bulletView) {
 			auto& tag = bulletView.get<TagComponent>(entity);
-			if (tag.tag != "Bullet") continue;
+			if (tag.tag != TagType::Bullet) continue;
 
 			auto& tc = bulletView.get<TransformComponent>(entity);
 			float distSq = tc.translate.x * tc.translate.x +
@@ -35,7 +35,7 @@ public:
 				// Player は破棄しない
 				if (registry.all_of<TagComponent>(entity)) {
 					auto& tag = registry.get<TagComponent>(entity);
-					if (tag.tag == "Player" || tag.tag == "PlayerSword") continue;
+					if (tag.tag == TagType::Player || tag.tag == TagType::PlayerSword) continue;
 				}
 				toDestroy.push_back(entity);
 			}

@@ -49,7 +49,7 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		cc.color = { 0.9f, 0.9f, 0.9f, 1.0f };
 
 		auto& tcTag = scene->GetRegistry().emplace<TagComponent>(sword);
-		tcTag.tag = "PlayerSword";
+		tcTag.tag = TagType::PlayerSword;
 
 		auto* renderer = scene->GetRenderer();
 		if (renderer) {
@@ -63,13 +63,13 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		auto& hb = scene->GetRegistry().emplace<HitboxComponent>(sword);
 		hb.isActive = false;
 		hb.damage = 25.0f;
-		hb.tag = "Sword";
+		hb.tag = TagType::Sword;
 			hb.size = { 1.2f, 1.2f, 1.2f }; 
 		hb.enabled = true;
 	} else {
 		// 既にタグがない場合は追加
 		if (!scene->GetRegistry().all_of<TagComponent>(sword)) {
-			scene->GetRegistry().emplace<TagComponent>(sword).tag = "PlayerSword";
+			scene->GetRegistry().emplace<TagComponent>(sword).tag = TagType::PlayerSword;
 		}
 		// 既にある場合は基本的なプロパティを維持
 		scene->GetRegistry().get<TransformComponent>(sword).scale = { 0.1f, 0.1f, 1.6f };
@@ -79,7 +79,7 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 			auto& hb = scene->GetRegistry().emplace<HitboxComponent>(sword);
 			hb.isActive = false;
 			hb.damage = 25.0f;
-			hb.tag = "Sword";
+			hb.tag = TagType::Sword;
 			hb.size = { 1.2f, 1.2f, 1.2f }; 
 			hb.enabled = true;
 			OutputDebugStringA("[PlayerScript] Hitbox Component ADDED to existing Sword entity.\n");

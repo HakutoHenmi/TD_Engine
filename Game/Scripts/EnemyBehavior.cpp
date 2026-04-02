@@ -9,7 +9,7 @@
 
 namespace Game {
 
-static bool HasTag(entt::registry& registry, entt::entity entity, const char* tagName) {
+static bool HasTag(entt::registry& registry, entt::entity entity, TagType tagName) {
 	if (!registry.valid(entity) || !registry.all_of<TagComponent>(entity)) return false;
 	return registry.get<TagComponent>(entity).tag == tagName;
 }

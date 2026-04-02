@@ -156,10 +156,93 @@ struct AnimatorComponent : public Component {
 	AnimatorComponent() { type = ComponentType::Animator; }
 };
 
+enum class TagType : uint32_t {
+	Untagged = 0,
+	Player,
+	Enemy,
+	Bullet,
+	Sword,
+	PlayerSword,
+	Projectile,
+	Pipe,
+	Canon,
+	Cannon,
+	Wall,
+	BulletTank,
+	PipeCannon,
+	Body,
+	Head,
+	Explosion,
+	Poison,
+	Trap,
+	Experience,
+	ExperienceOrb,
+	ExperienceMiner,
+	Default,
+	VFX,
+	HitDistortion_VFX
+};
+
+inline const char* TagToString(TagType tag) {
+	switch (tag) {
+	case TagType::Player: return "Player";
+	case TagType::Enemy: return "Enemy";
+	case TagType::Bullet: return "Bullet";
+	case TagType::Sword: return "Sword";
+	case TagType::PlayerSword: return "PlayerSword";
+	case TagType::Projectile: return "Projectile";
+	case TagType::Pipe: return "Pipe";
+	case TagType::Canon: return "Canon";
+	case TagType::Cannon: return "Cannon";
+	case TagType::Wall: return "Wall";
+	case TagType::BulletTank: return "BulletTank";
+	case TagType::PipeCannon: return "pipe_cannon";
+	case TagType::Body: return "Body";
+	case TagType::Head: return "Head";
+	case TagType::Explosion: return "Explosion";
+	case TagType::Poison: return "Poison";
+	case TagType::Trap: return "Trap";
+	case TagType::Experience: return "Experience";
+	case TagType::ExperienceOrb: return "ExperienceOrb";
+	case TagType::ExperienceMiner: return "ExperienceMiner";
+	case TagType::VFX: return "VFX";
+	case TagType::HitDistortion_VFX: return "HitDistortion_VFX";
+	case TagType::Default: return "Default";
+	default: return "Untagged";
+	}
+}
+
+inline TagType StringToTag(const std::string& s) {
+	if (s == "Player") return TagType::Player;
+	if (s == "Enemy") return TagType::Enemy;
+	if (s == "Bullet") return TagType::Bullet;
+	if (s == "Sword") return TagType::Sword;
+	if (s == "PlayerSword") return TagType::PlayerSword;
+	if (s == "Projectile") return TagType::Projectile;
+	if (s == "Pipe" || s == "pipe") return TagType::Pipe;
+	if (s == "Canon") return TagType::Canon;
+	if (s == "Cannon") return TagType::Cannon;
+	if (s == "Wall") return TagType::Wall;
+	if (s == "BulletTank") return TagType::BulletTank;
+	if (s == "pipe_cannon") return TagType::PipeCannon;
+	if (s == "Body") return TagType::Body;
+	if (s == "Head") return TagType::Head;
+	if (s == "Explosion") return TagType::Explosion;
+	if (s == "Poison") return TagType::Poison;
+	if (s == "Trap") return TagType::Trap;
+	if (s == "Experience") return TagType::Experience;
+	if (s == "ExperienceOrb") return TagType::ExperienceOrb;
+	if (s == "ExperienceMiner") return TagType::ExperienceMiner;
+	if (s == "VFX") return TagType::VFX;
+	if (s == "HitDistortion_VFX") return TagType::HitDistortion_VFX;
+	if (s == "Default") return TagType::Default;
+	return TagType::Untagged;
+}
+
 struct TagComponent : public Component {
-	std::string tag = "Untagged";
+	TagType tag = TagType::Untagged;
 	TagComponent() { type = ComponentType::Tag; }
-	TagComponent(const std::string& t) : tag(t) { type = ComponentType::Tag; }
+	TagComponent(TagType t) : tag(t) { type = ComponentType::Tag; }
 };
 
 // ★追加: プレイヤー入力 (意思)
@@ -260,7 +343,7 @@ struct HitboxComponent : public Component {
 	DirectX::XMFLOAT3 size = {1, 1, 1};    // 判定サイズ
 	float damage = 10.0f;                  // ダメージ量
 	bool isActive = false;                 // 有効フラグ（攻撃アニメ中のみtrue等）
-	std::string tag = "Default";           // 識別タグ ("Sword", "Projectile"等)
+	TagType tag = TagType::Default;           // 識別タグ ("Sword", "Projectile"等)
 	HitboxComponent() { type = ComponentType::Hitbox; }
 };
 
@@ -268,7 +351,7 @@ struct HitboxComponent : public Component {
 struct HurtboxComponent : public Component {
 	DirectX::XMFLOAT3 center = {0, 0, 0}; // ローカルオフセット
 	DirectX::XMFLOAT3 size = {1, 1, 1};    // 判定サイズ
-	std::string tag = "Body";              // 識別タグ ("Body", "Head"等)
+	TagType tag = TagType::Body;              // 識別タグ ("Body", "Head"等)
 	float damageMultiplier = 1.0f;         // ダメージ倍率 (頭部=2.0等)
 	HurtboxComponent() { type = ComponentType::Hurtbox; }
 };

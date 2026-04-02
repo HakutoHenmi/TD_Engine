@@ -7,7 +7,7 @@
 
 namespace Game {
 
-static bool HasTag(GameScene* scene, entt::entity entity, const char* tagName) {
+static bool HasTag(GameScene* scene, entt::entity entity, TagType tagName) {
 	if (!scene->GetRegistry().all_of<TagComponent>(entity)) return false;
 	return scene->GetRegistry().get<TagComponent>(entity).tag == tagName;
 }
@@ -55,12 +55,12 @@ static bool IsConnectedToBulletTankRecursive(GameScene* scene, entt::entity curr
 		}
 
 		// 隣に弾倉があれば到達成功
-		if (HasTag(scene, other, "BulletTank")) {
+		if (HasTag(scene, other, TagType::BulletTank)) {
 			return true;
 		}
 
 		// 隣がパイプならさらに先を調べる
-		if (HasTag(scene, other, "Pipe")) {
+		if (HasTag(scene, other, TagType::Pipe)) {
 
 			if (IsAlreadyVisited(visitedObjects, other)) {
 				continue;

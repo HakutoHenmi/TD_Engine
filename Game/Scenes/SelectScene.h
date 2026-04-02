@@ -5,6 +5,7 @@
 #include "WindowDX.h"
 #include "../../externals/entt/entt.hpp"
 #include "../Systems/ISystem.h"
+#include "../ObjectTypes.h"
 #include <vector>
 #include <memory>
 

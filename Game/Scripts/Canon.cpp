@@ -13,7 +13,7 @@
 
 namespace Game {
 
-static bool HasTag(entt::registry& registry, entt::entity entity, const char* tagName) {
+static bool HasTag(entt::registry& registry, entt::entity entity, TagType tagName) {
 	if (!registry.valid(entity)) {
 		return false;
 	}
@@ -164,7 +164,7 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	entt::entity target = entt::null;
 	float bestDistance = attackRange_;
 
-	const std::vector<entt::entity>& enemies = scene->GetEntitiesByTag("Enemy");
+	const std::vector<entt::entity>& enemies = scene->GetEntitiesByTag(TagType::Enemy);
 
 	for (entt::entity other : enemies) {
 		if (!registry.valid(other)) {
@@ -217,7 +217,7 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	entt::entity bullet = registry.create();
 
 	TagComponent& bulletTag = registry.emplace<TagComponent>(bullet);
-	bulletTag.tag = "Bullet";
+	bulletTag.tag = TagType::Bullet;
 
 	TransformComponent& bulletTransform = registry.emplace<TransformComponent>(bullet);
 	bulletTransform.translate = canonTransform.translate;
@@ -246,7 +246,7 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	HitboxComponent& bulletHitbox = registry.emplace<HitboxComponent>(bullet);
 	bulletHitbox.isActive = true;
 	bulletHitbox.damage = damage_;
-	bulletHitbox.tag = "Bullet";
+	bulletHitbox.tag = TagType::Bullet;
 	bulletHitbox.size = {1.0f, 1.0f, 1.0f};
 
 	ScriptComponent& bulletScriptComponent = registry.emplace<ScriptComponent>(bullet);
@@ -279,9 +279,9 @@ void Canon::UpdateConnection(entt::entity entity, GameScene* scene) {
 	entt::registry& registry = scene->GetRegistry();
 	float connectRange = 2.5f;
 
-	const std::vector<entt::entity>& allPipes = scene->GetEntitiesByTag("Pipe");
-	const std::vector<entt::entity>& allTanks = scene->GetEntitiesByTag("BulletTank");
-	const std::vector<entt::entity>& allCanons = scene->GetEntitiesByTag("Canon");
+	const std::vector<entt::entity>& allPipes = scene->GetEntitiesByTag(TagType::Pipe);
+	const std::vector<entt::entity>& allTanks = scene->GetEntitiesByTag(TagType::BulletTank);
+	const std::vector<entt::entity>& allCanons = scene->GetEntitiesByTag(TagType::Canon);
 
 	std::unordered_set<entt::entity> foundTanks;
 	std::unordered_set<entt::entity> visitedPipesForTanks;
