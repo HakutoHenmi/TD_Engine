@@ -13,7 +13,7 @@
 
 namespace Game {
 
-static bool HasTag(entt::registry& registry, entt::entity entity, const char* tagName) {
+static bool HasTag(entt::registry& registry, entt::entity entity, TagType tagName) {
 	if (!registry.valid(entity)) {
 		return false;
 	}
@@ -152,8 +152,8 @@ void PoisonTrap::UpdateConnection(entt::entity entity, GameScene* scene) {
 	entt::registry& registry = scene->GetRegistry();
 	float connectRange = 2.5f;
 
-	const std::vector<entt::entity>& allPipes = scene->GetEntitiesByTag("Pipe");
-	const std::vector<entt::entity>& allTanks = scene->GetEntitiesByTag("BulletTank");
+	const std::vector<entt::entity>& allPipes = scene->GetEntitiesByTag(TagType::Pipe);
+	const std::vector<entt::entity>& allTanks = scene->GetEntitiesByTag(TagType::BulletTank);
 
 	std::unordered_set<entt::entity> foundTanks;
 	std::unordered_set<entt::entity> visitedPipesForTanks;
@@ -191,7 +191,7 @@ bool PoisonTrap::IsEnemyInRange(entt::entity entity, GameScene* scene, float ran
 	}
 
 	const TransformComponent& trapTransform = registry.get<TransformComponent>(entity);
-	const std::vector<entt::entity>& enemies = scene->GetEntitiesByTag("Enemy");
+	const std::vector<entt::entity>& enemies = scene->GetEntitiesByTag(TagType::Enemy);
 
 	for (entt::entity enemy : enemies) {
 		if (!registry.valid(enemy)) {
@@ -243,7 +243,7 @@ void PoisonTrap::CreatePoisonAttackArea(entt::entity entity, GameScene* scene) {
 		poisonMeshRenderer.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 	}
 	TagComponent& poisonTag = registry.emplace<TagComponent>(poisonAttackArea);
-	poisonTag.tag = "PoisonAttackArea";
+	poisonTag.tag = TagType::Poison;
 
 	TransformComponent& poisonTransform = registry.emplace<TransformComponent>(poisonAttackArea);
 	poisonTransform.translate = trapTransform.translate;
@@ -253,7 +253,7 @@ void PoisonTrap::CreatePoisonAttackArea(entt::entity entity, GameScene* scene) {
 	HitboxComponent& poisonHitbox = registry.emplace<HitboxComponent>(poisonAttackArea);
 	poisonHitbox.isActive = true;
 	poisonHitbox.damage = poisonDamage_;
-	poisonHitbox.tag = "PoisonTrap";
+	poisonHitbox.tag = TagType::Poison;
 	poisonHitbox.size = {poisonRange_, poisonRange_, poisonRange_};
 
 	ScriptComponent& poisonScript = registry.emplace<ScriptComponent>(poisonAttackArea);

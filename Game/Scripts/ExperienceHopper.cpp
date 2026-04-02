@@ -1,4 +1,4 @@
-﻿#include "ExperienceHopper.h"
+#include "ExperienceHopper.h"
 #include "ScriptEngine.h"
 #include "Scenes/GameScene.h"
 #include "ObjectTypes.h"
@@ -8,7 +8,7 @@
 namespace Game {
 
 // タグ走査 (entt版)
-static bool HasTag(entt::registry& registry, entt::entity entity, const char* tagName) {
+static bool HasTag(entt::registry& registry, entt::entity entity, TagType tagName) {
 	if (!registry.valid(entity) || !registry.all_of<TagComponent>(entity)) return false;
 	return registry.get<TagComponent>(entity).tag == tagName;
 }
@@ -17,7 +17,7 @@ static int CountExperienceOrbs(entt::registry& registry) {
 	int orbCount = 0;
 	auto view = registry.view<TagComponent>();
 	for (auto entity : view) {
-		if (view.get<TagComponent>(entity).tag == "ExperienceOrb") orbCount++;
+		if (view.get<TagComponent>(entity).tag == TagType::ExperienceOrb) orbCount++;
 	}
 	return orbCount;
 }
@@ -41,8 +41,8 @@ static bool IsPipeConnectedToExperienceMinerRecursive(entt::registry& registry, 
 	for (auto other : view) {
 		if (other == currentPipe) continue;
 		if (!IsConnectedSphere(registry, currentPipe, other, connectRange)) continue;
-		if (HasTag(registry, other, "ExperienceMiner")) return true;
-		if (HasTag(registry, other, "Pipe")) {
+		if (HasTag(registry, other, TagType::ExperienceMiner)) return true;
+		if (HasTag(registry, other, TagType::Pipe)) {
 			if (IsAlreadyVisited(visited, other)) continue;
 			if (IsPipeConnectedToExperienceMinerRecursive(registry, other, visited, connectRange)) return true;
 		}
@@ -54,7 +54,7 @@ static bool IsHopperConnectedToMiner(entt::registry& registry, entt::entity hopp
 	const float connectRange = 2.5f;
 	auto view = registry.view<TransformComponent>();
 	for (auto other : view) {
-		if (!HasTag(registry, other, "Pipe")) continue;
+		if (!HasTag(registry, other, TagType::Pipe)) continue;
 		if (!IsConnectedSphere(registry, hopperEntity, other, connectRange)) continue;
 		std::vector<entt::entity> visited;
 		if (IsPipeConnectedToExperienceMinerRecursive(registry, other, visited, connectRange)) return true;
@@ -84,7 +84,7 @@ void ExperienceHopper::Update(entt::entity entity, GameScene* scene, float dt) {
 	// ExperienceOrb を生成 (enTT)
 	entt::entity orb = registry.create();
 	auto& oTag = registry.emplace<TagComponent>(orb);
-	oTag.tag = "ExperienceOrb";
+	oTag.tag = TagType::ExperienceOrb;
 	auto& oTc = registry.emplace<TransformComponent>(orb);
 	oTc.translate = tc.translate;
 	oTc.translate.y += 0.5f;
@@ -97,7 +97,7 @@ void ExperienceHopper::Update(entt::entity entity, GameScene* scene, float dt) {
 	auto& oHitbox = registry.emplace<HitboxComponent>(orb);
 	oHitbox.isActive = true;
 	oHitbox.damage = 0.0f;
-	oHitbox.tag = "ExperienceOrb";
+	oHitbox.tag = TagType::ExperienceOrb;
 	oHitbox.size = {1.0f, 1.0f, 1.0f};
 
 	auto* renderer = scene->GetRenderer();

@@ -659,6 +659,7 @@ void Renderer::EndFrame() {
 
 		list_->SetGraphicsRootSignature(rootSig3D_.Get());
 		
+		// Normal Shadow Pass
 		for (const auto& dc : drawCalls_) {
 			if (dc.isParticle || dc.shaderName == "Particle" || dc.shaderName == "ParticleAdditive" || dc.shaderName == "2D" || dc.shaderName == "Distortion") continue;
 
@@ -698,8 +699,7 @@ void Renderer::EndFrame() {
 
 		// Instanced Shadow Pass
 		for (const auto& idc : instancedDrawCalls_) {
-			// パーティクルや2Dはシャドウを落とさない (idc.shaderName == "Particle" 等)
-			if (idc.shaderName == "Particle" || idc.shaderName == "ParticleInstanced" || idc.shaderName == "2D") continue;
+			if (idc.shaderName == "Particle" || idc.shaderName == "ParticleInstanced" || idc.shaderName == "2D" || idc.shaderName == "Distortion") continue;
 			
 			auto* model = GetModel(idc.mesh);
 			if (!model || idc.instances.empty()) continue;
@@ -708,7 +708,6 @@ void Renderer::EndFrame() {
 			list_->SetGraphicsRootSignature(rootSig3D_.Get());
 			list_->SetGraphicsRootConstantBufferView(0, sCbAddr);
 
-			// インスタンスデータバインド (Slot 6) - ※RootSignature params[6] is t2
 			uint32_t dataSize = static_cast<uint32_t>(sizeof(InstanceData) * idc.instances.size());
 			uint32_t offset = upload_[fi].Allocate(dataSize, 256);
 			if (offset != UINT32_MAX) {
@@ -729,87 +728,86 @@ void Renderer::EndFrame() {
 	list_->RSSetViewports(1, &viewport_);
 	list_->RSSetScissorRects(1, &scissor_);
 
-	// Distortionオブジェクトの事前抽出（FlushDrawCallsでクリアされるため）
-	std::vector<DrawCall> distortionCalls;
+	// Distortion オブジェクトの事前集約 (Mesh-Texture のペアごとに InstanceData をまとめる)
+	struct DistortionKey {
+		MeshHandle mesh;
+		TextureHandle tex;
+		bool operator<(const DistortionKey& o) const {
+			if (mesh != o.mesh) return mesh < o.mesh;
+			return tex < o.tex;
+		}
+	};
+	std::map<DistortionKey, std::vector<InstanceData>> aggregatedJobs;
+
 	for (const auto& dc : drawCalls_) {
-		if (dc.shaderName == "Distortion") distortionCalls.push_back(dc);
+		if (dc.shaderName == "Distortion") {
+			InstanceData id; id.world = dc.worldMatrix; id.color = dc.color; id.uvScaleOffset = dc.uvScaleOffset;
+			aggregatedJobs[{dc.mesh, dc.tex}].push_back(id);
+		}
+	}
+	for (auto it = instancedDrawCalls_.begin(); it != instancedDrawCalls_.end(); ) {
+		if (it->shaderName == "Distortion") {
+			auto& target = aggregatedJobs[{it->mesh, it->tex}];
+			target.insert(target.end(), it->instances.begin(), it->instances.end());
+			it = instancedDrawCalls_.erase(it);
+		} else ++it;
 	}
 
 	FlushDrawCalls();
 	
-	// ★追加: 空間のゆがみ (Distortion) パス
-	if (!distortionCalls.empty()) {
-		// 1. 現在のシーン (ppSceneColor_) を backdropColor_ にコピー
+	// ★完全最適化: 空間のゆがみ (Distortion) パス (一括インスタンス描画)
+	if (!aggregatedJobs.empty()) {
 		if (ppSceneColor_ && backdropColor_) {
 			auto b1 = CD3DX12_RESOURCE_BARRIER::Transition(ppSceneColor_.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 			auto b2 = CD3DX12_RESOURCE_BARRIER::Transition(backdropColor_.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
 			D3D12_RESOURCE_BARRIER bars[] = { b1, b2 };
 			list_->ResourceBarrier(2, bars);
-
 			list_->CopyResource(backdropColor_.Get(), ppSceneColor_.Get());
-
 			auto b3 = CD3DX12_RESOURCE_BARRIER::Transition(ppSceneColor_.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
 			auto b4 = CD3DX12_RESOURCE_BARRIER::Transition(backdropColor_.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 			D3D12_RESOURCE_BARRIER bars2[] = { b3, b4 };
 			list_->ResourceBarrier(2, bars2);
-			ppSceneState_ = D3D12_RESOURCE_STATE_RENDER_TARGET; // ★状態を更新
+			ppSceneState_ = D3D12_RESOURCE_STATE_RENDER_TARGET;
 		}
 
-		// 2. Distortionオブジェクトのみを描画
 		if (ppSceneColor_ && backdropColor_) {
 			list_->OMSetRenderTargets(1, &rtv, FALSE, &dsv);
 			list_->SetGraphicsRootSignature(rootSigDistortion_.Get()); 
 			list_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			list_->SetGraphicsRootConstantBufferView(0, cbFrameAddr_);
 			
-			for (auto& dc : distortionCalls) {
-				auto* model = GetModel(dc.mesh);
-				if (!model) continue;
+			uint32_t bIdx = AllocateDynamicSrvIndex(1);
+			if (bIdx != UINT32_MAX) {
+				D3D12_CPU_DESCRIPTOR_HANDLE dest = window_->SRV_CPU((int)bIdx);
+				dev_->CopyDescriptorsSimple(1, dest, backdropSrvCpu_, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				list_->SetGraphicsRootDescriptorTable(2, window_->SRV_GPU((int)bIdx));
+			}
 
+			for (auto& pair : aggregatedJobs) {
+				const auto& key = pair.first;
+				const auto& instances = pair.second;
+				auto* model = GetModel(key.mesh);
+				if (!model || instances.empty()) continue;
 				if (pipelines_.count("Distortion")) {
 					list_->SetPipelineState(pipelines_["Distortion"].Get());
-				} else {
-					continue;
-				}
+				} else continue;
 
-				list_->SetGraphicsRootConstantBufferView(0, cbFrameAddr_);
-				
-				uint32_t sIdx = AllocateDynamicSrvIndex(2);
+				uint32_t sIdx = AllocateDynamicSrvIndex(1);
 				if (sIdx != UINT32_MAX) {
 					D3D12_CPU_DESCRIPTOR_HANDLE dest = window_->SRV_CPU((int)sIdx);
-					dev_->CopyDescriptorsSimple(1, dest, backdropSrvCpu_, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-					dest.ptr += srvInc_;
-					if (dc.tex < textures_.size() && textures_[dc.tex].res) {
-						dev_->CopyDescriptorsSimple(1, dest, textures_[dc.tex].srvCpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-					} else {
-						dev_->CopyDescriptorsSimple(1, dest, textures_[0].srvCpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-					}
-					list_->SetGraphicsRootDescriptorTable(2, window_->SRV_GPU((int)sIdx));
+					dev_->CopyDescriptorsSimple(1, dest, (key.tex < textures_.size() && textures_[key.tex].res) ? textures_[key.tex].srvCpu : textures_[0].srvCpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+					list_->SetGraphicsRootDescriptorTable(3, window_->SRV_GPU((int)sIdx));
 
-					// ★追加: b1 (CBObj) のバインド
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable : 4324)
-#endif
-					struct alignas(256) CBObj { Matrix4x4 world; float color[4]; };
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
-					CBObj ocb{}; ocb.world = dc.worldMatrix; 
-					ocb.color[0]=dc.color.x; ocb.color[1]=dc.color.y; ocb.color[2]=dc.color.z; ocb.color[3]=dc.color.w;
-					uint32_t oOff = upload_[fi].Allocate(sizeof(CBObj), 256);
-					if (oOff != UINT32_MAX) {
-						std::memcpy(upload_[fi].mapped + oOff, &ocb, sizeof(CBObj));
-						list_->SetGraphicsRootConstantBufferView(1, upload_[fi].buffer->GetGPUVirtualAddress() + oOff);
+					uint32_t dataSize = static_cast<uint32_t>(sizeof(InstanceData) * instances.size());
+					uint32_t offset = upload_[fi].Allocate(dataSize, 256);
+					if (offset != UINT32_MAX) {
+						std::memcpy(upload_[fi].mapped + offset, instances.data(), dataSize);
+						list_->SetGraphicsRootShaderResourceView(4, upload_[fi].buffer->GetGPUVirtualAddress() + offset);
+						auto vbv = model->GetVBV(); auto ibv = model->GetIBV();
+						list_->IASetVertexBuffers(0, 1, &vbv);
+						list_->IASetIndexBuffer(&ibv);
+						list_->DrawIndexedInstanced(model->GetIndexCount(), (uint32_t)instances.size(), 0, 0, 0);
 					}
-
-					// ★修正: model->Draw(list_) はデフォルトで RootIndex 3 を使うが、
-					// rootSigDistortion_ には index 3 が存在しないため D3D12 Device Removal が起きる。
-					// そのため手動で描画コマンドを積む。
-					auto vbv = model->GetVBV();
-					auto ibv = model->GetIBV();
-					list_->IASetVertexBuffers(0, 1, &vbv);
-					list_->IASetIndexBuffer(&ibv);
-					list_->DrawIndexedInstanced(model->GetIndexCount(), 1, 0, 0, 0);
 				}
 			}
 		}
@@ -831,7 +829,6 @@ void Renderer::EndFrame() {
 
 	auto rtvFinal = finalRtv_;
 	list_->OMSetRenderTargets(1, &rtvFinal, FALSE, nullptr);
-	
 	list_->ClearRenderTargetView(rtvFinal, kFinalSceneClearColor, 0, nullptr);
 
 	if (framePPEnabled_) {
@@ -840,7 +837,6 @@ void Renderer::EndFrame() {
 		list_->SetPipelineState(psoCopy_.Get());
 	}
 	list_->SetGraphicsRootSignature(rootSigPP_.Get());
-
 	list_->RSSetViewports(1, &viewport_);
 	list_->RSSetScissorRects(1, &scissor_);
 
@@ -888,29 +884,23 @@ void Renderer::EndFrame() {
 	list_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	list_->DrawInstanced(3, 1, 0, 0);
 
-	// ポストアフェクトが完了した最終ターゲットに対してUIを描画
 	FlushSprites();
 
-	// --- 3. finalSceneColor_ をShaderResourceStateに遷移 ---
 	if (finalSceneState_ != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
 		auto b = CD3DX12_RESOURCE_BARRIER::Transition(finalSceneColor_.Get(), finalSceneState_, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 		list_->ResourceBarrier(1, &b);
 		finalSceneState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 	}
 
-	// --- 4. BackBufferをRenderTargetStateに遷移し、全体をコピー描画 ---
 	ID3D12Resource* backBuffer = window_->GetCurrentBackBufferResource();
-	auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(backBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	list_->ResourceBarrier(1, &barrier);
+	auto br = CD3DX12_RESOURCE_BARRIER::Transition(backBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	list_->ResourceBarrier(1, &br);
 
 	auto rtvBack = window_->GetCurrentRTV();
 	list_->OMSetRenderTargets(1, &rtvBack, FALSE, nullptr);
-
-	// エディタの隙間等を目立たなくする暗い背景色でバックバッファをクリア
 	const float bgClearColor[] = { 0.06f, 0.06f, 0.06f, 1.0f };
 	list_->ClearRenderTargetView(rtvBack, bgClearColor, 0, nullptr);
 
-	// フルスクリーンで描画
 	D3D12_VIEWPORT fullVP = { 0.0f, 0.0f, static_cast<float>(window_->kW), static_cast<float>(window_->kH), 0.0f, 1.0f };
 	D3D12_RECT fullScissor = { 0, 0, static_cast<LONG>(window_->kW), static_cast<LONG>(window_->kH) };
 	list_->RSSetViewports(1, &fullVP);
@@ -1248,13 +1238,18 @@ bool Renderer::InitPipelines() {
 
 	// ★追加: 空間のゆがみ用 RootSignature (t0:Backdrop, t1:DistortionMap)
 	{
-		CD3DX12_DESCRIPTOR_RANGE rangeSRVs;
-		rangeSRVs.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 0); // t0, t1
+		CD3DX12_DESCRIPTOR_RANGE rangeBackdrop;
+		rangeBackdrop.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0); // t0: Backdrop
 
-		CD3DX12_ROOT_PARAMETER params[3]{};
+		CD3DX12_DESCRIPTOR_RANGE rangeDistMap;
+		rangeDistMap.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1); // t1: DistortionMap
+
+		CD3DX12_ROOT_PARAMETER params[5]{};
 		params[0].InitAsConstantBufferView(0);                                        // b0: CBFrame
-		params[1].InitAsConstantBufferView(1);                                        // b1: CBObj
-		params[2].InitAsDescriptorTable(1, &rangeSRVs, D3D12_SHADER_VISIBILITY_PIXEL); // t0, t1: Textures
+		params[1].InitAsConstantBufferView(1);                                        // b1: CBObj (互換用)
+		params[2].InitAsDescriptorTable(1, &rangeBackdrop, D3D12_SHADER_VISIBILITY_PIXEL); // t0: Backdrop
+		params[3].InitAsDescriptorTable(1, &rangeDistMap, D3D12_SHADER_VISIBILITY_PIXEL);  // t1: DistortionMap
+		params[4].InitAsShaderResourceView(2, 0, D3D12_SHADER_VISIBILITY_VERTEX);       // t2: InstanceData (VS)
 
 		CD3DX12_STATIC_SAMPLER_DESC samp(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
 		CD3DX12_ROOT_SIGNATURE_DESC rsDesc;

@@ -169,7 +169,7 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 					c.enabled = en; c.hp = comp.value("hp", 100.0f); c.maxHp = comp.value("maxHp", 100.0f); c.isDead = comp.value("isDead", false);
 				} else if (type == "Tag") {
 					auto& c = reg.get_or_emplace<TagComponent>(entity);
-					c.enabled = en; c.tag = comp.value("tag", "");
+					c.enabled = en; c.tag = StringToTag(comp.value("tag", "Untagged"));
 				} else if (type == "AudioSource") {
 					auto& c = reg.get_or_emplace<AudioSourceComponent>(entity);
 					c.enabled = en; c.soundPath = comp.value("soundPath", ""); c.volume = comp.value("volume", 1.0f);
@@ -497,7 +497,7 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 	}
 	if (auto* cp = registry.try_get<TagComponent>(entity)) {
 		addComma();
-		ss << "        {\"type\": \"Tag\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"tag\": \"" << EscapeJson(cp->tag) << "\"}";
+		ss << "        {\"type\": \"Tag\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"tag\": \"" << EscapeJson(TagToString(cp->tag)) << "\"}";
 	}
 	if (auto* cp = registry.try_get<PlayerInputComponent>(entity)) {
 		addComma();
@@ -1835,8 +1835,20 @@ void EditorUI::ShowInspector(GameScene* scene) {
 			if (auto* tag = registry.try_get<TagComponent>(entity)) {
 				if (ImGui::CollapsingHeader("Tag", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##Tag", &tag->enabled);
-					char buf[256]; strcpy_s(buf, tag->tag.c_str());
-					if (ImGui::InputText("Tag##TagInput", buf, sizeof(buf))) tag->tag = buf;
+					
+					const char* currentTagName = TagToString(tag->tag);
+					if (ImGui::BeginCombo("Tag##TagCombo", currentTagName)) {
+						for (int i = 0; i <= (int)TagType::HitDistortion_VFX; ++i) {
+							TagType t = (TagType)i;
+							bool isSelected = (tag->tag == t);
+							if (ImGui::Selectable(TagToString(t), isSelected)) {
+								tag->tag = t;
+								scene->SyncTag(entity); // キャッシュ更新
+							}
+							if (isSelected) ImGui::SetItemDefaultFocus();
+						}
+						ImGui::EndCombo();
+					}
 					if (ImGui::Button("Remove##Tag")) registry.remove<TagComponent>(entity);
 				}
 			}
@@ -2101,6 +2113,18 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					ImGui::DragFloat3("Ofs", &hb->center.x, 0.1f);
 					ImGui::DragFloat3("Size", &hb->size.x, 0.1f);
 					ImGui::DragFloat("DMG", &hb->damage, 1.0f);
+					
+					const char* currentTagName = TagToString(hb->tag);
+					if (ImGui::BeginCombo("Tag##HBTagCombo", currentTagName)) {
+						for (int i = 0; i <= (int)TagType::HitDistortion_VFX; ++i) {
+							TagType t = (TagType)i;
+							bool isSelected = (hb->tag == t);
+							if (ImGui::Selectable(TagToString(t), isSelected)) hb->tag = t;
+							if (isSelected) ImGui::SetItemDefaultFocus();
+						}
+						ImGui::EndCombo();
+					}
+
 					ImGui::Checkbox("Active", &hb->isActive);
 					if (ImGui::Button("Remove##HB")) registry.remove<HitboxComponent>(entity);
 				}
@@ -2111,6 +2135,18 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					ImGui::DragFloat3("Ofs", &hb->center.x, 0.1f);
 					ImGui::DragFloat3("Size", &hb->size.x, 0.1f);
 					ImGui::DragFloat("Mult", &hb->damageMultiplier, 0.1f);
+
+					const char* currentTagName = TagToString(hb->tag);
+					if (ImGui::BeginCombo("Tag##HurtBTagCombo", currentTagName)) {
+						for (int i = 0; i <= (int)TagType::HitDistortion_VFX; ++i) {
+							TagType t = (TagType)i;
+							bool isSelected = (hb->tag == t);
+							if (ImGui::Selectable(TagToString(t), isSelected)) hb->tag = t;
+							if (isSelected) ImGui::SetItemDefaultFocus();
+						}
+						ImGui::EndCombo();
+					}
+
 					if (ImGui::Button("Remove##HurtB")) registry.remove<HurtboxComponent>(entity);
 				}
 			}

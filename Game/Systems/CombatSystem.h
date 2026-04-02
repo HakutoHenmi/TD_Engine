@@ -1,203 +1,125 @@
 #include "ISystem.h"
 #include <cmath>
 #include "../Engine/Time/TimeManager.h" 
-#include "../Scripts/HitDistortionScript.h" // ★追加
-#include "GameScene.h"                     // ★追加
+#include "../Engine/QuadTree.h"
+#include "../Scripts/HitDistortionScript.h"
+#include "GameScene.h"
 
 namespace Game {
-
 
 class CombatSystem : public ISystem {
 public:
 	void Update(entt::registry& registry, GameContext& ctx) override {
 		if (!ctx.isPlaying) return;
 
-		// Hitboxを持つエンティティをリスト化
-		auto attackerView = registry.view<HitboxComponent, TransformComponent>();
-		std::vector<entt::entity> attackers;
-		for (auto entity : attackerView) attackers.push_back(entity);
+		// --- QuadTree の構築 (Hurtbox と BoxCollider を対象) ---
+		::Engine::PhysicsQuadTree qt(-4000.0f, -4000.0f, 4000.0f, 4000.0f, 6, 10);
+		
+		m_hurters.clear();
+		auto hurtboxView = registry.view<HurtboxComponent, TransformComponent>();
+		for (auto entity : hurtboxView) {
+			auto& hb = hurtboxView.get<HurtboxComponent>(entity);
+			auto& tc = hurtboxView.get<TransformComponent>(entity);
+			if (!hb.enabled) continue;
 
-		// 全アタッカーの存在確認ログ（120フレーム毎）
-		static int listLogCount = 0;
-		if (listLogCount++ % 120 == 0) {
-			char header[128];
-			sprintf_s(header, "[Combat] Total Attackers: %zu\n", attackers.size());
-			OutputDebugStringA(header);
-			for (auto attackerEntity : attackers) {
-				std::string name = registry.all_of<NameComponent>(attackerEntity) ? registry.get<NameComponent>(attackerEntity).name : "Unknown";
-				std::string tag = registry.all_of<TagComponent>(attackerEntity) ? registry.get<TagComponent>(attackerEntity).tag : "NoTag";
-				char item[256];
-				sprintf_s(item, "  - Entity: %s, Tag: %s, HitboxEnabled: %d, HitboxActive: %d\n", 
-					name.c_str(), tag.c_str(), 
-					registry.get<HitboxComponent>(attackerEntity).enabled ? 1 : 0,
-					registry.get<HitboxComponent>(attackerEntity).isActive ? 1 : 0);
-				OutputDebugStringA(item);
+			::Engine::Matrix4x4 world = ctx.scene ? ctx.scene->GetWorldMatrix(static_cast<int>(entity)) : tc.ToMatrix();
+			DirectX::XMMATRIX worldMat = DirectX::XMLoadFloat4x4(reinterpret_cast<const DirectX::XMFLOAT4X4*>(&world));
+			
+			// AABBを計算してQuadTreeに登録
+			DirectX::XMVECTOR center = DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&hb.center)), worldMat);
+			DirectX::XMVECTOR scale, rot, trans;
+			DirectX::XMMatrixDecompose(&scale, &rot, &trans, worldMat);
+			float ex = hb.size.x * 0.5f * std::abs(DirectX::XMVectorGetX(scale));
+			float ey = hb.size.y * 0.5f * std::abs(DirectX::XMVectorGetY(scale));
+			float ez = hb.size.z * 0.5f * std::abs(DirectX::XMVectorGetZ(scale));
+
+			float cx = DirectX::XMVectorGetX(center), cy = DirectX::XMVectorGetY(center), cz = DirectX::XMVectorGetZ(center);
+			
+			HurtDeviceInfo info;
+			info.entity = entity;
+			info.center = {cx, cy, cz};
+			info.extents = {ex, ey, ez};
+			
+			DirectX::XMFLOAT4X4 wm;
+			DirectX::XMStoreFloat4x4(&wm, worldMat);
+			info.axes[0] = { wm._11, wm._12, wm._13 };
+			info.axes[1] = { wm._21, wm._22, wm._23 };
+			info.axes[2] = { wm._31, wm._32, wm._33 };
+
+			// 正規化
+			for(int i=0; i<3; ++i) {
+				float len = std::sqrt(info.axes[i].x*info.axes[i].x + info.axes[i].y*info.axes[i].y + info.axes[i].z*info.axes[i].z);
+				if(len > 0.0001f) { info.axes[i].x /= len; info.axes[i].y /= len; info.axes[i].z /= len; }
 			}
+
+			uint32_t idx = static_cast<uint32_t>(m_hurters.size());
+			m_hurters.push_back(info);
+			qt.Insert(idx, cx - ex, cz - ez, cx + ex, cz + ez);
 		}
 
-		for (auto attackerEntity : attackers) {
-			if (!registry.valid(attackerEntity)) continue;
-			auto& hitbox = registry.get<HitboxComponent>(attackerEntity);
-			if (!hitbox.enabled) continue;
+		// Hitboxを持つエンティティの更新
+		auto attackerView = registry.view<HitboxComponent, TransformComponent>();
+		for (auto attackerEntity : attackerView) {
+			auto& hitbox = attackerView.get<HitboxComponent>(attackerEntity);
+			if (!hitbox.enabled || !hitbox.isActive) continue;
 
-			// アタッカー（剣など）のワールド行列取得
-			::Engine::Matrix4x4 aWorld = ::Engine::Matrix4x4::Identity();
-			if (ctx.scene) aWorld = ctx.scene->GetWorldMatrix(static_cast<int>(attackerEntity));
-			
+			::Engine::Matrix4x4 aWorld = ctx.scene ? ctx.scene->GetWorldMatrix(static_cast<int>(attackerEntity)) : registry.get<TransformComponent>(attackerEntity).ToMatrix();
 			DirectX::XMMATRIX aWorldMat = DirectX::XMLoadFloat4x4(reinterpret_cast<const DirectX::XMFLOAT4X4*>(&aWorld));
 			DirectX::XMVECTOR aCenter = DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&hitbox.center)), aWorldMat);
 			
-			DirectX::XMVECTOR aAxes[3];
-			aAxes[0] = DirectX::XMVector3Normalize(aWorldMat.r[0]);
-			aAxes[1] = DirectX::XMVector3Normalize(aWorldMat.r[1]);
-			aAxes[2] = DirectX::XMVector3Normalize(aWorldMat.r[2]);
+			DirectX::XMVECTOR aAxes[3] = {
+				DirectX::XMVector3Normalize(aWorldMat.r[0]),
+				DirectX::XMVector3Normalize(aWorldMat.r[1]),
+				DirectX::XMVector3Normalize(aWorldMat.r[2])
+			};
 			
-			DirectX::XMVECTOR aScale;
-			DirectX::XMVECTOR aRot;
-			DirectX::XMVECTOR aTrans;
+			DirectX::XMVECTOR aScale, aRot, aTrans;
 			DirectX::XMMatrixDecompose(&aScale, &aRot, &aTrans, aWorldMat);
-			
 			float aExtents[3] = {
 				hitbox.size.x * 0.5f * std::abs(DirectX::XMVectorGetX(aScale)),
 				hitbox.size.y * 0.5f * std::abs(DirectX::XMVectorGetY(aScale)),
 				hitbox.size.z * 0.5f * std::abs(DirectX::XMVectorGetZ(aScale))
 			};
 
-			// Hurtboxを持つエンティティと衝突判定
-			auto defenderView = registry.view<HurtboxComponent, TransformComponent>();
-			for (auto defenderEntity : defenderView) {
+			float acx = DirectX::XMVectorGetX(aCenter), acz = DirectX::XMVectorGetZ(aCenter);
+			m_nearbyIndices.clear();
+			qt.Query(acx - aExtents[0], acz - aExtents[2], acx + aExtents[0], acz + aExtents[2], m_nearbyIndices);
+
+			for (uint32_t hurtIdx : m_nearbyIndices) {
+				const auto& hurtInfo = m_hurters[hurtIdx];
+				entt::entity defenderEntity = hurtInfo.entity;
 				if (attackerEntity == defenderEntity) continue;
-				auto& hurtbox = registry.get<HurtboxComponent>(defenderEntity);
-				if (!hurtbox.enabled) continue;
 
-				::Engine::Matrix4x4 dWorld = ::Engine::Matrix4x4::Identity();
-				if (ctx.scene) dWorld = ctx.scene->GetWorldMatrix(static_cast<int>(defenderEntity));
-				DirectX::XMMATRIX dWorldMat = DirectX::XMLoadFloat4x4(reinterpret_cast<const DirectX::XMFLOAT4X4*>(&dWorld));
-				DirectX::XMVECTOR dCenter = DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&hurtbox.center)), dWorldMat);
-				
-				DirectX::XMVECTOR dAxes[3];
-				dAxes[0] = DirectX::XMVector3Normalize(dWorldMat.r[0]);
-				dAxes[1] = DirectX::XMVector3Normalize(dWorldMat.r[1]);
-				dAxes[2] = DirectX::XMVector3Normalize(dWorldMat.r[2]);
-				
-				DirectX::XMVECTOR dScale, dRot, dTrans;
-				DirectX::XMMatrixDecompose(&dScale, &dRot, &dTrans, dWorldMat);
-				float dExtents[3] = {
-					hurtbox.size.x * 0.5f * std::abs(DirectX::XMVectorGetX(dScale)),
-					hurtbox.size.y * 0.5f * std::abs(DirectX::XMVectorGetY(dScale)),
-					hurtbox.size.z * 0.5f * std::abs(DirectX::XMVectorGetZ(dScale))
+				DirectX::XMVECTOR dCenter = DirectX::XMLoadFloat3(&hurtInfo.center);
+				DirectX::XMVECTOR dAxes[3] = {
+					DirectX::XMLoadFloat3(&hurtInfo.axes[0]),
+					DirectX::XMLoadFloat3(&hurtInfo.axes[1]),
+					DirectX::XMLoadFloat3(&hurtInfo.axes[2])
 				};
+				float dExtents[3] = { hurtInfo.extents.x, hurtInfo.extents.y, hurtInfo.extents.z };
 
-				if (CheckObbOverlap(aCenter, aAxes, aExtents, dCenter, dAxes, dExtents) && hitbox.isActive) {
-					// 判定スキップロジック
-					std::string aTag = registry.all_of<TagComponent>(attackerEntity) ? registry.get<TagComponent>(attackerEntity).tag : "Untagged";
-					std::string dTag = registry.all_of<TagComponent>(defenderEntity) ? registry.get<TagComponent>(defenderEntity).tag : "Untagged";
+				if (CheckObbOverlap(aCenter, aAxes, aExtents, dCenter, dAxes, dExtents)) {
+					TagType aTag = registry.all_of<TagComponent>(attackerEntity) ? registry.get<TagComponent>(attackerEntity).tag : TagType::Untagged;
+					TagType dTag = registry.all_of<TagComponent>(defenderEntity) ? registry.get<TagComponent>(defenderEntity).tag : TagType::Untagged;
 					
-					char logStr[256];
-					sprintf_s(logStr, "[Combat] Overlap with %s. tags=(%s -> %s)\n", 
-						registry.all_of<NameComponent>(defenderEntity) ? registry.get<NameComponent>(defenderEntity).name.c_str() : "Unknown", aTag.c_str(), dTag.c_str());
-					OutputDebugStringA(logStr);
-
 					bool skipDamage = false;
-					if (aTag == "PlayerSword" || aTag == "Sword") { if (dTag != "Enemy") { skipDamage = true; OutputDebugStringA("  - SKIPPED: dTag is not Enemy\n"); } }
-					if (aTag != "Untagged" && aTag == dTag) { skipDamage = true; OutputDebugStringA("  - SKIPPED: Tag match\n"); }
+					if (aTag == TagType::PlayerSword || aTag == TagType::Sword) { if (dTag != TagType::Enemy) skipDamage = true; }
+					if (aTag != TagType::Untagged && aTag == dTag) skipDamage = true;
 					if (skipDamage) continue;
 
 					if (registry.all_of<HealthComponent>(defenderEntity)) {
 						auto& hc = registry.get<HealthComponent>(defenderEntity);
 						if (hc.invincibleTime <= 0.0f) {
+							auto& hurtbox = registry.get<HurtboxComponent>(defenderEntity);
 							hc.hp -= hitbox.damage * hurtbox.damageMultiplier;
 							hc.invincibleTime = 0.5f;
 
-							// ★追加: ヒット演出トリガー (Distortion)
 							if (ctx.scene) {
 								auto hitDistortion = ctx.scene->CreateEntity("HitDistortion_VFX");
-								// ★当たり判定を完全に除去
 								if (registry.all_of<BoxColliderComponent>(hitDistortion)) registry.remove<BoxColliderComponent>(hitDistortion);
 								if (registry.all_of<HurtboxComponent>(hitDistortion)) registry.remove<HurtboxComponent>(hitDistortion);
 								if (registry.all_of<RigidbodyComponent>(hitDistortion)) registry.remove<RigidbodyComponent>(hitDistortion);
 
-								OutputDebugStringA("[Combat] HitDistortion_VFX Created!\n");
-								auto& tc_hit = registry.get<TransformComponent>(hitDistortion); // ★修正: get に変更
-								DirectX::XMStoreFloat3(&tc_hit.translate, dCenter); // 敵の中心で発生
-								tc_hit.scale = { 1, 1, 1 };
-
-								auto& mrc_hit = registry.emplace<MeshRendererComponent>(hitDistortion);
-								mrc_hit.shaderName = "Distortion";
-								mrc_hit.texturePath = "Resources/Textures/normal.png";
-								mrc_hit.modelPath = "Resources/Models/Plane/cube.obj"; // ★修正: 球体から平面に変更
-								
-								// ★修正: ハンドルを明示的にロードしてセット
-								if (ctx.renderer) {
-									mrc_hit.modelHandle = ctx.renderer->LoadObjMesh(mrc_hit.modelPath);
-									mrc_hit.textureHandle = ctx.renderer->LoadTexture2D(mrc_hit.texturePath);
-								}
-								
-								mrc_hit.color = { 1, 1, 1, 2.0f }; // Alpha=2.0 で強力な歪み
-
-								auto& sc_hit = registry.emplace<ScriptComponent>(hitDistortion);
-								sc_hit.scripts.push_back({ "HitDistortionScript", "", std::make_shared<HitDistortionScript>(), false });
-							}
-
-							// ★追加: ヒット演出トリガー
-							hc.hitFlashTimer = 0.2f; // 0.2秒間光る
-							::Engine::TimeManager::GetInstance().SetHitstop(0.1f); // ★追加
-
-							ApplyKnockback(registry, attackerEntity, defenderEntity);
-
-							if (aTag == "Bullet" && ctx.scene) {
-								ctx.scene->DestroyObject(static_cast<uint32_t>(attackerEntity));
-							}
-						}
-					}
-				}
-			}
-
-			// BoxColliderフォールバックも OBB で実行
-			auto bcView = registry.view<BoxColliderComponent, TransformComponent>();
-			for (auto defenderEntity : bcView) {
-				if (attackerEntity == defenderEntity) continue;
-				if (registry.all_of<HurtboxComponent>(defenderEntity)) continue;
-				auto& bc = registry.get<BoxColliderComponent>(defenderEntity);
-				if (!bc.enabled) continue;
-
-				::Engine::Matrix4x4 dWorld = ::Engine::Matrix4x4::Identity();
-				if (ctx.scene) dWorld = ctx.scene->GetWorldMatrix(static_cast<int>(defenderEntity));
-				DirectX::XMMATRIX dWorldMat = DirectX::XMLoadFloat4x4(reinterpret_cast<const DirectX::XMFLOAT4X4*>(&dWorld));
-				DirectX::XMVECTOR dCenter = DirectX::XMVector3TransformCoord(DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&bc.center)), dWorldMat);
-				DirectX::XMVECTOR dAxes[3];
-				dAxes[0] = DirectX::XMVector3Normalize(dWorldMat.r[0]);
-				dAxes[1] = DirectX::XMVector3Normalize(dWorldMat.r[1]);
-				dAxes[2] = DirectX::XMVector3Normalize(dWorldMat.r[2]);
-				DirectX::XMVECTOR dScale, dRot, dTrans;
-				DirectX::XMMatrixDecompose(&dScale, &dRot, &dTrans, dWorldMat);
-				float dExtents[3] = {
-					bc.size.x * 0.5f * std::abs(DirectX::XMVectorGetX(dScale)),
-					bc.size.y * 0.5f * std::abs(DirectX::XMVectorGetY(dScale)),
-					bc.size.z * 0.5f * std::abs(DirectX::XMVectorGetZ(dScale))
-				};
-
-				if (CheckObbOverlap(aCenter, aAxes, aExtents, dCenter, dAxes, dExtents) && hitbox.isActive) {
-					std::string aTag = registry.all_of<TagComponent>(attackerEntity) ? registry.get<TagComponent>(attackerEntity).tag : "Untagged";
-					std::string dTag = registry.all_of<TagComponent>(defenderEntity) ? registry.get<TagComponent>(defenderEntity).tag : "Untagged";
-					
-					char logStr[256];
-					sprintf_s(logStr, "[Combat] Overlap with BoxCollider(%s). tags=(%s -> %s)\n", 
-						registry.all_of<NameComponent>(defenderEntity) ? registry.get<NameComponent>(defenderEntity).name.c_str() : "Unknown", aTag.c_str(), dTag.c_str());
-					OutputDebugStringA(logStr);
-
-					if ((aTag == "PlayerSword" || aTag == "Sword") && dTag != "Enemy") { OutputDebugStringA("  - SKIPPED: dTag is not Enemy (BoxCollider)\n"); continue; }
-
-					if (registry.all_of<HealthComponent>(defenderEntity)) {
-						auto& hc = registry.get<HealthComponent>(defenderEntity);
-						if (hc.invincibleTime <= 0.0f) {
-							hc.hp -= hitbox.damage;
-							hc.invincibleTime = 0.5f;
-
-							// ★追加: ヒット演出トリガー (Distortion)
-							if (ctx.scene) {
-								auto hitDistortion = ctx.scene->CreateEntity("HitDistortion_VFX");
-								OutputDebugStringA("[Combat] HitDistortion_VFX Created! (from BoxCollider)\n");
 								auto& tc_hit = registry.get<TransformComponent>(hitDistortion);
 								DirectX::XMStoreFloat3(&tc_hit.translate, dCenter);
 								tc_hit.scale = { 1, 1, 1 };
@@ -205,25 +127,25 @@ public:
 								auto& mrc_hit = registry.emplace<MeshRendererComponent>(hitDistortion);
 								mrc_hit.shaderName = "Distortion";
 								mrc_hit.texturePath = "Resources/Textures/normal.png";
-								mrc_hit.modelPath = "Resources/Models/Plane/cube.obj"; // ★修正: 球体から平面に変更
+								mrc_hit.modelPath = "Resources/Models/Plane/cube.obj";
+								
 								if (ctx.renderer) {
 									mrc_hit.modelHandle = ctx.renderer->LoadObjMesh(mrc_hit.modelPath);
 									mrc_hit.textureHandle = ctx.renderer->LoadTexture2D(mrc_hit.texturePath);
 								}
-								mrc_hit.color = { 1, 1, 1, 3.0f };
+								mrc_hit.color = { 1, 1, 1, 2.0f };
 
 								auto& sc_hit = registry.emplace<ScriptComponent>(hitDistortion);
 								sc_hit.scripts.push_back({ "HitDistortionScript", "", std::make_shared<HitDistortionScript>(), false });
 							}
 
-							// ★追加: ヒット演出トリガー
-							hc.hitFlashTimer = 0.2f; // 0.2秒間光る
+							hc.hitFlashTimer = 0.2f;
 							::Engine::TimeManager::GetInstance().SetHitstop(0.1f);
-
 							ApplyKnockback(registry, attackerEntity, defenderEntity);
 
-							if (aTag == "Bullet" && ctx.scene) {
+							if (aTag == TagType::Bullet && ctx.scene) {
 								ctx.scene->DestroyObject(static_cast<uint32_t>(attackerEntity));
+								break; // 弾は消えるのでループ抜ける
 							}
 						}
 					}
@@ -233,6 +155,15 @@ public:
 	}
 
 private:
+	struct HurtDeviceInfo {
+		entt::entity entity;
+		DirectX::XMFLOAT3 center;
+		DirectX::XMFLOAT3 extents;
+		DirectX::XMFLOAT3 axes[3];
+	};
+	std::vector<HurtDeviceInfo> m_hurters;
+	std::vector<uint32_t> m_nearbyIndices;
+
 	static bool CheckObbOverlap(DirectX::XMVECTOR cA, DirectX::XMVECTOR* axesA, float* extA, 
 						      DirectX::XMVECTOR cB, DirectX::XMVECTOR* axesB, float* extB) {
 		DirectX::XMVECTOR L_axes[15];
@@ -244,7 +175,6 @@ private:
 		}
 
 		DirectX::XMVECTOR relPos = DirectX::XMVectorSubtract(cA, cB);
-
 		for (int i = 0; i < 15; ++i) {
 			DirectX::XMVECTOR L = L_axes[i];
 			float lenSq = DirectX::XMVectorGetX(DirectX::XMVector3LengthSq(L));
@@ -276,7 +206,7 @@ private:
 			float knockbackPower = 35.0f;
 			dRb.velocity.x += (dx / dist) * knockbackPower;
 			dRb.velocity.z += (dz / dist) * knockbackPower;
-			dRb.velocity.y += 10.0f; // 囲みを抜けるため高めに跳ね上げる
+			dRb.velocity.y += 10.0f;
 		}
 	}
 };

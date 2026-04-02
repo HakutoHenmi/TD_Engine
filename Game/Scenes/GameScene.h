@@ -63,7 +63,9 @@ public:
 	
 	// ★追加: 高速タグ検索システム
 	const std::vector<entt::entity>& GetEntitiesByTag(const std::string& tag);
+	const std::vector<entt::entity>& GetEntitiesByTag(TagType tag); // ★追加
 	void SetTag(entt::entity entity, const std::string& tag);
+	void SetTag(entt::entity entity, TagType tag); // ★追加
 	void SyncTag(entt::entity entity); // ★追加: 手動同期用
 
 	// flowField_取得
@@ -84,7 +86,7 @@ private:
     std::mutex spawnMutex_; // ★追加: マルチスレッドから安全にスポーン・破棄登録を行えるようにする
 	
 	// タグ検索キャッシュ
-	std::unordered_map<std::string, std::vector<entt::entity>> tagCache_;
+	std::unordered_map<TagType, std::vector<entt::entity>> tagCache_;
 	std::vector<entt::entity> pendingTagSync_; // ★追加: 生成直後の同期待ち
 	void OnTagAdded(entt::registry& reg, entt::entity entity);
 	void OnTagRemoved(entt::registry& reg, entt::entity entity);

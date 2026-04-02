@@ -33,7 +33,7 @@ void BaseScript::Start(entt::entity entity, GameScene* scene) {
 
 	if (!registry.all_of<HurtboxComponent>(entity)) {
 		HurtboxComponent& hurtboxComponent = registry.emplace<HurtboxComponent>(entity);
-		hurtboxComponent.tag = "Core";
+		hurtboxComponent.tag = TagType::Body;
 		hurtboxComponent.enabled = true;
 
 		if (registry.all_of<BoxColliderComponent>(entity)) {
@@ -70,7 +70,7 @@ void BaseScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	entt::entity target = entt::null;
 	float bestDistance = attackRange_;
 
-	const auto& enemies = scene->GetEntitiesByTag("Enemy");
+	const auto& enemies = scene->GetEntitiesByTag(TagType::Enemy);
 	for (auto other : enemies) {
 		if (!registry.valid(other) || !registry.all_of<TransformComponent>(other)) continue;
 		
@@ -117,7 +117,7 @@ void BaseScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	entt::entity bullet = registry.create();
 
 	TagComponent& bulletTag = registry.emplace<TagComponent>(bullet);
-	bulletTag.tag = "Bullet";
+	bulletTag.tag = TagType::Bullet;
 
 	TransformComponent& bulletTransform = registry.emplace<TransformComponent>(bullet);
 	bulletTransform.translate = baseTransform.translate;
@@ -143,7 +143,7 @@ void BaseScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	HitboxComponent& hitboxComponent = registry.emplace<HitboxComponent>(bullet);
 	hitboxComponent.isActive = true;
 	hitboxComponent.damage = damage_;
-	hitboxComponent.tag = "Bullet";
+	hitboxComponent.tag = TagType::Bullet;
 	hitboxComponent.size = {0.2f, 0.2f, 0.2f};
 
 	ScriptComponent& scriptComponent = registry.emplace<ScriptComponent>(bullet);

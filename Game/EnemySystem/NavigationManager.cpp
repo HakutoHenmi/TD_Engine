@@ -1,5 +1,6 @@
 #include "NavigationManager.h"
 #include "../Scenes/GameScene.h"
+#include "../ObjectTypes.h"
 #include <queue>
 
 void NavigationManager::Initialize(int width, int height, float cellSize) {
@@ -26,7 +27,7 @@ void NavigationManager::UpdateCostMap(Game::GameScene* scene) {
 		if (registry.all_of<Game::TagComponent>(entity)) {
 			const auto& tag = tagView.get<Game::TagComponent>(entity).tag;
 			// チェックしたタグがWall, Canon, Pipeなら
-			if (tag == "Wall" || tag == "Cannon" || tag == "Pipe") {
+			if (tag == Game::TagType::Wall || tag == Game::TagType::Cannon || tag == Game::TagType::Pipe) {
 				if (registry.all_of<Game::TransformComponent>(entity)) {
 					auto& tc = tcView.get<Game::TransformComponent>(entity);
 

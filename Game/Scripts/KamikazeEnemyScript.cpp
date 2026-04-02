@@ -30,7 +30,7 @@ void KamikazeEnemyScript::Update(entt::entity entity, GameScene* scene, float dt
 	// キャッシュが有効か確認
 	bool found = false;
 	
-	const auto& players = scene->GetEntitiesByTag("Player");
+	const auto& players = scene->GetEntitiesByTag(TagType::Player);
 	for (auto p : players) {
 		if (registry.valid(p) && registry.all_of<TransformComponent>(p)) {
 			targetPos = registry.get<TransformComponent>(p).translate;
@@ -90,7 +90,7 @@ void KamikazeEnemyScript::Explode(entt::entity entity, GameScene* scene) {
 	hb.isActive = true;
 	hb.damage = damage_;
 	hb.size = {explosionRadius_, explosionRadius_, explosionRadius_};
-	hb.tag = "Explosion";
+	hb.tag = TagType::Explosion;
 
 	// 2. 爆発エフェクト（破片）を生成
 	// （※旧コードの SpawnObject が未対応だが、本来は EnTT ベースで行うべき）

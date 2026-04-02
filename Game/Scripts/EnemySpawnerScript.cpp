@@ -35,7 +35,7 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 	// Kを押して今いる敵を消す処理
 	// Kを押して今いる敵を消す処理
 	if (GetAsyncKeyState('K') & 0x8000) {
-		const auto& enemies = scene->GetEntitiesByTag("Enemy");
+		const auto& enemies = scene->GetEntitiesByTag(TagType::Enemy);
 		std::vector<entt::entity> toDestroy(enemies.begin(), enemies.end());
 		for (auto e : toDestroy) {
 			scene->GetRegistry().destroy(e);
@@ -137,15 +137,15 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 
 		auto& hurtbox = scene->GetRegistry().emplace<HurtboxComponent>(enemy);
 		hurtbox.size = { 2.0f, 2.0f, 2.0f };
-		hurtbox.tag = "Enemy";
+		hurtbox.tag = TagType::Enemy;
 		hurtbox.enabled = true;
 
 		// ★ 高速タグシステム経由でタグを設定
-		scene->SetTag(enemy, "Enemy");
+		scene->SetTag(enemy, TagType::Enemy);
 
 		auto& hbComponent = scene->GetRegistry().emplace<HitboxComponent>(enemy);
 		hbComponent.isActive = true;
-		hbComponent.tag = "Enemy";
+		hbComponent.tag = TagType::Enemy;
 		hbComponent.damage = 10.0f;
 		hbComponent.size = { 2.0f, 2.0f, 2.0f };
 		hbComponent.enabled = true;

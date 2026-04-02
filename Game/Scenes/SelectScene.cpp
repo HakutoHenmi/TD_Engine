@@ -82,7 +82,7 @@ void SelectScene::CreateUI() {
 		text.color = {1, 1, 1, 1};
 		
 		// 識別用タグの代わりに名前を使うか、新しくタグを付ける
-		registry_.emplace<TagComponent>(btn, "StageBtn");
+		registry_.emplace<TagComponent>(btn, TagType::Default);
 		registry_.emplace<VariableComponent>(btn).SetString("Path", stages_[i].path);
 	}
 

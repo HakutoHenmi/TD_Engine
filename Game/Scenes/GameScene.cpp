@@ -128,7 +128,7 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	// 前回プレイで動的に生成されたオブジェクトの削除
 	auto bulletView = registry_.view<TagComponent>();
 	for (auto entity : bulletView) {
-		if (bulletView.get<TagComponent>(entity).tag == "Bullet") {
+		if (bulletView.get<TagComponent>(entity).tag == TagType::Bullet) {
 			registry_.destroy(entity);
 		}
 	}
@@ -155,7 +155,7 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	tagCache_.clear();
 	auto tagInitView = registry_.view<TagComponent>();
 	for (auto entity : tagInitView) {
-		const auto& tag = tagInitView.get<TagComponent>(entity).tag;
+		const auto tag = tagInitView.get<TagComponent>(entity).tag;
 		tagCache_[tag].push_back(entity);
 	}
 	// リスナー登録
@@ -210,7 +210,7 @@ void GameScene::Update() {
 
 		// プレイヤーの生存確認 (Viewを直接参照して同期ズレを防ぐ)
 		// プレイヤーの生存確認
-		const auto& players = GetEntitiesByTag("Player");
+		const auto& players = GetEntitiesByTag(TagType::Player);
 		for (auto entity : players) {
 			if (registry_.valid(entity) && registry_.all_of<HealthComponent>(entity)) {
 				if (registry_.get<HealthComponent>(entity).hp <= 0) {
@@ -402,68 +402,6 @@ void GameScene::DestroyObject(uint32_t id) {
 	pendingDestroys_.push_back(static_cast<entt::entity>(id));
 }
 
-// ★追加: タグシステムの実装
-const std::vector<entt::entity>& GameScene::GetEntitiesByTag(const std::string& tag) {
-	static const std::vector<entt::entity> emptyList;
-	auto it = tagCache_.find(tag);
-	if (it == tagCache_.end())
-		return emptyList;
-	return it->second;
-}
-
-void GameScene::SyncTag(entt::entity entity) {
-	if (!registry_.valid(entity) || !registry_.all_of<TagComponent>(entity))
-		return;
-	const auto& tag = registry_.get<TagComponent>(entity).tag;
-
-	// すでにある程度管理されているか確認し、重複を防ぐ
-	auto& list = tagCache_[tag];
-	if (std::find(list.begin(), list.end(), entity) == list.end()) {
-		list.push_back(entity);
-	}
-}
-
-void GameScene::SetTag(entt::entity entity, const std::string& tag) {
-	auto& reg = GetRegistry();
-
-	// すでにタグがある場合は古いキャッシュから削除
-	if (reg.all_of<TagComponent>(entity)) {
-		const auto& oldTag = reg.get<TagComponent>(entity).tag;
-		if (oldTag == tag)
-			return; // 変更なし
-
-		auto it = tagCache_.find(oldTag);
-		if (it != tagCache_.end()) {
-			auto& oldList = it->second;
-			oldList.erase(std::remove(oldList.begin(), oldList.end(), entity), oldList.end());
-		}
-		reg.get<TagComponent>(entity).tag = tag;
-	} else {
-		// 新規付与
-		reg.emplace<TagComponent>(entity).tag = tag;
-	}
-
-	// 新しいキャッシュに追加
-	tagCache_[tag].push_back(entity);
-}
-
-void GameScene::OnTagAdded(entt::registry& reg, entt::entity entity) {
-	// 生成時はまだタグが設定されていない("Untagged")可能性があるため、保留リストに入れる
-	(void)reg;
-	pendingTagSync_.push_back(entity);
-}
-
-void GameScene::OnTagRemoved(entt::registry& reg, entt::entity entity) {
-	// Componentが削除される際、キャッシュからも消す
-	if (reg.all_of<TagComponent>(entity)) {
-		const auto& tag = reg.get<TagComponent>(entity).tag;
-		auto it = tagCache_.find(tag);
-		if (it != tagCache_.end()) {
-			auto& list = it->second;
-			list.erase(std::remove(list.begin(), list.end(), entity), list.end());
-		}
-	}
-}
 
 // ★追加: 名前でオブジェクトを検索
 entt::entity GameScene::FindObjectByName(const std::string& name) {
@@ -492,9 +430,9 @@ float GameScene::GetHeightAt(float x, float z, float startY, uint32_t excludeId)
 
 		bool isEnemyOrBullet = false;
 		if (registry_.all_of<TagComponent>(entity)) {
-			const auto& tag = registry_.get<TagComponent>(entity).tag;
-			if (tag == "Enemy" || tag == "Bullet" || tag == "Player" || tag == "Sword" || tag == "PlayerSword" || tag == "Projectile" || tag == "pipe" || tag == "Canon" || tag == "BulletTank" ||
-			    tag == "pipe_cannon") {
+			const auto tag = registry_.get<TagComponent>(entity).tag;
+			if (tag == TagType::Enemy || tag == TagType::Bullet || tag == TagType::Player || tag == TagType::Sword || tag == TagType::PlayerSword || tag == TagType::Projectile || tag == TagType::Pipe || tag == TagType::Canon || tag == TagType::BulletTank ||
+			    tag == TagType::PipeCannon) {
 				isEnemyOrBullet = true;
 			}
 		}
@@ -549,8 +487,8 @@ bool GameScene::RayCast(const Engine::Vector3& origin, const Engine::Vector3& di
 
 		// タグによるフィルタリング
 		if (registry_.all_of<TagComponent>(entity)) {
-			const auto& tag = registry_.get<TagComponent>(entity).tag;
-			if (tag == "Enemy" || tag == "Bullet" || tag == "Player" || tag == "Sword" || tag == "PlayerSword" || tag == "Projectile")
+			const auto tag = registry_.get<TagComponent>(entity).tag;
+			if (tag == TagType::Enemy || tag == TagType::Bullet || tag == TagType::Player || tag == TagType::Sword || tag == TagType::PlayerSword || tag == TagType::Projectile)
 				continue;
 		}
 
@@ -665,7 +603,7 @@ void GameScene::Draw() {
 #endif
 
 	// ★ 高速タグ検索を用いてプレイヤー位置を同期（O(N) -> O(1)）
-	const auto& players = GetEntitiesByTag("Player");
+	const auto& players = GetEntitiesByTag(TagType::Player);
 	if (!players.empty()) {
 		entt::entity playerEntity = players[0];
 		if (registry_.valid(playerEntity) && registry_.all_of<TransformComponent>(playerEntity)) {
@@ -1146,6 +1084,62 @@ void GameScene::SetIsPlaying(bool play) {
 		pendingDestroys_.clear();
 		pendingSpawns_.clear();
 	}
+}
+
+// =====================================================
+// ★ 高速タグアクセス実装
+// =====================================================
+
+const std::vector<entt::entity>& GameScene::GetEntitiesByTag(TagType tag) {
+	static const std::vector<entt::entity> emptyResult;
+	auto it = tagCache_.find(tag);
+	if (it != tagCache_.end()) {
+		return it->second;
+	}
+	return emptyResult;
+}
+
+void GameScene::SetTag(entt::entity entity, TagType tag) {
+	if (!registry_.valid(entity)) {
+		return;
+	}
+	auto& tc = registry_.get_or_emplace<TagComponent>(entity);
+	tc.tag = tag;
+	SyncTag(entity);
+}
+
+void GameScene::OnTagAdded(entt::registry& /*registry*/, entt::entity entity) {
+	// 即座に同期せず、次フレーム等の適切なタイミングで同期
+	pendingTagSync_.push_back(entity);
+}
+
+void GameScene::OnTagRemoved(entt::registry& /*registry*/, entt::entity entity) {
+	// キャッシュから全削除
+	for (auto& pair : tagCache_) {
+		auto& vec = pair.second;
+		vec.erase(std::remove(vec.begin(), vec.end(), entity), vec.end());
+	}
+}
+
+void GameScene::SyncTag(entt::entity entity) {
+	if (!registry_.valid(entity) || !registry_.all_of<TagComponent>(entity)) {
+		return;
+	}
+
+	// 古いキャッシュを削除
+	OnTagRemoved(registry_, entity);
+
+	// 新しいキャッシュに追加
+	const TagType tag = registry_.get<TagComponent>(entity).tag;
+	tagCache_[tag].push_back(entity);
+}
+
+const std::vector<entt::entity>& GameScene::GetEntitiesByTag(const std::string& tag) {
+	return GetEntitiesByTag(StringToTag(tag));
+}
+
+void GameScene::SetTag(entt::entity entity, const std::string& tagStr) {
+	SetTag(entity, StringToTag(tagStr));
 }
 
 } // namespace Game
