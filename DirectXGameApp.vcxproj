@@ -179,6 +179,7 @@ exit /b 0
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Game\Scripts\InstallationButton.cpp" />
     <ClCompile Include="Game\Editor\EditorUI.cpp" />
     <ClCompile Include="Game\Editor\PipeEditor.cpp" />
     <ClCompile Include="Game\Editor\EnemySpawnerEditor.cpp" />
@@ -206,13 +207,14 @@ exit /b 0
     <ClCompile Include="Game\Scripts\EnemySpawnerScript.cpp" />
     <ClCompile Include="Game\Scripts\IScript.cpp" />
     <ClCompile Include="Game\Scripts\CommunicationTestScript.cpp" />
+    <ClCompile Include="Game\Scripts\HitDistortionScript.cpp" />
     <ClCompile Include="Game\Scripts\SkillTree.cpp" />
     <ClCompile Include="Game\Systems\UISystem.cpp" />
     <ClCompile Include="Game\Systems\RiverSystem.cpp" />
-    <ClCompile Include="Game\Scripts\PoisonTrap.cpp" />
-    <ClCompile Include="Game\Scripts\PoisonAttackArea.cpp" />
+    <ClCompile Include="Game\EnemySystem\NavigationManager.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Game\Scripts\InstallationButton.h" />
     <ClInclude Include="Game\Editor\EditorUI.h" />
     <ClInclude Include="Game\Editor\PipeEditor.h" />
     <ClInclude Include="Game\Editor\EnemySpawnerEditor.h" />
@@ -241,6 +243,7 @@ exit /b 0
     <ClInclude Include="Game\Scripts\EnemySpawnerScript.h" />
     <ClInclude Include="Game\Scripts\CommunicationTestScript.h" />
     <ClInclude Include="Game\Scripts\ScriptUtils.h" />
+    <ClInclude Include="Game\Scripts\HitDistortionScript.h" />
     <ClInclude Include="Game\Scripts\SkillTree.h" />
     <ClInclude Include="Game\Systems\UISystem.h" />
     <ClInclude Include="Game\Systems\ISystem.h" />
@@ -254,8 +257,7 @@ exit /b 0
     <ClInclude Include="Game\Systems\ScriptSystem.h" />
     <ClInclude Include="Game\Systems\CleanupSystem.h" />
     <ClInclude Include="Game\Systems\RiverSystem.h" />
-    <ClInclude Include="Game\Scripts\PoisonTrap.h" />
-    <ClInclude Include="Game\Scripts\PoisonAttackArea.h" />
+    <ClInclude Include="Game\EnemySystem\NavigationManager.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\level_data.csv" />

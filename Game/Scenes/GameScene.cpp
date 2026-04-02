@@ -13,6 +13,7 @@
 #include "../Systems/CleanupSystem.h"
 #include "../Systems/CombatSystem.h"
 #include "../Systems/HealthSystem.h"
+#include "../Systems/MotionSystem.h" // ★追加
 #include "../Systems/PhysicsSystem.h"
 #include "../Systems/PlayerInputSystem.h"
 #include "../Systems/RiverSystem.h" // ★追加
@@ -113,6 +114,7 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	systems_.push_back(std::make_unique<CombatSystem>());
 	systems_.push_back(std::make_unique<AudioSystem>());
 	systems_.push_back(std::make_unique<UISystem>());
+	systems_.push_back(std::make_unique<MotionSystem>());
 	systems_.push_back(std::make_unique<CleanupSystem>());
 
 	// ★追加: 起動直後の状態を初期スナップショットとして保存
@@ -156,14 +158,20 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	registry_.on_construct<TagComponent>().connect<&GameScene::OnTagAdded>(this);
 	registry_.on_destroy<TagComponent>().disconnect<&GameScene::OnTagRemoved>(this);
 	registry_.on_destroy<TagComponent>().connect<&GameScene::OnTagRemoved>(this);
+
+	// NavigationManagerの初期化
+	flowField_ = std::make_unique<NavigationManager>();
+	flowField_->Initialize(100, 100, 2.0f);
+
+	//ステージロード直後に一度地形を読み込む
+	flowField_->UpdateCostMap(this);
 }
 
 // =====================================================
 // ★ Update: 各Systemに処理を委譲
 // =====================================================
 void GameScene::Update() {
-	if (!renderer_)
-		return;
+	if (!renderer_) return;
 
 	// ★追加: 行列キャッシュを毎フレームクリア
 	ClearMatrixCache();
@@ -226,10 +234,6 @@ void GameScene::Update() {
 	ctx_.scene = this;
 	ctx_.eventSystem = &eventSystem_;
 	ctx_.pendingSpawns = &pendingSpawns_;
-
-	// viewportのデフォルト設定（フルスクリーン想定）
-	ctx_.viewportOffset = {0, 0};
-	ctx_.viewportSize = {(float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH};
 
 	// GPU Collision Dispatch（エンジンの汎用 PhysicsSystem.h に移行したため、ここでは何もしない）
 
@@ -710,7 +714,7 @@ void GameScene::Draw() {
 					renderer_->DrawSkinnedMesh(mr.modelHandle, mr.textureHandle, world, bonePalette, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w});
 				} else {
 					if (mr.shaderName == "Toon" || mr.shaderName == "ToonSkinning" || mr.shaderName == "Hologram" || mr.shaderName == "EmissiveGlow" || mr.shaderName == "ForceField" ||
-					    mr.shaderName == "Dissolve") {
+					    mr.shaderName == "Dissolve" || mr.shaderName == "Distortion") {
 						renderer_->DrawMesh(mr.modelHandle, mr.textureHandle, world, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w}, mr.shaderName);
 					} else {
 						renderer_->DrawMeshInstanced(

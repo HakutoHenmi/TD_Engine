@@ -15,6 +15,9 @@
 #include "../../Engine/Input.h"
 #include "../../Engine/WindowDX.h"
 
+//Button UI
+#include "InstallationButton.h"
+
 namespace Game {
 
 void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
@@ -83,17 +86,17 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			return; // 設置モードの入力を抑制
 		}
 
-		if (key1) {
+		if (key1 || InstallationButton::IsButtonPressed(InstallationButton::Tank)) {
 			selectedObjPath_ = "Resources/Prefabs/BulletTank.prefab";
 			isPlacementMode_ = true;
 		}
 
-		if (key2) {
+		if (key2 || InstallationButton::IsButtonPressed(InstallationButton::Pipe)) {
 			selectedObjPath_ = "Resources/Prefabs/Pipe.prefab";
 			isPlacementMode_ = true;
 		}
 
-		if (key3) {
+		if (key3 || InstallationButton::IsButtonPressed(InstallationButton::Cannon)) {
 			selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
 			isPlacementMode_ = true;
 		}
@@ -117,7 +120,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				if (registry.all_of<TransformComponent>(spawnedEntity)) {
 					auto& tc = registry.get<TransformComponent>(spawnedEntity);
 					if (!registry.all_of<HierarchyComponent>(spawnedEntity) || registry.get<HierarchyComponent>(spawnedEntity).parentId == entt::null) {
-						tc.translate = {-50.0f, 10.0f, 0.0f};
+						tc.translate = {-50.0f, 20.0f, 50.0f};
 					}
 				}
 			}
@@ -128,6 +131,27 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			isPreparation_ = true;
 		}
 		isPlacementMode_ = false;
+	}
+
+	// フェーズが切り替わった瞬間の検知
+	if (isPreparation_ != preIsPreparation_) {
+		auto& nav = scene->GetNavigationManager();
+
+		if (!isPreparation_) {
+			// 準備から戦闘に切り替わった瞬間
+			// 設置物を反映するためにコストマップを更新
+			nav.UpdateCostMap(scene);
+
+			// 敵が目指すコアをゴールの位置としてフローフィールドを計算
+			auto core = scene->FindObjectByName("Core");
+			if (scene->GetRegistry().valid(core)) {
+				auto& tc = scene->GetRegistry().get<TransformComponent>(core);
+				nav.GenerateFlowField(tc.translate.x, tc.translate.z);
+			}
+		}
+
+		// 状態を同期
+		preIsPreparation_ = isPreparation_;
 	}
 
 	preKeyN_ = keyN;
@@ -320,8 +344,7 @@ bool PhaseSystemScript::ExtractPrefabRenderPaths(const std::string& prefabPath, 
 }
 
 bool PhaseSystemScript::IsPlacementBlocked(GameScene* scene, const Engine::Vector3& hitPoint) const {
-	constexpr float kBlockRadius = 1.0f;
-	constexpr float kBlockRadiusSq = kBlockRadius * kBlockRadius;
+    constexpr float kBlockHalfExtent = 2.0f; // 2x2 square
 
 	auto& registry = scene->GetRegistry();
 	auto view = registry.view<TransformComponent>();
@@ -345,8 +368,7 @@ bool PhaseSystemScript::IsPlacementBlocked(GameScene* scene, const Engine::Vecto
 		const auto& tc = view.get<TransformComponent>(entity);
 		const float dx = tc.translate.x - hitPoint.x;
 		const float dz = tc.translate.z - hitPoint.z;
-		const float distSq = dx * dx + dz * dz;
-		if (distSq < kBlockRadiusSq) {
+     if (std::abs(dx) < kBlockHalfExtent && std::abs(dz) < kBlockHalfExtent) {
 			return true;
 		}
 	}

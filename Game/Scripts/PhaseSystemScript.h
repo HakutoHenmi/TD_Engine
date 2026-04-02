@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "IScript.h"
 #include "SkillTree.h"
 #include "../../externals/entt/entt.hpp"
@@ -29,6 +29,7 @@ public:
 
 private:
 	inline static bool isPreparation_ = true;
+	bool preIsPreparation_ = true; // フェーズ切り替わり検知用
 	int currentPhase_ = 0;
 
 	bool preKeyP_ = false; // 初期化しておく

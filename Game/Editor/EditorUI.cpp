@@ -7,6 +7,9 @@
 #include "../Systems/UISystem.h"    
 #include "../Scripts/IScript.h"     
 #include "../Scripts/ScriptEngine.h" 
+#ifdef _MSC_VER
+#pragma warning(disable: 4865)
+#endif
 
 #include "Audio.h"
 #include <tuple> // 追加
@@ -217,6 +220,22 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 					reg.get_or_emplace<UIButtonComponent>(entity).enabled = en;
 				} else if (type == "AudioListener") {
 					reg.get_or_emplace<AudioListenerComponent>(entity).enabled = en;
+				} else if (type == "Motion") {
+					auto& c = reg.get_or_emplace<MotionComponent>(entity);
+					c.enabled = en;
+					if (comp.contains("keyframes") && comp["keyframes"].is_array()) {
+						c.keyframes.clear();
+						for (auto& kf : comp["keyframes"]) {
+							MotionComponent::Keyframe k;
+							k.time = kf.value("time", 0.0f);
+							if (kf.contains("translate")) k.translate = {kf["translate"][0], kf["translate"][1], kf["translate"][2]};
+							if (kf.contains("rotate")) k.rotate = {kf["rotate"][0], kf["rotate"][1], kf["rotate"][2]};
+							if (kf.contains("scale")) k.scale = {kf["scale"][0], kf["scale"][1], kf["scale"][2]};
+							c.keyframes.push_back(k);
+						}
+					}
+					c.totalDuration = comp.value("totalDuration", 1.0f);
+					c.loop = comp.value("loop", true);
 				}
 			}
 		}
@@ -522,6 +541,16 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 	if (auto* cp = registry.try_get<AudioListenerComponent>(entity)) {
 		addComma();
 		ss << "        {\"type\": \"AudioListener\", \"enabled\": " << (cp->enabled ? "true" : "false") << "}";
+	}
+	if (auto* cp = registry.try_get<MotionComponent>(entity)) {
+		addComma();
+		ss << "        {\"type\": \"Motion\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"totalDuration\": " << cp->totalDuration << ", \"loop\": " << (cp->loop ? "true" : "false") << ", \"keyframes\": [\n";
+		for (size_t i = 0; i < cp->keyframes.size(); ++i) {
+			auto& kf = cp->keyframes[i];
+			ss << "          {\"time\": " << kf.time << ", \"translate\": [" << kf.translate.x << "," << kf.translate.y << "," << kf.translate.z << "], \"rotate\": [" << kf.rotate.x << "," << kf.rotate.y << "," << kf.rotate.z << "], \"scale\": [" << kf.scale.x << "," << kf.scale.y << "," << kf.scale.z << "]}";
+			if (i < cp->keyframes.size() - 1) ss << ",\n";
+		}
+		ss << "\n        ]}";
 	}
 
 	ss << "\n      ]\n";
@@ -989,20 +1018,28 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	float targetIdxY = currentCursorPos.y + cursorPadding.y;
 	ImGui::SetCursorPos(ImVec2(targetIdxX, targetIdxY));
 	
-	// Pick game image region
-	gameImageMin = ImGui::GetCursorScreenPos();
-	gameImageMax = ImVec2(gameImageMin.x + renderW, gameImageMin.y + renderH);
+	// 描画実行
+	ImGui::Image((ImTextureID)renderer->GetGameFinalSRV().ptr, ImVec2(renderW, renderH));
+	
+	// ★修正: 実際に画像が描画された正確なスクリーン座標を取得
+	gameImageMin = ImGui::GetItemRectMin();
+	gameImageMax = ImGui::GetItemRectMax();
 	
 	// ★追加: UISystemなどの座標変換用にコンテキストへ設定
 	auto& gctx = gameScene->GetContext();
 	gctx.viewportOffset = { gameImageMin.x, gameImageMin.y };
 	gctx.viewportSize = { renderW, renderH };
 	
-	// Tool Editors Update & Draw (Overlays)
+	// エディター上のマウス座標を内部解像度(1920x1080)に正確に変換して上書き
+	// ★修正: ピクセル中心(+0.5f)を基準に精密なマッピングを行う
+	ImVec2 mPos_img = ImGui::GetMousePos();
+	gctx.overrideMouseX = (mPos_img.x - gameImageMin.x) * (float)Engine::WindowDX::kW / renderW;
+	gctx.overrideMouseY = (mPos_img.y - gameImageMin.y) * (float)Engine::WindowDX::kH / renderH;
+	gctx.useOverrideMouse = true;
+
+	// Tool Editors Update & Draw (Overlays) - 画像の上にオーバーレイとして描画
 	s_pipeEditor.UpdateAndDraw(gameScene, renderer, gameImageMin, gameImageMax, renderW, renderH);
 	s_spawnerEditor.UpdateAndDraw(gameScene, renderer, gameImageMin, gameImageMax, renderW, renderH);
-
-	ImGui::Image((ImTextureID)renderer->GetGameFinalSRV().ptr, ImVec2(renderW, renderH));
 	
 	// Project to Scene Drop
 	if (ImGui::BeginDragDropTarget()) {
@@ -1027,8 +1064,18 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	auto selectedEnt = gameScene->GetSelectedEntity();
 
 	if (!isPlaying && selectedEnt != entt::null && gameScene->GetRegistry().valid(selectedEnt)) {
-		auto& tc = gameScene->GetRegistry().get<TransformComponent>(selectedEnt);
-		DirectX::XMVECTOR objPos3D = DirectX::XMLoadFloat3(&tc.translate);
+		auto& reg = gameScene->GetRegistry();
+		auto* mc = reg.try_get<MotionComponent>(selectedEnt);
+		auto& tc = reg.get<TransformComponent>(selectedEnt);
+		
+		DirectX::XMFLOAT3 currentPos;
+		if (mc && mc->selectedKeyframe >= 0 && mc->selectedKeyframe < (int)mc->keyframes.size()) {
+			currentPos = mc->keyframes[mc->selectedKeyframe].translate;
+		} else {
+			currentPos = tc.translate;
+		}
+
+		DirectX::XMVECTOR objPos3D = DirectX::XMLoadFloat3(&currentPos);
 		DirectX::XMMATRIX view = gameScene->GetCamera().View();
 		DirectX::XMMATRIX proj = gameScene->GetCamera().Proj();
 		
@@ -1085,9 +1132,9 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				gizmoDragging = true;
 				gizmoDragAxis = hoveredAxis;
 				gizmoDragStartMouse = mousePos;
-				gizmoStartTranslate = tc.translate;
-				gizmoStartRotate = tc.rotate;
-				gizmoStartScale = tc.scale;
+				gizmoStartTranslate = currentPos;
+				gizmoStartRotate = {0,0,0}; // Not needed for KFs yet
+				gizmoStartScale = {1,1,1};
 			}
 
 			if (gizmoDragging) {
@@ -1130,18 +1177,22 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 					float sensitivity = (currentGizmoMode == GizmoMode::Rotate) ? 0.02f : 0.05f;
 					if (currentGizmoMode == GizmoMode::Scale) sensitivity = 0.01f;
 
+					auto* targetPos = mc && mc->selectedKeyframe >= 0 ? &mc->keyframes[mc->selectedKeyframe].translate : &reg.get<TransformComponent>(selectedEnt).translate;
+					auto* targetRot = &reg.get<TransformComponent>(selectedEnt).rotate;
+					auto* targetScale = &reg.get<TransformComponent>(selectedEnt).scale;
+
 					if (currentGizmoMode == GizmoMode::Translate) {
-						if (gizmoDragAxis == 0) tc.translate.x += projMovement * sensitivity;
-						if (gizmoDragAxis == 1) tc.translate.y -= projMovement * sensitivity; // Screen Y is inverted
-						if (gizmoDragAxis == 2) tc.translate.z += projMovement * sensitivity;
-					} else if (currentGizmoMode == GizmoMode::Rotate) {
-						if (gizmoDragAxis == 0) tc.rotate.x += projMovement * sensitivity;
-						if (gizmoDragAxis == 1) tc.rotate.y -= projMovement * sensitivity;
-						if (gizmoDragAxis == 2) tc.rotate.z += projMovement * sensitivity;
-					} else if (currentGizmoMode == GizmoMode::Scale) {
-						if (gizmoDragAxis == 0) tc.scale.x += projMovement * sensitivity;
-						if (gizmoDragAxis == 1) tc.scale.y -= projMovement * sensitivity;
-						if (gizmoDragAxis == 2) tc.scale.z += projMovement * sensitivity;
+						if (gizmoDragAxis == 0) targetPos->x += projMovement * sensitivity;
+						if (gizmoDragAxis == 1) targetPos->y -= projMovement * sensitivity; // Screen Y is inverted
+						if (gizmoDragAxis == 2) targetPos->z += projMovement * sensitivity;
+					} else if (currentGizmoMode == GizmoMode::Rotate && !mc) {
+						if (gizmoDragAxis == 0) targetRot->x += projMovement * sensitivity;
+						if (gizmoDragAxis == 1) targetRot->y -= projMovement * sensitivity;
+						if (gizmoDragAxis == 2) targetRot->z += projMovement * sensitivity;
+					} else if (currentGizmoMode == GizmoMode::Scale && !mc) {
+						if (gizmoDragAxis == 0) targetScale->x += projMovement * sensitivity;
+						if (gizmoDragAxis == 1) targetScale->y -= projMovement * sensitivity;
+						if (gizmoDragAxis == 2) targetScale->z += projMovement * sensitivity;
 					}
 				}
 			}
@@ -1164,19 +1215,162 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				drawList->AddRectFilled(ImVec2(endY.x-4, endY.y-4), ImVec2(endY.x+4, endY.y+4), colY);
 				drawList->AddRectFilled(ImVec2(endZ.x-4, endZ.y-4), ImVec2(endZ.x+4, endZ.y+4), colZ);
 			} else { // Rotate
-				drawList->AddCircle(origin, gizmoLen, IM_COL32(200,200,200,100), 32, 1.0f);
+			}
+
+			// Spline Keyframe Picking
+			if (mc && !gizmoHovered) {
+				if (ImGui::IsMouseClicked(0)) {
+					mousePos = ImGui::GetMousePos();
+					float sx = mousePos.x, sy = mousePos.y;
+					
+					view = gameScene->GetCamera().View();
+					proj = gameScene->GetCamera().Proj();
+
+					for (int i = 0; i < (int)mc->keyframes.size(); ++i) {
+						DirectX::XMVECTOR p3D = DirectX::XMLoadFloat3(&mc->keyframes[i].translate);
+						projP = DirectX::XMVector3Project(p3D, 0, 0, renderW, renderH, 0.0f, 1.0f, proj, view, DirectX::XMMatrixIdentity());
+						px = DirectX::XMVectorGetX(projP) + gameImageMin.x;
+						py = DirectX::XMVectorGetY(projP) + gameImageMin.y;
+						pz = DirectX::XMVectorGetZ(projP);
+
+						if (pz > 0.0f && pz < 1.0f) {
+							float dx = sx - px, dy = sy - py;
+							if (std::sqrt(dx*dx + dy*dy) < 15.0f) {
+								mc->selectedKeyframe = i;
+								gizmoHovered = true; // Prevent object picking
+								break;
+							}
+						}
+					}
+				}
+				}
+			}
+			
+			// ★追加: UI Gizmo Logic
+			if (auto* rt = reg.try_get<RectTransformComponent>(selectedEnt)) {
+				ImDrawList* drawList = ImGui::GetWindowDrawList();
+				UISystem::WorldRect wr = UISystem::CalculateWorldRect(selectedEnt, reg, (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH);
+				
+				// 内部解像度 (1920x1080) から実際の表示ピクセルへの変換スケーラー
+				float scaleX = renderW / (float)Engine::WindowDX::kW;
+				float scaleY = renderH / (float)Engine::WindowDX::kH;
+
+				ImVec2 pMin(gameImageMin.x + wr.x * scaleX, gameImageMin.y + wr.y * scaleY);
+				ImVec2 pMax(pMin.x + wr.w * scaleX, pMin.y + wr.h * scaleY);
+				
+				// UI本体の枠 (オレンジ色)
+				drawList->AddRect(pMin, pMax, IM_COL32(255, 140, 0, 255), 0.0f, 0, 2.0f);
+				
+				// UIButton があれば判定エリアも表示 (水色)
+				if (auto* btn = reg.try_get<UIButtonComponent>(selectedEnt)) {
+					float hw = wr.w * btn->hitboxScale.x;
+					float hh = wr.h * btn->hitboxScale.y;
+					float cx = wr.x + wr.w * 0.5f + btn->hitboxOffset.x;
+					float cy = wr.y + wr.h * 0.5f + btn->hitboxOffset.y;
+					float hx = cx - hw * 0.5f;
+					float hy = cy - hh * 0.5f;
+
+					ImVec2 hpMin(gameImageMin.x + hx * scaleX, gameImageMin.y + hy * scaleY);
+					ImVec2 hpMax(hpMin.x + hw * scaleX, hpMin.y + hh * scaleY);
+					drawList->AddRect(hpMin, hpMax, IM_COL32(0, 255, 255, 255), 0.0f, 0, 1.0f);
+
+					// 判定エリア移動ハンドル (中央の丸)
+					ImVec2 hCenter((hpMin.x + hpMax.x) * 0.5f, (hpMin.y + hpMax.y) * 0.5f);
+					drawList->AddCircleFilled(hCenter, 6.0f, IM_COL32(0, 255, 255, 255));
+					
+					ImVec2 mPos = ImGui::GetMousePos();
+					float dx_h = mPos.x - hCenter.x;
+					float dy_h = mPos.y - hCenter.y;
+					float dToHCenter = std::sqrt(dx_h * dx_h + dy_h * dy_h);
+
+					if (dToHCenter < 10.0f) {
+						gizmoHovered = true; // ホバー時もフラグを立てて背面クリックを防止
+						if (!uiDragging && ImGui::IsMouseClicked(0)) {
+							uiDragging = true;
+							uiDragHandle = 10; // 10 = HitboxOffset
+							uiDragStartHitOffset = btn->hitboxOffset;
+						}
+					}
+					
+					// 判定エリア拡縮ハンドル (右下の丸)
+					ImVec2 hScaleHandle = hpMax;
+					drawList->AddCircleFilled(hScaleHandle, 6.0f, IM_COL32(0, 255, 255, 255));
+					float dx_s = mPos.x - hScaleHandle.x;
+					float dy_s = mPos.y - hScaleHandle.y;
+					float dToHScale = std::sqrt(dx_s * dx_s + dy_s * dy_s);
+					if (dToHScale < 10.0f) {
+						gizmoHovered = true;
+						if (!uiDragging && ImGui::IsMouseClicked(0)) {
+							uiDragging = true;
+							uiDragHandle = 11; // 11 = HitboxScale
+							uiDragStartHitScale = btn->hitboxScale;
+						}
+					}
+				}
+
+				// UI本体移動ハンドル (左上)
+				drawList->AddCircleFilled(pMin, 8.0f, IM_COL32(255, 140, 0, 255));
+				
+				ImVec2 mPos = ImGui::GetMousePos();
+				float dx_p = mPos.x - pMin.x;
+				float dy_p = mPos.y - pMin.y;
+				float dToPMin = std::sqrt(dx_p * dx_p + dy_p * dy_p);
+				if (dToPMin < 12.0f) {
+					gizmoHovered = true;
+					if (!uiDragging && ImGui::IsMouseClicked(0)) {
+						uiDragging = true;
+						uiDragHandle = 0; // 0 = Rect Pos
+						uiDragStartPos = rt->pos;
+					}
+				}
+
+				// UI本体拡縮ハンドル (右下)
+				drawList->AddCircleFilled(pMax, 8.0f, IM_COL32(255, 140, 0, 255));
+				float dx_m = mPos.x - pMax.x;
+				float dy_m = mPos.y - pMax.y;
+				float dToPMax = std::sqrt(dx_m * dx_m + dy_m * dy_m);
+				if (dToPMax < 12.0f) {
+					gizmoHovered = true;
+					if (!uiDragging && ImGui::IsMouseClicked(0)) {
+						uiDragging = true;
+						uiDragHandle = 1; // 1 = Rect Size
+						uiDragStartSize = rt->size;
+					}
+				}
+
+				if (uiDragging) {
+					gizmoHovered = true;
+					ImVec2 delta = ImGui::GetMouseDragDelta(0);
+					float dx = delta.x / scaleX;
+					float dy = delta.y / scaleY;
+
+					if (uiDragHandle == 0) { // UI Pos
+						rt->pos.x = uiDragStartPos.x + dx;
+						rt->pos.y = uiDragStartPos.y + dy;
+					} else if (uiDragHandle == 1) { // UI Size
+						rt->size.x = (std::max)(1.0f, uiDragStartSize.x + dx);
+						rt->size.y = (std::max)(1.0f, uiDragStartSize.y + dy);
+					} else if (uiDragHandle == 10) { // Hitbox Offset
+						if (auto* btn = reg.try_get<UIButtonComponent>(selectedEnt)) {
+							btn->hitboxOffset.x = uiDragStartHitOffset.x + dx;
+							btn->hitboxOffset.y = uiDragStartHitOffset.y + dy;
+						}
+					} else if (uiDragHandle == 11) { // Hitbox Scale
+						if (auto* btn = reg.try_get<UIButtonComponent>(selectedEnt)) {
+							btn->hitboxScale.x = (std::max)(0.01f, uiDragStartHitScale.x + dx / wr.w);
+							btn->hitboxScale.y = (std::max)(0.01f, uiDragStartHitScale.y + dy / wr.h);
+						}
+					}
+
+					if (ImGui::IsMouseReleased(0)) {
+						uiDragging = false;
+						uiDragHandle = -1;
+				}
 			}
 		}
 	}
 
-	// Hotkeys for Gizmo - Also disabled during PLAY
-	if (!isPlaying && ImGui::IsWindowFocused() && !ImGui::IsAnyItemActive()) {
-		if (ImGui::IsKeyPressed(ImGuiKey_W)) currentGizmoMode = GizmoMode::Translate;
-		if (ImGui::IsKeyPressed(ImGuiKey_E)) currentGizmoMode = GizmoMode::Rotate;
-		if (ImGui::IsKeyPressed(ImGuiKey_R)) currentGizmoMode = GizmoMode::Scale;
-	}
-
-	// Scene Picking - Also disabled during PLAY (optional, but requested "nothing can be done")
+	// Scene Picking - Also disabled during PLAY
 	if (!isPlaying && ImGui::IsItemHovered() && !gizmoHovered) {
 		if (ImGui::IsMouseClicked(0)) {
 			ImVec2 mousePos = ImGui::GetMousePos();
@@ -1596,6 +1790,45 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					if (ImGui::Button("Remove##HP")) registry.remove<HealthComponent>(entity);
 				}
 			}
+			if (auto* mc = registry.try_get<MotionComponent>(entity)) {
+				if (ImGui::CollapsingHeader("Motion Editor", ImGuiTreeNodeFlags_DefaultOpen)) {
+					ImGui::Checkbox("Enabled##MC", &mc->enabled);
+					ImGui::Checkbox("Playing", &mc->isPlaying);
+					ImGui::DragFloat("Current Time", &mc->currentTime, 0.01f, 0, mc->totalDuration);
+					ImGui::DragFloat("Duration", &mc->totalDuration, 0.1f, 0.1f, 100.0f);
+					ImGui::Checkbox("Loop", &mc->loop);
+					
+					if (ImGui::Button("Add Keyframe")) {
+						MotionComponent::Keyframe k;
+						k.time = mc->totalDuration;
+						if (!mc->keyframes.empty()) {
+							k.translate = mc->keyframes.back().translate;
+						}
+						mc->keyframes.push_back(k);
+					}
+					
+					ImGui::Separator();
+					ImGui::Text("Keyframes:");
+					for (int i = 0; i < (int)mc->keyframes.size(); ++i) {
+						char label[32]; sprintf_s(label, "KF %d", i);
+						if (ImGui::Selectable(label, mc->selectedKeyframe == i)) {
+							mc->selectedKeyframe = i;
+						}
+						if (mc->selectedKeyframe == i) {
+							ImGui::Indent();
+							ImGui::DragFloat("Time", &mc->keyframes[i].time, 0.01f, 0, mc->totalDuration);
+							ImGui::DragFloat3("Pos", &mc->keyframes[i].translate.x, 0.1f);
+							if (ImGui::Button("Remove KF")) {
+								mc->keyframes.erase(mc->keyframes.begin() + i);
+								mc->selectedKeyframe = -1;
+							}
+							ImGui::Unindent();
+						}
+					}
+
+					if (ImGui::Button("Remove##MC")) registry.remove<MotionComponent>(entity);
+				}
+			}
 			if (auto* cp = registry.try_get<ScriptComponent>(selected)) {
 				if (ImGui::CollapsingHeader("Scripts", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##Scripts", &cp->enabled);
@@ -1746,6 +1979,11 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				if (ImGui::CollapsingHeader("UIButton", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##BTN", &btn->enabled);
 					ImGui::Text("Hovered: %s", btn->isHovered ? "Yes" : "No");
+					
+					// ★追加: 判定エリアの個別調整
+					ImGui::DragFloat2("Hitbox Offset", &btn->hitboxOffset.x, 1.0f);
+					ImGui::DragFloat2("Hitbox Scale", &btn->hitboxScale.x, 0.01f, 0.0f, 10.0f);
+					
 					if (ImGui::Button("Remove##BTN")) registry.remove<UIButtonComponent>(entity);
 				}
 			}

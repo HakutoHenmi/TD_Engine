@@ -1,4 +1,4 @@
-﻿{
+{
   "settings": {
     "postProcessEnabled": false,
     "ambientColor": [0.4, 0.4, 0.45],
@@ -7,7 +7,7 @@
   },
   "objects": [
     {
-      "id": 7,
+      "id": 1048583,
       "parentId": 4294967295,
       "name": "Floor",
       "locked": true,
@@ -21,7 +21,7 @@
       ]
     },
     {
-      "id": 6,
+      "id": 1048582,
       "parentId": 4294967295,
       "name": "Player",
       "locked": true,
@@ -42,7 +42,7 @@
       ]
     },
     {
-      "id": 5,
+      "id": 1048581,
       "parentId": 4294967295,
       "name": "Sun",
       "locked": true,
@@ -54,7 +54,7 @@
       ]
     },
     {
-      "id": 4,
+      "id": 1048580,
       "parentId": 4294967295,
       "name": "UI",
       "locked": true,
@@ -68,7 +68,7 @@
       ]
     },
     {
-      "id": 3,
+      "id": 1048579,
       "parentId": 4294967295,
       "name": "Core",
       "locked": false,
@@ -83,8 +83,8 @@
       ]
     },
     {
-      "id": 2,
-      "parentId": 3,
+      "id": 1048578,
+      "parentId": 1048579,
       "name": "PreparationCamera",
       "locked": false,
       "translate": [2.28225, 9.09971, -2.48776],
@@ -101,7 +101,7 @@
       ]
     },
     {
-      "id": 1,
+      "id": 1048577,
       "parentId": 4294967295,
       "name": "PhysicsSystem",
       "locked": true,
@@ -113,7 +113,7 @@
       ]
     },
     {
-      "id": 0,
+      "id": 1048576,
       "parentId": 4294967295,
       "name": "PlayerSword",
       "locked": false,
@@ -127,5 +127,3 @@
     }
   ]
 }
-
-

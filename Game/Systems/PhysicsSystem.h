@@ -20,10 +20,11 @@ public:
 			::Engine::Vector3 aabbMin, aabbMax;
 		};
 		struct CollidableMesh {
-			entt::entity entity;
-			uint32_t meshHandle;
-			::Engine::Vector3 aabbMin, aabbMax;
-			::Engine::Matrix4x4 world;
+			entt::entity entity = entt::null;
+			uint32_t meshHandle = 0;
+			::Engine::Vector3 aabbMin = { 0.0f, 0.0f, 0.0f };
+			::Engine::Vector3 aabbMax = { 0.0f, 0.0f, 0.0f };
+			::Engine::Matrix4x4 world = ::Engine::Matrix4x4::Identity();
 		};
 
 		std::vector<CollidableBox> dynamics;
