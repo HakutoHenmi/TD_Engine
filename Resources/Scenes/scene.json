@@ -115,10 +115,10 @@
     },
     {
       "id": 2097165,
-      "parentId": 4294967295,
+      "parentId": 2097171,
       "name": "PlayerSword",
       "locked": false,
-      "translate": [0.763783, 1.80906, -11.6188],
+      "translate": [0, 0, 0],
       "rotate": [0.785398, -14.043, 0.523599],
       "scale": [0.1, 0.1, 1.6],
       "components": [

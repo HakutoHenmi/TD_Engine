@@ -251,19 +251,42 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 				} else if (type == "Motion") {
 					auto& c = reg.get_or_emplace<MotionComponent>(entity);
 					c.enabled = en;
-					if (comp.contains("keyframes") && comp["keyframes"].is_array()) {
-						c.keyframes.clear();
+					if (comp.contains("clips") && comp["clips"].is_object()) {
+						c.clips.clear();
+						for (auto& [name, clipJ] : comp["clips"].items()) {
+							MotionComponent::MotionClip clip;
+							clip.name = name;
+							clip.totalDuration = clipJ.value("totalDuration", 1.0f);
+							clip.loop = clipJ.value("loop", false);
+							if (clipJ.contains("keyframes") && clipJ["keyframes"].is_array()) {
+								for (auto& kf : clipJ["keyframes"]) {
+									MotionComponent::Keyframe k;
+									k.time = kf.value("time", 0.0f);
+									if (kf.contains("translate")) k.translate = {kf["translate"][0], kf["translate"][1], kf["translate"][2]};
+									if (kf.contains("rotate")) k.rotate = {kf["rotate"][0], kf["rotate"][1], kf["rotate"][2]};
+									if (kf.contains("scale")) k.scale = {kf["scale"][0], kf["scale"][1], kf["scale"][2]};
+									clip.keyframes.push_back(k);
+								}
+							}
+							c.clips[name] = clip;
+						}
+					} else if (comp.contains("keyframes")) {
+						// 互換用: 旧フォーマット
+						MotionComponent::MotionClip clip;
+						clip.name = "Default";
+						clip.totalDuration = comp.value("totalDuration", 1.0f);
+						clip.loop = comp.value("loop", true);
 						for (auto& kf : comp["keyframes"]) {
 							MotionComponent::Keyframe k;
 							k.time = kf.value("time", 0.0f);
 							if (kf.contains("translate")) k.translate = {kf["translate"][0], kf["translate"][1], kf["translate"][2]};
 							if (kf.contains("rotate")) k.rotate = {kf["rotate"][0], kf["rotate"][1], kf["rotate"][2]};
 							if (kf.contains("scale")) k.scale = {kf["scale"][0], kf["scale"][1], kf["scale"][2]};
-							c.keyframes.push_back(k);
+							clip.keyframes.push_back(k);
 						}
+						c.clips["Default"] = clip;
 					}
-					c.totalDuration = comp.value("totalDuration", 1.0f);
-					c.loop = comp.value("loop", true);
+					c.activeClip = comp.value("activeClip", "Default");
 				}
 			}
 		}
@@ -577,13 +600,20 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 	}
 	if (auto* cp = registry.try_get<MotionComponent>(entity)) {
 		addComma();
-		ss << "        {\"type\": \"Motion\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"totalDuration\": " << cp->totalDuration << ", \"loop\": " << (cp->loop ? "true" : "false") << ", \"keyframes\": [\n";
-		for (size_t i = 0; i < cp->keyframes.size(); ++i) {
-			auto& kf = cp->keyframes[i];
-			ss << "          {\"time\": " << kf.time << ", \"translate\": [" << kf.translate.x << "," << kf.translate.y << "," << kf.translate.z << "], \"rotate\": [" << kf.rotate.x << "," << kf.rotate.y << "," << kf.rotate.z << "], \"scale\": [" << kf.scale.x << "," << kf.scale.y << "," << kf.scale.z << "]}";
-			if (i < cp->keyframes.size() - 1) ss << ",\n";
+		ss << "        {\"type\": \"Motion\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"activeClip\": \"" << EscapeJson(cp->activeClip) << "\", \"clips\": {\n";
+		bool firstClip = true;
+		for (auto& [clipName, clip] : cp->clips) {
+			if (!firstClip) ss << ",\n";
+			firstClip = false;
+			ss << "          \"" << EscapeJson(clipName) << "\": {\"totalDuration\": " << clip.totalDuration << ", \"loop\": " << (clip.loop ? "true" : "false") << ", \"keyframes\": [\n";
+			for (size_t i = 0; i < clip.keyframes.size(); ++i) {
+				auto& kf = clip.keyframes[i];
+				ss << "            {\"time\": " << kf.time << ", \"translate\": [" << kf.translate.x << "," << kf.translate.y << "," << kf.translate.z << "], \"rotate\": [" << kf.rotate.x << "," << kf.rotate.y << "," << kf.rotate.z << "], \"scale\": [" << kf.scale.x << "," << kf.scale.y << "," << kf.scale.z << "]}";
+				if (i < clip.keyframes.size() - 1) ss << ",\n";
+			}
+			ss << "\n          ]}";
 		}
-		ss << "\n        ]}";
+		ss << "\n        }}";
 	}
 
 	ss << "\n      ]\n";
@@ -1112,8 +1142,13 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 		auto& tc = reg.get<TransformComponent>(selectedEnt);
 		
 		DirectX::XMFLOAT3 currentPos;
-		if (mc && mc->selectedKeyframe >= 0 && mc->selectedKeyframe < (int)mc->keyframes.size()) {
-			currentPos = mc->keyframes[mc->selectedKeyframe].translate;
+		if (mc && mc->selectedKeyframe >= 0 && mc->clips.count(mc->activeClip)) {
+			auto& kfs = mc->clips.at(mc->activeClip).keyframes;
+			if (mc->selectedKeyframe < (int)kfs.size()) {
+				currentPos = kfs[mc->selectedKeyframe].translate;
+			} else {
+				currentPos = tc.translate;
+			}
 		} else {
 			currentPos = tc.translate;
 		}
@@ -1220,7 +1255,13 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 					float sensitivity = (currentGizmoMode == GizmoMode::Rotate) ? 0.02f : 0.05f;
 					if (currentGizmoMode == GizmoMode::Scale) sensitivity = 0.01f;
 
-					auto* targetPos = mc && mc->selectedKeyframe >= 0 ? &mc->keyframes[mc->selectedKeyframe].translate : &reg.get<TransformComponent>(selectedEnt).translate;
+					DirectX::XMFLOAT3* targetPos = &reg.get<TransformComponent>(selectedEnt).translate;
+					if (mc && mc->selectedKeyframe >= 0 && mc->clips.count(mc->activeClip)) {
+						auto& kfs = mc->clips.at(mc->activeClip).keyframes;
+						if (mc->selectedKeyframe < (int)kfs.size()) {
+							targetPos = &kfs[mc->selectedKeyframe].translate;
+						}
+					}
 					auto* targetRot = &reg.get<TransformComponent>(selectedEnt).rotate;
 					auto* targetScale = &reg.get<TransformComponent>(selectedEnt).scale;
 
@@ -1269,29 +1310,33 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 					view = gameScene->GetCamera().View();
 					proj = gameScene->GetCamera().Proj();
 
-					for (int i = 0; i < (int)mc->keyframes.size(); ++i) {
-						DirectX::XMVECTOR p3D = DirectX::XMLoadFloat3(&mc->keyframes[i].translate);
-						projP = DirectX::XMVector3Project(p3D, 0, 0, renderW, renderH, 0.0f, 1.0f, proj, view, DirectX::XMMatrixIdentity());
-						px = DirectX::XMVectorGetX(projP) + gameImageMin.x;
-						py = DirectX::XMVectorGetY(projP) + gameImageMin.y;
-						pz = DirectX::XMVectorGetZ(projP);
+					if (mc->clips.count(mc->activeClip)) {
+						auto& kfs = mc->clips.at(mc->activeClip).keyframes;
+						for (int i = 0; i < (int)kfs.size(); ++i) {
+							DirectX::XMVECTOR p3D = DirectX::XMLoadFloat3(&kfs[i].translate);
+							projP = DirectX::XMVector3Project(p3D, 0, 0, renderW, renderH, 0.0f, 1.0f, proj, view, DirectX::XMMatrixIdentity());
+							px = DirectX::XMVectorGetX(projP) + gameImageMin.x;
+							py = DirectX::XMVectorGetY(projP) + gameImageMin.y;
+							pz = DirectX::XMVectorGetZ(projP);
 
-						if (pz > 0.0f && pz < 1.0f) {
-							float dx = sx - px, dy = sy - py;
-							if (std::sqrt(dx*dx + dy*dy) < 15.0f) {
-								mc->selectedKeyframe = i;
-								gizmoHovered = true; // Prevent object picking
-								break;
+							if (pz > 0.0f && pz < 1.0f) {
+								float dx = sx - px, dy = sy - py;
+								if (std::sqrt(dx*dx + dy*dy) < 15.0f) {
+									mc->selectedKeyframe = i;
+									gizmoHovered = true; // Prevent object picking
+									break;
+								}
 							}
 						}
 					}
 				}
-				}
 			}
-			
-			// ★追加: UI Gizmo Logic
-			if (auto* rt = reg.try_get<RectTransformComponent>(selectedEnt)) {
-				ImDrawList* drawList = ImGui::GetWindowDrawList();
+		}
+
+		// ★追加: UI Gizmo Logic
+		if (auto* rt = reg.try_get<RectTransformComponent>(selectedEnt)) {
+			ImDrawList* uiDrawList = ImGui::GetWindowDrawList();
+			ImVec2 mPos = ImGui::GetMousePos();
 				UISystem::WorldRect wr = UISystem::CalculateWorldRect(selectedEnt, reg, (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH);
 				
 				// 内部解像度 (1920x1080) から実際の表示ピクセルへの変換スケーラー
@@ -1302,7 +1347,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				ImVec2 pMax(pMin.x + wr.w * scaleX, pMin.y + wr.h * scaleY);
 				
 				// UI本体の枠 (オレンジ色)
-				drawList->AddRect(pMin, pMax, IM_COL32(255, 140, 0, 255), 0.0f, 0, 2.0f);
+				uiDrawList->AddRect(pMin, pMax, IM_COL32(255, 140, 0, 255), 0.0f, 0, 2.0f);
 				
 				// UIButton があれば判定エリアも表示 (水色)
 				if (auto* btn = reg.try_get<UIButtonComponent>(selectedEnt)) {
@@ -1315,13 +1360,13 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 
 					ImVec2 hpMin(gameImageMin.x + hx * scaleX, gameImageMin.y + hy * scaleY);
 					ImVec2 hpMax(hpMin.x + hw * scaleX, hpMin.y + hh * scaleY);
-					drawList->AddRect(hpMin, hpMax, IM_COL32(0, 255, 255, 255), 0.0f, 0, 1.0f);
+					uiDrawList->AddRect(hpMin, hpMax, IM_COL32(0, 255, 255, 255), 0.0f, 0, 1.0f);
 
 					// 判定エリア移動ハンドル (中央の丸)
 					ImVec2 hCenter((hpMin.x + hpMax.x) * 0.5f, (hpMin.y + hpMax.y) * 0.5f);
-					drawList->AddCircleFilled(hCenter, 6.0f, IM_COL32(0, 255, 255, 255));
+					uiDrawList->AddCircleFilled(hCenter, 6.0f, IM_COL32(0, 255, 255, 255));
 					
-					ImVec2 mPos = ImGui::GetMousePos();
+					mPos = ImGui::GetMousePos();
 					float dx_h = mPos.x - hCenter.x;
 					float dy_h = mPos.y - hCenter.y;
 					float dToHCenter = std::sqrt(dx_h * dx_h + dy_h * dy_h);
@@ -1337,7 +1382,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 					
 					// 判定エリア拡縮ハンドル (右下の丸)
 					ImVec2 hScaleHandle = hpMax;
-					drawList->AddCircleFilled(hScaleHandle, 6.0f, IM_COL32(0, 255, 255, 255));
+					uiDrawList->AddCircleFilled(hScaleHandle, 6.0f, IM_COL32(0, 255, 255, 255));
 					float dx_s = mPos.x - hScaleHandle.x;
 					float dy_s = mPos.y - hScaleHandle.y;
 					float dToHScale = std::sqrt(dx_s * dx_s + dy_s * dy_s);
@@ -1352,9 +1397,9 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				}
 
 				// UI本体移動ハンドル (左上)
-				drawList->AddCircleFilled(pMin, 8.0f, IM_COL32(255, 140, 0, 255));
+				uiDrawList->AddCircleFilled(pMin, 8.0f, IM_COL32(255, 140, 0, 255));
 				
-				ImVec2 mPos = ImGui::GetMousePos();
+				mPos = ImGui::GetMousePos();
 				float dx_p = mPos.x - pMin.x;
 				float dy_p = mPos.y - pMin.y;
 				float dToPMin = std::sqrt(dx_p * dx_p + dy_p * dy_p);
@@ -1368,7 +1413,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				}
 
 				// UI本体拡縮ハンドル (右下)
-				drawList->AddCircleFilled(pMax, 8.0f, IM_COL32(255, 140, 0, 255));
+				uiDrawList->AddCircleFilled(pMax, 8.0f, IM_COL32(255, 140, 0, 255));
 				float dx_m = mPos.x - pMax.x;
 				float dy_m = mPos.y - pMax.y;
 				float dToPMax = std::sqrt(dx_m * dx_m + dy_m * dy_m);
@@ -1877,40 +1922,92 @@ void EditorUI::ShowInspector(GameScene* scene) {
 			if (auto* mc = registry.try_get<MotionComponent>(entity)) {
 				if (ImGui::CollapsingHeader("Motion Editor", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##MC", &mc->enabled);
-					ImGui::Checkbox("Playing", &mc->isPlaying);
-					ImGui::DragFloat("Current Time", &mc->currentTime, 0.01f, 0, mc->totalDuration);
-					ImGui::DragFloat("Duration", &mc->totalDuration, 0.1f, 0.1f, 100.0f);
-					ImGui::Checkbox("Loop", &mc->loop);
 					
-					if (ImGui::Button("Add Keyframe")) {
-						MotionComponent::Keyframe k;
-						k.time = mc->totalDuration;
-						if (!mc->keyframes.empty()) {
-							k.translate = mc->keyframes.back().translate;
-						}
-						mc->keyframes.push_back(k);
-					}
-					
-					ImGui::Separator();
-					ImGui::Text("Keyframes:");
-					for (int i = 0; i < (int)mc->keyframes.size(); ++i) {
-						char label[32]; sprintf_s(label, "KF %d", i);
-						if (ImGui::Selectable(label, mc->selectedKeyframe == i)) {
-							mc->selectedKeyframe = i;
-						}
-						if (mc->selectedKeyframe == i) {
-							ImGui::Indent();
-							ImGui::DragFloat("Time", &mc->keyframes[i].time, 0.01f, 0, mc->totalDuration);
-							ImGui::DragFloat3("Pos", &mc->keyframes[i].translate.x, 0.1f);
-							if (ImGui::Button("Remove KF")) {
-								mc->keyframes.erase(mc->keyframes.begin() + i);
+					// Clip Selection
+					if (ImGui::BeginCombo("Active Clip", mc->activeClip.c_str())) {
+						for (auto& [name, clip] : mc->clips) {
+							bool isSelected = (mc->activeClip == name);
+							if (ImGui::Selectable(name.c_str(), isSelected)) {
+								mc->activeClip = name;
+								mc->currentTime = 0.0f;
 								mc->selectedKeyframe = -1;
 							}
-							ImGui::Unindent();
+						}
+						ImGui::EndCombo();
+					}
+
+					ImGui::SameLine();
+					if (ImGui::Button("+##NewClip")) {
+						ImGui::OpenPopup("NewClipPopup");
+					}
+
+					if (ImGui::BeginPopup("NewClipPopup")) {
+						static char newClipBuf[64] = "NewClip";
+						ImGui::InputText("Name", newClipBuf, sizeof(newClipBuf));
+						if (ImGui::Button("Add")) {
+							MotionComponent::MotionClip clip;
+							clip.name = newClipBuf;
+							clip.keyframes.push_back({0.00f, {0,0,0}, {0,0,0}, {1,1,1}});
+							clip.keyframes.push_back({1.00f, {1,0,0}, {0,0,0}, {1,1,1}});
+							mc->clips[newClipBuf] = clip;
+							mc->activeClip = newClipBuf;
+							ImGui::CloseCurrentPopup();
+						}
+						ImGui::EndPopup();
+					}
+
+					if (ImGui::Button("Delete Clip") && mc->clips.size() > 1) {
+						mc->clips.erase(mc->activeClip);
+						mc->activeClip = mc->clips.begin()->first;
+					}
+
+					ImGui::Separator();
+					if (mc->clips.count(mc->activeClip)) {
+						auto& clip = mc->clips[mc->activeClip];
+						ImGui::Text("Clip: %s", clip.name.c_str());
+						ImGui::Checkbox("Playing", &mc->isPlaying);
+						ImGui::DragFloat("Current Time", &mc->currentTime, 0.01f, 0, clip.totalDuration);
+						ImGui::DragFloat("Duration", &clip.totalDuration, 0.1f, 0.1f, 100.0f);
+						ImGui::Checkbox("Loop", &clip.loop);
+						
+						if (ImGui::Button("Add Keyframe")) {
+							MotionComponent::Keyframe k;
+							k.time = clip.totalDuration;
+							if (!clip.keyframes.empty()) {
+								k.translate = clip.keyframes.back().translate;
+								k.rotate = clip.keyframes.back().rotate;
+								k.scale = clip.keyframes.back().scale;
+							} else {
+								k.translate = {0,0,0};
+								k.rotate = {0,0,0};
+								k.scale = {1,1,1};
+							}
+							clip.keyframes.push_back(k);
+						}
+						
+						ImGui::Separator();
+						ImGui::Text("Keyframes:");
+						for (int i = 0; i < (int)clip.keyframes.size(); ++i) {
+							char label[32]; sprintf_s(label, "KF %d", i);
+							if (ImGui::Selectable(label, mc->selectedKeyframe == i)) {
+								mc->selectedKeyframe = i;
+							}
+							if (mc->selectedKeyframe == i) {
+								ImGui::Indent();
+								ImGui::DragFloat("Time", &clip.keyframes[i].time, 0.01f, 0, clip.totalDuration);
+								ImGui::DragFloat3("Pos", &clip.keyframes[i].translate.x, 0.1f);
+								ImGui::DragFloat3("Rot", &clip.keyframes[i].rotate.x, 0.01f);
+								ImGui::DragFloat3("Scale", &clip.keyframes[i].scale.x, 0.01f);
+								if (ImGui::Button("Remove KF")) {
+									clip.keyframes.erase(clip.keyframes.begin() + i);
+									mc->selectedKeyframe = -1;
+								}
+								ImGui::Unindent();
+							}
 						}
 					}
 
-					if (ImGui::Button("Remove##MC")) registry.remove<MotionComponent>(entity);
+					if (ImGui::Button("Remove Component##MC")) registry.remove<MotionComponent>(entity);
 				}
 			}
 			if (auto* cp = registry.try_get<ScriptComponent>(selected)) {
