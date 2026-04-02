@@ -232,8 +232,8 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 					c.borderBottom = comp.value("borderBottom", 10.0f);
 					c.borderLeft = comp.value("borderLeft", 10.0f);
 					c.borderRight = comp.value("borderRight", 10.0f);
-					// ★追加: UIImageもテクスチャをロードするように修正
-					if (!c.texturePath.empty()) c.textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(c.texturePath);
+					// ★UIテクスチャはリニア変換を避けるため sRGB=false でロード
+					if (!c.texturePath.empty()) c.textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(c.texturePath, false);
 				} else if (type == "UIText") {
 					auto& c = reg.get_or_emplace<UITextComponent>(entity);
 					c.enabled = en; c.text = comp.value("text", ""); c.fontSize = comp.value("fontSize", 24.0f);
@@ -857,12 +857,13 @@ std::string EditorUI::GetUnifiedProjectPath(const std::string& path) {
 
 void EditorUI::Initialize(Engine::Renderer* renderer) {
 	if (!renderer) return;
-	s_icons.folder = renderer->LoadTexture2D("Resources/Editor/Icons/folder.png");
-	s_icons.file = renderer->LoadTexture2D("Resources/Editor/Icons/file.png");
-	s_icons.model = renderer->LoadTexture2D("Resources/Editor/Icons/model.png");
-	s_icons.prefab = renderer->LoadTexture2D("Resources/Editor/Icons/prefab.png");
-	s_icons.audio = renderer->LoadTexture2D("Resources/Editor/Icons/audio.png");
-	s_icons.script = renderer->LoadTexture2D("Resources/Editor/Icons/script.png");
+	// ★エディタUI用アイコンは sRGB=false でロード
+	s_icons.folder = renderer->LoadTexture2D("Resources/Editor/Icons/folder.png", false);
+	s_icons.file = renderer->LoadTexture2D("Resources/Editor/Icons/file.png", false);
+	s_icons.model = renderer->LoadTexture2D("Resources/Editor/Icons/model.png", false);
+	s_icons.prefab = renderer->LoadTexture2D("Resources/Editor/Icons/prefab.png", false);
+	s_icons.audio = renderer->LoadTexture2D("Resources/Editor/Icons/audio.png", false);
+	s_icons.script = renderer->LoadTexture2D("Resources/Editor/Icons/script.png", false);
 }
 
 // ====== Main UI ======
@@ -2141,7 +2142,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				if (ImGui::CollapsingHeader("UIImage", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##IMG", &img->enabled);
 					if (AssetField("Texture", img->texturePath, {".png", ".jpg"})) {
-						img->textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(img->texturePath);
+						img->textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(img->texturePath, false);
 					}
 					ImGui::ColorEdit4("Color", &img->color.x);
 					ImGui::DragInt("Layer", &img->layer, 1, -100, 100);
@@ -2377,7 +2378,7 @@ void EditorUI::ShowProject([[maybe_unused]] Engine::Renderer* renderer, [[maybe_
 				// Thumbnail attempt
 				std::string fullPath = entry.path().string();
 				if (s_thumbnails.find(fullPath) == s_thumbnails.end()) {
-					s_thumbnails[fullPath] = Engine::Renderer::GetInstance()->LoadTexture2D(fullPath);
+					s_thumbnails[fullPath] = Engine::Renderer::GetInstance()->LoadTexture2D(fullPath, false);
 				}
 				icon = s_thumbnails[fullPath];
 			}
