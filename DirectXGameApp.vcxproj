@@ -209,6 +209,8 @@ exit /b 0
     <ClCompile Include="Game\Scripts\SkillTree.cpp" />
     <ClCompile Include="Game\Systems\UISystem.cpp" />
     <ClCompile Include="Game\Systems\RiverSystem.cpp" />
+    <ClCompile Include="Game\Scripts\PoisonTrap.cpp" />
+    <ClCompile Include="Game\Scripts\PoisonAttackArea.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Editor\EditorUI.h" />
@@ -252,6 +254,8 @@ exit /b 0
     <ClInclude Include="Game\Systems\ScriptSystem.h" />
     <ClInclude Include="Game\Systems\CleanupSystem.h" />
     <ClInclude Include="Game\Systems\RiverSystem.h" />
+    <ClInclude Include="Game\Scripts\PoisonTrap.h" />
+    <ClInclude Include="Game\Scripts\PoisonAttackArea.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\level_data.csv" />
