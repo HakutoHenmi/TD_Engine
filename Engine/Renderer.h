@@ -38,6 +38,7 @@ public:
 		float rotationRad = 0.0f;
 		Vector4 color{1, 1, 1, 1};
 		Vector4 uvScaleOffset{1.0f, 1.0f, 0.0f, 0.0f}; // ★追加: UVスケール・オフセット
+		int layer = 0; // ★追加: 描画レイヤー（大きいほど手前）
 	};
 
 	struct CollisionRequest {
@@ -259,6 +260,7 @@ public:
 		float left, right, top, bottom; // border in pixels
 		Vector4 color{1,1,1,1};
 		float rotationRad = 0;
+		int layer = 0; // ★追加: 描画レイヤー
 	};
 	void DrawSprite(TextureHandle texH, const SpriteDesc& s);
 	void DrawSprite9Slice(TextureHandle texH, const Sprite9SliceDesc& s); // ★追加

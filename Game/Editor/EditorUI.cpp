@@ -185,9 +185,22 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 				} else if (type == "River") {
 					auto& c = reg.get_or_emplace<RiverComponent>(entity);
 					c.enabled = en; c.width = comp.value("width", 5.0f); c.flowSpeed = comp.value("flowSpeed", 1.0f);
+					c.uvScale = comp.value("uvScale", 1.0f);
+					c.texturePath = comp.value("texturePath", "Resources/Water/water.png");
+					if (comp.contains("points") && comp["points"].is_array()) {
+						c.points.clear();
+						for (auto& pt : comp["points"]) {
+							if (pt.is_array() && pt.size() >= 3)
+								c.points.push_back({pt[0], pt[1], pt[2]});
+						}
+					}
 				} else if (type == "WorldSpaceUI") {
 					auto& c = reg.get_or_emplace<WorldSpaceUIComponent>(entity);
 					c.enabled = en; c.showHealthBar = comp.value("showHealthBar", true);
+					c.showDamageNumbers = comp.value("showDamageNumbers", true);
+					if (comp.contains("offset")) c.offset = {comp["offset"][0], comp["offset"][1], comp["offset"][2]};
+					c.barWidth = comp.value("barWidth", 60.0f);
+					c.barHeight = comp.value("barHeight", 6.0f);
 				} else if (type == "GpuMeshCollider") {
 					auto& c = reg.get_or_emplace<GpuMeshColliderComponent>(entity);
 					c.enabled = en;
@@ -207,17 +220,32 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 					c.enabled = en; if (comp.contains("pos")) c.pos = {comp["pos"][0], comp["pos"][1]};
 					if (comp.contains("size")) c.size = {comp["size"][0], comp["size"][1]};
 					if (comp.contains("anchor")) c.anchor = {comp["anchor"][0], comp["anchor"][1]};
+					if (comp.contains("pivot")) c.pivot = {comp["pivot"][0], comp["pivot"][1]};
+					c.rotation = comp.value("rotation", 0.0f);
 				} else if (type == "UIImage") {
 					auto& c = reg.get_or_emplace<UIImageComponent>(entity);
 					c.enabled = en; c.texturePath = comp.value("texturePath", "");
 					if (comp.contains("color")) c.color = {comp["color"][0], comp["color"][1], comp["color"][2], comp["color"][3]};
+					c.layer = comp.value("layer", 0);
+					c.is9Slice = comp.value("is9Slice", false);
+					c.borderTop = comp.value("borderTop", 10.0f);
+					c.borderBottom = comp.value("borderBottom", 10.0f);
+					c.borderLeft = comp.value("borderLeft", 10.0f);
+					c.borderRight = comp.value("borderRight", 10.0f);
 					// ★追加: UIImageもテクスチャをロードするように修正
 					if (!c.texturePath.empty()) c.textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(c.texturePath);
 				} else if (type == "UIText") {
 					auto& c = reg.get_or_emplace<UITextComponent>(entity);
 					c.enabled = en; c.text = comp.value("text", ""); c.fontSize = comp.value("fontSize", 24.0f);
 				} else if (type == "UIButton") {
-					reg.get_or_emplace<UIButtonComponent>(entity).enabled = en;
+					auto& c = reg.get_or_emplace<UIButtonComponent>(entity);
+					c.enabled = en;
+					if (comp.contains("normalColor")) c.normalColor = {comp["normalColor"][0], comp["normalColor"][1], comp["normalColor"][2], comp["normalColor"][3]};
+					if (comp.contains("hoverColor")) c.hoverColor = {comp["hoverColor"][0], comp["hoverColor"][1], comp["hoverColor"][2], comp["hoverColor"][3]};
+					if (comp.contains("pressedColor")) c.pressedColor = {comp["pressedColor"][0], comp["pressedColor"][1], comp["pressedColor"][2], comp["pressedColor"][3]};
+					c.onClickCallback = comp.value("onClickCallback", "");
+					if (comp.contains("hitboxOffset")) c.hitboxOffset = {comp["hitboxOffset"][0], comp["hitboxOffset"][1]};
+					if (comp.contains("hitboxScale")) c.hitboxScale = {comp["hitboxScale"][0], comp["hitboxScale"][1]};
 				} else if (type == "AudioListener") {
 					reg.get_or_emplace<AudioListenerComponent>(entity).enabled = en;
 				} else if (type == "Motion") {
@@ -485,11 +513,16 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 	}
 	if (auto* cp = registry.try_get<RiverComponent>(entity)) {
 		addComma();
-		ss << "        {\"type\": \"River\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"width\": " << cp->width << ", \"flowSpeed\": " << cp->flowSpeed << "}";
+		ss << "        {\"type\": \"River\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"width\": " << cp->width << ", \"flowSpeed\": " << cp->flowSpeed << ", \"uvScale\": " << cp->uvScale << ", \"texturePath\": \"" << EscapeJson(cp->texturePath) << "\", \"points\": [";
+		for (size_t pi = 0; pi < cp->points.size(); ++pi) {
+			if (pi > 0) ss << ", ";
+			ss << "[" << cp->points[pi].x << "," << cp->points[pi].y << "," << cp->points[pi].z << "]";
+		}
+		ss << "]}";
 	}
 	if (auto* cp = registry.try_get<WorldSpaceUIComponent>(entity)) {
 		addComma();
-		ss << "        {\"type\": \"WorldSpaceUI\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"showHealthBar\": " << (cp->showHealthBar ? "true" : "false") << "}";
+		ss << "        {\"type\": \"WorldSpaceUI\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"showHealthBar\": " << (cp->showHealthBar ? "true" : "false") << ", \"showDamageNumbers\": " << (cp->showDamageNumbers ? "true" : "false") << ", \"offset\": [" << cp->offset.x << "," << cp->offset.y << "," << cp->offset.z << "], \"barWidth\": " << cp->barWidth << ", \"barHeight\": " << cp->barHeight << "}";
 	}
 	if (auto* cp = registry.try_get<GpuMeshColliderComponent>(entity)) {
 		addComma();
@@ -524,11 +557,11 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 	}
 	if (auto* cp = registry.try_get<RectTransformComponent>(entity)) {
 		addComma();
-		ss << "        {\"type\": \"RectTransform\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"pos\": [" << cp->pos.x << "," << cp->pos.y << "], \"size\": [" << cp->size.x << "," << cp->size.y << "], \"anchor\": [" << cp->anchor.x << "," << cp->anchor.y << "]}";
+		ss << "        {\"type\": \"RectTransform\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"pos\": [" << cp->pos.x << "," << cp->pos.y << "], \"size\": [" << cp->size.x << "," << cp->size.y << "], \"anchor\": [" << cp->anchor.x << "," << cp->anchor.y << "], \"pivot\": [" << cp->pivot.x << "," << cp->pivot.y << "], \"rotation\": " << cp->rotation << "}";
 	}
 	if (auto* cp = registry.try_get<UIImageComponent>(entity)) {
 		addComma();
-		ss << "        {\"type\": \"UIImage\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"texturePath\": \"" << EscapeJson(cp->texturePath) << "\", \"color\": [" << cp->color.x << "," << cp->color.y << "," << cp->color.z << "," << cp->color.w << "]}";
+		ss << "        {\"type\": \"UIImage\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"texturePath\": \"" << EscapeJson(cp->texturePath) << "\", \"color\": [" << cp->color.x << "," << cp->color.y << "," << cp->color.z << "," << cp->color.w << "], \"layer\": " << cp->layer << ", \"is9Slice\": " << (cp->is9Slice ? "true" : "false") << ", \"borderTop\": " << cp->borderTop << ", \"borderBottom\": " << cp->borderBottom << ", \"borderLeft\": " << cp->borderLeft << ", \"borderRight\": " << cp->borderRight << "}";
 	}
 	if (auto* cp = registry.try_get<UITextComponent>(entity)) {
 		addComma();
@@ -536,7 +569,7 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 	}
 	if (auto* cp = registry.try_get<UIButtonComponent>(entity)) {
 		addComma();
-		ss << "        {\"type\": \"UIButton\", \"enabled\": " << (cp->enabled ? "true" : "false") << "}";
+		ss << "        {\"type\": \"UIButton\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"normalColor\": [" << cp->normalColor.x << "," << cp->normalColor.y << "," << cp->normalColor.z << "," << cp->normalColor.w << "], \"hoverColor\": [" << cp->hoverColor.x << "," << cp->hoverColor.y << "," << cp->hoverColor.z << "," << cp->hoverColor.w << "], \"pressedColor\": [" << cp->pressedColor.x << "," << cp->pressedColor.y << "," << cp->pressedColor.z << "," << cp->pressedColor.w << "], \"onClickCallback\": \"" << EscapeJson(cp->onClickCallback) << "\", \"hitboxOffset\": [" << cp->hitboxOffset.x << "," << cp->hitboxOffset.y << "], \"hitboxScale\": [" << cp->hitboxScale.x << "," << cp->hitboxScale.y << "]}";
 	}
 	if (auto* cp = registry.try_get<AudioListenerComponent>(entity)) {
 		addComma();
@@ -647,9 +680,19 @@ void EditorUI::SaveScene(GameScene* scene, const std::string& path) {
 
 	std::string absPath = GetUnifiedProjectPath(targetPath);
 	OutputDebugStringA(("[EditorUI] Saving scene to: " + absPath + "\n").c_str());
-	std::ofstream f(Engine::PathUtils::FromUTF8(absPath));
-	if (!f.is_open()) { LogError("Save failed: " + absPath); return; }
-	f << SaveToMemory(scene);
+	
+	std::string content = SaveToMemory(scene);
+	if (content.empty()) { LogError("Save failed: empty content"); return; }
+
+	std::ofstream f(Engine::PathUtils::FromUTF8(absPath), std::ios::out | std::ios::trunc);
+	if (!f.is_open()) { LogError("Save failed (cannot open): " + absPath); return; }
+	f << content;
+	f.flush(); // ★追加: 確実にディスクに書き出す
+	if (f.bad() || f.fail()) {
+		LogError("Save failed (write error): " + absPath);
+		f.close();
+		return;
+	}
 	f.close();
 	Log("Scene saved: " + absPath);
 }
@@ -1963,6 +2006,14 @@ void EditorUI::ShowInspector(GameScene* scene) {
 						img->textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(img->texturePath);
 					}
 					ImGui::ColorEdit4("Color", &img->color.x);
+					ImGui::DragInt("Layer", &img->layer, 1, -100, 100);
+					ImGui::Checkbox("9-Slice", &img->is9Slice);
+					if (img->is9Slice) {
+						ImGui::DragFloat("Border Top", &img->borderTop, 1.0f, 0, 500);
+						ImGui::DragFloat("Border Bottom", &img->borderBottom, 1.0f, 0, 500);
+						ImGui::DragFloat("Border Left", &img->borderLeft, 1.0f, 0, 500);
+						ImGui::DragFloat("Border Right", &img->borderRight, 1.0f, 0, 500);
+					}
 					if (ImGui::Button("Remove##IMG")) registry.remove<UIImageComponent>(entity);
 				}
 			}

@@ -83,6 +83,11 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 
 		registry_.emplace<TransformComponent>(plane, DirectX::XMFLOAT3{0, 0, 0}, DirectX::XMFLOAT3{0, 0, 0}, DirectX::XMFLOAT3{20, 1, 20});
 
+		// ★追加: 物理判定用にGpuMeshColliderを付与
+		auto& gmc = registry_.emplace<GpuMeshColliderComponent>(plane);
+		gmc.meshHandle = mesh.modelHandle;
+		gmc.enabled = true;
+
 		// 準備フェーズシステムの作成 (フォールバック)
 		auto ps = registry_.create();
 		registry_.emplace<NameComponent>(ps, "PhaseSystem");

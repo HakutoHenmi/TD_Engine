@@ -1709,8 +1709,9 @@ float4 main(VSIn v, uint instanceID : SV_InstanceID) : SV_POSITION {
 		blend.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
 		blend.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
 		blend.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-		blend.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
-		blend.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+		// ★修正: アルファチャネルは常に最大値を維持し、スプライトのアルファ値でRTのアルファを破壊しない
+		blend.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ZERO;
+		blend.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
 		blend.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
 		blend.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 		pso.BlendState = blend;
@@ -2340,6 +2341,7 @@ void Renderer::DrawSprite9Slice(TextureHandle texH, const Sprite9SliceDesc& s) {
 			sd.color = s.color;
 			sd.rotationRad = s.rotationRad;
 			sd.uvScaleOffset = { u[col+1] - u[col], v[row+1] - v[row], u[col], v[row] };
+			sd.layer = s.layer; // ★追加: レイヤー引き継ぎ
 			DrawSprite(texH, sd);
 		}
 	}
@@ -2347,6 +2349,11 @@ void Renderer::DrawSprite9Slice(TextureHandle texH, const Sprite9SliceDesc& s) {
 
 void Renderer::FlushSprites() {
 	if (spriteDrawCalls_.empty()) return;
+
+	// ★追加: レイヤー値で安定ソート（小さい値が先 = 奥に描画）
+	std::stable_sort(spriteDrawCalls_.begin(), spriteDrawCalls_.end(), [](const SpriteDrawCall& a, const SpriteDrawCall& b) {
+		return a.desc.layer < b.desc.layer;
+	});
 
 	const float W = (float)Engine::WindowDX::kW;
 	const float H = (float)Engine::WindowDX::kH;

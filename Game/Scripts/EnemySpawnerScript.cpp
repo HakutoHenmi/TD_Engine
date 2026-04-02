@@ -123,6 +123,14 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 		bool isFly = (enemyScriptPath == "EnemyBehavior" && enemyScriptParams.find("\"moveType\":1") != std::string::npos);
 		rbComponent.useGravity = !isFly;
 
+		// ★追加: 接地判定と地形追従のために CharacterMovementComponent を付与
+		if (!isFly) {
+			auto& cm = scene->GetRegistry().emplace<CharacterMovementComponent>(enemy);
+			cm.speed = 5.0f;
+			cm.heightOffset = 1.0f; // 2mのcubeなので足元は y-1.0f
+			cm.enabled = true;
+		}
+
 		auto& hComponent = scene->GetRegistry().emplace<HealthComponent>(enemy);
 		hComponent.hp = 100.0f;
 		hComponent.maxHp = 100.0f;
