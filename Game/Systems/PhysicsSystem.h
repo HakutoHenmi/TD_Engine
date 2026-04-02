@@ -57,7 +57,9 @@ public:
 				rb.velocity.z -= rb.velocity.z * damping * ctx.dt;
 
 				tc.translate.x += rb.velocity.x * ctx.dt;
-				tc.translate.y += rb.velocity.y * ctx.dt;
+				if (!hasCMS) { // CMSがある場合はCMS側で垂直移動と接地スナップを制御する
+					tc.translate.y += rb.velocity.y * ctx.dt;
+				}
 				tc.translate.z += rb.velocity.z * ctx.dt;
 			}
 

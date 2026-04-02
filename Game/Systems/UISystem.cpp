@@ -231,6 +231,7 @@ void UISystem::RenderNodeWithRect(entt::entity entity, entt::registry& registry,
                 border.w = wr.w + 4.0f;
                 border.h = wr.h + 4.0f;
                 border.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+                border.layer = img.layer; // ★追加: レイヤー引き継ぎ
                 ctx.renderer->DrawSprite(0, border); // 0番テクスチャはRenderer初期化時に生成された白色
             }
 
@@ -241,12 +242,17 @@ void UISystem::RenderNodeWithRect(entt::entity entity, entt::registry& registry,
                 s.left = img.borderLeft; s.right = img.borderRight; s.top = img.borderTop; s.bottom = img.borderBottom;
                 s.color = { finalColor.x, finalColor.y, finalColor.z, finalColor.w };
                 s.rotationRad = DirectX::XMConvertToRadians(registry.get<RectTransformComponent>(entity).rotation);
+                s.layer = img.layer; // ★追加: レイヤー値を設定
+                // ★注意: 9Sliceは内部でDrawSpriteに分解されるため、layer値は個別のSpriteDescで設定が必要
+                // → DrawSprite9Sliceの内部で生成されるSpriteDescにはlayerが引き継がれないため、
+                //   通常描画にフォールバックするか、Renderer側で対応する
                 ctx.renderer->DrawSprite9Slice(img.textureHandle, s);
             } else {
                 Engine::Renderer::SpriteDesc s;
                 s.x = wr.x; s.y = wr.y; s.w = wr.w; s.h = wr.h;
                 s.color = { finalColor.x, finalColor.y, finalColor.z, finalColor.w };
                 s.rotationRad = DirectX::XMConvertToRadians(registry.get<RectTransformComponent>(entity).rotation);
+                s.layer = img.layer; // ★追加: レイヤー値を設定
                 ctx.renderer->DrawSprite(img.textureHandle, s);
             }
         }

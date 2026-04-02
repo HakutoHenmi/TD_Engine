@@ -310,6 +310,7 @@ struct UIImageComponent : public Component {
 	float borderBottom = 10.0f;
 	float borderLeft = 10.0f;
 	float borderRight = 10.0f;
+	int layer = 0; // ★追加: 描画レイヤー（大きいほど手前）
 	UIImageComponent() { type = ComponentType::UIImage; }
 };
 
