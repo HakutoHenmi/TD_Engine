@@ -1,8 +1,10 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include "../../Engine/PathUtils.h"
 #include "GameScene.h"
+#include "../../Engine/Audio.h"
+#include "../../Engine/PathUtils.h"
+#include "../../Engine/SceneManager.h"
 #include "../Editor/EditorUI.h"
 #include "../Scripts/ScriptEngine.h"
 #include "../Systems/AudioSystem.h"
@@ -16,8 +18,6 @@
 #include "../Systems/RiverSystem.h" // ★追加
 #include "../Systems/ScriptSystem.h"
 #include "../Systems/UISystem.h"
-#include "../../Engine/SceneManager.h"
-#include "../../Engine/Audio.h"
 #include "imgui.h"
 #include <Windows.h> // OutputDebugStringA
 #include <algorithm>
@@ -67,18 +67,19 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	if (registry_.storage<entt::entity>().empty() || !loaded) {
 		auto sun = registry_.create();
 		registry_.emplace<NameComponent>(sun, "Sun");
-		registry_.emplace<TransformComponent>(sun, DirectX::XMFLOAT3{0, 10, 0}, DirectX::XMFLOAT3{DirectX::XMConvertToRadians(45.0f), DirectX::XMConvertToRadians(30.0f), 0}, DirectX::XMFLOAT3{1, 1, 1});
+		registry_.emplace<TransformComponent>(
+		    sun, DirectX::XMFLOAT3{0, 10, 0}, DirectX::XMFLOAT3{DirectX::XMConvertToRadians(45.0f), DirectX::XMConvertToRadians(30.0f), 0}, DirectX::XMFLOAT3{1, 1, 1});
 		registry_.emplace<DirectionalLightComponent>(sun);
 
 		auto plane = registry_.create();
 		registry_.emplace<NameComponent>(plane, "Plane");
-		
+
 		auto& mesh = registry_.emplace<MeshRendererComponent>(plane);
 		mesh.modelHandle = renderer_->LoadObjMesh("Resources/Models/plane.obj");
 		mesh.textureHandle = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
 		mesh.modelPath = "Resources/Models/plane.obj";
 		mesh.texturePath = "Resources/Textures/white1x1.png";
-		
+
 		registry_.emplace<TransformComponent>(plane, DirectX::XMFLOAT3{0, 0, 0}, DirectX::XMFLOAT3{0, 0, 0}, DirectX::XMFLOAT3{20, 1, 20});
 
 		// 準備フェーズシステムの作成 (フォールバック)
@@ -137,14 +138,11 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	}
 
 	// ★追加: 川の初期メッシュ生成
-	auto riverView = registry_.view<RiverComponent, TransformComponent>();
-	for (auto entity : riverView) {
-		auto& rv = riverView.get<RiverComponent>(entity);
+	registry_.view<RiverComponent, TransformComponent>().each([&](RiverComponent& rv, TransformComponent& tc) {
 		if (rv.enabled && rv.meshHandle == 0) {
-			auto& tc = riverView.get<TransformComponent>(entity);
 			RiverSystem::BuildRiverMesh(rv, renderer_, registry_, tc.translate);
 		}
-	}
+	});
 
 	// ★追加: タグシステムの初期化
 	tagCache_.clear();
@@ -174,7 +172,8 @@ void GameScene::Update() {
 	if (!pendingTagSync_.empty()) {
 		std::vector<entt::entity> list = std::move(pendingTagSync_);
 		for (auto e : list) {
-			if (registry_.valid(e)) SyncTag(e);
+			if (registry_.valid(e))
+				SyncTag(e);
 		}
 	}
 
@@ -188,7 +187,8 @@ void GameScene::Update() {
 
 	// コンテキストを更新
 	ctx_.dt = dt;
-	if (isPlaying_) playTime_ += dt;
+	if (isPlaying_)
+		playTime_ += dt;
 
 	// ★ 勝利/敗北判定 (テスト用)
 	if (isPlaying_) {
@@ -196,10 +196,11 @@ void GameScene::Update() {
 		bool loss = Engine::Input::GetInstance()->Trigger(DIK_J);
 
 		// プレイヤーの生存確認 (Viewを直接参照して同期ズレを防ぐ)
-		auto playerView = registry_.view<TagComponent, HealthComponent>();
-		for (auto entity : playerView) {
-			if (playerView.get<TagComponent>(entity).tag == "Player") {
-				if (playerView.get<HealthComponent>(entity).hp <= 0) {
+		// プレイヤーの生存確認
+		const auto& players = GetEntitiesByTag("Player");
+		for (auto entity : players) {
+			if (registry_.valid(entity) && registry_.all_of<HealthComponent>(entity)) {
+				if (registry_.get<HealthComponent>(entity).hp <= 0) {
 					loss = true;
 					break;
 				}
@@ -227,43 +228,46 @@ void GameScene::Update() {
 	ctx_.pendingSpawns = &pendingSpawns_;
 
 	// viewportのデフォルト設定（フルスクリーン想定）
-	ctx_.viewportOffset = { 0, 0 };
-	ctx_.viewportSize = { (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH };
+	ctx_.viewportOffset = {0, 0};
+	ctx_.viewportSize = {(float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH};
 
 	// GPU Collision Dispatch（エンジンの汎用 PhysicsSystem.h に移行したため、ここでは何もしない）
-	// Animation（エンジン固有処理のため残留）
 
 	// Animation（エンジン固有処理のため残留）
 	auto animView = registry_.view<AnimatorComponent, MeshRendererComponent>();
-	if (isPlaying_ && animView.begin() != animView.end()) {
-		std::vector<entt::entity> animEntities(animView.begin(), animView.end());
-		Engine::JobSystem::Dispatch((uint32_t)animEntities.size(), 64, [&](uint32_t i) {
-			auto entity = animEntities[i];
-			auto& anim = animView.get<AnimatorComponent>(entity);
-			auto& meshWrapper = animView.get<MeshRendererComponent>(entity);
+	if (isPlaying_) {
+		std::vector<entt::entity> animEntities;
+		animView.each([&](entt::entity entity, auto&, auto&) { animEntities.push_back(entity); });
 
-			if (anim.enabled && anim.isPlaying) {
-				anim.time += dt * 60.0f * anim.speed;
-				auto* m = renderer_->GetModel(meshWrapper.modelHandle);
-				if (m) {
-					const auto& data = m->GetData();
-					for (const auto& a : data.animations) {
-						if (a.name == anim.currentAnimation) {
-							if (anim.time > a.duration) {
-								if (anim.loop)
-									anim.time = std::fmod(anim.time, a.duration);
-								else {
-									anim.time = a.duration;
-									anim.isPlaying = false;
+		if (!animEntities.empty()) {
+			Engine::JobSystem::Dispatch((uint32_t)animEntities.size(), 64, [&](uint32_t i) {
+				auto entity = animEntities[i];
+				auto& anim = registry_.get<AnimatorComponent>(entity);
+				auto& meshWrapper = registry_.get<MeshRendererComponent>(entity);
+
+				if (anim.enabled && anim.isPlaying) {
+					anim.time += dt * 60.0f * anim.speed;
+					auto* m = renderer_->GetModel(meshWrapper.modelHandle);
+					if (m) {
+						const auto& data = m->GetData();
+						for (const auto& a : data.animations) {
+							if (a.name == anim.currentAnimation) {
+								if (anim.time > a.duration) {
+									if (anim.loop)
+										anim.time = std::fmod(anim.time, a.duration);
+									else {
+										anim.time = a.duration;
+										anim.isPlaying = false;
+									}
 								}
+								break;
 							}
-							break;
 						}
 					}
 				}
-			}
-		});
-		Engine::JobSystem::Wait();
+			});
+			Engine::JobSystem::Wait();
+		}
 	}
 
 	// パーティクルエディター
@@ -272,7 +276,8 @@ void GameScene::Update() {
 	// ★ 全Systemを順に実行
 	for (auto& system : systems_) {
 		// リザルト遷移中などはシステムを動かさない (エンティティが削除されている可能性があるため)
-		if (!isPlaying_) break;
+		if (!isPlaying_)
+			break;
 		system->Update(registry_, ctx_);
 	}
 
@@ -292,8 +297,8 @@ void GameScene::Update() {
 		}
 
 		if (!pendingDestroys_.empty()) {
-			for(auto id: pendingDestroys_) {
-				if(registry_.valid(id)) {
+			for (auto id : pendingDestroys_) {
+				if (registry_.valid(id)) {
 					registry_.destroy(id);
 				}
 			}
@@ -356,7 +361,8 @@ void GameScene::Update() {
 	// パーティクルエミッターコンポーネント
 	auto peView = registry_.view<ParticleEmitterComponent, TransformComponent, NameComponent>();
 	peView.each([&](auto, ParticleEmitterComponent& pe, const TransformComponent& tc, const NameComponent& nc) {
-		if (!pe.enabled) return;
+		if (!pe.enabled)
+			return;
 
 		if (!pe.isInitialized && renderer_) {
 			pe.emitter.Initialize(*renderer_, nc.name + "_Emitter");
@@ -391,14 +397,16 @@ void GameScene::DestroyObject(uint32_t id) {
 const std::vector<entt::entity>& GameScene::GetEntitiesByTag(const std::string& tag) {
 	static const std::vector<entt::entity> emptyList;
 	auto it = tagCache_.find(tag);
-	if (it == tagCache_.end()) return emptyList;
+	if (it == tagCache_.end())
+		return emptyList;
 	return it->second;
 }
 
 void GameScene::SyncTag(entt::entity entity) {
-	if (!registry_.valid(entity) || !registry_.all_of<TagComponent>(entity)) return;
+	if (!registry_.valid(entity) || !registry_.all_of<TagComponent>(entity))
+		return;
 	const auto& tag = registry_.get<TagComponent>(entity).tag;
-	
+
 	// すでにある程度管理されているか確認し、重複を防ぐ
 	auto& list = tagCache_[tag];
 	if (std::find(list.begin(), list.end(), entity) == list.end()) {
@@ -408,11 +416,12 @@ void GameScene::SyncTag(entt::entity entity) {
 
 void GameScene::SetTag(entt::entity entity, const std::string& tag) {
 	auto& reg = GetRegistry();
-	
+
 	// すでにタグがある場合は古いキャッシュから削除
 	if (reg.all_of<TagComponent>(entity)) {
 		const auto& oldTag = reg.get<TagComponent>(entity).tag;
-		if (oldTag == tag) return; // 変更なし
+		if (oldTag == tag)
+			return; // 変更なし
 
 		auto it = tagCache_.find(oldTag);
 		if (it != tagCache_.end()) {
@@ -469,32 +478,38 @@ float GameScene::GetHeightAt(float x, float z, float startY, uint32_t excludeId)
 
 	auto view = registry_.view<TransformComponent>();
 	for (auto entity : view) {
-		if (excludeId != 0 && static_cast<uint32_t>(entity) == excludeId) continue;
+		if (excludeId != 0 && static_cast<uint32_t>(entity) == excludeId)
+			continue;
 
 		bool isEnemyOrBullet = false;
 		if (registry_.all_of<TagComponent>(entity)) {
 			const auto& tag = registry_.get<TagComponent>(entity).tag;
-			if (tag == "Enemy" || tag == "Bullet" || tag == "Player" || tag == "Sword" || tag == "PlayerSword" || tag == "Projectile" || 
-				tag == "pipe" || tag == "Canon" || tag == "BulletTank" || tag == "pipe_cannon") {
+			if (tag == "Enemy" || tag == "Bullet" || tag == "Player" || tag == "Sword" || tag == "PlayerSword" || tag == "Projectile" || tag == "pipe" || tag == "Canon" || tag == "BulletTank" ||
+			    tag == "pipe_cannon") {
 				isEnemyOrBullet = true;
 			}
 		}
-		if (isEnemyOrBullet) continue;
+		if (isEnemyOrBullet)
+			continue;
 
 		uint32_t modelHandle = 0;
 		if (registry_.all_of<GpuMeshColliderComponent>(entity)) {
 			auto& mc = registry_.get<GpuMeshColliderComponent>(entity);
-			if (mc.enabled) modelHandle = mc.meshHandle;
+			if (mc.enabled)
+				modelHandle = mc.meshHandle;
 		}
 		if (modelHandle == 0 && registry_.all_of<MeshRendererComponent>(entity)) {
 			auto& mr = registry_.get<MeshRendererComponent>(entity);
-			if (mr.enabled) modelHandle = mr.modelHandle;
+			if (mr.enabled)
+				modelHandle = mr.modelHandle;
 		}
 
-		if (modelHandle == 0) continue;
+		if (modelHandle == 0)
+			continue;
 
 		auto* model = renderer_->GetModel(modelHandle);
-		if (!model) continue;
+		if (!model)
+			continue;
 
 		float dist = 0.0f;
 		Engine::Vector3 hitPoint;
@@ -520,27 +535,33 @@ bool GameScene::RayCast(const Engine::Vector3& origin, const Engine::Vector3& di
 
 	auto view = registry_.view<TransformComponent>();
 	for (auto entity : view) {
-		if (excludeId != 0 && static_cast<uint32_t>(entity) == excludeId) continue;
+		if (excludeId != 0 && static_cast<uint32_t>(entity) == excludeId)
+			continue;
 
 		// タグによるフィルタリング
 		if (registry_.all_of<TagComponent>(entity)) {
 			const auto& tag = registry_.get<TagComponent>(entity).tag;
-			if (tag == "Enemy" || tag == "Bullet" || tag == "Player" || tag == "Sword" || tag == "PlayerSword" || tag == "Projectile") continue;
+			if (tag == "Enemy" || tag == "Bullet" || tag == "Player" || tag == "Sword" || tag == "PlayerSword" || tag == "Projectile")
+				continue;
 		}
 
 		uint32_t modelHandle = 0;
 		if (registry_.all_of<GpuMeshColliderComponent>(entity)) {
 			auto& mc = registry_.get<GpuMeshColliderComponent>(entity);
-			if (mc.enabled) modelHandle = mc.meshHandle;
+			if (mc.enabled)
+				modelHandle = mc.meshHandle;
 		}
 		if (modelHandle == 0 && registry_.all_of<MeshRendererComponent>(entity)) {
 			auto& mr = registry_.get<MeshRendererComponent>(entity);
-			if (mr.enabled) modelHandle = mr.modelHandle;
+			if (mr.enabled)
+				modelHandle = mr.modelHandle;
 		}
-		if (modelHandle == 0) continue;
+		if (modelHandle == 0)
+			continue;
 
 		auto* model = renderer_->GetModel(modelHandle);
-		if (!model) continue;
+		if (!model)
+			continue;
 
 		float dist = 0.0f;
 		Engine::Vector3 hitPoint;
@@ -561,20 +582,21 @@ bool GameScene::RayCast(const Engine::Vector3& origin, const Engine::Vector3& di
 	return false;
 }
 
-Engine::Matrix4x4 GameScene::GetWorldMatrix(int entityId) const {
-	return GetWorldMatrixRecursive(static_cast<entt::entity>(entityId), 0);
-}
+Engine::Matrix4x4 GameScene::GetWorldMatrix(int entityId) const { return GetWorldMatrixRecursive(static_cast<entt::entity>(entityId), 0); }
 
 Engine::Matrix4x4 GameScene::GetWorldMatrixRecursive(entt::entity e, int depth) const {
-	if (depth > 32) return Engine::Matrix4x4::Identity();
-	
-	auto it = matrixCache_.find(e);
-	if (it != matrixCache_.end()) return it->second;
+	if (depth > 32)
+		return Engine::Matrix4x4::Identity();
 
-	if (!registry_.valid(e) || !registry_.all_of<TransformComponent>(e)) return Engine::Matrix4x4::Identity();
+	auto it = matrixCache_.find(e);
+	if (it != matrixCache_.end())
+		return it->second;
+
+	if (!registry_.valid(e) || !registry_.all_of<TransformComponent>(e))
+		return Engine::Matrix4x4::Identity();
 	const auto& tc = registry_.get<TransformComponent>(e);
 	Engine::Matrix4x4 local = tc.ToMatrix();
-	
+
 	Engine::Matrix4x4 world = local;
 	if (registry_.all_of<HierarchyComponent>(e)) {
 		const auto& hc = registry_.get<HierarchyComponent>(e);
@@ -593,12 +615,14 @@ void GameScene::Draw() {
 	// ★★★ GPU負荷テスト: Hキーで大量オブジェクト生成 ★★★
 	{
 		static int stressTestGridSize = 0;
-		if (!isPlaying_) stressTestGridSize = 0; // Stop時にリセット
+		if (!isPlaying_)
+			stressTestGridSize = 0; // Stop時にリセット
 		static bool prevH = false;
 		bool currH = (GetAsyncKeyState('H') & 0x8000) != 0;
 		if (currH && !prevH) {
 			stressTestGridSize += 32; // add 32x32 = 1024 objects each press
-			std::string msg = "[StressTest] Triggered! Grid size: " + std::to_string(stressTestGridSize) + "x" + std::to_string(stressTestGridSize) + " (" + std::to_string(stressTestGridSize * stressTestGridSize) + " objects)\n";
+			std::string msg = "[StressTest] Triggered! Grid size: " + std::to_string(stressTestGridSize) + "x" + std::to_string(stressTestGridSize) + " (" +
+			                  std::to_string(stressTestGridSize * stressTestGridSize) + " objects)\n";
 			OutputDebugStringA(msg.c_str());
 		}
 		prevH = currH;
@@ -613,15 +637,10 @@ void GameScene::Draw() {
 			for (int z = 0; z < stressTestGridSize; ++z) {
 				for (int x = 0; x < stressTestGridSize; ++x) {
 					Engine::Transform t;
-					t.translate = { startOffset + x * spacing, 10.0f, startOffset + z * spacing };
-					t.rotate = { 0, 0, 0 };
-					t.scale = { 0.5f, 0.5f, 0.5f };
-					Engine::Vector4 color = {
-						0.3f + (x % 5) * 0.15f,
-						0.3f + (z % 5) * 0.15f,
-						0.5f + ((x + z) % 3) * 0.2f,
-						1.0f
-					};
+					t.translate = {startOffset + x * spacing, 10.0f, startOffset + z * spacing};
+					t.rotate = {0, 0, 0};
+					t.scale = {0.5f, 0.5f, 0.5f};
+					Engine::Vector4 color = {0.3f + (x % 5) * 0.15f, 0.3f + (z % 5) * 0.15f, 0.5f + ((x + z) % 3) * 0.2f, 1.0f};
 					renderer_->DrawMeshInstanced(cubeModel, whiteTex, t, color, "Default");
 				}
 			}
@@ -653,7 +672,7 @@ void GameScene::Draw() {
 			const auto& cc = registry_.get<ColorComponent>(entity);
 			color = {cc.color.x, cc.color.y, cc.color.z, cc.color.w};
 		}
-		
+
 		bool hasMeshRenderer = false;
 		if (registry_.all_of<MeshRendererComponent>(entity)) {
 			const auto& mr = registry_.get<MeshRendererComponent>(entity);
@@ -688,15 +707,14 @@ void GameScene::Draw() {
 
 				Engine::Matrix4x4 world = this->GetWorldMatrix(static_cast<int>(entity));
 				if (hasAnim) {
-					renderer_->DrawSkinnedMesh(
-					    mr.modelHandle, mr.textureHandle, world, bonePalette, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w});
+					renderer_->DrawSkinnedMesh(mr.modelHandle, mr.textureHandle, world, bonePalette, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w});
 				} else {
-					if (mr.shaderName == "Toon" || mr.shaderName == "ToonSkinning") {
+					if (mr.shaderName == "Toon" || mr.shaderName == "ToonSkinning" || mr.shaderName == "Hologram" || mr.shaderName == "EmissiveGlow" || mr.shaderName == "ForceField" ||
+					    mr.shaderName == "Dissolve") {
 						renderer_->DrawMesh(mr.modelHandle, mr.textureHandle, world, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w}, mr.shaderName);
 					} else {
 						renderer_->DrawMeshInstanced(
-							mr.modelHandle, mr.textureHandle, world, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w}, mr.shaderName,
-							mr.extraTextureHandles);
+						    mr.modelHandle, mr.textureHandle, world, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w}, mr.shaderName, mr.extraTextureHandles);
 					}
 				}
 			}
@@ -714,9 +732,9 @@ void GameScene::Draw() {
 			if (rv.enabled && rv.meshHandle != 0) {
 				auto tex = renderer_->LoadTexture2D(rv.texturePath);
 				Engine::Transform identity;
-				identity.translate = {0,0,0};
-				identity.rotate = {0,0,0};
-				identity.scale = {1,1,1};
+				identity.translate = {0, 0, 0};
+				identity.rotate = {0, 0, 0};
+				identity.scale = {1, 1, 1};
 				renderer_->DrawMesh(rv.meshHandle, tex, identity, {rv.flowSpeed, rv.uvScale, 0.0f, 0.0f}, "River");
 			}
 		}
@@ -740,7 +758,8 @@ void GameScene::Draw() {
 
 extern GizmoMode currentGizmoMode;
 void GameScene::DrawUI() {
-	if (!isPlaying_) return;
+	if (!isPlaying_)
+		return;
 	for (auto& sys : systems_) {
 		sys->DrawUI(registry_, ctx_);
 	}
@@ -756,7 +775,7 @@ void GameScene::DrawSelectionHighlight() {
 	for (auto entity : selectedEntities_) {
 		if (!registry_.valid(entity) || !registry_.all_of<TransformComponent>(entity))
 			continue;
-		
+
 		auto& tc = registry_.get<TransformComponent>(entity);
 		Engine::Vector3 pos = {tc.translate.x, tc.translate.y, tc.translate.z};
 
@@ -804,14 +823,14 @@ void GameScene::DrawSelectionHighlight() {
 				Engine::Vector3 cp = {bc.center.x, bc.center.y, bc.center.z};
 				Engine::Vector4 colColor = {0.2f, 1.0f, 0.2f, 0.8f};
 				Engine::Vector3 cv[8] = {
-					{cp.x - hx, cp.y - hy, cp.z - hz},
-					{cp.x + hx, cp.y - hy, cp.z - hz},
-					{cp.x + hx, cp.y + hy, cp.z - hz},
-					{cp.x - hx, cp.y + hy, cp.z - hz},
-					{cp.x - hx, cp.y - hy, cp.z + hz},
-					{cp.x + hx, cp.y - hy, cp.z + hz},
-					{cp.x + hx, cp.y + hy, cp.z + hz},
-					{cp.x - hx, cp.y + hy, cp.z + hz},
+				    {cp.x - hx, cp.y - hy, cp.z - hz},
+                    {cp.x + hx, cp.y - hy, cp.z - hz},
+                    {cp.x + hx, cp.y + hy, cp.z - hz},
+                    {cp.x - hx, cp.y + hy, cp.z - hz},
+				    {cp.x - hx, cp.y - hy, cp.z + hz},
+                    {cp.x + hx, cp.y - hy, cp.z + hz},
+                    {cp.x + hx, cp.y + hy, cp.z + hz},
+                    {cp.x - hx, cp.y + hy, cp.z + hz},
 				};
 				for (int i = 0; i < 8; ++i) {
 					DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(cv[i].x, cv[i].y, cv[i].z, 1.0f), worldMat);
@@ -828,9 +847,15 @@ void GameScene::DrawSelectionHighlight() {
 				Engine::Vector4 gColor = gmc.isIntersecting ? Engine::Vector4{1.0f, 0.2f, 0.2f, 0.8f} : Engine::Vector4{0.2f, 0.2f, 1.0f, 0.8f};
 				float hs = 1.0f;
 				Engine::Vector3 cv[8] = {
-					{-hs, -hs, -hs}, {hs,  -hs, -hs}, {hs,  hs,  -hs}, {-hs, hs,  -hs},
-					{-hs, -hs, hs }, {hs,  -hs, hs }, {hs,  hs,  hs }, {-hs, hs,  hs }
-				};
+				    {-hs, -hs, -hs},
+                    {hs,  -hs, -hs},
+                    {hs,  hs,  -hs},
+                    {-hs, hs,  -hs},
+                    {-hs, -hs, hs },
+                    {hs,  -hs, hs },
+                    {hs,  hs,  hs },
+                    {-hs, hs,  hs }
+                };
 				for (int i = 0; i < 8; ++i) {
 					DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(cv[i].x, cv[i].y, cv[i].z, 1.0f), worldMat);
 					DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&cv[i]), p);
@@ -847,10 +872,14 @@ void GameScene::DrawSelectionHighlight() {
 				Engine::Vector3 cp = {hb.center.x, hb.center.y, hb.center.z};
 				Engine::Vector4 hbColor = hb.isActive ? Engine::Vector4{1.0f, 0.2f, 0.2f, 1.0f} : Engine::Vector4{1.0f, 0.2f, 0.2f, 0.3f};
 				Engine::Vector3 hv[8] = {
-					{cp.x - hx, cp.y - hy, cp.z - hz}, {cp.x + hx, cp.y - hy, cp.z - hz},
-					{cp.x + hx, cp.y + hy, cp.z - hz}, {cp.x - hx, cp.y + hy, cp.z - hz},
-					{cp.x - hx, cp.y - hy, cp.z + hz}, {cp.x + hx, cp.y - hy, cp.z + hz},
-					{cp.x + hx, cp.y + hy, cp.z + hz}, {cp.x - hx, cp.y + hy, cp.z + hz},
+				    {cp.x - hx, cp.y - hy, cp.z - hz},
+                    {cp.x + hx, cp.y - hy, cp.z - hz},
+                    {cp.x + hx, cp.y + hy, cp.z - hz},
+                    {cp.x - hx, cp.y + hy, cp.z - hz},
+				    {cp.x - hx, cp.y - hy, cp.z + hz},
+                    {cp.x + hx, cp.y - hy, cp.z + hz},
+                    {cp.x + hx, cp.y + hy, cp.z + hz},
+                    {cp.x - hx, cp.y + hy, cp.z + hz},
 				};
 				for (int i = 0; i < 8; ++i) {
 					DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(hv[i].x, hv[i].y, hv[i].z, 1.0f), worldMat);
@@ -868,10 +897,14 @@ void GameScene::DrawSelectionHighlight() {
 				Engine::Vector3 cp = {hb.center.x, hb.center.y, hb.center.z};
 				Engine::Vector4 hbColor = {0.2f, 1.0f, 0.5f, 0.6f};
 				Engine::Vector3 hv[8] = {
-					{cp.x - hx, cp.y - hy, cp.z - hz}, {cp.x + hx, cp.y - hy, cp.z - hz},
-					{cp.x + hx, cp.y + hy, cp.z - hz}, {cp.x - hx, cp.y + hy, cp.z - hz},
-					{cp.x - hx, cp.y - hy, cp.z + hz}, {cp.x + hx, cp.y - hy, cp.z + hz},
-					{cp.x + hx, cp.y + hy, cp.z + hz}, {cp.x - hx, cp.y + hy, cp.z + hz},
+				    {cp.x - hx, cp.y - hy, cp.z - hz},
+                    {cp.x + hx, cp.y - hy, cp.z - hz},
+                    {cp.x + hx, cp.y + hy, cp.z - hz},
+                    {cp.x - hx, cp.y + hy, cp.z - hz},
+				    {cp.x - hx, cp.y - hy, cp.z + hz},
+                    {cp.x + hx, cp.y - hy, cp.z + hz},
+                    {cp.x + hx, cp.y + hy, cp.z + hz},
+                    {cp.x - hx, cp.y + hy, cp.z + hz},
 				};
 				for (int i = 0; i < 8; ++i) {
 					DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(hv[i].x, hv[i].y, hv[i].z, 1.0f), worldMat);
@@ -974,7 +1007,8 @@ void GameScene::DrawLightGizmos() {
 		return;
 	auto dlView = registry_.view<DirectionalLightComponent, TransformComponent>();
 	dlView.each([&](auto entity, const DirectionalLightComponent& dl, const TransformComponent& tc) {
-		if (!dl.enabled) return;
+		if (!dl.enabled)
+			return;
 		Engine::Vector3 pos = {tc.translate.x, tc.translate.y, tc.translate.z};
 		Engine::Matrix4x4 mat = tc.GetTransform().ToMatrix();
 		Engine::Vector3 fwd = {mat.m[2][0], mat.m[2][1], mat.m[2][2]};
@@ -990,7 +1024,8 @@ void GameScene::DrawLightGizmos() {
 
 	auto plView = registry_.view<PointLightComponent, TransformComponent>();
 	plView.each([&](auto entity, const PointLightComponent& pl, const TransformComponent& tc) {
-		if (!pl.enabled) return;
+		if (!pl.enabled)
+			return;
 		Engine::Vector3 pos = {tc.translate.x, tc.translate.y, tc.translate.z};
 		bool isSelected = (selectedEntities_.find(entity) != selectedEntities_.end());
 		float alpha = isSelected ? 1.0f : 0.4f;
@@ -1004,7 +1039,8 @@ void GameScene::DrawLightGizmos() {
 
 	auto slView = registry_.view<SpotLightComponent, TransformComponent>();
 	slView.each([&](auto entity, const SpotLightComponent& sl, const TransformComponent& tc) {
-		if (!sl.enabled) return;
+		if (!sl.enabled)
+			return;
 		Engine::Vector3 pos = {tc.translate.x, tc.translate.y, tc.translate.z};
 		Engine::Matrix4x4 mat = tc.GetTransform().ToMatrix();
 		Engine::Vector3 fwd = {mat.m[2][0], mat.m[2][1], mat.m[2][2]};
@@ -1020,7 +1056,8 @@ void GameScene::DrawLightGizmos() {
 }
 
 void GameScene::SetIsPlaying(bool play) {
-	if (isPlaying_ == play) return;
+	if (isPlaying_ == play)
+		return;
 
 	if (play) {
 		// プレイ開始時: スクリプトの現在の設定（インスペクターでの変更）をコンポーネントに確実に反映 (Flush)
@@ -1062,7 +1099,7 @@ void GameScene::SetIsPlaying(bool play) {
 		if (!sceneSnapshot_.empty()) {
 			OutputDebugStringA(("[GameScene] Restoring from memory snapshot (size: " + std::to_string(sceneSnapshot_.size()) + ")...\n").c_str());
 			EditorUI::LoadFromMemory(this, sceneSnapshot_);
-			
+
 			// 保存しておいた名前を元に選択状態を復元
 			selectedEntities_.clear();
 			selectedEntity_ = entt::null;
@@ -1071,7 +1108,8 @@ void GameScene::SetIsPlaying(bool play) {
 				for (auto entity : view) {
 					if (view.get<NameComponent>(entity).name == name) {
 						selectedEntities_.insert(entity);
-						if (selectedEntity_ == entt::null) selectedEntity_ = entity;
+						if (selectedEntity_ == entt::null)
+							selectedEntity_ = entity;
 						break;
 					}
 				}
@@ -1088,15 +1126,12 @@ void GameScene::SetIsPlaying(bool play) {
 		sceneSnapshot_ = "";
 
 		// ★追加: 川のメッシュなど、動的メッシュの再生成
-		auto riverView = registry_.view<RiverComponent, TransformComponent>();
-		for (auto entity : riverView) {
-			auto& rv = riverView.get<RiverComponent>(entity);
+		registry_.view<RiverComponent, TransformComponent>().each([&](RiverComponent& rv, TransformComponent& tc) {
 			if (rv.enabled && rv.meshHandle == 0) {
-				auto& tc = riverView.get<TransformComponent>(entity);
 				RiverSystem::BuildRiverMesh(rv, renderer_, registry_, tc.translate);
 			}
-		}
-		
+		});
+
 		// ペンディングデータのクリア
 		std::lock_guard<std::mutex> lock(spawnMutex_);
 		pendingDestroys_.clear();

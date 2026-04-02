@@ -197,19 +197,14 @@ bool PhaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3&
 	bool hitTerrain = false;
 
 	auto& registry = scene->GetRegistry();
-	auto terrainView = registry.view<NameComponent, TransformComponent>();
-	
-	for (auto entity : terrainView) {
-		const auto& nc = terrainView.get<NameComponent>(entity);
-		const auto& tc = terrainView.get<TransformComponent>(entity);
-
+	registry.view<NameComponent, TransformComponent>().each([&](entt::entity entity, const NameComponent& nc, const TransformComponent& tc) {
 		bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || 
 		                 (nc.name.find("Floor") != std::string::npos) || 
 		                 (nc.name.find("Ground") != std::string::npos) || 
 		                 (nc.name.find("Stage") != std::string::npos) ||
 		                 (nc.name.find("Plane") != std::string::npos);
 		if (!isTerrain)
-			continue;
+			return;
 
 		Engine::Model* model = nullptr;
 		// GpuMeshCollider か MeshRenderer からモデルを取得
@@ -228,7 +223,7 @@ bool PhaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3&
 		}
 
 		if (!model)
-			continue;
+			return;
 
 		float d;
 		Engine::Vector3 hp;
@@ -237,7 +232,7 @@ bool PhaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3&
 			outHitPoint = hp;
 			hitTerrain = true;
 		}
-	}
+	});
 
 	// --- フォールバック: 仮想的な y=0 平面との交差判定 ---
 	if (!hitTerrain) {
