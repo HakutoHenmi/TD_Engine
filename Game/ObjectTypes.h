@@ -485,18 +485,37 @@ struct MotionComponent : public Component {
 		DirectX::XMFLOAT3 rotate = {0, 0, 0};
 		DirectX::XMFLOAT3 scale = {1, 1, 1};
 	};
-	std::vector<Keyframe> keyframes;
+
+	struct MotionClip {
+		std::string name;
+		std::vector<Keyframe> keyframes;
+		float totalDuration = 1.0f;
+		bool loop = false;
+	};
+
+	std::map<std::string, MotionClip> clips;
+	std::string activeClip = "Default";
+	
 	float currentTime = 0.0f;
-	float totalDuration = 1.0f;
 	bool isPlaying = false;
-	bool loop = true;
 	int selectedKeyframe = -1; // エディタ用
 
 	MotionComponent() { 
 		type = ComponentType::Motion; 
-		// 初期値として2点追加
-		keyframes.push_back({0.0f, {0,0,0}, {0,0,0}, {1,1,1}});
-		keyframes.push_back({1.0f, {5,0,0}, {0,0,0}, {1,1,1}});
+		// 初期値としてデフォルトクリップを作成
+		MotionClip defaultClip;
+		defaultClip.name = "Default";
+		defaultClip.keyframes.push_back({0.0f, {0,0,0}, {0,0,0}, {1,1,1}});
+		defaultClip.keyframes.push_back({1.0f, {5,0,0}, {0,0,0}, {1,1,1}});
+		clips["Default"] = defaultClip;
+	}
+
+	void PlayAnimation(const std::string& clipName) {
+		if (clips.find(clipName) != clips.end()) {
+			activeClip = clipName;
+			currentTime = 0.0f;
+			isPlaying = true;
+		}
 	}
 };
 

@@ -137,6 +137,9 @@ public:
 
 								auto& sc_hit = registry.emplace<ScriptComponent>(hitDistortion);
 								sc_hit.scripts.push_back({ "HitDistortionScript", "", std::make_shared<HitDistortionScript>(), false });
+
+								auto& tcTag_hit = registry.emplace<TagComponent>(hitDistortion);
+								tcTag_hit.tag = TagType::HitDistortion_VFX;
 							}
 
 							hc.hitFlashTimer = 0.2f;

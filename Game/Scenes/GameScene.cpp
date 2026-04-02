@@ -432,7 +432,7 @@ float GameScene::GetHeightAt(float x, float z, float startY, uint32_t excludeId)
 		if (registry_.all_of<TagComponent>(entity)) {
 			const auto tag = registry_.get<TagComponent>(entity).tag;
 			if (tag == TagType::Enemy || tag == TagType::Bullet || tag == TagType::Player || tag == TagType::Sword || tag == TagType::PlayerSword || tag == TagType::Projectile || tag == TagType::Pipe || tag == TagType::Canon || tag == TagType::BulletTank ||
-			    tag == TagType::PipeCannon) {
+			    tag == TagType::PipeCannon || tag == TagType::VFX || tag == TagType::HitDistortion_VFX) {
 				isEnemyOrBullet = true;
 			}
 		}
@@ -488,7 +488,7 @@ bool GameScene::RayCast(const Engine::Vector3& origin, const Engine::Vector3& di
 		// タグによるフィルタリング
 		if (registry_.all_of<TagComponent>(entity)) {
 			const auto tag = registry_.get<TagComponent>(entity).tag;
-			if (tag == TagType::Enemy || tag == TagType::Bullet || tag == TagType::Player || tag == TagType::Sword || tag == TagType::PlayerSword || tag == TagType::Projectile)
+			if (tag == TagType::Enemy || tag == TagType::Bullet || tag == TagType::Player || tag == TagType::Sword || tag == TagType::PlayerSword || tag == TagType::Projectile || tag == TagType::VFX || tag == TagType::HitDistortion_VFX)
 				continue;
 		}
 

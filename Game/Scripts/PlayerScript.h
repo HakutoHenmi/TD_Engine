@@ -7,6 +7,7 @@
 #include <deque>
 #include "../../externals/entt/entt.hpp"
 #include "../Engine/Matrix4x4.h"
+#include "ObjectTypes.h"
 
 namespace Game {
 
@@ -35,24 +36,6 @@ private:
 	bool isAttacking_ = false;
 	bool attackQueued_ = false;
 	bool prevAttackKeyDown_ = false;
-
-	bool isReturning_ = false;
-	float returnTimer_ = 0.0f;
-
-	DirectX::XMFLOAT3 currentSwordRot_ = {0.0f, 0.0f, 0.0f};
-	DirectX::XMFLOAT3 startSwordRot_ = {0.0f, 0.0f, 0.0f};
-
-	DirectX::XMFLOAT3 currentBodyRot_ = {0.0f, 0.0f, 0.0f};
-	DirectX::XMFLOAT3 startBodyRot_ = {0.0f, 0.0f, 0.0f};
-
-	float EaseOutCubic(float t) { return 1.0f - std::powf(1.0f - t, 3.0f); }
-	float EaseOutQuint(float t) { return 1.0f - std::powf(1.0f - t, 5.0f); }
-	float EaseOutBack(float t) {
-		float c1 = 1.70158f;
-		float c3 = c1 + 1.0f;
-		return 1.0f + c3 * std::powf(t - 1.0f, 3.0f) + c1 * std::powf(t - 1.0f, 2.0f);
-	}
-	float EaseOutExpo(float t) { return (t == 1.0f) ? 1.0f : 1.0f - std::powf(2.0f, -10.0f * t); }
 
 	std::string swordName_ = "PlayerSword";
 
