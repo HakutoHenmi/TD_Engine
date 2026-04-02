@@ -1421,30 +1421,59 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 			float sy = mousePos.y - gameImageMin.y;
 			
 			if (sx >= 0 && sx <= renderW && sy >= 0 && sy <= renderH) {
-				DirectX::XMVECTOR rayOrig, rayDir;
-				ScreenToWorldRay(sx, sy, (float)renderW, (float)renderH, gameScene->GetCamera().View(), gameScene->GetCamera().Proj(), rayOrig, rayDir);
-				
-				float minD = FLT_MAX;
+				float internalMouseX = gctx.overrideMouseX;
+				float internalMouseY = gctx.overrideMouseY;
+
 				entt::entity hitE = entt::null;
-				gameScene->GetRegistry().view<MeshRendererComponent, TransformComponent>().each([&](entt::entity e, const MeshRendererComponent& mr, [[maybe_unused]] const TransformComponent& tc) {
-					if (mr.modelHandle == 0) return;
-					auto* m = renderer->GetModel(mr.modelHandle);
-					if (!m) return;
-
-					float d; Engine::Vector3 p;
-					// ロックされているオブジェクトはピッキング（クリック選択）させない
-					if (auto* esc = gameScene->GetRegistry().try_get<EditorStateComponent>(e)) {
-						if (esc->locked) return;
-					}
-
-					if (m->RayCast(rayOrig, rayDir, gameScene->GetWorldMatrix(static_cast<int>(e)), d, p)) {
-						if (d < minD) { minD = d; hitE = e; }
+				
+				// 1. UI Picking Pass (Priority)
+				int maxLayer = -10000;
+				gameScene->GetRegistry().view<RectTransformComponent>().each([&](entt::entity e, const RectTransformComponent&) {
+					UISystem::WorldRect wr = UISystem::CalculateWorldRect(e, gameScene->GetRegistry(), (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH);
+					if (internalMouseX >= wr.x && internalMouseX <= wr.x + wr.w &&
+						internalMouseY >= wr.y && internalMouseY <= wr.y + wr.h) {
+						
+						int layer = 0;
+						if (auto* img = gameScene->GetRegistry().try_get<UIImageComponent>(e)) {
+							layer = img->layer;
+						}
+						// より手前（レイヤーが大きい）のUIを優先
+						if (hitE == entt::null || layer >= maxLayer) {
+							maxLayer = layer;
+							hitE = e;
+						}
 					}
 				});
+
+				// 2. 3D Picking Pass (If no UI hit)
+				if (hitE == entt::null) {
+					DirectX::XMVECTOR rayOrig, rayDir;
+					ScreenToWorldRay(sx, sy, (float)renderW, (float)renderH, gameScene->GetCamera().View(), gameScene->GetCamera().Proj(), rayOrig, rayDir);
+					
+					float minD = FLT_MAX;
+					gameScene->GetRegistry().view<MeshRendererComponent, TransformComponent>().each([&](entt::entity e, const MeshRendererComponent& mr, [[maybe_unused]] const TransformComponent& tc) {
+						if (mr.modelHandle == 0) return;
+						auto* m = renderer->GetModel(mr.modelHandle);
+						if (!m) return;
+
+						float d; Engine::Vector3 p;
+						// ロックされているオブジェクトはピッキング（クリック選択）させない
+						if (auto* esc = gameScene->GetRegistry().try_get<EditorStateComponent>(e)) {
+							if (esc->locked) return;
+						}
+
+						if (m->RayCast(rayOrig, rayDir, gameScene->GetWorldMatrix(static_cast<int>(e)), d, p)) {
+							if (d < minD) { minD = d; hitE = e; }
+						}
+					});
+				}
+
 				if (hitE != entt::null) {
 					gameScene->SetSelectedEntity(hitE);
+					gameScene->GetSelectedEntities() = {hitE};
 				} else {
 					gameScene->SetSelectedEntity(entt::null);
+					gameScene->GetSelectedEntities().clear();
 				}
 			}
 		}
