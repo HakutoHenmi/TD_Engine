@@ -181,8 +181,10 @@ bool UISystem::WorldToScreenWithView(const DirectX::XMFLOAT3& worldPos, const En
     DirectX::XMMATRIX proj = camera.Proj();
     DirectX::XMMATRIX world = DirectX::XMMatrixIdentity();
 
-    // XMVector3Project は ビューポート(x, y, w, h, minZ, maxZ) を受け取る
-    DirectX::XMVECTOR screenPos = DirectX::XMVector3Project(p, 0, 0, viewSize.x, viewSize.y, 0.0f, 1.0f, proj, view, world);
+    // ビューポートサイズが0の場合、投影計算に失敗するためガード
+    float vw = std::max(1.0f, viewSize.x);
+    float vh = std::max(1.0f, viewSize.y);
+    DirectX::XMVECTOR screenPos = DirectX::XMVector3Project(p, 0, 0, vw, vh, 0.0f, 1.0f, proj, view, world);
     
     DirectX::XMFLOAT3 sp;
     DirectX::XMStoreFloat3(&sp, screenPos);
