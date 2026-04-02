@@ -122,10 +122,7 @@ void PoisonTrap::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	}
 
-	if (poisonTimer_ > 0.0f) {
-		poisonTimer_ -= dt;
-		return;
-	}
+
 
 	CreatePoisonAttackArea(entity, scene);
 	poisonTimer_ = poisonInterval_;
@@ -239,14 +236,19 @@ void PoisonTrap::CreatePoisonAttackArea(entt::entity entity, GameScene* scene) {
 	const TransformComponent& trapTransform = registry.get<TransformComponent>(entity);
 
 	entt::entity poisonAttackArea = registry.create();
-
+	auto* renderer = scene->GetRenderer();
+	if (renderer) {
+		MeshRendererComponent& poisonMeshRenderer = registry.emplace<MeshRendererComponent>(poisonAttackArea);
+		poisonMeshRenderer.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+		poisonMeshRenderer.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+	}
 	TagComponent& poisonTag = registry.emplace<TagComponent>(poisonAttackArea);
 	poisonTag.tag = "PoisonAttackArea";
 
 	TransformComponent& poisonTransform = registry.emplace<TransformComponent>(poisonAttackArea);
 	poisonTransform.translate = trapTransform.translate;
 	poisonTransform.rotate = trapTransform.rotate;
-	poisonTransform.scale = {1.0f, 1.0f, 1.0f};
+	poisonTransform.scale = {poisonRange_, poisonRange_, poisonRange_};
 
 	HitboxComponent& poisonHitbox = registry.emplace<HitboxComponent>(poisonAttackArea);
 	poisonHitbox.isActive = true;
@@ -256,6 +258,8 @@ void PoisonTrap::CreatePoisonAttackArea(entt::entity entity, GameScene* scene) {
 
 	ScriptComponent& poisonScript = registry.emplace<ScriptComponent>(poisonAttackArea);
 	poisonScript.scripts.push_back({"PoisonAttackArea", "", nullptr});
+
+
 }
 
 void PoisonTrap::Debug(bool connected) {

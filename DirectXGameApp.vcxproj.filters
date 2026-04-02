@@ -75,6 +75,9 @@
     <ClCompile Include="Game\Scripts\SkillTree.cpp" />
     <ClCompile Include="Game\Scripts\InstallationButton.cpp" />
     <ClCompile Include="Game\EnemySystem\NavigationManager.cpp" />
+    <ClCompile Include="Game\Scripts\HitDistortionScript.cpp" />
+    <ClCompile Include="Game\Scripts\PoisonTrap.cpp" />
+    <ClCompile Include="Game\Scripts\PoisonAttackArea.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
@@ -184,6 +187,9 @@
     <ClInclude Include="Game\Scripts\SkillTree.h" />
     <ClInclude Include="Game\Scripts\InstallationButton.h" />
     <ClInclude Include="Game\EnemySystem\NavigationManager.h" />
+    <ClInclude Include="Game\Scripts\HitDistortionScript.h" />
+    <ClInclude Include="Game\Scripts\PoisonTrap.h" />
+    <ClInclude Include="Game\Scripts\PoisonAttackArea.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">
