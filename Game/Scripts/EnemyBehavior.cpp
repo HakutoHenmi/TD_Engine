@@ -188,16 +188,16 @@ void EnemyBehavior::Move(entt::entity entity, GameScene* scene, float /*dt*/) {
 	auto& registry = scene->GetRegistry();
 	auto& tc = registry.get<TransformComponent>(entity);
 
-	// Navigation取得
+	// 1. NavigationManager を取得
 	auto& nav = scene->GetNavigationManager();
 
 	float dirX = 0.0f;
 	float dirZ = 0.0f;
 
-	// 足元の進むべき方向をマネージャーから取得
+	// 2. 自分の足元の「進むべき方向」をマネージャーに聞く
 	nav.GetDirection(tc.translate.x, tc.translate.z, dirX, dirZ);
 
-	// 物理コンポーネントがあるかチェック
+	// 3. 物理コンポーネントがあるかチェック
 	if (registry.all_of<RigidbodyComponent>(entity)) {
 		auto& rb = registry.get<RigidbodyComponent>(entity);
 
@@ -211,26 +211,26 @@ void EnemyBehavior::Move(entt::entity entity, GameScene* scene, float /*dt*/) {
 			rb.velocity.z = vz;
 
 			// 地面の高さに合わせて y 座標を補正（埋まり・浮き防止）
-			//float h = scene->GetHeightAt(tc.translate.x, tc.translate.z, tc.translate.y + 1.0f, static_cast<uint32_t>(entity));
-			//if (h > -9000.0f) {
-			//	tc.translate.y = h + 0.1f; // 少しだけ浮かせて接地させるやんす
-			//}
-			//} else {
-			//	// 飛行タイプ（y軸はふわふわさせるやんす）
-			//	rb.velocity.x = vx;
-			//	rb.velocity.z = vz;
-
-			//	float floatHeight = 5.0f; // 地面から5m上を飛ぶ
-			//	float targetY = groundHeight_ + floatHeight + std::sin(scene->GetContext().playTime * 2.0f) * 0.5f;
-			//	tc.translate.y += (targetY - tc.translate.y) * 2.0f * dt;
-			//}
-
-			// 4. 進んでいる方向を向く（滑らかに回転させるとより『スローンフォール』っぽいやんす！）
-			if (std::abs(vx) > 0.1f || std::abs(vz) > 0.1f) {
-				float targetAngle = std::atan2(vx, vz);
-				// 角度の線形補間（Lerp）を自作エンジン側で持ってればそれを使うのがベストやんす
-				tc.rotate.y = targetAngle;
+			float h = scene->GetHeightAt(tc.translate.x, tc.translate.z, tc.translate.y + 1.0f, static_cast<uint32_t>(entity));
+			if (h > -9000.0f) {
+				tc.translate.y = h + 0.1f; // 少しだけ浮かせて接地させるやんす
 			}
+		} 
+		//else {
+		//	// 飛行タイプ（y軸はふわふわさせるやんす）
+		//	rb.velocity.x = vx;
+		//	rb.velocity.z = vz;
+
+		//	float floatHeight = 5.0f; // 地面から5m上を飛ぶ
+		//	float targetY = groundHeight_ + floatHeight + std::sin(scene->GetContext().playTime * 2.0f) * 0.5f;
+		//	tc.translate.y += (targetY - tc.translate.y) * 2.0f * dt;
+		//}
+
+		// 4. 進んでいる方向を向く（滑らかに回転させるとより『スローンフォール』っぽいやんす！）
+		if (std::abs(vx) > 0.1f || std::abs(vz) > 0.1f) {
+			float targetAngle = std::atan2(vx, vz);
+			// 角度の線形補間（Lerp）を自作エンジン側で持ってればそれを使うのがベストやんす
+			tc.rotate.y = targetAngle; 
 		}
 	}
 }
