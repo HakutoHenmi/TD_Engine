@@ -145,7 +145,7 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 		currentAttackInterval = attackInterval_ / powerRate;
 	}
 
-	Debug(isConnectedToTank_);
+	// Debug(isConnectedToTank_); // ★削除: Update 内での ImGui 呼び出しは例外の原因となる可能性があるため
 
 	if (attackTimer_ > 0.0f) {
 		attackTimer_ -= dt;
@@ -268,6 +268,7 @@ void Canon::OnEditorUI() {
 	ImGui::Text("Rotation: %.2f", rotationSpeed_);
 	ImGui::Text("Connected Tanks: %d", connectedTankCount);
 	ImGui::Text("Connected Canons: %d", connectedCanonCount);
+	ImGui::Text("Connected to Tank: %s", isConnectedToTank_ ? "YES" : "NO");
 #endif
 }
 
@@ -317,18 +318,9 @@ void Canon::UpdateConnection(entt::entity entity, GameScene* scene) {
 	connectedCanonCount = static_cast<int>(foundCanons.size());
 }
 
-void Canon::Debug(bool connected) {
-	(void)connected;
-
-#ifndef NDEBUG
-#ifdef USE_IMGUI
-	ImGui::Begin("Canon Debug");
-	ImGui::Text("Canon connected to tank: %s", isConnectedToTank_ ? "YES" : "NO");
-	ImGui::Text("Connected Tanks: %d", connectedTankCount);
-	ImGui::Text("Connected Canons: %d", connectedCanonCount);
-	ImGui::End();
-#endif
-#endif
+void Canon::Debug(bool /*connected*/) {
+	// 以前はここで ImGui::Begin を呼んでいたが、Update からの呼び出しは危険なため廃止。
+	// 代わりに OnEditorUI を使用する。
 }
 
 REGISTER_SCRIPT(Canon);

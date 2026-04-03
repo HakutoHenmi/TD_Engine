@@ -112,7 +112,7 @@ void PoisonTrap::Update(entt::entity entity, GameScene* scene, float dt) {
 		UpdateConnection(entity, scene);
 	}
 
-	Debug(isConnectedToTank_);
+	// Debug(isConnectedToTank_); // ★削除: Update 内での ImGui 呼び出しは例外の原因となる可能性があるため
 
 	if (!isConnectedToTank_) {
 		return;
@@ -140,7 +140,9 @@ void PoisonTrap::OnEditorUI() {
 	ImGui::Separator();
 	ImGui::Text("Status (Debug)");
 	ImGui::Text("Connected Tanks: %d", connectedTankCount);
-	ImGui::Text("Connected To Tank: %s", isConnectedToTank_ ? "YES" : "NO");
+	ImGui::Text("Connected to Tank: %s", isConnectedToTank_ ? "YES" : "NO");
+	ImGui::Text("Poison Range: %.2f", poisonRange_);
+	ImGui::Text("Poison Interval: %.2f", poisonInterval_);
 #endif
 }
 
@@ -262,20 +264,9 @@ void PoisonTrap::CreatePoisonAttackArea(entt::entity entity, GameScene* scene) {
 
 }
 
-void PoisonTrap::Debug(bool connected) {
-	(void)connected;
-
-#ifndef NDEBUG
-#ifdef USE_IMGUI
-	ImGui::Begin("PoisonTrap Debug");
-	ImGui::Text("PoisonTrap connected to tank: %s", isConnectedToTank_ ? "YES" : "NO");
-	ImGui::Text("Connected Tanks: %d", connectedTankCount);
-	ImGui::Text("Poison Damage: %.2f", poisonDamage_);
-	ImGui::Text("Poison Range: %.2f", poisonRange_);
-	ImGui::Text("Poison Interval: %.2f", poisonInterval_);
-	ImGui::End();
-#endif
-#endif
+void PoisonTrap::Debug(bool /*connected*/) {
+	// 以前はここで ImGui::Begin を呼んでいたが、Update からの呼び出しは危険なため廃止。
+	// 代わりに OnEditorUI を使用する。
 }
 
 REGISTER_SCRIPT(PoisonTrap);

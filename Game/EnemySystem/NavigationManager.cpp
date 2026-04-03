@@ -85,25 +85,28 @@ void NavigationManager::GenerateFlowField(float targetWorldX, float targetWorldZ
 		for (int i = 0; i < 8; ++i) {
 			int nextX = currX + dx[i];
 			int nextZ = currZ + dz[i];
+			
+			// グリッドの範囲内かチェック（配列アクセス前に行う必要がある）
+			if (nextX < 0 || nextX >= width_ || nextZ < 0 || nextZ >= height_) {
+				continue;
+			}
 
 			// 斜め移動の場合、その横にある2マスが壁なら通れないようにする
 			if (grid_[GetIndex(nextX, currZ)].cost == 255 || grid_[GetIndex(currX, nextZ)].cost == 255) {
 				continue;
 			}
 
-			if (nextX >= 0 && nextX < width_ && nextZ >= 0 && nextZ < height_) {
-				int nextIndex = GetIndex(nextX, nextZ);
-				FlowCell& nextCell = grid_[nextIndex];
+			int nextIndex = GetIndex(nextX, nextZ);
+			FlowCell& nextCell = grid_[nextIndex];
 
-				// 壁[255]ではないより短い経路が見つかった場合
-				if (nextCell.cost < 255) {
-					float moveCost = (i < 4) ? (float)nextCell.cost : (float)nextCell.cost * 1.414f;
-					float newCost = grid_[currIndex].bestCost + moveCost;
+			// 壁[255]ではないより短い経路が見つかった場合
+			if (nextCell.cost < 255) {
+				float moveCost = (i < 4) ? (float)nextCell.cost : (float)nextCell.cost * 1.414f;
+				float newCost = grid_[currIndex].bestCost + moveCost;
 
-					if (newCost < nextCell.bestCost) {
-						nextCell.bestCost = newCost;
-						openIndices.push(nextIndex);
-					}
+				if (newCost < nextCell.bestCost) {
+					nextCell.bestCost = newCost;
+					openIndices.push(nextIndex);
 				}
 			}
 		}

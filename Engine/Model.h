@@ -113,7 +113,7 @@ public:
 	void UpdateVertices(const std::vector<VertexData>& vertices);
 
 	// SRV作成
-	void CreateSrv(ID3D12Device* device, ID3D12DescriptorHeap* srvHeap, UINT descriptorSize, UINT heapIndex);
+	void CreateSrv(ID3D12Device* device, ID3D12DescriptorHeap* srvHeap, ID3D12DescriptorHeap* srvHeapMaster, UINT descriptorSize, UINT heapIndex);
 
 	// 描画 (Rendererの実装に合わせてデフォルト引数を調整: t0がindex 3の場合)
 	void Draw(ID3D12GraphicsCommandList* cmd, UINT rootSrvParamIndex = 3);

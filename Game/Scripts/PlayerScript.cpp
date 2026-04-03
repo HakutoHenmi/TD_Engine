@@ -197,14 +197,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))  scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = true;
 	}
 
-#if defined(USE_IMGUI) && !defined(NDEBUG)
-	ImGui::Begin("Player Debug");
-	ImGui::Text("Experience: %.1f", experience_);
-	ImGui::Text("Subscribe Count: %d", debugSubscribeCount_);
-	ImGui::Text("Receive Count: %d", debugReceiveCount_);
-	ImGui::Text("Last Value: %.2f", debugLastValue_);
-	ImGui::End();
-#endif
+	// Update 内での ImGui 呼び出しは例外の原因となる可能性があるため、OnEditorUI に移動しました。
 }
 
 void PlayerScript::UpdateMovement(entt::entity entity, GameScene* scene, float /*dt*/) {
@@ -343,6 +336,16 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 			renderer->DrawLine3D(base1 - off, base2 - off, col, true);
 		}
 	}
+}
+
+void PlayerScript::OnEditorUI() {
+#if defined(USE_IMGUI) && !defined(NDEBUG)
+	ImGui::SeparatorText("Player Debug");
+	ImGui::Text("Experience: %.1f", experience_);
+	ImGui::Text("Subscribe Count: %d", debugSubscribeCount_);
+	ImGui::Text("Receive Count: %d", debugReceiveCount_);
+	ImGui::Text("Last Value: %.2f", debugLastValue_);
+#endif
 }
 
 void PlayerScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}

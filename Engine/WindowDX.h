@@ -41,6 +41,7 @@ public:
 	ID3D12CommandQueue* Queue() const { return que_.Get(); }
 
 	ID3D12DescriptorHeap* SRV() const { return srvH_.Get(); }
+	ID3D12DescriptorHeap* SRV_CPU_Heap() const { return srvH_CPU_.Get(); } // ★追加
 	UINT SrvInc() const { return srvInc_; }
 	UINT FrameIndex() const { return fi_; }
 
@@ -50,6 +51,7 @@ public:
 	D3D12_CPU_DESCRIPTOR_HANDLE RTV_CPU(int offset) const;
 	D3D12_CPU_DESCRIPTOR_HANDLE DSV_CPU(int offset) const;
 	D3D12_CPU_DESCRIPTOR_HANDLE SRV_CPU(int offset) const;
+	D3D12_CPU_DESCRIPTOR_HANDLE SRV_CPU_Master(int offset) const; // ★追加
 	D3D12_GPU_DESCRIPTOR_HANDLE SRV_GPU(int offset) const;
 
 	HWND GetHwnd() const { return hwnd_; }
@@ -83,6 +85,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvH_;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvH_;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> srvH_;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> srvH_CPU_; // ★追加: 非ShaderVisible
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> back_[kBackBufferCount];
 	Microsoft::WRL::ComPtr<ID3D12Resource> depth_;

@@ -358,6 +358,7 @@ private:
 	struct Texture {
 		Microsoft::WRL::ComPtr<ID3D12Resource> res;
 		D3D12_CPU_DESCRIPTOR_HANDLE srvCpu{};
+		D3D12_CPU_DESCRIPTOR_HANDLE srvCpuMaster{}; // ★追加: 非ShaderVisible
 		D3D12_GPU_DESCRIPTOR_HANDLE srvGpu{};
 	};
 
@@ -465,6 +466,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> backdropColor_;
 	D3D12_CPU_DESCRIPTOR_HANDLE backdropRtv_{};
 	D3D12_CPU_DESCRIPTOR_HANDLE backdropSrvCpu_{};
+	D3D12_CPU_DESCRIPTOR_HANDLE backdropSrvCpuMaster_{}; // ★追加
 	D3D12_GPU_DESCRIPTOR_HANDLE backdropSrv_{};
 
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoPP_;
