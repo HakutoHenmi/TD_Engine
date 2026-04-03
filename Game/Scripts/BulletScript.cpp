@@ -53,7 +53,23 @@ static entt::entity FindNearestEnemy(entt::registry& registry, GameScene* scene,
 	return nearestEnemy;
 }
 
-void BulletScript::Start(entt::entity /*entity*/, GameScene* /*scene*/) { lifeTime_ = 0.0f; }
+void BulletScript::Start(entt::entity entity, GameScene*scene ) {
+	lifeTime_ = 0.0f;
+
+	if (!scene) {
+		target_ = entt::null;
+		return;
+	}
+
+	entt::registry& registry = scene->GetRegistry();
+
+	if (!registry.valid(entity)) {
+		target_ = entt::null;
+		return;
+	}
+
+	target_ = FindNearestEnemy(registry, scene, entity, homingSearchRange_);
+}
 
 void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (!scene) {
@@ -75,14 +91,8 @@ void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	lifeTime_ += dt;
 
 	if (lifeTime_ >= maxLifeTime_) {
-
-		scene->DestroyObject(static_cast<uint32_t>(entity)); // 自分を削除
-
+		scene->DestroyObject(static_cast<uint32_t>(entity));
 		return;
-	}
-
-	if (!registry.valid(target_)) {
-		target_ = FindNearestEnemy(registry, scene, entity, homingSearchRange_);
 	}
 
 	if (registry.valid(target_)) {
