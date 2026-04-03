@@ -9,16 +9,16 @@ public:
 	void Update(entt::entity entity, GameScene* scene, float dt) override;
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
 
-	void SetTarget(entt::entity target) { target_ = target; }
+	void SetTarget(entt::entity target);
+	void SetHasTarget(bool hasTarget);
 
 private:
 	entt::entity target_ = entt::null;
+	bool hasTarget_ = false;
 
-	float speed_ = 30.0f;
 	float lifeTime_ = 0.0f;
-	float maxLifeTime_ = 3.0f;
-
-	float homingSearchRange_ = 100.0f;
+	float maxLifeTime_ = 5.0f;
+	float speed_ = 20.0f;
 };
 
 } // namespace Game

@@ -3,72 +3,29 @@
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
 #include <cmath>
-#include <vector>
 
 namespace Game {
 
-static entt::entity FindNearestEnemy(entt::registry& registry, GameScene* scene, entt::entity bulletEntity, float searchRange) {
-	if (!scene) {
-		return entt::null;
-	}
-
-	if (!registry.valid(bulletEntity)) {
-		return entt::null;
-	}
-
-	if (!registry.all_of<TransformComponent>(bulletEntity)) {
-		return entt::null;
-	}
-
-	TransformComponent& bulletTransform = registry.get<TransformComponent>(bulletEntity);
-
-	entt::entity nearestEnemy = entt::null;
-	float bestDistance = searchRange;
-
-	const std::vector<entt::entity>& enemies = scene->GetEntitiesByTag("Enemy");
-
-	for (entt::entity enemy : enemies) {
-		if (!registry.valid(enemy)) {
-			continue;
-		}
-
-		if (!registry.all_of<TransformComponent>(enemy)) {
-			continue;
-		}
-
-		TransformComponent& enemyTransform = registry.get<TransformComponent>(enemy);
-
-		float diffX = enemyTransform.translate.x - bulletTransform.translate.x;
-		float diffY = enemyTransform.translate.y - bulletTransform.translate.y;
-		float diffZ = enemyTransform.translate.z - bulletTransform.translate.z;
-
-		float distance = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
-
-		if (distance < bestDistance) {
-			bestDistance = distance;
-			nearestEnemy = enemy;
-		}
-	}
-
-	return nearestEnemy;
-}
-
-void BulletScript::Start(entt::entity entity, GameScene*scene ) {
+void BulletScript::Start(entt::entity entity, GameScene* scene) {
 	lifeTime_ = 0.0f;
+	hasTarget_ = false;
+	target_ = entt::null;
 
 	if (!scene) {
-		target_ = entt::null;
 		return;
 	}
 
-	entt::registry& registry = scene->GetRegistry();
+	float hasTargetValue = GetVar(entity, scene, "HasTarget", 0.0f);
 
-	if (!registry.valid(entity)) {
-		target_ = entt::null;
-		return;
+	if (hasTargetValue > 0.5f) {
+		float targetEntityValue = GetVar(entity, scene, "TargetEntity", -1.0f);
+
+		if (targetEntityValue >= 0.0f) {
+			uint32_t targetEntityId = static_cast<uint32_t>(targetEntityValue);
+			target_ = static_cast<entt::entity>(targetEntityId);
+			hasTarget_ = true;
+		}
 	}
-
-	target_ = FindNearestEnemy(registry, scene, entity, homingSearchRange_);
 }
 
 void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
@@ -95,13 +52,21 @@ void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	}
 
-	if (registry.valid(target_)) {
-		if (!registry.all_of<TransformComponent>(target_)) {
+	if (hasTarget_) {
+		if (!registry.valid(target_)) {
+			hasTarget_ = false;
 			target_ = entt::null;
 		}
 	}
 
-	if (!registry.valid(target_)) {
+	if (hasTarget_) {
+		if (!registry.all_of<TransformComponent>(target_)) {
+			hasTarget_ = false;
+			target_ = entt::null;
+		}
+	}
+
+	if (!hasTarget_) {
 		float cosX = std::cos(bulletTransform.rotate.x);
 		float moveX = std::sin(bulletTransform.rotate.y) * cosX * speed_ * dt;
 		float moveY = -std::sin(bulletTransform.rotate.x) * speed_ * dt;

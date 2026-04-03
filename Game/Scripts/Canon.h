@@ -24,6 +24,7 @@ private:
 	int connectedCanonCount = 0;
 	float connectionCheckTimer_ = 0.0f;
 	bool isConnectedToTank_ = false;
+	entt::entity currentTarget_ = entt::null;
 
 private:
 	void Debug(bool connected);

@@ -1,12 +1,14 @@
 #include "Canon.h"
+#include "BulletScript.h"
+#include "BulletScript.h"
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
+#include "ScriptUtils.h"
 #include <algorithm>
 #include <cmath>
 #include <unordered_set>
 #include <vector>
-
 #ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
 #endif
@@ -161,39 +163,48 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
 
-	entt::entity target = entt::null;
-	float bestDistance = attackRange_;
-
-	const std::vector<entt::entity>& enemies = scene->GetEntitiesByTag(TagType::Enemy);
-
-	for (entt::entity other : enemies) {
-		if (!registry.valid(other)) {
-			continue;
+	if (registry.valid(currentTarget_)) {
+		if (!registry.all_of<TransformComponent>(currentTarget_)) {
+			currentTarget_ = entt::null;
 		}
+	} else {
+		currentTarget_ = entt::null;
+	}
 
-		if (!registry.all_of<TransformComponent>(other)) {
-			continue;
-		}
+	if (currentTarget_ == entt::null) {
+		float bestDistance = attackRange_;
 
-		TransformComponent& enemyTransform = registry.get<TransformComponent>(other);
+		const std::vector<entt::entity>& enemies = scene->GetEntitiesByTag(TagType::Enemy);
 
-		float diffX = enemyTransform.translate.x - canonTransform.translate.x;
-		float diffY = enemyTransform.translate.y - canonTransform.translate.y;
-		float diffZ = enemyTransform.translate.z - canonTransform.translate.z;
+		for (entt::entity other : enemies) {
+			if (!registry.valid(other)) {
+				continue;
+			}
 
-		float distance = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
+			if (!registry.all_of<TransformComponent>(other)) {
+				continue;
+			}
 
-		if (distance < bestDistance) {
-			bestDistance = distance;
-			target = other;
+			TransformComponent& enemyTransform = registry.get<TransformComponent>(other);
+
+			float diffX = enemyTransform.translate.x - canonTransform.translate.x;
+			float diffY = enemyTransform.translate.y - canonTransform.translate.y;
+			float diffZ = enemyTransform.translate.z - canonTransform.translate.z;
+
+			float distance = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
+
+			if (distance < bestDistance) {
+				bestDistance = distance;
+				currentTarget_ = other;
+			}
 		}
 	}
 
-	if (target == entt::null) {
+	if (currentTarget_ == entt::null) {
 		return;
 	}
 
-	TransformComponent& targetTransform = registry.get<TransformComponent>(target);
+	TransformComponent& targetTransform = registry.get<TransformComponent>(currentTarget_);
 
 	float toX = targetTransform.translate.x - canonTransform.translate.x;
 	float toZ = targetTransform.translate.z - canonTransform.translate.z;
@@ -251,6 +262,9 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	ScriptComponent& bulletScriptComponent = registry.emplace<ScriptComponent>(bullet);
 	bulletScriptComponent.scripts.push_back({"BulletScript", "", nullptr});
+
+	SetVar(bullet, scene, "HasTarget", 1.0f);
+	SetVar(bullet, scene, "TargetEntity", static_cast<float>(static_cast<uint32_t>(currentTarget_)));
 
 	attackTimer_ = currentAttackInterval;
 }
