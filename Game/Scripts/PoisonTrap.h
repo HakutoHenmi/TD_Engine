@@ -15,8 +15,8 @@ public:
 
 private:
 	float poisonDamage_ = 3.0f;
-	float poisonRange_ = 3.0f;
-	float poisonInterval_ = 0.5f;
+	float poisonRange_ = 6.0f;
+	float poisonInterval_ = 0.2f;
 	float poisonTimer_ = 0.0f;
 
 	int connectedTankCount = 0;

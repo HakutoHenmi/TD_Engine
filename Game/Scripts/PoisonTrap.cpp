@@ -248,7 +248,7 @@ void PoisonTrap::CreatePoisonAttackArea(entt::entity entity, GameScene* scene) {
 	TransformComponent& poisonTransform = registry.emplace<TransformComponent>(poisonAttackArea);
 	poisonTransform.translate = trapTransform.translate;
 	poisonTransform.rotate = trapTransform.rotate;
-	poisonTransform.scale = {poisonRange_, poisonRange_, poisonRange_};
+	poisonTransform.scale = {poisonRange_/2.0f, poisonRange_/2.0f, poisonRange_/2.0f};
 
 	HitboxComponent& poisonHitbox = registry.emplace<HitboxComponent>(poisonAttackArea);
 	poisonHitbox.isActive = true;
