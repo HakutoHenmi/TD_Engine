@@ -207,6 +207,7 @@ void WindowDX::Shutdown() {
 		b.Reset();
 
 	srvH_.Reset();
+	srvH_CPU_.Reset(); // ★追加
 	dsvH_.Reset();
 	rtvH_.Reset();
 
@@ -365,6 +366,12 @@ bool WindowDX::CreateRTVDSV_() {
 		d.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		if (FAILED(dev_->CreateDescriptorHeap(&d, IID_PPV_ARGS(&srvH_))))
 			return false;
+		
+		// ★追加: 非ShaderVisibleなマスターヒープを作成 (CopyDescriptorsのソース用)
+		d.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+		if (FAILED(dev_->CreateDescriptorHeap(&d, IID_PPV_ARGS(&srvH_CPU_))))
+			return false;
+
 		srvInc_ = dev_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
 	return true;
@@ -406,6 +413,12 @@ D3D12_CPU_DESCRIPTOR_HANDLE WindowDX::DSV_CPU(int offset) const {
 }
 D3D12_CPU_DESCRIPTOR_HANDLE WindowDX::SRV_CPU(int offset) const {
 	auto h = srvH_->GetCPUDescriptorHandleForHeapStart();
+	h.ptr += (SIZE_T)offset * srvInc_;
+	return h;
+}
+// ★追加: CPUマスターハンドル取得
+D3D12_CPU_DESCRIPTOR_HANDLE WindowDX::SRV_CPU_Master(int offset) const {
+	auto h = srvH_CPU_->GetCPUDescriptorHandleForHeapStart();
 	h.ptr += (SIZE_T)offset * srvInc_;
 	return h;
 }

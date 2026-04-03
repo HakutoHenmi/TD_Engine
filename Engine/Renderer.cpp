@@ -126,6 +126,7 @@ bool Renderer::Initialize(WindowDX* window) {
 		// 6. SRV作成
 		const uint32_t srvIdx = AllocateSrvIndex();
 		t.srvCpu = window_->SRV_CPU((int)srvIdx);
+		t.srvCpuMaster = window_->SRV_CPU_Master((int)srvIdx); // ★追加
 		t.srvGpu = window_->SRV_GPU((int)srvIdx);
 
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
@@ -134,6 +135,7 @@ bool Renderer::Initialize(WindowDX* window) {
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		srvDesc.Texture2D.MipLevels = 1;
 		dev_->CreateShaderResourceView(t.res.Get(), &srvDesc, t.srvCpu);
+		dev_->CreateShaderResourceView(t.res.Get(), &srvDesc, t.srvCpuMaster); // ★追加: 二重化
 
 		// textures_[0] として登録
 		textures_.push_back(t);
@@ -197,6 +199,7 @@ bool Renderer::Initialize(WindowDX* window) {
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		const uint32_t sIdx = AllocateSrvIndex();
 		dev_->CreateShaderResourceView(shadowMap_.Get(), &srvDesc, window_->SRV_CPU((int)sIdx));
+		dev_->CreateShaderResourceView(shadowMap_.Get(), &srvDesc, window_->SRV_CPU_Master((int)sIdx)); // ★追加
 		shadowSrv_ = window_->SRV_GPU((int)sIdx);
 	}
 
@@ -775,11 +778,13 @@ void Renderer::EndFrame() {
 			list_->SetGraphicsRootSignature(rootSigDistortion_.Get()); 
 			list_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			list_->SetGraphicsRootConstantBufferView(0, cbFrameAddr_);
+			list_->SetGraphicsRootConstantBufferView(1, cbFrameAddr_);
+			list_->RSSetViewports(1, &viewport_);
 			
 			uint32_t bIdx = AllocateDynamicSrvIndex(1);
 			if (bIdx != UINT32_MAX) {
-				D3D12_CPU_DESCRIPTOR_HANDLE dest = window_->SRV_CPU((int)bIdx);
-				dev_->CopyDescriptorsSimple(1, dest, backdropSrvCpu_, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+				D3D12_CPU_DESCRIPTOR_HANDLE bDest = window_->SRV_CPU((int)bIdx);
+				dev_->CopyDescriptorsSimple(1, bDest, backdropSrvCpuMaster_, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 				list_->SetGraphicsRootDescriptorTable(2, window_->SRV_GPU((int)bIdx));
 			}
 
@@ -795,7 +800,9 @@ void Renderer::EndFrame() {
 				uint32_t sIdx = AllocateDynamicSrvIndex(1);
 				if (sIdx != UINT32_MAX) {
 					D3D12_CPU_DESCRIPTOR_HANDLE dest = window_->SRV_CPU((int)sIdx);
-					dev_->CopyDescriptorsSimple(1, dest, (key.tex < textures_.size() && textures_[key.tex].res) ? textures_[key.tex].srvCpu : textures_[0].srvCpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+					// ★修正: マスター記述子をソースにする
+					D3D12_CPU_DESCRIPTOR_HANDLE src = (key.tex < textures_.size() && textures_[key.tex].res) ? textures_[key.tex].srvCpuMaster : textures_[0].srvCpuMaster;
+					dev_->CopyDescriptorsSimple(1, dest, src, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 					list_->SetGraphicsRootDescriptorTable(3, window_->SRV_GPU((int)sIdx));
 
 					uint32_t dataSize = static_cast<uint32_t>(sizeof(InstanceData) * instances.size());
@@ -2110,6 +2117,7 @@ Renderer::TextureHandle Renderer::LoadTexture2D(const std::string& filePath, boo
 
 	const uint32_t idx = AllocateSrvIndex();
 	D3D12_CPU_DESCRIPTOR_HANDLE cpu = window_->SRV_CPU((int)idx);
+	D3D12_CPU_DESCRIPTOR_HANDLE cpuMaster = window_->SRV_CPU_Master((int)idx); // ★追加
 	D3D12_GPU_DESCRIPTOR_HANDLE gpu = window_->SRV_GPU((int)idx);
 	D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
 	srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -2117,10 +2125,12 @@ Renderer::TextureHandle Renderer::LoadTexture2D(const std::string& filePath, boo
 	srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srv.Texture2D.MipLevels = 1;
 	dev_->CreateShaderResourceView(tex.Get(), &srv, cpu);
+	dev_->CreateShaderResourceView(tex.Get(), &srv, cpuMaster); // ★追加
 
 	Texture t{};
 	t.res = tex;
 	t.srvCpu = cpu;
+	t.srvCpuMaster = cpuMaster; // ★追加
 	t.srvGpu = gpu;
 
 	TextureHandle handle = (TextureHandle)textures_.size();
@@ -2230,7 +2240,7 @@ Renderer::MeshHandle Renderer::LoadObjMesh(const std::string& objFilePath) {
 
 	if (model->GetData().material.textureFilePath.size() > 0) {
 		uint32_t idx = AllocateSrvIndex();
-		model->CreateSrv(dev_, srvHeap_, srvInc_, idx);
+		model->CreateSrv(dev_, srvHeap_, window_->SRV_CPU_Heap(), srvInc_, idx);
 	}
 
 	MeshHandle handle = (MeshHandle)models_.size();
@@ -2527,6 +2537,7 @@ bool Renderer::InitPostProcess_() {
 
 		const uint32_t idx = AllocateSrvIndex();
 		D3D12_CPU_DESCRIPTOR_HANDLE cpu = window_->SRV_CPU((int)idx);
+		D3D12_CPU_DESCRIPTOR_HANDLE cpuMaster = window_->SRV_CPU_Master((int)idx); // ★追加
 		ppSrvGpu_ = window_->SRV_GPU((int)idx);
 		D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
 		srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -2534,6 +2545,7 @@ bool Renderer::InitPostProcess_() {
 		srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srv.Texture2D.MipLevels = 1;
 		dev_->CreateShaderResourceView(ppSceneColor_.Get(), &srv, cpu);
+		dev_->CreateShaderResourceView(ppSceneColor_.Get(), &srv, cpuMaster); // ★追加
 	}
 	{
 		static const char* kVSPP = R"(
@@ -2647,6 +2659,7 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 
 		const uint32_t idx = AllocateSrvIndex();
 		D3D12_CPU_DESCRIPTOR_HANDLE cpu = window_->SRV_CPU((int)idx);
+		D3D12_CPU_DESCRIPTOR_HANDLE cpuMaster = window_->SRV_CPU_Master((int)idx); // ★追加
 		finalSrvGpu_ = window_->SRV_GPU((int)idx);
 		D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
 		srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -2654,6 +2667,7 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 		srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srv.Texture2D.MipLevels = 1;
 		dev_->CreateShaderResourceView(finalSceneColor_.Get(), &srv, cpu);
+		dev_->CreateShaderResourceView(finalSceneColor_.Get(), &srv, cpuMaster); // ★追加
 	}
 
 	// ★追加: Distortion用バックドロップテクスチャの作成
@@ -2672,12 +2686,14 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 		uint32_t sIdx = AllocateSrvIndex();
 		backdropSrv_ = window_->SRV_GPU((int)sIdx);
 		backdropSrvCpu_ = window_->SRV_CPU((int)sIdx);
+		backdropSrvCpuMaster_ = window_->SRV_CPU_Master((int)sIdx); // ★追加
 		D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
 		srv.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		srv.Texture2D.MipLevels = 1;
-		dev_->CreateShaderResourceView(backdropColor_.Get(), &srv, window_->SRV_CPU((int)sIdx));
+		dev_->CreateShaderResourceView(backdropColor_.Get(), &srv, backdropSrvCpu_);
+		dev_->CreateShaderResourceView(backdropColor_.Get(), &srv, backdropSrvCpuMaster_); // ★追加
 	}
 
 	// ★追加: Distortion PSOの作成
@@ -2791,7 +2807,8 @@ Renderer::CustomRenderTarget Renderer::CreateRenderTarget(uint32_t width, uint32
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	srvDesc.Texture2D.MipLevels = 1;
-	dev_->CreateShaderResourceView(target.texture.Get(), &srvDesc, CD3DX12_CPU_DESCRIPTOR_HANDLE(srvHeap_->GetCPUDescriptorHandleForHeapStart(), srvIdx, srvInc_));
+	dev_->CreateShaderResourceView(target.texture.Get(), &srvDesc, window_->SRV_CPU((int)srvIdx));
+	dev_->CreateShaderResourceView(target.texture.Get(), &srvDesc, window_->SRV_CPU_Master((int)srvIdx)); // ★追加
 
 	return target;
 }
@@ -3030,11 +3047,11 @@ void Renderer::EndCollisionCheck() {
 	auto bBack = CD3DX12_RESOURCE_BARRIER::Transition(collisionResultBuffer_.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 	collisionList_->ResourceBarrier(1, &bBack);
 
-	// 7. 命令発行とGPU完了待ち (これによって PhysicsSystem がこの直後に安全に結果を読める)
+	// 7. 命令発行と完了待ちの解除 (非同期的実行)
 	collisionList_->Close();
 	ID3D12CommandList* ppLists[] = {collisionList_.Get()};
 	queue_->ExecuteCommandLists(1, ppLists);
-	WaitGPU();
+	// WaitGPU(); // ★削除: CPU停止によるTDRを回避。結果は次フレーム以降に整合することになるが、生存性は向上する。
 
 	// 8. リクエストリストをクリア (重要: 漏れると毎フレーム蓄積する)
 	collisionRequests_.clear();

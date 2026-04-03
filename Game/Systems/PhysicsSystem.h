@@ -224,7 +224,7 @@ public:
 		uint32_t nextResultIdx = 0;
 
 		if (ctx.renderer && !m_dynamics.empty() && !m_statics.empty()) {
-			ctx.renderer->BeginCollisionCheck(2048);
+			ctx.renderer->BeginCollisionCheck(1024);
 
 			for (auto& d : m_dynamics) {
 				auto& tc = registry.get<TransformComponent>(d.entity);
@@ -244,7 +244,7 @@ public:
 					    d.aabbMax.x < s.aabbMin.x || d.aabbMin.x > s.aabbMax.x ||
 					    d.aabbMax.z < s.aabbMin.z || d.aabbMin.z > s.aabbMax.z) continue;
 
-					if (nextResultIdx >= 2048) break;
+					if (nextResultIdx >= 1024) break;
 
 					auto& sTc = registry.get<TransformComponent>(s.entity);
 					::Engine::Transform staticTransform;
@@ -256,7 +256,7 @@ public:
 					ctx.renderer->DispatchCollision(0, s.meshHandle, dynTransform, bc, staticTransform, rIdx);
 					m_pendingGpuRequests.push_back({d.entity, rIdx});
 				}
-				if (nextResultIdx >= 2048) break;
+				if (nextResultIdx >= 1024) break;
 			}
 
 			ctx.renderer->EndCollisionCheck();

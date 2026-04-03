@@ -88,6 +88,7 @@ private:
 	// タグ検索キャッシュ
 	std::unordered_map<TagType, std::vector<entt::entity>> tagCache_;
 	std::vector<entt::entity> pendingTagSync_; // ★追加: 生成直後の同期待ち
+	std::vector<entt::entity> pendingTagRemoved_; // ★追加: 破棄時のキャッシュ削除待ち
 	void OnTagAdded(entt::registry& reg, entt::entity entity);
 	void OnTagRemoved(entt::registry& reg, entt::entity entity);
 

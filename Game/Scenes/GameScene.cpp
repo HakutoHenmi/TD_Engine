@@ -153,6 +153,8 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 
 	// ★追加: タグシステムの初期化
 	tagCache_.clear();
+	pendingTagSync_.clear();
+	pendingTagRemoved_.clear();
 	auto tagInitView = registry_.view<TagComponent>();
 	for (auto entity : tagInitView) {
 		const auto tag = tagInitView.get<TagComponent>(entity).tag;
@@ -181,12 +183,30 @@ void GameScene::Update() {
 	// ★追加: 行列キャッシュを毎フレームクリア
 	ClearMatrixCache();
 
-	// ★追加: タグの遅延同期（生成直後にタグが設定されるケースに対応）
-	if (!pendingTagSync_.empty()) {
-		std::vector<entt::entity> list = std::move(pendingTagSync_);
-		for (auto e : list) {
-			if (registry_.valid(e))
+	// ★追加: タグの遅延同期および削除（生成直後や破棄時の同期待ちを処理）
+	// リストが空でない場合のみ処理
+	if (!pendingTagRemoved_.empty() || !pendingTagSync_.empty()) {
+		// 1. 削除・変更予定のエンティティを全キャッシュから取り除く
+		std::vector<entt::entity> toRemove = std::move(pendingTagRemoved_);
+		// pendingTagSync に入っているものは「タグが変わる」可能性があるので、一旦古いキャッシュから消しておく
+		for (auto e : pendingTagSync_) {
+			toRemove.push_back(e);
+		}
+
+		for (auto e : toRemove) {
+			for (auto& pair : tagCache_) {
+				auto& vec = pair.second;
+				// すべてのタグリストから、そのエンティティを削除
+				vec.erase(std::remove(vec.begin(), vec.end(), e), vec.end());
+			}
+		}
+
+		// 2. 最新のタグで同期
+		std::vector<entt::entity> toSync = std::move(pendingTagSync_);
+		for (auto e : toSync) {
+			if (registry_.valid(e)) {
 				SyncTag(e);
+			}
 		}
 	}
 
@@ -1109,7 +1129,8 @@ void GameScene::SetTag(entt::entity entity, TagType tag) {
 	}
 	auto& tc = registry_.get_or_emplace<TagComponent>(entity);
 	tc.tag = tag;
-	SyncTag(entity);
+	// 直接 SyncTag せず、遅延更新リストに追加
+	pendingTagSync_.push_back(entity);
 }
 
 void GameScene::OnTagAdded(entt::registry& /*registry*/, entt::entity entity) {
@@ -1118,11 +1139,9 @@ void GameScene::OnTagAdded(entt::registry& /*registry*/, entt::entity entity) {
 }
 
 void GameScene::OnTagRemoved(entt::registry& /*registry*/, entt::entity entity) {
-	// キャッシュから全削除
-	for (auto& pair : tagCache_) {
-		auto& vec = pair.second;
-		vec.erase(std::remove(vec.begin(), vec.end(), entity), vec.end());
-	}
+	// 即座に削除せず、遅延リストに追加して次フレーム開始時に削除を行う
+	// これにより、イテレーション中のコンテナ変更による例外を防止する
+	pendingTagRemoved_.push_back(entity);
 }
 
 void GameScene::SyncTag(entt::entity entity) {
@@ -1130,11 +1149,10 @@ void GameScene::SyncTag(entt::entity entity) {
 		return;
 	}
 
-	// 古いキャッシュを削除
-	OnTagRemoved(registry_, entity);
-
-	// 新しいキャッシュに追加
+	// 新しいキャッシュに追加（削除は Update の開始時に一括して行われる前提）
 	const TagType tag = registry_.get<TagComponent>(entity).tag;
+	
+	// 重複チェックを一件ずつ行うと遅いため、基本的には Update 側の全削除を信頼する
 	tagCache_[tag].push_back(entity);
 }
 

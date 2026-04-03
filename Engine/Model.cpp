@@ -373,11 +373,19 @@ void Model::UpdateVertices(const std::vector<VertexData>& vertices) {
 	vb_->Unmap(0, nullptr);
 }
 
-void Model::CreateSrv(ID3D12Device* device, ID3D12DescriptorHeap* srvHeap, UINT descriptorSize, UINT heapIndex) {
+void Model::CreateSrv(ID3D12Device* device, ID3D12DescriptorHeap* srvHeap, ID3D12DescriptorHeap* srvHeapMaster, UINT descriptorSize, UINT heapIndex) {
 	if (!hasTexture_)
 		return;
 	D3D12_CPU_DESCRIPTOR_HANDLE cpu = srvHeap->GetCPUDescriptorHandleForHeapStart();
 	cpu.ptr += (SIZE_T)descriptorSize * heapIndex;
+	
+	// ★追加: マスターヒープに対しても記述子を作成
+	if (srvHeapMaster) {
+		D3D12_CPU_DESCRIPTOR_HANDLE cpuMaster = srvHeapMaster->GetCPUDescriptorHandleForHeapStart();
+		cpuMaster.ptr += (SIZE_T)descriptorSize * heapIndex;
+		device->CreateShaderResourceView(tex_.Get(), &srvDesc_, cpuMaster);
+	}
+
 	srvGpu_ = srvHeap->GetGPUDescriptorHandleForHeapStart();
 	srvGpu_.ptr += (UINT64)descriptorSize * heapIndex;
 	device->CreateShaderResourceView(tex_.Get(), &srvDesc_, cpu);
