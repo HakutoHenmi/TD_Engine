@@ -17,6 +17,7 @@ private:
 	};
 
 	float LerpFloat(float start, float end, float t);
+	void CreateExplosionAttackArea(entt::entity entity, GameScene* scene);
 
 	entt::entity target_ = entt::null;
 	bool hasTarget_ = false;
@@ -24,13 +25,11 @@ private:
 	float lifeTime_ = 0.0f;
 	float maxLifeTime_ = 8.0f;
 
-	float moveSpeed_ = 8.0f;
 	float arcHeight_ = 12.0f;
-	float hitDistance_ = 1.0f;
+	float flightTime_ = 0.0f;
+	float maxFlightTime_ = 1.2f;
 
 	Vector3 startPosition_ = {0.0f, 0.0f, 0.0f};
-	float totalDistance_ = 1.0f;
-	float traveledDistance_ = 0.0f;
 };
 
 } // namespace Game

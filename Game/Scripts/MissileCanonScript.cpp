@@ -224,11 +224,11 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 		bulletMeshRenderer.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 	}
 
-	HitboxComponent& bulletHitbox = registry.emplace<HitboxComponent>(bullet);
-	bulletHitbox.isActive = true;
-	bulletHitbox.damage = damage_;
-	bulletHitbox.tag = TagType::Bullet;
-	bulletHitbox.size = {1.0f, 1.0f, 1.0f};
+	//HitboxComponent& bulletHitbox = registry.emplace<HitboxComponent>(bullet);
+	//bulletHitbox.isActive = false;
+	//bulletHitbox.damage = 0;
+	//bulletHitbox.tag = TagType::Bullet;
+	//bulletHitbox.size = {1.0f, 1.0f, 1.0f};
 
 	ScriptComponent& bulletScriptComponent = registry.emplace<ScriptComponent>(bullet);
 	bulletScriptComponent.scripts.push_back({"MissileBulletScript", "", nullptr});
