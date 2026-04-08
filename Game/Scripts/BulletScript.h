@@ -9,8 +9,6 @@ public:
 	void Update(entt::entity entity, GameScene* scene, float dt) override;
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
 
-	void SetTarget(entt::entity target);
-	void SetHasTarget(bool hasTarget);
 
 private:
 	entt::entity target_ = entt::null;
