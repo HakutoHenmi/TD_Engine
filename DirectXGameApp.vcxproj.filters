@@ -78,6 +78,9 @@
     <ClCompile Include="Game\Scripts\HitDistortionScript.cpp" />
     <ClCompile Include="Game\Scripts\PoisonTrap.cpp" />
     <ClCompile Include="Game\Scripts\PoisonAttackArea.cpp" />
+    <ClCompile Include="Game\Scripts\MissileBulletScript.cpp" />
+    <ClCompile Include="Game\Scripts\MissileCanonScript.cpp" />
+    <ClCompile Include="Game\Scripts\ExplosionAttackArea.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
@@ -157,9 +160,6 @@
     </ClInclude>
     <ClInclude Include="Game\Scripts\EnemyBehavior.h" />
     <ClInclude Include="Game\Systems\RiverSystem.h" />
-    <ClInclude Include="Game\Scripts\Canon.h">
-      <Filter>Scripts</Filter>
-    </ClInclude>
     <ClInclude Include="Game\Scripts\PipeScript.h" />
     <ClInclude Include="Game\Scripts\PhaseSystemScript.h" />
     <ClInclude Include="Game\Scripts\PreparationCamera.h" />
@@ -190,6 +190,9 @@
     <ClInclude Include="Game\Scripts\HitDistortionScript.h" />
     <ClInclude Include="Game\Scripts\PoisonTrap.h" />
     <ClInclude Include="Game\Scripts\PoisonAttackArea.h" />
+    <ClInclude Include="Game\Scripts\MissileBulletScript.h" />
+    <ClInclude Include="Game\Scripts\MissileCanonScript.h" />
+    <ClInclude Include="Game\Scripts\ExplosionAttackArea.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">
