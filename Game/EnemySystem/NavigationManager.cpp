@@ -3,10 +3,12 @@
 #include "../ObjectTypes.h"
 #include <queue>
 
-void NavigationManager::Initialize(int width, int height, float cellSize) {
+void NavigationManager::Initialize(int width, int height, float cellSize, float originX, float originZ) {
 	width_ = width;
 	height_ = height;
 	cellSize_ = cellSize;
+	originX_ = originX;
+	originZ_ = originZ;
 	grid_.assign(width * height, FlowCell{1, FLT_MAX, 0.0f, 0.0f});
 }
 
@@ -58,8 +60,8 @@ void NavigationManager::GenerateFlowField(float targetWorldX, float targetWorldZ
 	}
 
 	// 目的地をグリッド座標に変換
-	int targetX = static_cast<int>(targetWorldX / cellSize_);
-	int targetZ = static_cast<int>(targetWorldZ / cellSize_);
+	int targetX = static_cast<int>((targetWorldX - originX_) / cellSize_);
+	int targetZ = static_cast<int>((targetWorldZ - originZ_) / cellSize_);
 
 	// 目的地がグリッドの範囲外なら何もしない
 	if (targetX < 0 || targetX >= width_ || targetZ < 0 || targetZ >= height_)
@@ -148,8 +150,8 @@ void NavigationManager::CalculateDirections() {
 }
 
 void NavigationManager::GetDirection(float worldX, float worldZ, float& outX, float& outZ) {
-	int x = static_cast<int>(worldX / cellSize_);
-	int z = static_cast<int>(worldZ / cellSize_);
+	int x = static_cast<int>((worldX - originX_) / cellSize_);
+	int z = static_cast<int>((worldZ - originZ_) / cellSize_);
 
 	if (x >= 0 && x < width_ && z >= 0 && z < height_) {
 		const auto& cell = grid_[GetIndex(x, z)];
@@ -158,5 +160,39 @@ void NavigationManager::GetDirection(float worldX, float worldZ, float& outX, fl
 	} else {
 		outX = 0;
 		outZ = 0;
+	}
+}
+
+void NavigationManager::DrawDebug(Game::GameScene* scene) {
+	auto* renderer = scene->GetRenderer();
+	if (!renderer) return;
+
+	for (int z = 0; z < height_; ++z) {
+		for (int x = 0; x < width_; ++x) {
+			int idx = GetIndex(x, z);
+
+			// セルのワールド座標を計算
+			float wx = x * cellSize_ + (cellSize_ * 0.5f) + originX_;
+			float wz = z * cellSize_ + (cellSize_ * 0.5f) + originZ_;
+			float wy = 0.5f; // 地面より少し上に表示
+
+			// --- 1. 壁の表示 (コストが255なら赤い点) ---
+			if (grid_[idx].cost == 255) {
+				Engine::Vector3 p1 = { wx - 0.2f, wy, wz };
+				Engine::Vector3 p2 = { wx + 0.2f, wy, wz };
+				renderer->DrawLine3D(p1, p2, { 1.0f, 0.0f, 0.0f, 1.0f }, true);
+			}
+
+			// --- 2. ベクトルの表示 (方向があれば青い線) ---
+			if (grid_[idx].dirX != 0.0f || grid_[idx].dirZ != 0.0f) {
+				Engine::Vector3 start = { wx, wy, wz };
+				Engine::Vector3 end = { 
+					wx + grid_[idx].dirX * (cellSize_ * 0.4f), 
+					wy, 
+					wz + grid_[idx].dirZ * (cellSize_ * 0.4f) 
+				};
+				renderer->DrawLine3D(start, end, { 0.0f, 0.5f, 1.0f, 1.0f }, true);
+			}
+		}
 	}
 }

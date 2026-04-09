@@ -168,7 +168,7 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 
 	// NavigationManagerの初期化
 	flowField_ = std::make_unique<NavigationManager>();
-	flowField_->Initialize(100, 100, 2.0f);
+	flowField_->Initialize(100, 100, 2.0f, -100, -100);
 
 	//ステージロード直後に一度地形を読み込む
 	flowField_->UpdateCostMap(this);
@@ -623,6 +623,10 @@ void GameScene::Draw() {
 #ifdef USE_IMGUI
 	if (!isPlaying_) {
 		DrawEditorGizmos();
+	}
+	// デバッグ時のみフローフィールドを表示
+	if (!isPlaying_ && flowField_) {
+		flowField_->DrawDebug(this);
 	}
 #endif
 
