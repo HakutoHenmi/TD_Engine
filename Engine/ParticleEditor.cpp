@@ -170,14 +170,56 @@ void ParticleEditor::DrawUI() {
 			targetEmitter->params.texturePath = texBuf;
 		}
 
-        char shaderBuf[256];
-        strcpy_s(shaderBuf, targetEmitter->params.shaderName.c_str());
-        if (ImGui::InputText("Shader Name", shaderBuf, sizeof(shaderBuf))) {
-            targetEmitter->params.shaderName = shaderBuf;
-        }
+		// ★変更: シェーダー選択ドロップダウン
+		struct ShaderOption {
+			const char* label;
+			const char* shaderName;
+			bool isAdditive;
+		};
+		static const ShaderOption shaderOptions[] = {
+			{ "(Default) Particle",              "",                        false },
+			{ "Particle (Alpha Blend)",          "Particle",               false },
+			{ "Particle (Additive)",             "ParticleAdditive",       true  },
+			{ "Procedural Smoke",                "ProceduralSmoke",        false },
+			{ "Procedural Smoke (Additive)",     "ProceduralSmokeAdditive",true  },
+		};
+		static const int shaderOptionCount = IM_ARRAYSIZE(shaderOptions);
+
+		// 現在のシェーダー名からインデックスを検索
+		int currentShaderIdx = 0;
+		for (int i = 0; i < shaderOptionCount; ++i) {
+			if (targetEmitter->params.shaderName == shaderOptions[i].shaderName) {
+				currentShaderIdx = i;
+				break;
+			}
+		}
+
+		if (ImGui::Combo("Shader Type", &currentShaderIdx, [](void* data, int idx, const char** out) -> bool {
+			const ShaderOption* opts = (const ShaderOption*)data;
+			*out = opts[idx].label;
+			return true;
+		}, (void*)shaderOptions, shaderOptionCount)) {
+			targetEmitter->params.shaderName = shaderOptions[currentShaderIdx].shaderName;
+			targetEmitter->params.isAdditive = shaderOptions[currentShaderIdx].isAdditive;
+
+			// ★追加: ProceduralSmoke系を選択した場合、煙用プリセットを適用
+			std::string sn = shaderOptions[currentShaderIdx].shaderName;
+			if (sn == "ProceduralSmoke" || sn == "ProceduralSmokeAdditive") {
+				targetEmitter->params.startVelocity = {0, 1.5f, 0};
+				targetEmitter->params.velocityVariance = {0.3f, 0.3f, 0.3f};
+				targetEmitter->params.acceleration = {0, 0.5f, 0}; // 上昇気流
+				targetEmitter->params.damping = 1.0f;
+				targetEmitter->params.lifeTime = 3.0f;
+				targetEmitter->params.lifeTimeVariance = 0.5f;
+				targetEmitter->params.startSize = {1.5f, 1.5f, 1.5f};
+				targetEmitter->params.endSize = {4.0f, 4.0f, 4.0f};
+				targetEmitter->params.startColor = {0.85f, 0.9f, 0.95f, 0.7f};
+				targetEmitter->params.endColor = {0.6f, 0.65f, 0.7f, 0.0f};
+				targetEmitter->params.emitRate = 8.0f;
+			}
+		}
 
 		ImGui::Checkbox("Use Billboard", &targetEmitter->params.useBillboard);
-		ImGui::Checkbox("Additive Blending", &targetEmitter->params.isAdditive);
 
 		// ★追加: UVアニメーション
 		ImGui::Separator();

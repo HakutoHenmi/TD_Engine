@@ -21,6 +21,9 @@ void ExplosionAttackArea::Start(entt::entity entity, GameScene* scene) {
 		return;
 	}
 
+	damage_ = GetVar(entity, scene, "Damage", 30.0f);
+	radius_ = GetVar(entity, scene, "ExplosionRadius", 10.0f);
+
 	lifeTime_ = 0.0f;
 
 	if (!registry.all_of<TransformComponent>(entity)) {
@@ -48,8 +51,15 @@ void ExplosionAttackArea::Start(entt::entity entity, GameScene* scene) {
 
 		float distance = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
 
-		if (distance <= damageRadius_) {
-			scene->DestroyObject(static_cast<uint32_t>(enemy));
+		if (distance <= radius_) {
+			if (registry.all_of<HealthComponent>(enemy)) {
+				HealthComponent& hc = registry.get<HealthComponent>(enemy);
+				hc.hp -= damage_;
+				hc.hitFlashTimer = 0.2f; // ヒット演出
+			} else {
+				// HealthComponentがない場合はとりあえず即死（旧仕様維持）
+				scene->DestroyObject(static_cast<uint32_t>(enemy));
+			}
 		}
 	}
 
@@ -99,7 +109,8 @@ void ExplosionAttackArea::OnDestroy(entt::entity entity, GameScene* scene) {
 
 void ExplosionAttackArea::OnEditorUI() {
 #if defined(USE_IMGUI) && !defined(NDEBUG)
-	ImGui::DragFloat("Damage Radius", &damageRadius_, 0.1f, 0.1f, 30.0f);
+	ImGui::DragFloat("Damage", &damage_, 1.0f, 0.0f, 1000.0f);
+	ImGui::DragFloat("Radius", &radius_, 0.1f, 0.1f, 50.0f);
 	ImGui::DragFloat("Max Life Time", &maxLifeTime_, 0.01f, 0.1f, 5.0f);
 #endif
 }

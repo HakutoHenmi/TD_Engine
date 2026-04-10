@@ -16,8 +16,8 @@ public:
 private:
 	float lifeTime_ = 0.0f;
 	float maxLifeTime_ = 1.0f;
-	float damageRadius_ = 10.0f;
-	float damageAmount_ = 30.0f;
+	float radius_ = 10.0f;
+	float damage_ = 30.0f;
 };
 
 } // namespace Game
