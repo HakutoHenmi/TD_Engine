@@ -2101,6 +2101,62 @@ void EditorUI::ShowInspector(GameScene* scene) {
 				if (ImGui::CollapsingHeader("ParticleEmitter", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##PE", &pe->enabled);
 					AssetField("Asset", pe->assetPath, {".json"});
+
+					// ★追加: シェーダータイプドロップダウン
+					struct ShaderOption { const char* label; const char* shaderName; bool isAdditive; };
+					static const ShaderOption shaderOptions[] = {
+						{ "(Default) Particle",              "",                        false },
+						{ "Particle (Alpha Blend)",          "Particle",               false },
+						{ "Particle (Additive)",             "ParticleAdditive",       true  },
+						{ "Procedural Smoke",                "ProceduralSmoke",        false },
+						{ "Procedural Smoke (Additive)",     "ProceduralSmokeAdditive",true  },
+					};
+					static const int shaderOptionCount = IM_ARRAYSIZE(shaderOptions);
+
+					int currentIdx = 0;
+					for (int si = 0; si < shaderOptionCount; ++si) {
+						if (pe->emitter.params.shaderName == shaderOptions[si].shaderName) {
+							currentIdx = si;
+							break;
+						}
+					}
+
+					if (ImGui::Combo("Shader Type##PE", &currentIdx, [](void* data, int idx, const char** out) -> bool {
+						*out = ((const ShaderOption*)data)[idx].label;
+						return true;
+					}, (void*)shaderOptions, shaderOptionCount)) {
+						pe->emitter.params.shaderName = shaderOptions[currentIdx].shaderName;
+						pe->emitter.params.isAdditive = shaderOptions[currentIdx].isAdditive;
+
+						// ★追加: ProceduralSmoke系を選択した場合、煙用プリセットを適用
+						std::string sn = shaderOptions[currentIdx].shaderName;
+						if (sn == "ProceduralSmoke" || sn == "ProceduralSmokeAdditive") {
+							pe->emitter.params.startVelocity = {0, 1.5f, 0};
+							pe->emitter.params.velocityVariance = {0.3f, 0.3f, 0.3f};
+							pe->emitter.params.acceleration = {0, 0.5f, 0}; // 上昇気流
+							pe->emitter.params.damping = 1.0f;
+							pe->emitter.params.lifeTime = 3.0f;
+							pe->emitter.params.lifeTimeVariance = 0.5f;
+							pe->emitter.params.startSize = {1.5f, 1.5f, 1.5f};
+							pe->emitter.params.endSize = {4.0f, 4.0f, 4.0f};
+							pe->emitter.params.startColor = {0.85f, 0.9f, 0.95f, 0.7f};  // 水蒸気らしい薄青白いグレー
+							pe->emitter.params.endColor = {0.6f, 0.65f, 0.7f, 0.0f}; // 滑らかに空気色にフェード
+							pe->emitter.params.emitRate = 8.0f;
+						}
+					}
+
+					if (ImGui::Button("Save Asset##PE")) {
+						if (!pe->assetPath.empty()) {
+							if (pe->emitter.SaveToJson(pe->assetPath)) {
+								Log("Saved Particle Asset: " + pe->assetPath);
+							} else {
+								LogError("Failed to save Particle Asset: " + pe->assetPath);
+							}
+						} else {
+							LogError("Particle Asset Path is empty.");
+						}
+					}
+					ImGui::SameLine();
 					if (ImGui::Button("Remove##PE")) registry.remove<ParticleEmitterComponent>(entity);
 				}
 			}

@@ -235,6 +235,8 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 
 	SetVar(bullet, scene, "HasTarget", 1.0f);
 	SetVar(bullet, scene, "TargetEntity", static_cast<float>(static_cast<uint32_t>(currentTarget_)));
+	SetVar(bullet, scene, "Damage", damage_);
+	SetVar(bullet, scene, "ExplosionRadius", explosionRadius_);
 
 	attackTimer_ = currentAttackInterval;
 }
@@ -246,6 +248,7 @@ void MissileCanonScript::OnEditorUI() {
 	ImGui::DragFloat("Attack Range", &attackRange_, 0.1f, 1.0f, 100.0f);
 	ImGui::DragFloat("Attack Interval", &attackInterval_, 0.01f, 0.1f, 10.0f);
 	ImGui::DragFloat("Damage", &damage_, 1.0f, 1.0f, 500.0f);
+	ImGui::DragFloat("Explosion Radius", &explosionRadius_, 0.1f, 0.1f, 50.0f);
 
 	ImGui::Separator();
 	ImGui::Text("Connected Tanks: %d", connectedTankCount);

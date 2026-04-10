@@ -534,6 +534,8 @@ void Renderer::FlushDrawCalls() {
 			if (defaultShaderName == "ParticleInstanced") {
 				if (sName == "Particle") sName = "ParticleInstanced";
 				else if (sName == "ParticleAdditive") sName = "ParticleAdditiveInstanced";
+				else if (sName == "ProceduralSmoke") sName = "ProceduralSmokeInstanced";
+				else if (sName == "ProceduralSmokeAdditive") sName = "ProceduralSmokeAdditiveInstanced";
 			}
 			// ★修正: Toon系や新しく追加したリッチシェーダーはインスタンス描画非対応のためデフォルトにフォールバック
 			if (sName == "Toon" || sName == "ToonSkinning" || sName == "ToonOutline" || sName == "ToonSkinningOutline" ||
@@ -664,7 +666,7 @@ void Renderer::EndFrame() {
 		
 		// Normal Shadow Pass
 		for (const auto& dc : drawCalls_) {
-			if (dc.isParticle || dc.shaderName == "Particle" || dc.shaderName == "ParticleAdditive" || dc.shaderName == "2D" || dc.shaderName == "Distortion") continue;
+			if (dc.isParticle || dc.shaderName == "Particle" || dc.shaderName == "ParticleAdditive" || dc.shaderName == "ProceduralSmoke" || dc.shaderName == "ProceduralSmokeAdditive" || dc.shaderName == "2D" || dc.shaderName == "Distortion") continue;
 
 			auto* model = GetModel(dc.mesh);
 			if (!model) continue;
@@ -702,7 +704,7 @@ void Renderer::EndFrame() {
 
 		// Instanced Shadow Pass
 		for (const auto& idc : instancedDrawCalls_) {
-			if (idc.shaderName == "Particle" || idc.shaderName == "ParticleInstanced" || idc.shaderName == "2D" || idc.shaderName == "Distortion") continue;
+			if (idc.shaderName == "Particle" || idc.shaderName == "ParticleInstanced" || idc.shaderName == "ProceduralSmoke" || idc.shaderName == "ProceduralSmokeInstanced" || idc.shaderName == "2D" || idc.shaderName == "Distortion") continue;
 			
 			auto* model = GetModel(idc.mesh);
 			if (!model || idc.instances.empty()) continue;
@@ -1581,6 +1583,106 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD, float4 color:COLOR) : 
 	// パーティクル 加算 インスタンス描画
 	if (vsPartInst && psPart) {
 		CreatePSO_Transparent("ParticleAdditiveInstanced", vsPartInst.Get(), psPart.Get(), true);
+	}
+
+	// ★追加: プロシージャル煙パーティクル (FBMノイズベース)
+	static const char* kPSProceduralSmoke = R"(
+cbuffer CBFrame : register(b0) {
+    row_major float4x4 gView;
+    row_major float4x4 gProj;
+    row_major float4x4 gViewProj;
+    float3 gCamPos;
+    float gTime;
+};
+
+struct VSOutput {
+    float4 svpos : SV_POSITION;
+    float2 uv    : TEXCOORD;
+    float4 color : COLOR;
+};
+
+// --- ノイズ関数群 ---
+float hash(float2 p) {
+    float3 p3 = frac(float3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return frac((p3.x + p3.y) * p3.z);
+}
+
+float noise(float2 p) {
+    float2 i = floor(p);
+    float2 f = frac(p);
+    f = f * f * (3.0 - 2.0 * f); // smoothstep
+    float a = hash(i);
+    float b = hash(i + float2(1.0, 0.0));
+    float c = hash(i + float2(0.0, 1.0));
+    float d = hash(i + float2(1.0, 1.0));
+    return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
+}
+
+// FBM (Fractal Brownian Motion) - 軽量版 (2オクターブ)
+float fbm(float2 p) {
+    float val = 0.5 * noise(p);
+    p = float2(p.x * 0.866 - p.y * 0.5, p.x * 0.5 + p.y * 0.866) * 2.17;
+    val += 0.235 * noise(p);
+    return val;
+}
+
+float4 main(VSOutput input) : SV_TARGET {
+    // カメラ近接フェード (近い場合は重いノイズ計算をスキップ)
+    float camFade = smoothstep(3.0, 10.0, input.svpos.w);
+    if (camFade <= 0.01) discard;
+
+    float2 uv = input.uv;
+    float2 center = uv - 0.5;
+    float baseDist = length(center);
+
+    // 画面外周は無条件で破棄 (最適化)
+    if (baseDist >= 0.5) discard;
+
+    // 時間によるスクロール (煙特有の湧き上がる動き)
+    float t = gTime * 0.3;
+    float2 noiseUV = uv * 3.0 + float2(-t * 0.3, -t * 1.2);
+
+    // FBMで煙のシルエットとなるディティールを生成 (1回のみ)
+    float n = fbm(noiseUV);
+
+    // 原点からの距離にノイズを足して、円を「モクモクした形」に歪ませる
+    float distortedDist = baseDist + (n * 0.4);
+
+    // 歪んだ距離を使って、滑らかなモヤモヤしたマスクを作る
+    float smokeDensity = 1.0 - smoothstep(0.15, 0.55, distortedDist);
+    if (smokeDensity <= 0.01) discard;
+
+    // --- スチームパンク風ライティング ---
+    float3 lightDir = normalize(float3(0.3, 0.8, -0.5));
+    // 煙のふくらみを擬似的に法線として扱う (中心から外に向かう法線 + 上向き成分)
+    float3 fakeNormal = normalize(float3(center.x, -center.y, 0.4 - n * 0.3));
+    float NdotL = saturate(dot(fakeNormal, lightDir));
+
+    // 水蒸気(Steam)向けのスチームパンク風ライティング
+    // 環境光や下からの反射光として、ほんのり暖かみのあるハイライト
+    float3 warmLight = float3(1.15, 1.05, 0.95);
+    
+    // 基本色 (入力カラーを活用)
+    float3 baseColor = input.color.rgb;
+    
+    // 水蒸気は黒くならず、影部分は少しグレー・青みがかった透かし色になる
+    float3 shadowColor = baseColor * float3(0.65, 0.70, 0.75);
+    float3 litColor = baseColor * warmLight * 1.25;
+
+    // シャドウとハイライトのコントラストを合成
+    float3 finalColor = lerp(shadowColor, litColor, NdotL);
+
+    // アルファ値: 外枠が滑らかに透ける
+    float alpha = smokeDensity * input.color.a * camFade;
+
+    return float4(finalColor, alpha);
+}
+)";
+	auto psProceduralSmoke = CompileShader(kPSProceduralSmoke, "main", "ps_5_0");
+	if (vsPartInst && psProceduralSmoke) {
+		CreatePSO_Transparent("ProceduralSmokeInstanced", vsPartInst.Get(), psProceduralSmoke.Get(), false);
+		CreatePSO_Transparent("ProceduralSmokeAdditiveInstanced", vsPartInst.Get(), psProceduralSmoke.Get(), true);
 	}
 
 	// Skinning用レイアウト

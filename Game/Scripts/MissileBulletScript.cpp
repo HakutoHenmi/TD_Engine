@@ -31,6 +31,9 @@ void MissileBulletScript::Start(entt::entity entity, GameScene* scene) {
 		}
 	}
 
+	damage_ = GetVar(entity, scene, "Damage", 50.0f);
+	explosionRadius_ = GetVar(entity, scene, "ExplosionRadius", 10.0f);
+
 	entt::registry& registry = scene->GetRegistry();
 
 	if (!registry.valid(entity)) {
@@ -186,10 +189,13 @@ void MissileBulletScript::CreateExplosionAttackArea(entt::entity entity, GameSce
 	TransformComponent& explosionTransform = registry.emplace<TransformComponent>(explosionAttackArea);
 	explosionTransform.translate = missileTransform.translate;
 	explosionTransform.rotate = {0.0f, 0.0f, 0.0f};
-	explosionTransform.scale = {10.0f, 10.0f, 10.0f};
+	explosionTransform.scale = {explosionRadius_, explosionRadius_, explosionRadius_};
 
 	ScriptComponent& explosionScript = registry.emplace<ScriptComponent>(explosionAttackArea);
 	explosionScript.scripts.push_back({"ExplosionAttackArea", "", nullptr});
+
+	SetVar(explosionAttackArea, scene, "Damage", damage_);
+	SetVar(explosionAttackArea, scene, "ExplosionRadius", explosionRadius_);
 }
 
 void MissileBulletScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
