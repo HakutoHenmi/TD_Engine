@@ -61,6 +61,11 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	// ★ スキルツリーの入力処理 (準備フェーズ中のみ)
 	bool keyN = input->Trigger(DIK_N) || (GetAsyncKeyState('N') & 0x8001);
 
+	// 外部(EnemySpawnerScript など)からのフェーズ変更要求を反映
+	if (!isPhaseTransitioning_ && isPhase_ != Transition && NextPhase_ != isPhase_) {
+		RequestPhaseChange(NextPhase_);
+	}
+
 	if (isPhase_ == PreparationPhase) {
 		// Nキーでスキルツリーの開閉
 		if (keyN && !preKeyN_) {

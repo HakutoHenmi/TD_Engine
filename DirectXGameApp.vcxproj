@@ -217,7 +217,7 @@ exit /b 0
     <ClCompile Include="Game\EnemySystem\NavigationManager.cpp" />
     <ClCompile Include="Game\Scripts\MissileBulletScript.cpp" />
     <ClCompile Include="Game\Scripts\MissileCanonScript.cpp" />
-    <ClCompile Include="PhaseTransition.cpp" />
+    <ClCompile Include="Game\Scripts\PhaseTransition.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scripts\ExplosionAttackArea.h" />
@@ -268,7 +268,7 @@ exit /b 0
     <ClInclude Include="Game\EnemySystem\NavigationManager.h" />
     <ClInclude Include="Game\Scripts\MissileBulletScript.h" />
     <ClInclude Include="Game\Scripts\MissileCanonScript.h" />
-    <ClInclude Include="PhaseTransition.h" />
+    <ClInclude Include="Game\Scripts\PhaseTransition.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\level_data.csv" />
@@ -361,10 +361,10 @@ exit /b 0
     <None Include="Resources\Models\Signboard\Switch.png" />
     <None Include="Resources\Models\Signboard\tamasan.png" />
     <None Include="Resources\Models\Signboard\ThisIsSwitch.png" />
-    <None Include="Resources\Models\Signboard\これが.png" />
+    <None Include="Resources\Models\Signboard\これぁEpng" />
     <None Include="Resources\Models\Signboard\たまさん.png" />
     <None Include="Resources\Models\Signboard\はねるよ.png" />
-    <None Include="Resources\Models\Signboard\スイッチ.png" />
+    <None Include="Resources\Models\Signboard\スイチE��.png" />
     <None Include="Resources\Models\Signboard\Signboard\Padjumpm.png" />
     <None Include="Resources\Models\Signboard\Signboard\Signboard.mtl" />
     <None Include="Resources\Models\Signboard\Signboard\Signboard.obj" />
