@@ -1,7 +1,7 @@
 #pragma once
+#include "../../externals/entt/entt.hpp"
 #include "IScript.h"
 #include "SkillTree.h"
-#include "../../externals/entt/entt.hpp"
 
 struct ImVec2; // 前方宣言
 namespace Engine {
@@ -12,6 +12,8 @@ namespace Game {
 
 class PhaseSystemScript : public IScript {
 public:
+	enum PhaseState { PreparationPhase, BattlePhase, Transition };
+
 	void Start(entt::entity entity, GameScene* scene) override;
 	void Update(entt::entity entity, GameScene* scene, float dt) override;
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
@@ -24,19 +26,17 @@ public:
 	bool IsPrefabPath(const std::string& path) const;
 	bool ExtractPrefabRenderPaths(const std::string& prefabPath, std::string& outModelPath, std::string& outTexturePath) const;
 
-	static bool IsPreparation() { return isPreparation_; };
-	static void SetPreparation(bool prep) { isPreparation_ = prep; }
+	static PhaseState IsPreparation() { return isPhase_; };
+	static void SetPreparation(PhaseState prep) { NextPhase_ = prep; }
 
 private:
-	inline static bool isPreparation_ = true;
-	bool preIsPreparation_ = true; // フェーズ切り替わり検知用
+	inline static PhaseState isPhase_ = PreparationPhase;
+	inline static PhaseState NextPhase_ = PreparationPhase;
+	PhaseState preIsPreparation_ = PreparationPhase; // フェーズ切り替わり検知用
 	int currentPhase_ = 0;
 
 	bool preKeyP_ = false; // 初期化しておく
 	bool prekeySpace_ = false;
-	bool preKey1_ = false;
-	bool preKey2_ = false;
-	bool preKey3_ = false;
 	bool isPlacementMode_ = false;
 	std::string selectedObjPath_ = "Resources/Models/cube/cube.obj";
 	std::string previewObjPath_;

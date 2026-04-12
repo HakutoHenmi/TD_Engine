@@ -47,6 +47,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		if (isPlacementMode_) renderer->DrawLine3D({0, 22, 0}, {5, 22, 0}, {0, 0, 1, 1}, true);
 	}
 
+	// ★入力処理: キーボードとUI両方からの入力を受け付ける
 	bool key1 = input->Trigger(DIK_1) || (GetAsyncKeyState('1') & 0x8001);
 	bool key2 = input->Trigger(DIK_2) || (GetAsyncKeyState('2') & 0x8001);
 	bool key3 = input->Trigger(DIK_3) || (GetAsyncKeyState('3') & 0x8001);
@@ -86,6 +87,8 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			return; // 設置モードの入力を抑制
 		}
 
+		// 設置モードへの切り替え
+
 		if (key1 || InstallationButton::IsButtonPressed(InstallationButton::Tank)) {
 			selectedObjPath_ = "Resources/Prefabs/BulletTank.prefab";
 			isPlacementMode_ = true;
@@ -107,23 +110,9 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		Installation(scene, selectedObjPath_);
 
 		if (keySpace) {
-			isPreparation_ = false;
+			NextPhase_ = false;
 			isPlacementMode_ = false;
 			skillTree_.Close(); // フェーズ移行時にスキルツリーを閉じる
-			currentPhase_++;
-
-			std::string enemyPrefabPath = "Resources/Prefabs/EnemySpawner" + std::to_string(currentPhase_) + ".prefab";
-			std::vector<entt::entity> spawnedEnemies = EditorUI::LoadPrefab(scene, enemyPrefabPath);
-
-			auto& registry = scene->GetRegistry();
-			for (auto spawnedEntity : spawnedEnemies) {
-				if (registry.all_of<TransformComponent>(spawnedEntity)) {
-					auto& tc = registry.get<TransformComponent>(spawnedEntity);
-					if (!registry.all_of<HierarchyComponent>(spawnedEntity) || registry.get<HierarchyComponent>(spawnedEntity).parentId == entt::null) {
-						tc.translate = {-50.0f, 20.0f, 50.0f};
-					}
-				}
-			}
 		}
 
 	} else {
@@ -147,6 +136,21 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			if (scene->GetRegistry().valid(core)) {
 				auto& tc = scene->GetRegistry().get<TransformComponent>(core);
 				nav.GenerateFlowField(tc.translate.x, tc.translate.z);
+			}
+
+			// 敵のスポーン地点の生成
+			currentPhase_++;
+			std::string enemyPrefabPath = "Resources/Prefabs/EnemySpawner" + std::to_string(currentPhase_) + ".prefab";
+			std::vector<entt::entity> spawnedEnemies = EditorUI::LoadPrefab(scene, enemyPrefabPath);
+
+			auto& registry = scene->GetRegistry();
+			for (auto spawnedEntity : spawnedEnemies) {
+				if (registry.all_of<TransformComponent>(spawnedEntity)) {
+					auto& tc = registry.get<TransformComponent>(spawnedEntity);
+					if (!registry.all_of<HierarchyComponent>(spawnedEntity) || registry.get<HierarchyComponent>(spawnedEntity).parentId == entt::null) {
+						tc.translate = {-50.0f, 20.0f, 50.0f};
+					}
+				}
 			}
 		}
 
