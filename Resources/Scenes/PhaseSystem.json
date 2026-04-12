@@ -7,7 +7,7 @@
   },
   "objects": [
     {
-      "id": 3145737,
+      "id": 3145738,
       "parentId": 4294967295,
       "name": "Floor",
       "locked": true,
@@ -21,7 +21,7 @@
       ]
     },
     {
-      "id": 3145736,
+      "id": 3145737,
       "parentId": 4294967295,
       "name": "Player",
       "locked": true,
@@ -42,7 +42,7 @@
       ]
     },
     {
-      "id": 4194311,
+      "id": 3145736,
       "parentId": 4294967295,
       "name": "Sun",
       "locked": true,
@@ -54,7 +54,7 @@
       ]
     },
     {
-      "id": 4194310,
+      "id": 3145735,
       "parentId": 4294967295,
       "name": "PlayerSword",
       "locked": false,
@@ -88,7 +88,7 @@
       ]
     },
     {
-      "id": 4194309,
+      "id": 3145734,
       "parentId": 4294967295,
       "name": "Core",
       "locked": false,
@@ -103,8 +103,8 @@
       ]
     },
     {
-      "id": 4194308,
-      "parentId": 4194309,
+      "id": 3145733,
+      "parentId": 3145734,
       "name": "PreparationCamera",
       "locked": false,
       "translate": [2.28225, 40, -2.48776],
@@ -121,7 +121,7 @@
       ]
     },
     {
-      "id": 4194307,
+      "id": 3145732,
       "parentId": 4294967295,
       "name": "PhysicsSystem",
       "locked": true,
@@ -133,7 +133,7 @@
       ]
     },
     {
-      "id": 4194306,
+      "id": 3145731,
       "parentId": 4294967295,
       "name": "TankButton",
       "locked": false,
@@ -141,14 +141,14 @@
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":2}"}]},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":0}"}]},
         {"type": "RectTransform", "enabled": true, "pos": [-400,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TankButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
-      "id": 4194305,
+      "id": 3145730,
       "parentId": 4294967295,
       "name": "PipeButton",
       "locked": false,
@@ -163,7 +163,7 @@
       ]
     },
     {
-      "id": 4194304,
+      "id": 3145729,
       "parentId": 4294967295,
       "name": "CannonButton",
       "locked": false,
@@ -175,6 +175,20 @@
         {"type": "RectTransform", "enabled": true, "pos": [400,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/CannonButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+      ]
+    },
+    {
+      "id": 3145728,
+      "parentId": 4294967295,
+      "name": "Fede",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Script", "enabled": true, "scripts": [{"path": "PhaseTransition", "param": ""}]},
+        {"type": "RectTransform", "enabled": true, "pos": [0,0], "size": [1978,1092], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/white1x1.png", "color": [0,0,0,0], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10}
       ]
     }
   ]

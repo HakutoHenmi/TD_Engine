@@ -1,4 +1,5 @@
 #include "PhaseSystemScript.h"
+#include "PhaseTransition.h"
 #include "Editor/EditorUI.h"
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
@@ -186,14 +187,21 @@ void PhaseSystemScript::RequestPhaseChange(PhaseState nextPhase) {
 	isPhase_ = Transition;
 	isPhaseTransitioning_ = true;
 	isFadeFinished_ = false;
+
+	if (PhaseTransition::IsAvailable()) {
+		PhaseTransition::RequestFade(0.35f);
+	}
 }
 
 void PhaseSystemScript::UpdatePhaseTransition() {
 	if (!isPhaseTransitioning_)
 		return;
 
-	// TODO: 実際のフェード完了判定に差し替える
-	isFadeFinished_ = true;
+  if (PhaseTransition::IsAvailable()) {
+		isFadeFinished_ = PhaseTransition::ConsumeSwitchPoint();
+	} else {
+		isFadeFinished_ = true;
+	}
 
 	if (isFadeFinished_) {
 		isPhase_ = NextPhase_;
