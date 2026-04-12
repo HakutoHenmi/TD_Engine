@@ -189,7 +189,7 @@ void PhaseSystemScript::RequestPhaseChange(PhaseState nextPhase) {
 	isFadeFinished_ = false;
 
 	if (PhaseTransition::IsAvailable()) {
-		PhaseTransition::RequestFade(0.35f);
+        PhaseTransition::RequestFade();
 	}
 }
 

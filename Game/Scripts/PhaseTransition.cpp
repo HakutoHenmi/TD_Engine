@@ -5,10 +5,16 @@
 #include <cmath>
 #include <iostream>
 #include <algorithm>
+#include "../../Engine/ThirdParty/nlohmann/json.hpp"
+#if defined(USE_IMGUI) && !defined(NDEBUG)
+#include "../../externals/imgui/imgui.h"
+#endif
 
 #include "PhaseSystemScript.h"
 
 namespace Game {
+
+using json = nlohmann::json;
 
 void PhaseTransition::Start(entt::entity entity, GameScene* scene) {
   isAvailable_ = true;
@@ -54,7 +60,9 @@ void PhaseTransition::Update(entt::entity entity, GameScene* scene, float dt) {
 
 
 void PhaseTransition::RequestFade(float duration) {
-	fadeDuration_ = (duration > 0.01f) ? duration : 0.01f;
+  if (duration > 0.0f) {
+		fadeDuration_ = (duration > 0.01f) ? duration : 0.01f;
+	}
 	requestFade_ = true;
 }
 
@@ -67,6 +75,34 @@ bool PhaseTransition::ConsumeSwitchPoint() {
 
 bool PhaseTransition::IsAvailable() {
 	return isAvailable_;
+}
+
+void PhaseTransition::OnEditorUI() {
+#if defined(USE_IMGUI) && !defined(NDEBUG)
+	ImGui::SeparatorText("Phase Transition");
+	ImGui::SliderFloat("フェード時間(秒)", &fadeDuration_, 0.05f, 3.0f, "%.2f");
+	ImGui::Text("現在アルファ: %.2f", alpha_);
+	if (ImGui::Button("フェードテスト")) {
+		RequestFade(fadeDuration_);
+	}
+#endif
+}
+
+std::string PhaseTransition::SerializeParameters() {
+	json j;
+	j["fadeDuration"] = fadeDuration_;
+	return j.dump();
+}
+
+void PhaseTransition::DeserializeParameters(const std::string& data) {
+	if (data.empty()) return;
+	try {
+		json j = json::parse(data);
+		if (j.contains("fadeDuration")) {
+			fadeDuration_ = std::max(0.01f, j["fadeDuration"].get<float>());
+		}
+	} catch (...) {
+	}
 }
 
 void PhaseTransition::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {

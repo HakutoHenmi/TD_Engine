@@ -14,8 +14,11 @@ public:
 	void Start(entt::entity entity, GameScene* scene) override;
 	void Update(entt::entity entity, GameScene* scene, float dt) override;
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
+	void OnEditorUI() override;
+	std::string SerializeParameters() override;
+	void DeserializeParameters(const std::string& data) override;
 
-	static void RequestFade(float duration = 0.35f);
+    static void RequestFade(float duration = -1.0f);
 	static bool ConsumeSwitchPoint();
 	static bool IsAvailable();
 
