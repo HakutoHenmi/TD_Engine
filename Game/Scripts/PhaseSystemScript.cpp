@@ -9,6 +9,7 @@
 #include <cmath>
 #include <fstream>
 #include <string.h>
+#include <vector>
 #ifdef USE_IMGUI
 #include <imgui.h>
 #endif
@@ -21,6 +22,39 @@
 
 namespace Game {
 
+namespace {
+float SnapTo2x2Grid(float value) {
+	return std::floor(value / 2.0f) * 2.0f;
+}
+
+std::vector<Engine::Vector3> BuildPipePathPoints(const Engine::Vector3& start, const Engine::Vector3& end) {
+	std::vector<Engine::Vector3> points;
+
+   const int x0 = static_cast<int>(SnapTo2x2Grid(start.x));
+	const int z0 = static_cast<int>(SnapTo2x2Grid(start.z));
+	const int x1 = static_cast<int>(SnapTo2x2Grid(end.x));
+	const int z1 = static_cast<int>(SnapTo2x2Grid(end.z));
+	constexpr int kStep = 2;
+
+	const float y = end.y;
+	points.push_back({static_cast<float>(x0), y, static_cast<float>(z0)});
+
+	int x = x0;
+	int z = z0;
+	while (x != x1) {
+     x += (x1 > x) ? kStep : -kStep;
+		points.push_back({static_cast<float>(x), y, static_cast<float>(z)});
+	}
+
+	while (z != z1) {
+     z += (z1 > z) ? kStep : -kStep;
+		points.push_back({static_cast<float>(x), y, static_cast<float>(z)});
+	}
+
+	return points;
+}
+}
+
 void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	(void)entity;
 	(void)scene;
@@ -29,6 +63,7 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	preIsPhase_ = PreparationPhase;
 	isPhaseTransitioning_ = false;
 	isFadeFinished_ = false;
+	hasPipeStartPoint_ = false;
 
 	// スキルツリーの初期化
 	if (auto* renderer = Engine::Renderer::GetInstance()) {
@@ -102,19 +137,27 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		if (key1 || InstallationButton::IsButtonPressed(InstallationButton::Tank)) {
 			selectedObjPath_ = "Resources/Prefabs/BulletTank.prefab";
 			isPlacementMode_ = true;
+			isPipeSet_ = false;
+           hasPipeStartPoint_ = false;
 		}
 
 		if (key2 || InstallationButton::IsButtonPressed(InstallationButton::Pipe)) {
 			selectedObjPath_ = "Resources/Prefabs/Pipe.prefab";
+			isPipeSet_ = true;
 			isPlacementMode_ = true;
+           hasPipeStartPoint_ = false;
 		}
 
 		if (key3 || InstallationButton::IsButtonPressed(InstallationButton::Cannon)) {
 			selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
 			isPlacementMode_ = true;
+			isPipeSet_ = false;
+           hasPipeStartPoint_ = false;
 		}
 		if (input->IsMouseTrigger(1) && isPlacementMode_) {
 			isPlacementMode_ = false;
+			isPipeSet_ = false;
+           hasPipeStartPoint_ = false;
 		}
 
 		Installation(scene, selectedObjPath_);
@@ -122,6 +165,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		if (keySpace) {
            RequestPhaseChange(BattlePhase);
 			isPlacementMode_ = false;
+           hasPipeStartPoint_ = false;
 			skillTree_.Close(); // フェーズ移行時にスキルツリーを閉じる
 		}
 
@@ -130,8 +174,10 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
           RequestPhaseChange(PreparationPhase);
 		}
 		isPlacementMode_ = false;
+     hasPipeStartPoint_ = false;
    } else {
 		isPlacementMode_ = false;
+       hasPipeStartPoint_ = false;
 	}
 
 	UpdatePhaseTransition();
@@ -215,6 +261,8 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 		return;
 
 	auto* input = Engine::Input::GetInstance();
+ if (!input)
+		return;
 	Engine::Vector3 hitPoint{};
 	if (!TryGetTerrainHitPoint(scene, hitPoint))
 		return;
@@ -222,6 +270,47 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 	Engine::Vector3 snappedHitPoint = hitPoint;
 	snappedHitPoint.x = std::floor(snappedHitPoint.x);
 	snappedHitPoint.z = std::floor(snappedHitPoint.z);
+
+	if (isPipeSet_) {
+      snappedHitPoint.x = SnapTo2x2Grid(snappedHitPoint.x);
+		snappedHitPoint.z = SnapTo2x2Grid(snappedHitPoint.z);
+
+		if (!hasPipeStartPoint_) {
+			const bool canPlaceStart = !IsPlacementBlocked(scene, snappedHitPoint);
+			DrawPlacementPreview(scene, snappedHitPoint, objPath, canPlaceStart);
+
+			if (input->IsMouseTrigger(0) && canPlaceStart) {
+				pipeStartX_ = snappedHitPoint.x;
+				pipeStartY_ = snappedHitPoint.y;
+				pipeStartZ_ = snappedHitPoint.z;
+				hasPipeStartPoint_ = true;
+			}
+			return;
+		}
+
+		Engine::Vector3 startPoint{pipeStartX_, pipeStartY_, pipeStartZ_};
+		auto pathPoints = BuildPipePathPoints(startPoint, snappedHitPoint);
+		bool canPlaceAll = !pathPoints.empty();
+		for (const auto& p : pathPoints) {
+			const bool canPlacePoint = !IsPlacementBlocked(scene, p);
+			DrawPlacementPreview(scene, p, objPath, canPlacePoint);
+			if (!canPlacePoint) {
+				canPlaceAll = false;
+			}
+		}
+
+		if (input->IsMouseTrigger(0)) {
+			if (canPlaceAll) {
+				for (const auto& p : pathPoints) {
+					SpawnPlacedObject(scene, p, objPath);
+				}
+				isPlacementMode_ = false;
+				isPipeSet_ = false;
+			}
+			hasPipeStartPoint_ = false;
+		}
+		return;
+	}
 
 	const bool canPlace = !IsPlacementBlocked(scene, snappedHitPoint);
 

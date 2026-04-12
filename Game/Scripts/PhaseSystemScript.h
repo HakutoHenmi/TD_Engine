@@ -40,8 +40,15 @@ private:
 	bool preKeyP_ = false; // 初期化しておく
 	bool prekeySpace_ = false;
 	bool isPlacementMode_ = false;
-    bool isPhaseTransitioning_ = false;
+	bool isPhaseTransitioning_ = false;
 	bool isFadeFinished_ = false;
+
+	bool isPipeSet_ = false;
+	bool hasPipeStartPoint_ = false;
+	float pipeStartX_ = 0.0f;
+	float pipeStartY_ = 0.0f;
+	float pipeStartZ_ = 0.0f;
+
 	std::string selectedObjPath_ = "Resources/Models/cube/cube.obj";
 	std::string previewObjPath_;
 	uint32_t previewModelHandle_ = 0;
