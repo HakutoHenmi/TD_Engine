@@ -186,7 +186,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		}
 	}
 
-	if (hasPhaseSystem && PhaseSystemScript::IsPreparation()) {
+	if (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase) {
 		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) scene->GetRegistry().get<CameraTargetComponent>(entity).enabled = false;
 		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))  scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = false;
 	} else {

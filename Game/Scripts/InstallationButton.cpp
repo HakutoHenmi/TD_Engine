@@ -38,7 +38,7 @@ void InstallationButton::Update(entt::entity entity, GameScene* scene, float dt)
 	isButtonPressed_[buttonTypes_] = scene->GetRegistry().all_of<UIButtonComponent>(entity) && scene->GetRegistry().get<UIButtonComponent>(entity).isPressed;
 	isButtonPressed[buttonTypes_] = isButtonPressed_[buttonTypes_];
 
-	if (PhaseSystemScript::IsPreparation()) {
+	if (PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase) {
 		if (scene->GetRegistry().all_of<UIImageComponent>(entity))
 			scene->GetRegistry().get<UIImageComponent>(entity).enabled = true;
 		if (scene->GetRegistry().all_of<UIButtonComponent>(entity))

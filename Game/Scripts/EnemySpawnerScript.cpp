@@ -48,7 +48,7 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 		if (!hasEnemy) {
 			auto& sc = scene->GetRegistry().get<ScriptComponent>(spawnerEntity);
 			sc.enabled = false;
-			PhaseSystemScript::SetPreparation(true);
+            PhaseSystemScript::SetPreparation(PhaseSystemScript::PreparationPhase);
 		}
 		return;
 	}

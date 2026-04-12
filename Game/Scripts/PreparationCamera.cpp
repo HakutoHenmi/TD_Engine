@@ -18,7 +18,7 @@ void PreparationCamera::Update(entt::entity entity, GameScene* scene, float dt) 
 	if (!registry.all_of<TransformComponent>(entity))
 		return;
 
-	if (PhaseSystemScript::IsPreparation()) {
+	if (PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase) {
 		UpdateMovement(entity, scene, dt);
 		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity))scene->GetRegistry().get<CameraTargetComponent>(entity).enabled = true;
 		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = true;

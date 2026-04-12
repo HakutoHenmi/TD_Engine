@@ -217,6 +217,7 @@ exit /b 0
     <ClCompile Include="Game\EnemySystem\NavigationManager.cpp" />
     <ClCompile Include="Game\Scripts\MissileBulletScript.cpp" />
     <ClCompile Include="Game\Scripts\MissileCanonScript.cpp" />
+    <ClCompile Include="PhaseTransition.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scripts\ExplosionAttackArea.h" />
@@ -267,6 +268,7 @@ exit /b 0
     <ClInclude Include="Game\EnemySystem\NavigationManager.h" />
     <ClInclude Include="Game\Scripts\MissileBulletScript.h" />
     <ClInclude Include="Game\Scripts\MissileCanonScript.h" />
+    <ClInclude Include="PhaseTransition.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\level_data.csv" />

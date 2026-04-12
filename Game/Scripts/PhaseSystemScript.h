@@ -25,19 +25,23 @@ public:
 	bool IsPlacementBlocked(GameScene* scene, const Engine::Vector3& hitPoint) const;
 	bool IsPrefabPath(const std::string& path) const;
 	bool ExtractPrefabRenderPaths(const std::string& prefabPath, std::string& outModelPath, std::string& outTexturePath) const;
+	void RequestPhaseChange(PhaseState nextPhase);
+	void UpdatePhaseTransition();
 
-	static PhaseState IsPreparation() { return isPhase_; };
+	static PhaseState IsPhase() { return isPhase_; };
 	static void SetPreparation(PhaseState prep) { NextPhase_ = prep; }
 
 private:
 	inline static PhaseState isPhase_ = PreparationPhase;
 	inline static PhaseState NextPhase_ = PreparationPhase;
-	PhaseState preIsPreparation_ = PreparationPhase; // フェーズ切り替わり検知用
+	PhaseState preIsPhase_ = PreparationPhase; // フェーズ切り替わり検知用
 	int currentPhase_ = 0;
 
 	bool preKeyP_ = false; // 初期化しておく
 	bool prekeySpace_ = false;
 	bool isPlacementMode_ = false;
+    bool isPhaseTransitioning_ = false;
+	bool isFadeFinished_ = false;
 	std::string selectedObjPath_ = "Resources/Models/cube/cube.obj";
 	std::string previewObjPath_;
 	uint32_t previewModelHandle_ = 0;

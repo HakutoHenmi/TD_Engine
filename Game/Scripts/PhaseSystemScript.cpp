@@ -23,7 +23,11 @@ namespace Game {
 void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	(void)entity;
 	(void)scene;
-	isPreparation_ = true;
+  isPhase_ = PreparationPhase;
+	NextPhase_ = PreparationPhase;
+	preIsPhase_ = PreparationPhase;
+	isPhaseTransitioning_ = false;
+	isFadeFinished_ = false;
 
 	// スキルツリーの初期化
 	if (auto* renderer = Engine::Renderer::GetInstance()) {
@@ -43,7 +47,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
 		renderer->DrawLine3D({0, 20, 0}, {5, 20, 0}, {1, 1, 1, 1}, true);
-		if (isPreparation_) renderer->DrawLine3D({0, 21, 0}, {5, 21, 0}, {0, 1, 0, 1}, true);
+       if (isPhase_ == PreparationPhase) renderer->DrawLine3D({0, 21, 0}, {5, 21, 0}, {0, 1, 0, 1}, true);
 		if (isPlacementMode_) renderer->DrawLine3D({0, 22, 0}, {5, 22, 0}, {0, 0, 1, 1}, true);
 	}
 
@@ -57,7 +61,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	// ★ スキルツリーの入力処理 (準備フェーズ中のみ)
 	bool keyN = input->Trigger(DIK_N) || (GetAsyncKeyState('N') & 0x8001);
 
-	if (isPreparation_) {
+	if (isPhase_ == PreparationPhase) {
 		// Nキーでスキルツリーの開閉
 		if (keyN && !preKeyN_) {
 			skillTree_.Toggle();
@@ -110,23 +114,29 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		Installation(scene, selectedObjPath_);
 
 		if (keySpace) {
-			NextPhase_ = false;
+           RequestPhaseChange(BattlePhase);
 			isPlacementMode_ = false;
 			skillTree_.Close(); // フェーズ移行時にスキルツリーを閉じる
 		}
 
-	} else {
+    } else if (isPhase_ == BattlePhase) {
 		if (keyP) {
-			isPreparation_ = true;
+          RequestPhaseChange(PreparationPhase);
 		}
+		isPlacementMode_ = false;
+   } else {
 		isPlacementMode_ = false;
 	}
 
+	UpdatePhaseTransition();
+
 	// フェーズが切り替わった瞬間の検知
-	if (isPreparation_ != preIsPreparation_) {
+	if (isPhase_ != preIsPhase_) {
 		auto& nav = scene->GetNavigationManager();
 
-		if (!isPreparation_) {
+
+
+		if (isPhase_ == BattlePhase) {
 			// 準備から戦闘に切り替わった瞬間
 			// 設置物を反映するためにコストマップを更新
 			nav.UpdateCostMap(scene);
@@ -155,10 +165,36 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		}
 
 		// 状態を同期
-		preIsPreparation_ = isPreparation_;
+		preIsPhase_ = isPhase_;
 	}
 
 	preKeyN_ = keyN;
+}
+
+void PhaseSystemScript::RequestPhaseChange(PhaseState nextPhase) {
+	if (isPhase_ == Transition || isPhaseTransitioning_)
+		return;
+	if (isPhase_ == nextPhase)
+		return;
+
+	NextPhase_ = nextPhase;
+	isPhase_ = Transition;
+	isPhaseTransitioning_ = true;
+	isFadeFinished_ = false;
+}
+
+void PhaseSystemScript::UpdatePhaseTransition() {
+	if (!isPhaseTransitioning_)
+		return;
+
+	// TODO: 実際のフェード完了判定に差し替える
+	isFadeFinished_ = true;
+
+	if (isFadeFinished_) {
+		isPhase_ = NextPhase_;
+		isPhaseTransitioning_ = false;
+		isFadeFinished_ = false;
+	}
 }
 
 void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPath) {
