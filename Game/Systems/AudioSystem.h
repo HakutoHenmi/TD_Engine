@@ -50,6 +50,14 @@ public:
 						finalVol *= atten;
 					}
 				}
+				
+				// ★追加: マスター音量の適用
+				if (as.category == AudioCategory::BGM) {
+					finalVol *= audio->GetMasterBGMVolume();
+				} else {
+					finalVol *= audio->GetMasterSEVolume();
+				}
+				
 				audio->SetVolume(as.voiceHandle, finalVol);
 			}
 		}

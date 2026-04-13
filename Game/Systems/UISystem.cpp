@@ -68,6 +68,8 @@ void UISystem::Draw(entt::registry& registry, GameContext& ctx) {
 
             if (currentParentId == parentId) {
                 auto& rect = view.get<RectTransformComponent>(e);
+                // ★追加: enabledがfalseならこのノードと子ノードをスキップ
+                if (!rect.enabled) continue;
                 float worldW = rect.size.x;
                 float worldH = rect.size.y;
                 float anchorX = parentRect.x + parentRect.w * rect.anchor.x;
