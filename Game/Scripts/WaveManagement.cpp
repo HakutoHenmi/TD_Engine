@@ -81,6 +81,7 @@ void WaveManagement::Update(entt::entity /*entity*/, GameScene* scene, float /*d
 
 void WaveManagement::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
+void WaveManagement::SpawnSpanner(int /*currentWave*/, GameScene* /*scene*/) {}
 
 #if defined(USE_IMGUI) && !defined(NDEBUG)
 void WaveManagement::OnEditorUI() {
@@ -143,7 +144,16 @@ void WaveManagement::OnEditorUI() {
 				std::string sname = nc ? nc->name : "Spawner";
 
 				ImGui::PushID(static_cast<int>(si));
-				if (ImGui::TreeNode(sname.c_str())) {
+				bool isSpawnerNodeOpen = ImGui::TreeNode(sname.c_str());
+
+				// 選択（ギズモ用）
+				if (ImGui::IsItemClicked()) {
+					cachedScene_->SetSelectedEntity(spawner);
+					cachedScene_->GetSelectedEntities().clear();
+					cachedScene_->GetSelectedEntities().insert(spawner);
+				}
+
+				if (isSpawnerNodeOpen) {
 					// 座標設定
 					if (auto* tc = cachedScene_->GetRegistry().try_get<TransformComponent>(spawner)) {
 						ImGui::DragFloat3("Position", &tc->translate.x, 0.1f);
