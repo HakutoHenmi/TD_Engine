@@ -215,6 +215,53 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 				} else if (type == "ParticleEmitter") {
 					auto& c = reg.get_or_emplace<ParticleEmitterComponent>(entity);
 					c.enabled = en; c.assetPath = comp.value("assetPath", "");
+					
+					auto& p = c.emitter.params;
+					if (comp.contains("emitRate")) p.emitRate = comp["emitRate"].get<float>();
+					if (comp.contains("burstCount")) p.burstCount = comp["burstCount"].get<int>();
+					if (comp.contains("shape")) p.shape = static_cast<Engine::EmissionShape>(comp["shape"].get<int>());
+					if (comp.contains("shapeRadius")) p.shapeRadius = comp["shapeRadius"].get<float>();
+					if (comp.contains("shapeAngle")) p.shapeAngle = comp["shapeAngle"].get<float>();
+					if (comp.contains("lifeTime")) p.lifeTime = comp["lifeTime"].get<float>();
+					if (comp.contains("lifeTimeVariance")) p.lifeTimeVariance = comp["lifeTimeVariance"].get<float>();
+					
+					if (comp.contains("startVelocity") && comp["startVelocity"].size() >= 3)
+						p.startVelocity = {comp["startVelocity"][0], comp["startVelocity"][1], comp["startVelocity"][2]};
+					if (comp.contains("velocityVariance") && comp["velocityVariance"].size() >= 3)
+						p.velocityVariance = {comp["velocityVariance"][0], comp["velocityVariance"][1], comp["velocityVariance"][2]};
+					if (comp.contains("acceleration") && comp["acceleration"].size() >= 3)
+						p.acceleration = {comp["acceleration"][0], comp["acceleration"][1], comp["acceleration"][2]};
+					if (comp.contains("damping")) p.damping = comp["damping"].get<float>();
+					
+					if (comp.contains("startSize") && comp["startSize"].size() >= 3)
+						p.startSize = {comp["startSize"][0], comp["startSize"][1], comp["startSize"][2]};
+					if (comp.contains("startSizeVariance") && comp["startSizeVariance"].size() >= 3)
+						p.startSizeVariance = {comp["startSizeVariance"][0], comp["startSizeVariance"][1], comp["startSizeVariance"][2]};
+					if (comp.contains("endSize") && comp["endSize"].size() >= 3)
+						p.endSize = {comp["endSize"][0], comp["endSize"][1], comp["endSize"][2]};
+					if (comp.contains("endSizeVariance") && comp["endSizeVariance"].size() >= 3)
+						p.endSizeVariance = {comp["endSizeVariance"][0], comp["endSizeVariance"][1], comp["endSizeVariance"][2]};
+						
+					if (comp.contains("startColor") && comp["startColor"].size() >= 4)
+						p.startColor = {comp["startColor"][0], comp["startColor"][1], comp["startColor"][2], comp["startColor"][3]};
+					if (comp.contains("endColor") && comp["endColor"].size() >= 4)
+						p.endColor = {comp["endColor"][0], comp["endColor"][1], comp["endColor"][2], comp["endColor"][3]};
+						
+					if (comp.contains("angularVelocity") && comp["angularVelocity"].size() >= 3)
+						p.angularVelocity = {comp["angularVelocity"][0], comp["angularVelocity"][1], comp["angularVelocity"][2]};
+					if (comp.contains("angularVelocityVariance") && comp["angularVelocityVariance"].size() >= 3)
+						p.angularVelocityVariance = {comp["angularVelocityVariance"][0], comp["angularVelocityVariance"][1], comp["angularVelocityVariance"][2]};
+						
+					if (comp.contains("texturePath")) p.texturePath = comp["texturePath"].get<std::string>();
+					if (comp.contains("shaderName")) p.shaderName = comp["shaderName"].get<std::string>();
+					if (comp.contains("useBillboard")) p.useBillboard = comp["useBillboard"].get<bool>();
+					if (comp.contains("isAdditive")) p.isAdditive = comp["isAdditive"].get<bool>();
+					if (comp.contains("useUvAnim")) p.useUvAnim = comp["useUvAnim"].get<bool>();
+					if (comp.contains("uvAnimCols")) p.uvAnimCols = comp["uvAnimCols"].get<int>();
+					if (comp.contains("uvAnimRows")) p.uvAnimRows = comp["uvAnimRows"].get<int>();
+					if (comp.contains("uvAnimFps")) p.uvAnimFps = comp["uvAnimFps"].get<float>();
+					
+					c.isInitialized = false; // 強制的に再初期化・適用させる
 				} else if (type == "RectTransform") {
 					auto& c = reg.get_or_emplace<RectTransformComponent>(entity);
 					c.enabled = en; if (comp.contains("pos")) c.pos = {comp["pos"][0], comp["pos"][1]};
@@ -576,7 +623,32 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 	}
 	if (auto* cp = registry.try_get<ParticleEmitterComponent>(entity)) {
 		addComma();
-		ss << "        {\"type\": \"ParticleEmitter\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"assetPath\": \"" << EscapeJson(cp->assetPath) << "\"}";
+		ss << "        {\"type\": \"ParticleEmitter\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"assetPath\": \"" << EscapeJson(cp->assetPath) << "\"";
+		
+		auto& p = cp->emitter.params;
+		ss << ", \"emitRate\": " << p.emitRate << ", \"burstCount\": " << p.burstCount;
+		ss << ", \"shape\": " << static_cast<int>(p.shape) << ", \"shapeRadius\": " << p.shapeRadius << ", \"shapeAngle\": " << p.shapeAngle;
+		ss << ", \"lifeTime\": " << p.lifeTime << ", \"lifeTimeVariance\": " << p.lifeTimeVariance;
+		ss << ", \"startVelocity\": [" << p.startVelocity.x << "," << p.startVelocity.y << "," << p.startVelocity.z << "]";
+		ss << ", \"velocityVariance\": [" << p.velocityVariance.x << "," << p.velocityVariance.y << "," << p.velocityVariance.z << "]";
+		ss << ", \"acceleration\": [" << p.acceleration.x << "," << p.acceleration.y << "," << p.acceleration.z << "]";
+		ss << ", \"damping\": " << p.damping;
+		ss << ", \"startSize\": [" << p.startSize.x << "," << p.startSize.y << "," << p.startSize.z << "]";
+		ss << ", \"startSizeVariance\": [" << p.startSizeVariance.x << "," << p.startSizeVariance.y << "," << p.startSizeVariance.z << "]";
+		ss << ", \"endSize\": [" << p.endSize.x << "," << p.endSize.y << "," << p.endSize.z << "]";
+		ss << ", \"endSizeVariance\": [" << p.endSizeVariance.x << "," << p.endSizeVariance.y << "," << p.endSizeVariance.z << "]";
+		ss << ", \"startColor\": [" << p.startColor.x << "," << p.startColor.y << "," << p.startColor.z << "," << p.startColor.w << "]";
+		ss << ", \"endColor\": [" << p.endColor.x << "," << p.endColor.y << "," << p.endColor.z << "," << p.endColor.w << "]";
+		ss << ", \"angularVelocity\": [" << p.angularVelocity.x << "," << p.angularVelocity.y << "," << p.angularVelocity.z << "]";
+		ss << ", \"angularVelocityVariance\": [" << p.angularVelocityVariance.x << "," << p.angularVelocityVariance.y << "," << p.angularVelocityVariance.z << "]";
+		ss << ", \"texturePath\": \"" << EscapeJson(p.texturePath) << "\"";
+		ss << ", \"shaderName\": \"" << EscapeJson(p.shaderName) << "\"";
+		ss << ", \"useBillboard\": " << (p.useBillboard ? "true" : "false");
+		ss << ", \"isAdditive\": " << (p.isAdditive ? "true" : "false");
+		ss << ", \"useUvAnim\": " << (p.useUvAnim ? "true" : "false");
+		ss << ", \"uvAnimCols\": " << p.uvAnimCols << ", \"uvAnimRows\": " << p.uvAnimRows << ", \"uvAnimFps\": " << p.uvAnimFps;
+		
+		ss << "}";
 	}
 	if (auto* cp = registry.try_get<RectTransformComponent>(entity)) {
 		addComma();
