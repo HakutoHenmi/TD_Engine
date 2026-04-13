@@ -318,6 +318,8 @@ struct SpotLightComponent : public Component {
 	SpotLightComponent() { type = ComponentType::SpotLight; }
 };
 
+enum class AudioCategory { BGM, SE };
+
 // ★追加: AudioSource コンポーネント (音の発信源)
 struct AudioSourceComponent : public Component {
 	std::string soundPath = "";       // 音声ファイルパス
@@ -329,6 +331,7 @@ struct AudioSourceComponent : public Component {
 	bool is3D = true;                  // 3Dサウンド（距離減衰あり）
 	float maxDistance = 50.0f;         // 減衰最大距離
 	bool isPlaying = false;            // 再生中フラグ
+	AudioCategory category = AudioCategory::SE; // ★追加: カテゴリ
 	AudioSourceComponent() { type = ComponentType::AudioSource; }
 };
 

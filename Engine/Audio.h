@@ -3,8 +3,11 @@
 #include <string>
 #include <vector>
 #include <windows.h>
+#undef max
+#undef min
 #include <wrl.h>
 #include <xaudio2.h>
+#include <algorithm>
 
 // Media Foundation
 #include <mfapi.h>
@@ -55,6 +58,12 @@ public:
 	// ★追加: ボイスの音量変更
 	void SetVolume(size_t voiceHandle, float volume);
 
+	// ★追加: マスター音量管理
+	float GetMasterBGMVolume() const { return masterBGMVolume_; }
+	void SetMasterBGMVolume(float volume) { masterBGMVolume_ = (std::max)(0.0f, (std::min)(1.0f, volume)); }
+	float GetMasterSEVolume() const { return masterSEVolume_; }
+	void SetMasterSEVolume(float volume) { masterSEVolume_ = (std::max)(0.0f, (std::min)(1.0f, volume)); }
+
 	// ★追加: 全てのボイスを停止 (Playモード終了時用)
 	void StopAll();
 
@@ -78,6 +87,10 @@ private:
 	// Key: 発行した再生ハンドル, Value: ボイス実体
 	std::map<size_t, VoiceData> activeVoices_;
 	size_t nextVoiceHandle_ = 1;
+
+	// ★追加: マスター音量
+	float masterBGMVolume_ = 1.0f;
+	float masterSEVolume_ = 1.0f;
 };
 
 } // namespace Engine
