@@ -31,7 +31,7 @@ void MissileBulletScript::Start(entt::entity entity, GameScene* scene) {
 		}
 	}
 
-	damage_ = GetVar(entity, scene, "Damage", 50.0f);
+	damage_ = GetVar(entity, scene, "Damage", 10.0f);
 	explosionRadius_ = GetVar(entity, scene, "ExplosionRadius", 10.0f);
 
 	entt::registry& registry = scene->GetRegistry();
