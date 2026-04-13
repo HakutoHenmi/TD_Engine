@@ -38,17 +38,27 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 		const auto& enemies = scene->GetEntitiesByTag(TagType::Enemy);
 		std::vector<entt::entity> toDestroy(enemies.begin(), enemies.end());
 		for (auto e : toDestroy) {
-			scene->GetRegistry().destroy(e);
+            if (scene->GetRegistry().valid(e)) {
+				scene->DestroyObject(static_cast<uint32_t>(e));
+			}
 		}
 	}
 
 	if (currentWave_ >= waveCount) {
-		bool hasEnemy = !scene->GetEntitiesByTag("Enemy").empty();
+      bool hasEnemy = false;
+		const auto& enemies = scene->GetEntitiesByTag(TagType::Enemy);
+		auto& registry = scene->GetRegistry();
+		for (auto enemy : enemies) {
+			if (registry.valid(enemy)) {
+				hasEnemy = true;
+				break;
+			}
+		}
 
 		if (!hasEnemy) {
-			auto& sc = scene->GetRegistry().get<ScriptComponent>(spawnerEntity);
+            auto& sc = registry.get<ScriptComponent>(spawnerEntity);
 			sc.enabled = false;
-			PhaseSystemScript::SetPreparation(true);
+            PhaseSystemScript::SetPreparation(PhaseSystemScript::PreparationPhase);
 		}
 		return;
 	}

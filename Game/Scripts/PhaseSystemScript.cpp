@@ -1,29 +1,88 @@
 #include "PhaseSystemScript.h"
+#include "../../Engine/PathUtils.h"
 #include "Editor/EditorUI.h"
 #include "ObjectTypes.h"
+#include "PhaseTransition.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
-#include "../../Engine/PathUtils.h"
 #include <cfloat>
 #include <cmath>
 #include <fstream>
 #include <string.h>
+#include <vector>
 #ifdef USE_IMGUI
 #include <imgui.h>
 #endif
-#include <iostream>
 #include "../../Engine/Input.h"
 #include "../../Engine/WindowDX.h"
+#include <iostream>
 
-//Button UI
+// Button UI
 #include "InstallationButton.h"
 
 namespace Game {
 
+namespace {
+float SnapTo2x2Grid(float value) { return std::floor(value / 2.0f) * 2.0f; }
+
+std::vector<Engine::Vector3> BuildPipePathPoints(const Engine::Vector3& start, const Engine::Vector3& end) {
+	std::vector<Engine::Vector3> points;
+
+	const int x0 = static_cast<int>(SnapTo2x2Grid(start.x));
+	const int z0 = static_cast<int>(SnapTo2x2Grid(start.z));
+	const int x1 = static_cast<int>(SnapTo2x2Grid(end.x));
+	const int z1 = static_cast<int>(SnapTo2x2Grid(end.z));
+	constexpr int kStep = 2;
+
+	const float y = end.y;
+	points.push_back({static_cast<float>(x0), y, static_cast<float>(z0)});
+
+	int x = x0;
+	int z = z0;
+   const int stepX = (x1 > x0) ? kStep : -kStep;
+	const int stepZ = (z1 > z0) ? kStep : -kStep;
+	const int totalX = std::abs((x1 - x0) / kStep);
+	const int totalZ = std::abs((z1 - z0) / kStep);
+
+	int movedX = 0;
+	int movedZ = 0;
+	while (movedX < totalX || movedZ < totalZ) {
+		const bool canMoveX = movedX < totalX;
+		const bool canMoveZ = movedZ < totalZ;
+
+		bool moveX = false;
+		if (canMoveX && canMoveZ) {
+			const int nextXScore = (movedX + 1) * totalZ;
+			const int nextZScore = (movedZ + 1) * totalX;
+			moveX = nextXScore <= nextZScore;
+		} else {
+			moveX = canMoveX;
+		}
+
+		if (moveX) {
+			x += stepX;
+			++movedX;
+		} else {
+			z += stepZ;
+			++movedZ;
+		}
+
+		points.push_back({static_cast<float>(x), y, static_cast<float>(z)});
+	}
+
+	return points;
+}
+} // namespace
+
 void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	(void)entity;
 	(void)scene;
-	isPreparation_ = true;
+	isPhase_ = PreparationPhase;
+	NextPhase_ = PreparationPhase;
+	preIsPhase_ = PreparationPhase;
+	isPhaseTransitioning_ = false;
+	isFadeFinished_ = false;
+	hasPipeStartPoint_ = false;
 
 	// スキルツリーの初期化
 	if (auto* renderer = Engine::Renderer::GetInstance()) {
@@ -37,16 +96,20 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	(void)scene;
 	(void)dt;
 	auto* input = Engine::Input::GetInstance();
-	if (!input) return;
+	if (!input)
+		return;
 
 	// スクリプト動作確認用の白い線 (常に表示)
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
 		renderer->DrawLine3D({0, 20, 0}, {5, 20, 0}, {1, 1, 1, 1}, true);
-		if (isPreparation_) renderer->DrawLine3D({0, 21, 0}, {5, 21, 0}, {0, 1, 0, 1}, true);
-		if (isPlacementMode_) renderer->DrawLine3D({0, 22, 0}, {5, 22, 0}, {0, 0, 1, 1}, true);
+		if (isPhase_ == PreparationPhase)
+			renderer->DrawLine3D({0, 21, 0}, {5, 21, 0}, {0, 1, 0, 1}, true);
+		if (isPlacementMode_)
+			renderer->DrawLine3D({0, 22, 0}, {5, 22, 0}, {0, 0, 1, 1}, true);
 	}
 
+	// ★入力処理: キーボードとUI両方からの入力を受け付ける
 	bool key1 = input->Trigger(DIK_1) || (GetAsyncKeyState('1') & 0x8001);
 	bool key2 = input->Trigger(DIK_2) || (GetAsyncKeyState('2') & 0x8001);
 	bool key3 = input->Trigger(DIK_3) || (GetAsyncKeyState('3') & 0x8001);
@@ -56,7 +119,12 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	// ★ スキルツリーの入力処理 (準備フェーズ中のみ)
 	bool keyN = input->Trigger(DIK_N) || (GetAsyncKeyState('N') & 0x8001);
 
-	if (isPreparation_) {
+	// 外部(EnemySpawnerScript など)からのフェーズ変更要求を反映
+	if (!isPhaseTransitioning_ && isPhase_ != Transition && NextPhase_ != isPhase_) {
+		RequestPhaseChange(NextPhase_);
+	}
+
+	if (isPhase_ == PreparationPhase) {
 		// Nキーでスキルツリーの開閉
 		if (keyN && !preKeyN_) {
 			skillTree_.Toggle();
@@ -86,32 +154,74 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			return; // 設置モードの入力を抑制
 		}
 
+		// 設置モードへの切り替え
+
 		if (key1 || InstallationButton::IsButtonPressed(InstallationButton::Tank)) {
 			selectedObjPath_ = "Resources/Prefabs/BulletTank.prefab";
 			isPlacementMode_ = true;
+			isPipeSet_ = false;
+			hasPipeStartPoint_ = false;
 		}
 
 		if (key2 || InstallationButton::IsButtonPressed(InstallationButton::Pipe)) {
 			selectedObjPath_ = "Resources/Prefabs/Pipe.prefab";
+			isPipeSet_ = true;
 			isPlacementMode_ = true;
+			hasPipeStartPoint_ = false;
 		}
 
 		if (key3 || InstallationButton::IsButtonPressed(InstallationButton::Cannon)) {
 			selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
 			isPlacementMode_ = true;
+			isPipeSet_ = false;
+			hasPipeStartPoint_ = false;
 		}
 		if (input->IsMouseTrigger(1) && isPlacementMode_) {
 			isPlacementMode_ = false;
+			isPipeSet_ = false;
+			hasPipeStartPoint_ = false;
 		}
 
 		Installation(scene, selectedObjPath_);
 
 		if (keySpace) {
-			isPreparation_ = false;
+			RequestPhaseChange(BattlePhase);
 			isPlacementMode_ = false;
+			hasPipeStartPoint_ = false;
 			skillTree_.Close(); // フェーズ移行時にスキルツリーを閉じる
-			currentPhase_++;
+		}
 
+	} else if (isPhase_ == BattlePhase) {
+		if (keyP) {
+			RequestPhaseChange(PreparationPhase);
+		}
+		isPlacementMode_ = false;
+		hasPipeStartPoint_ = false;
+	} else {
+		isPlacementMode_ = false;
+		hasPipeStartPoint_ = false;
+	}
+
+	UpdatePhaseTransition();
+
+	// フェーズが切り替わった瞬間の検知
+	if (isPhase_ != preIsPhase_) {
+		auto& nav = scene->GetNavigationManager();
+
+		if (isPhase_ == BattlePhase) {
+			// 準備から戦闘に切り替わった瞬間
+			// 設置物を反映するためにコストマップを更新
+			nav.UpdateCostMap(scene);
+
+			// 敵が目指すコアをゴールの位置としてフローフィールドを計算
+			auto core = scene->FindObjectByName("Core");
+			if (scene->GetRegistry().valid(core)) {
+				auto& tc = scene->GetRegistry().get<TransformComponent>(core);
+				nav.GenerateFlowField(tc.translate.x, tc.translate.z);
+			}
+
+			// 敵のスポーン地点の生成
+			currentPhase_++;
 			std::string enemyPrefabPath = "Resources/Prefabs/EnemySpawner" + std::to_string(currentPhase_) + ".prefab";
 			std::vector<entt::entity> spawnedEnemies = EditorUI::LoadPrefab(scene, enemyPrefabPath);
 
@@ -126,35 +236,44 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			}
 		}
 
-	} else {
-		if (keyP) {
-			isPreparation_ = true;
-		}
-		isPlacementMode_ = false;
-	}
-
-	// フェーズが切り替わった瞬間の検知
-	if (isPreparation_ != preIsPreparation_) {
-		auto& nav = scene->GetNavigationManager();
-
-		if (!isPreparation_) {
-			// 準備から戦闘に切り替わった瞬間
-			// 設置物を反映するためにコストマップを更新
-			nav.UpdateCostMap(scene);
-
-			// 敵が目指すコアをゴールの位置としてフローフィールドを計算
-			auto core = scene->FindObjectByName("Core");
-			if (scene->GetRegistry().valid(core)) {
-				auto& tc = scene->GetRegistry().get<TransformComponent>(core);
-				nav.GenerateFlowField(tc.translate.x, tc.translate.z);
-			}
-		}
-
 		// 状態を同期
-		preIsPreparation_ = isPreparation_;
+		preIsPhase_ = isPhase_;
 	}
 
 	preKeyN_ = keyN;
+}
+
+void PhaseSystemScript::RequestPhaseChange(PhaseState nextPhase) {
+	if (isPhase_ == Transition || isPhaseTransitioning_)
+		return;
+	if (isPhase_ == nextPhase)
+		return;
+
+	NextPhase_ = nextPhase;
+	isPhase_ = Transition;
+	isPhaseTransitioning_ = true;
+	isFadeFinished_ = false;
+
+	if (PhaseTransition::IsAvailable()) {
+		PhaseTransition::RequestFade();
+	}
+}
+
+void PhaseSystemScript::UpdatePhaseTransition() {
+	if (!isPhaseTransitioning_)
+		return;
+
+	if (PhaseTransition::IsAvailable()) {
+		isFadeFinished_ = PhaseTransition::ConsumeSwitchPoint();
+	} else {
+		isFadeFinished_ = true;
+	}
+
+	if (isFadeFinished_) {
+		isPhase_ = NextPhase_;
+		isPhaseTransitioning_ = false;
+		isFadeFinished_ = false;
+	}
 }
 
 void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPath) {
@@ -162,6 +281,8 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 		return;
 
 	auto* input = Engine::Input::GetInstance();
+	if (!input)
+		return;
 	Engine::Vector3 hitPoint{};
 	if (!TryGetTerrainHitPoint(scene, hitPoint))
 		return;
@@ -170,12 +291,53 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 	snappedHitPoint.x = std::floor(snappedHitPoint.x);
 	snappedHitPoint.z = std::floor(snappedHitPoint.z);
 
+	if (isPipeSet_) {
+		snappedHitPoint.x = SnapTo2x2Grid(snappedHitPoint.x);
+		snappedHitPoint.z = SnapTo2x2Grid(snappedHitPoint.z);
+
+		if (!hasPipeStartPoint_) {
+			const bool canPlaceStart = !IsPlacementBlocked(scene, snappedHitPoint);
+			DrawPlacementPreview(scene, snappedHitPoint, objPath, canPlaceStart);
+
+			if (input->IsMouseTrigger(0) && canPlaceStart) {
+				pipeStartX_ = snappedHitPoint.x;
+				pipeStartY_ = snappedHitPoint.y;
+				pipeStartZ_ = snappedHitPoint.z;
+				hasPipeStartPoint_ = true;
+			}
+			return;
+		}
+
+		Engine::Vector3 startPoint{pipeStartX_, pipeStartY_, pipeStartZ_};
+		auto pathPoints = BuildPipePathPoints(startPoint, snappedHitPoint);
+		bool canPlaceAll = !pathPoints.empty();
+		for (const auto& p : pathPoints) {
+			const bool canPlacePoint = !IsPlacementBlocked(scene, p);
+			DrawPlacementPreview(scene, p, objPath, canPlacePoint);
+			if (!canPlacePoint) {
+				canPlaceAll = false;
+			}
+		}
+
+		if (input->IsMouseTrigger(0)) {
+			if (canPlaceAll) {
+				for (const auto& p : pathPoints) {
+					SpawnPlacedObject(scene, p, objPath);
+				}
+				isPlacementMode_ = false;
+				isPipeSet_ = false;
+			}
+			hasPipeStartPoint_ = false;
+		}
+		return;
+	}
+
 	const bool canPlace = !IsPlacementBlocked(scene, snappedHitPoint);
 
-   DrawPlacementPreview(scene, snappedHitPoint, objPath, canPlace);
+	DrawPlacementPreview(scene, snappedHitPoint, objPath, canPlace);
 
 	if (input->IsMouseTrigger(0) && canPlace) {
-        SpawnPlacedObject(scene, snappedHitPoint, objPath);
+		SpawnPlacedObject(scene, snappedHitPoint, objPath);
 		isPlacementMode_ = false;
 	}
 }
@@ -199,11 +361,12 @@ bool PhaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3&
 	if (!insideImage)
 		return false;
 #else
-    auto* input = Engine::Input::GetInstance();
-    if (!input) return false;
-    input->GetMousePos(localX, localY);
-    tW = (float)Engine::WindowDX::kW;
-    tH = (float)Engine::WindowDX::kH;
+	auto* input = Engine::Input::GetInstance();
+	if (!input)
+		return false;
+	input->GetMousePos(localX, localY);
+	tW = (float)Engine::WindowDX::kW;
+	tH = (float)Engine::WindowDX::kH;
 #endif
 
 	auto& camera = scene->GetCamera();
@@ -222,11 +385,8 @@ bool PhaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3&
 
 	auto& registry = scene->GetRegistry();
 	registry.view<NameComponent, TransformComponent>().each([&](entt::entity entity, const NameComponent& nc, const TransformComponent& tc) {
-		bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || 
-		                 (nc.name.find("Floor") != std::string::npos) || 
-		                 (nc.name.find("Ground") != std::string::npos) || 
-		                 (nc.name.find("Stage") != std::string::npos) ||
-		                 (nc.name.find("Plane") != std::string::npos);
+		bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || (nc.name.find("Floor") != std::string::npos) || (nc.name.find("Ground") != std::string::npos) ||
+		                 (nc.name.find("Stage") != std::string::npos) || (nc.name.find("Plane") != std::string::npos);
 		if (!isTerrain)
 			return;
 
@@ -238,7 +398,7 @@ bool PhaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3&
 				model = renderer->GetModel(gmc.meshHandle);
 			}
 		}
-		
+
 		if (!model && registry.all_of<MeshRendererComponent>(entity)) {
 			auto& mr = registry.get<MeshRendererComponent>(entity);
 			if (mr.modelHandle != 0) {
@@ -267,7 +427,7 @@ bool PhaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3&
 		if (std::abs(dir.y) > 0.0001f) {
 			float t = -orig.y / dir.y;
 			if (t > 0) {
-				outHitPoint = { orig.x + dir.x * t, 0.0f, orig.z + dir.z * t };
+				outHitPoint = {orig.x + dir.x * t, 0.0f, orig.z + dir.z * t};
 				hitTerrain = true;
 			}
 		}
@@ -315,7 +475,8 @@ bool PhaseSystemScript::ExtractPrefabRenderPaths(const std::string& prefabPath, 
 	std::ifstream f(Engine::PathUtils::FromUTF8(absPath));
 	if (!f.is_open()) {
 		f.open(Engine::PathUtils::FromUTF8(prefabPath));
-		if (!f.is_open()) return false;
+		if (!f.is_open())
+			return false;
 	}
 
 	std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
@@ -344,7 +505,7 @@ bool PhaseSystemScript::ExtractPrefabRenderPaths(const std::string& prefabPath, 
 }
 
 bool PhaseSystemScript::IsPlacementBlocked(GameScene* scene, const Engine::Vector3& hitPoint) const {
-    constexpr float kBlockHalfExtent = 2.0f; // 2x2 square
+	constexpr float kBlockHalfExtent = 2.0f; // 2x2 square
 
 	auto& registry = scene->GetRegistry();
 	auto view = registry.view<TransformComponent>();
@@ -356,11 +517,8 @@ bool PhaseSystemScript::IsPlacementBlocked(GameScene* scene, const Engine::Vecto
 
 		if (registry.all_of<NameComponent>(entity)) {
 			const auto& nc = registry.get<NameComponent>(entity);
-			const bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || 
-			                       (nc.name.find("Floor") != std::string::npos) || 
-			                       (nc.name.find("Ground") != std::string::npos) || 
-			                       (nc.name.find("Stage") != std::string::npos) ||
-			                       (nc.name.find("Plane") != std::string::npos);
+			const bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || (nc.name.find("Floor") != std::string::npos) || (nc.name.find("Ground") != std::string::npos) ||
+			                       (nc.name.find("Stage") != std::string::npos) || (nc.name.find("Plane") != std::string::npos);
 			if (isTerrain)
 				continue;
 		}
@@ -368,7 +526,7 @@ bool PhaseSystemScript::IsPlacementBlocked(GameScene* scene, const Engine::Vecto
 		const auto& tc = view.get<TransformComponent>(entity);
 		const float dx = tc.translate.x - hitPoint.x;
 		const float dz = tc.translate.z - hitPoint.z;
-     if (std::abs(dx) < kBlockHalfExtent && std::abs(dz) < kBlockHalfExtent) {
+		if (std::abs(dx) < kBlockHalfExtent && std::abs(dz) < kBlockHalfExtent) {
 			return true;
 		}
 	}
@@ -417,7 +575,7 @@ void PhaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector
 	}
 
 	entt::entity newEntity = scene->CreateEntity((objPath.find("cylinder") != std::string::npos || objPath.find("Cylinder") != std::string::npos) ? "PlacedCylinder" : "PlacedCube");
-	
+
 	auto& tc = registry.get<TransformComponent>(newEntity);
 	tc.translate = {hitPoint.x, hitPoint.y + 0.5f, hitPoint.z};
 	tc.scale = {1.0f, 1.0f, 1.0f};
@@ -430,9 +588,8 @@ void PhaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector
 	mr.shaderName = "Toon";
 }
 
-void PhaseSystemScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) { }
+void PhaseSystemScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 REGISTER_SCRIPT(PhaseSystemScript);
 
 } // namespace Game
-
