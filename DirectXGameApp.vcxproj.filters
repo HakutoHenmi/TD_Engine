@@ -82,6 +82,7 @@
     <ClCompile Include="Game\Scripts\MissileCanonScript.cpp" />
     <ClCompile Include="Game\Scripts\ExplosionAttackArea.cpp" />
     <ClCompile Include="Game\Scripts\PhaseTransition.cpp" />
+    <ClCompile Include="Game\Scripts\WaveManagement.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
@@ -195,6 +196,7 @@
     <ClInclude Include="Game\Scripts\MissileCanonScript.h" />
     <ClInclude Include="Game\Scripts\ExplosionAttackArea.h" />
     <ClInclude Include="Game\Scripts\PhaseTransition.h" />
+    <ClInclude Include="Game\Scripts\WaveManagement.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">
@@ -607,18 +609,6 @@
       <Filter>Resources\Models\Signboard</Filter>
     </None>
     <None Include="Resources\Models\Signboard\ThisIsSwitch.png">
-      <Filter>Resources\Models\Signboard</Filter>
-    </None>
-    <None Include="Resources\Models\Signboard\‚±‚ê‚ª.png">
-      <Filter>Resources\Models\Signboard</Filter>
-    </None>
-    <None Include="Resources\Models\Signboard\‚½‚Ü‚³‚ñ.png">
-      <Filter>Resources\Models\Signboard</Filter>
-    </None>
-    <None Include="Resources\Models\Signboard\‚Í‚Ë‚é‚æ.png">
-      <Filter>Resources\Models\Signboard</Filter>
-    </None>
-    <None Include="Resources\Models\Signboard\ƒXƒCƒbƒ`.png">
       <Filter>Resources\Models\Signboard</Filter>
     </None>
     <None Include="Resources\Models\Signboard\Signboard\Padjumpm.png">
@@ -1149,15 +1139,6 @@
     <None Include="Resources\Textures\fonts\AppliMincho\ReadMe.txt">
       <Filter>Resources\Textures\fonts\AppliMincho</Filter>
     </None>
-    <None Include="Resources\Textures\fonts\AppliMincho\ƒAƒvƒŠ–¾’©.otf">
-      <Filter>Resources\Textures\fonts\AppliMincho</Filter>
-    </None>
-    <None Include="Resources\Textures\fonts\AppliMincho\ƒAƒvƒŠ–¾’©Old.otf">
-      <Filter>Resources\Textures\fonts\AppliMincho</Filter>
-    </None>
-    <None Include="Resources\Textures\fonts\AppliMincho\ƒAƒvƒŠ–¾’©UD.otf">
-      <Filter>Resources\Textures\fonts\AppliMincho</Filter>
-    </None>
     <None Include="Resources\Textures\fonts\Huninn\Huninn-Regular.ttf">
       <Filter>Resources\Textures\fonts\Huninn</Filter>
     </None>
@@ -1296,5 +1277,12 @@
     <None Include="Resources\Textures\UI\uvChecker.png">
       <Filter>Resources\Textures\UI</Filter>
     </None>
+    <None Include="Resources\Models\Signboard\ã“ã‚ŒãEpng" />
+    <None Include="Resources\Models\Signboard\ãŸã¾ã•ã‚“.png" />
+    <None Include="Resources\Models\Signboard\ã¯ã­ã‚‹ã‚ˆ.png" />
+    <None Include="Resources\Models\Signboard\ã‚¹ã‚¤ãƒEï¿½ï¿½.png" />
+    <None Include="Resources\Textures\fonts\AppliMincho\ã‚¢ãƒ—ãƒªæ˜Žæœ.otf" />
+    <None Include="Resources\Textures\fonts\AppliMincho\ã‚¢ãƒ—ãƒªæ˜ŽæœOld.otf" />
+    <None Include="Resources\Textures\fonts\AppliMincho\ã‚¢ãƒ—ãƒªæ˜ŽæœUD.otf" />
   </ItemGroup>
 </Project>
