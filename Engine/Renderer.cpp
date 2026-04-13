@@ -9,9 +9,10 @@
 #include <cstring>
 #include <numeric>
 
-#include <DirectXMath.h>
-#include <DirectXTex.h>
+#include <directxmath.h>
 #include <d3dcompiler.h>
+#include <d3dx12.h>
+#include "UnicodeUtils.h"
 #include <d3dx12.h>
 #ifdef _MSC_VER
 #pragma warning(disable: 4865)
@@ -215,6 +216,10 @@ bool Renderer::Initialize(WindowDX* window) {
 	if (FAILED(dev_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&collisionAlloc_)))) return false;
 	if (FAILED(dev_->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, collisionAlloc_.Get(), nullptr, IID_PPV_ARGS(&collisionList_)))) return false;
 	collisionList_->Close(); // 最初は閉じておく
+
+	// テキストシステム初期化
+	// ※"msgothic.ttc" はWindows環境依存ですがテスト用に使用
+	InitTextSystem("C:\\Windows\\Fonts\\msgothic.ttc", 64.0f);
 
 	return true;
 }
@@ -894,6 +899,7 @@ void Renderer::EndFrame() {
 	list_->DrawInstanced(3, 1, 0, 0);
 
 	FlushSprites();
+	FlushText(); // ★追加: メインUI描画後にテキスト描画を実行
 
 	if (finalSceneState_ != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
 		auto b = CD3DX12_RESOURCE_BARRIER::Transition(finalSceneColor_.Get(), finalSceneState_, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -2554,6 +2560,266 @@ void Renderer::FlushSprites() {
 		list_->SetGraphicsRootDescriptorTable(1, textures_[texH].srvGpu);
 		list_->DrawInstanced(6, 1, 0, 0);
 	}
+}
+
+// ★追加: テキスト描画システム
+
+bool Renderer::InitTextSystem(const std::string& fontPath, float pixelHeight) {
+	// 既にこのフォントがロード済みなら何もしない
+	if (glyphCaches_.count(fontPath)) return true;
+
+	auto cache = std::make_unique<DynamicGlyphCache>();
+	if (!cache->Initialize(this, fontPath, pixelHeight)) {
+		return false;
+	}
+	glyphCaches_[fontPath] = std::move(cache);
+
+	// テキスト描画用 PSO が未作成なら作成 (初回のみ)
+	if (!psoText_) {
+		if (!rootSig2D_) return false;
+
+		static const char* kVSText = R"(
+struct VSIn { float2 pos : POSITION; float2 uv : TEXCOORD0; float4 color : COLOR0; };
+struct VSOut { float4 svpos : SV_POSITION; float2 uv : TEXCOORD0; float4 color : COLOR0; };
+VSOut main(VSIn v) {
+    VSOut o;
+    o.svpos = float4(v.pos, 0, 1);
+    o.uv = v.uv;
+    o.color = v.color;
+    return o;
+})";
+
+		static const char* kPSText = R"(
+Texture2D gTex : register(t0);
+SamplerState gSmp : register(s0);
+struct PSIn { float4 svpos : SV_POSITION; float2 uv : TEXCOORD0; float4 color : COLOR0; };
+float4 main(PSIn i) : SV_TARGET {
+    float alpha = gTex.Sample(gSmp, i.uv).r;
+    return float4(i.color.rgb, i.color.a * alpha);
+})";
+
+		auto vsBlob = CompileShader(kVSText, "main", "vs_5_0");
+		auto psBlob = CompileShader(kPSText, "main", "ps_5_0");
+		if (!vsBlob || !psBlob) return false;
+
+		D3D12_INPUT_ELEMENT_DESC layout[] = {
+			{"POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+			{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 8,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+			{"COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+		};
+
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC pso{};
+		pso.pRootSignature = rootSig2D_.Get();
+		pso.VS = {vsBlob->GetBufferPointer(), vsBlob->GetBufferSize()};
+		pso.PS = {psBlob->GetBufferPointer(), psBlob->GetBufferSize()};
+		pso.InputLayout = {layout, _countof(layout)};
+		pso.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		pso.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+		pso.NumRenderTargets = 1;
+		pso.SampleDesc.Count = 1;
+		pso.SampleMask = UINT_MAX;
+		pso.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+
+		auto blend = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+		blend.RenderTarget[0].BlendEnable = TRUE;
+		blend.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+		blend.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+		blend.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+		blend.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+		blend.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
+		blend.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+		blend.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+		pso.BlendState = blend;
+
+		pso.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+		pso.DepthStencilState.DepthEnable = FALSE;
+		pso.DSVFormat = DXGI_FORMAT_UNKNOWN;
+
+		if (FAILED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoText_)))) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void Renderer::DrawString(const std::string& text, float x, float y, float scale, const Vector4& color, const std::string& fontPath) {
+	// フォントが未ロードなら遅延初期化
+	if (!glyphCaches_.count(fontPath)) {
+		if (!InitTextSystem(fontPath, 64.0f)) return;
+	}
+	auto& cache = glyphCaches_[fontPath];
+	if (!cache || !cache->IsInitialized()) return;
+
+	const float W = static_cast<float>(Engine::WindowDX::kW);
+	const float H = static_cast<float>(Engine::WindowDX::kH);
+
+	auto codepoints = Utf8ToCodepoints(text);
+
+	float cursorX = x;
+	float cursorY = y;
+
+	int ascent = cache->GetAscent();
+	float scaledAscent = ascent * scale;
+
+	auto& vertices = textVerticesMap_[fontPath];
+
+	for (uint32_t cp : codepoints) {
+		// 改行処理
+		if (cp == '\n') {
+			cursorX = x;
+			cursorY += cache->GetLineHeight() * scale;
+			continue;
+		}
+		// タブ → 4スペース分
+		if (cp == '\t') {
+			const CachedGlyph* spaceGlyph = cache->GetGlyph(' ');
+			if (spaceGlyph) {
+				cursorX += spaceGlyph->metrics.advance * scale * 4.0f;
+			}
+			continue;
+		}
+
+		const CachedGlyph* glyph = cache->GetGlyph(cp);
+		if (!glyph) continue;
+
+		if (glyph->hasBitmap) {
+			// Quadの位置を計算 (ピクセル座標)
+			float xPos = cursorX + glyph->metrics.bearingX * scale;
+			float yPos = cursorY + (scaledAscent - glyph->metrics.bearingY * scale);
+			float w = glyph->metrics.width * scale;
+			float h = glyph->metrics.height * scale;
+
+			// ピクセル座標 → NDC
+			auto toNdcX = [W](float px) { return (px / W) * 2.0f - 1.0f; };
+			auto toNdcY = [H](float py) { return 1.0f - (py / H) * 2.0f; };
+
+			float nx0 = toNdcX(xPos);
+			float ny0 = toNdcY(yPos);
+			float nx1 = toNdcX(xPos + w);
+			float ny1 = toNdcY(yPos + h);
+
+			// 6頂点 (2三角形)
+			TextVertex v0 = { nx0, ny0, glyph->u0, glyph->v0, color.x, color.y, color.z, color.w };
+			TextVertex v1 = { nx1, ny0, glyph->u1, glyph->v0, color.x, color.y, color.z, color.w };
+			TextVertex v2 = { nx0, ny1, glyph->u0, glyph->v1, color.x, color.y, color.z, color.w };
+			TextVertex v3 = { nx0, ny1, glyph->u0, glyph->v1, color.x, color.y, color.z, color.w };
+			TextVertex v4 = { nx1, ny0, glyph->u1, glyph->v0, color.x, color.y, color.z, color.w };
+			TextVertex v5 = { nx1, ny1, glyph->u1, glyph->v1, color.x, color.y, color.z, color.w };
+
+			vertices.push_back(v0);
+			vertices.push_back(v1);
+			vertices.push_back(v2);
+			vertices.push_back(v3);
+			vertices.push_back(v4);
+			vertices.push_back(v5);
+		}
+
+		cursorX += glyph->metrics.advance * scale;
+	}
+}
+
+void Renderer::FlushText() {
+	if (textVerticesMap_.empty() || !psoText_) return;
+
+	const uint32_t fi = window_->FrameIndex();
+
+	ID3D12DescriptorHeap* heaps[] = { srvHeap_ };
+	list_->SetDescriptorHeaps(1, heaps);
+	list_->SetPipelineState(psoText_.Get());
+	list_->SetGraphicsRootSignature(rootSig2D_.Get());
+	list_->RSSetViewports(1, &viewport_);
+	list_->RSSetScissorRects(1, &scissor_);
+	list_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	// b0: ダミーのCBSprite
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4324)
+#endif
+	struct alignas(256) CBSprite {
+		Matrix4x4 mvp;
+		float color[4];
+	};
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+	CBSprite cb{};
+	cb.mvp = Matrix4x4::Identity();
+	cb.color[0] = cb.color[1] = cb.color[2] = cb.color[3] = 1.0f;
+	const uint32_t cbOff = upload_[fi].Allocate(sizeof(CBSprite), 256);
+	if (cbOff != UINT32_MAX) {
+		std::memcpy(upload_[fi].mapped + cbOff, &cb, sizeof(CBSprite));
+		list_->SetGraphicsRootConstantBufferView(0, upload_[fi].buffer->GetGPUVirtualAddress() + cbOff);
+	}
+
+	// フォントごとにアトラスSRVをバインドして描画
+	for (auto& [fontKey, vertices] : textVerticesMap_) {
+		if (vertices.empty()) continue;
+
+		auto it = glyphCaches_.find(fontKey);
+		if (it == glyphCaches_.end() || !it->second) continue;
+
+		const uint32_t vertCount = static_cast<uint32_t>(vertices.size());
+		const uint32_t bytesNeeded = vertCount * sizeof(TextVertex);
+
+		const uint32_t vbOff = upload_[fi].Allocate(bytesNeeded, 16);
+		if (vbOff == UINT32_MAX) continue;
+
+		std::memcpy(upload_[fi].mapped + vbOff, vertices.data(), bytesNeeded);
+
+		// このフォントのアトラスSRVをバインド
+		uint32_t texIdx = AllocateDynamicSrvIndex(1);
+		if (texIdx != UINT32_MAX) {
+			D3D12_CPU_DESCRIPTOR_HANDLE dest = window_->SRV_CPU(static_cast<int>(texIdx));
+			dev_->CopyDescriptorsSimple(1, dest, it->second->GetAtlasSrvCpuMaster(),
+			                            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			list_->SetGraphicsRootDescriptorTable(1, window_->SRV_GPU(static_cast<int>(texIdx)));
+		}
+
+		D3D12_VERTEX_BUFFER_VIEW vbv{};
+		vbv.BufferLocation = upload_[fi].buffer->GetGPUVirtualAddress() + vbOff;
+		vbv.SizeInBytes = bytesNeeded;
+		vbv.StrideInBytes = sizeof(TextVertex);
+
+		list_->IASetVertexBuffers(0, 1, &vbv);
+		list_->DrawInstanced(vertCount, 1, 0, 0);
+	}
+
+	textVerticesMap_.clear();
+}
+
+float Renderer::MeasureTextWidth(const std::string& text, float scale, const std::string& fontPath) {
+	// フォントが未ロードなら遅延初期化
+	if (!glyphCaches_.count(fontPath)) {
+		if (!InitTextSystem(fontPath, 64.0f)) return 0.0f;
+	}
+	auto it = glyphCaches_.find(fontPath);
+	if (it == glyphCaches_.end() || !it->second || !it->second->IsInitialized()) return 0.0f;
+	auto& cache = it->second;
+
+	auto codepoints = Utf8ToCodepoints(text);
+	float width = 0.0f;
+
+	for (uint32_t cp : codepoints) {
+		if (cp == '\n') break;
+		if (cp == '\t') {
+			const CachedGlyph* spaceGlyph = cache->GetGlyph(' ');
+			if (spaceGlyph) width += spaceGlyph->metrics.advance * scale * 4.0f;
+			continue;
+		}
+		const CachedGlyph* glyph = cache->GetGlyph(cp);
+		if (glyph) {
+			width += glyph->metrics.advance * scale;
+		}
+	}
+	return width;
+}
+
+float Renderer::GetTextLineHeight(float scale, const std::string& fontPath) const {
+	auto it = glyphCaches_.find(fontPath);
+	if (it == glyphCaches_.end() || !it->second || !it->second->IsInitialized()) return 0.0f;
+	return it->second->GetLineHeight() * scale;
 }
 
 // ★追加: 3Dライン描画（蓄積API）

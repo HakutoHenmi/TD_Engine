@@ -89,6 +89,17 @@ void UISystem::Draw(entt::registry& registry, GameContext& ctx) {
 
     WorldRect screen = { 0, 0, (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH };
     renderRecursive(renderRecursive, entt::null, screen);
+
+    // ★追加: RectTransformを持たないが、Transform と UIText を持つエンティティの簡易2D描画
+    auto viewRawText = registry.view<TransformComponent, UITextComponent>(entt::exclude<RectTransformComponent>);
+    for (auto e : viewRawText) {
+        auto& text = viewRawText.get<UITextComponent>(e);
+        auto& transform = viewRawText.get<TransformComponent>(e);
+        if (text.enabled) {
+            // Transformの X/Y をスクリーンのピクセル座標として扱う (Zは無視)
+            DrawTextW(e, registry, text, transform.translate.x, transform.translate.y, 0.0f, 0.0f, ctx.renderer);
+        }
+    }
 }
 
 // ★追加: ワールド空間UI（HPバー）の描画パス
@@ -271,22 +282,23 @@ void UISystem::RenderNodeWithRect(entt::entity entity, entt::registry& registry,
     }
 }
 
-void UISystem::DrawTextW(entt::entity /*entity*/, entt::registry& /*registry*/, const UITextComponent& text, float worldX, float worldY, float worldW, float worldH, Engine::Renderer* /*renderer*/) {
-#ifdef USE_IMGUI
-    ImDrawList* drawList = ImGui::GetBackgroundDrawList();
-    if (!drawList) return;
+void UISystem::DrawTextW(entt::entity /*entity*/, entt::registry& /*registry*/, const UITextComponent& text, float worldX, float worldY, float worldW, float worldH, Engine::Renderer* renderer) {
+	if (!renderer || text.text.empty() || text.color.w <= 0.01f) return;
 
-    ImVec2 pos(worldX, worldY);
-    // 中央揃えなどの簡易実装
-    ImVec2 textSize = ImGui::CalcTextSize(text.text.c_str());
-    pos.x += (worldW - textSize.x) * 0.5f;
-    pos.y += (worldH - textSize.y) * 0.5f;
+	// フォントレンダラーの初期化サイズ (Renderer 内で 64.0f) を基準にスケール
+	float fontScale = text.fontSize / 64.0f;
 
-    ImU32 color = ImGui::GetColorU32(ImVec4(text.color.x, text.color.y, text.color.z, text.color.w));
-    drawList->AddText(ImGui::GetFont(), text.fontSize, pos, color, text.text.c_str());
-#else
-    (void)text; (void)worldX; (void)worldY; (void)worldW; (void)worldH;
-#endif
+	float tw = renderer->MeasureTextWidth(text.text, fontScale, text.fontPath);
+	float th = renderer->GetTextLineHeight(fontScale, text.fontPath);
+
+	// 中央揃え (worldW/worldHが0の場合は左上揃え)
+	float px = worldX;
+	float py = worldY;
+	if (worldW > 0.0f) px += (worldW - tw) * 0.5f;
+	if (worldH > 0.0f) py += (worldH - th) * 0.5f;
+
+	Engine::Vector4 colorVec = { text.color.x, text.color.y, text.color.z, text.color.w };
+	renderer->DrawString(text.text, px, py, fontScale, colorVec, text.fontPath);
 }
 
 void UISystem::ProcessButton(entt::entity entity, entt::registry& registry, UIButtonComponent& btn, float worldX, float worldY, float worldW, float worldH, GameContext& ctx) {

@@ -143,6 +143,9 @@
     <ClCompile Include="Engine\ParticleEmitter.cpp" />
     <ClCompile Include="Engine\ParticleEditor.cpp" />
     <ClCompile Include="Engine\Renderer.cpp" />
+    <ClCompile Include="Engine\DynamicGlyphCache.cpp" />
+    <ClCompile Include="Engine\Font.cpp" />
+    <ClCompile Include="externals\stb\stb_truetype_impl.cpp" />
     <ClCompile Include="Engine\RibbonRenderer.cpp" />
     <ClCompile Include="Engine\SceneManager.cpp" />
     <ClCompile Include="Engine\TextureManager.cpp" />
@@ -184,6 +187,10 @@
     <ClInclude Include="Engine\ParticleEmitter.h" />
     <ClInclude Include="Engine\ParticleEditor.h" />
     <ClInclude Include="Engine\Renderer.h" />
+    <ClInclude Include="Engine\DynamicGlyphCache.h" />
+    <ClInclude Include="Engine\Font.h" />
+    <ClInclude Include="Engine\UnicodeUtils.h" />
+    <ClInclude Include="externals\stb\stb_truetype.h" />
     <ClInclude Include="Engine\RibbonRenderer.h" />
     <ClInclude Include="Engine\SceneManager.h" />
     <ClInclude Include="Engine\TextureManager.h" />
