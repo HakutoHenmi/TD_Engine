@@ -404,6 +404,7 @@ struct UITextComponent : public Component {
 	std::string text = "New Text";
 	float fontSize = 24.0f;
 	DirectX::XMFLOAT4 color = {1, 1, 1, 1};
+	std::string fontPath = "C:\\Windows\\Fonts\\msgothic.ttc"; // フォントファイルパス
 	UITextComponent() { type = ComponentType::UIText; }
 };
 

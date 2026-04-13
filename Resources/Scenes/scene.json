@@ -7,6 +7,32 @@
   },
   "objects": [
     {
+      "id": 26,
+      "parentId": 0,
+      "name": "Empty",
+      "locked": false,
+      "translate": [0.8, 16.8, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "RectTransform", "enabled": true, "pos": [8,168], "size": [100,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIText", "enabled": true, "text": "masuyagou 増谷真紀子", "fontSize": 150, "fontPath": "C:\\Windows\\Fonts\\msgothic.ttc", "color": [1,1,1,1]}
+      ]
+    },
+    {
+      "id": 25,
+      "parentId": 0,
+      "name": "Empty",
+      "locked": false,
+      "translate": [-59.748, 1.5, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "RectTransform", "enabled": true, "pos": [-578,15], "size": [708.905,266.107], "anchor": [0.8,0.48], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIText", "enabled": true, "text": "ますやごう　マスヤゴウ", "fontSize": 150, "fontPath": "C:\\Windows\\Fonts\\msgothic.ttc", "color": [1,1,1,1]}
+      ]
+    },
+    {
       "id": 1048600,
       "parentId": 4294967295,
       "name": "particle smoke",

@@ -283,7 +283,11 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 					if (!c.texturePath.empty()) c.textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(c.texturePath, false);
 				} else if (type == "UIText") {
 					auto& c = reg.get_or_emplace<UITextComponent>(entity);
-					c.enabled = en; c.text = comp.value("text", ""); c.fontSize = comp.value("fontSize", 24.0f);
+					c.enabled = en; 
+					c.text = comp.value("text", ""); 
+					c.fontSize = comp.value("fontSize", 24.0f);
+					c.fontPath = comp.value("fontPath", "C:\\Windows\\Fonts\\msgothic.ttc");
+					if (comp.contains("color")) c.color = {comp["color"][0], comp["color"][1], comp["color"][2], comp["color"][3]};
 				} else if (type == "UIButton") {
 					auto& c = reg.get_or_emplace<UIButtonComponent>(entity);
 					c.enabled = en;
@@ -660,7 +664,7 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 	}
 	if (auto* cp = registry.try_get<UITextComponent>(entity)) {
 		addComma();
-		ss << "        {\"type\": \"UIText\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"text\": \"" << EscapeJson(cp->text) << "\", \"fontSize\": " << cp->fontSize << "}";
+		ss << "        {\"type\": \"UIText\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"text\": \"" << EscapeJson(cp->text) << "\", \"fontSize\": " << cp->fontSize << ", \"fontPath\": \"" << EscapeJson(cp->fontPath) << "\", \"color\": [" << cp->color.x << "," << cp->color.y << "," << cp->color.z << "," << cp->color.w << "]}";
 	}
 	if (auto* cp = registry.try_get<UIButtonComponent>(entity)) {
 		addComma();
@@ -2290,6 +2294,38 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					char tbuf[256]; strcpy_s(tbuf, txt->text.c_str());
 					if (ImGui::InputText("Text", tbuf, sizeof(tbuf))) txt->text = tbuf;
 					ImGui::DragFloat("Font Size", &txt->fontSize, 1.0f, 1, 100);
+					ImGui::ColorEdit4("Color##TXT", &txt->color.x);
+
+					// フォント選択ドロップダウン
+					std::vector<std::string> fonts = { "C:\\Windows\\Fonts\\msgothic.ttc" };
+					std::string fontDir = GetUnifiedProjectPath("Resources/Fonts");
+					if (std::filesystem::exists(Engine::PathUtils::FromUTF8(fontDir))) {
+						for (auto& p : std::filesystem::directory_iterator(Engine::PathUtils::FromUTF8(fontDir))) {
+							std::string ext = p.path().extension().string();
+							if (ext == ".ttf" || ext == ".ttc" || ext == ".otf") {
+								fonts.push_back(GetUnifiedProjectPath("Resources/Fonts/" + p.path().filename().string()));
+							}
+						}
+					}
+
+					if (ImGui::BeginCombo("Font Path", txt->fontPath.c_str())) {
+						for (const auto& f : fonts) {
+							bool isSelected = (txt->fontPath == f);
+							if (ImGui::Selectable(f.c_str(), isSelected)) txt->fontPath = f;
+							if (isSelected) ImGui::SetItemDefaultFocus();
+						}
+						ImGui::EndCombo();
+					}
+					AssetField("Custom Font", txt->fontPath, { ".ttf", ".ttc", ".otf" });
+
+					if (!registry.all_of<RectTransformComponent>(entity)) {
+						ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.4f, 0.0f, 1.0f));
+						if (ImGui::Button("Add RectTransform (Show UI Gizmo)")) {
+							registry.emplace<RectTransformComponent>(entity);
+						}
+						ImGui::PopStyleColor();
+					}
+
 					if (ImGui::Button("Remove##TXT")) registry.remove<UITextComponent>(entity);
 				}
 			}

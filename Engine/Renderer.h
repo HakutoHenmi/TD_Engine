@@ -7,6 +7,9 @@
 #include <unordered_map>
 #include <vector>
 
+// ★追加: テキスト描画用
+#include "DynamicGlyphCache.h"
+
 #include <d3d12.h>
 #include <wrl/client.h>
 
@@ -266,6 +269,21 @@ public:
 	void DrawSprite9Slice(TextureHandle texH, const Sprite9SliceDesc& s); // ★追加
 	void FlushSprites(); // スプライトの描画実行
 
+	// ★追加: テキスト描画
+	// text: UTF-8 文字列
+	// x, y: スクリーン座標 (左上基準, ピクセル)
+	// scale: フォントのスケール (1.0 = デフォルトサイズ)
+	// color: 文字色 (RGBA)
+	void DrawString(const std::string& text, float x, float y, float scale = 1.0f, const Vector4& color = {1,1,1,1}, const std::string& fontPath = "C:\\Windows\\Fonts\\msgothic.ttc");
+	void FlushText(); // テキストの描画実行
+
+	// テキストシステムの初期化 (フォントファイルの読み込み)
+	bool InitTextSystem(const std::string& fontPath, float pixelHeight = 48.0f);
+
+	// テキスト描画の幅を事前計算 (レイアウト用)
+	float MeasureTextWidth(const std::string& text, float scale = 1.0f, const std::string& fontPath = "C:\\Windows\\Fonts\\msgothic.ttc");
+	float GetTextLineHeight(float scale = 1.0f, const std::string& fontPath = "C:\\Windows\\Fonts\\msgothic.ttc") const;
+
 	// ★追加: 3Dライン描画（エディタ用ギズモ・グリッドなど）
 	void DrawLine3D(const Vector3& p0, const Vector3& p1, const Vector4& color, bool xray = false);
 	void FlushLines();
@@ -317,6 +335,11 @@ public:
 	// ★追加: 風とプレイヤーの位置設定
 	void SetWindParams(const Vector4& p) { cbFrame_.windParams = p; }
 	void SetPlayerPos(const Vector3& p) { cbFrame_.playerPos = p; }
+
+	// ★追加: DynamicGlyphCache からの SRV 割り当て用
+	uint32_t AllocateTextSrvIndex() { return AllocateSrvIndex(1); }
+	WindowDX* GetWindow() const { return window_; }
+	ID3D12CommandQueue* GetQueue() const { return queue_; }
 
 private:
 	struct Mesh {
@@ -429,6 +452,17 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSig2D_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> pso2D_;
+
+	// ★追加: テキスト描画用 (複数フォント対応)
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoText_;
+	std::unordered_map<std::string, std::unique_ptr<DynamicGlyphCache>> glyphCaches_;
+	struct TextVertex {
+		float x, y;   // position (NDC)
+		float u, v;   // texture coordinate
+		float r, g, b, a; // color
+	};
+	// フォントパスごとに頂点を蓄積
+	std::unordered_map<std::string, std::vector<TextVertex>> textVerticesMap_;
 
 	// ★追加: 3Dライン描画用
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoLine3D_;
