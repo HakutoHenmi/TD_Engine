@@ -34,10 +34,10 @@ void NavigationManager::UpdateCostMap(Game::GameScene* scene) {
 					auto& tc = tcView.get<Game::TransformComponent>(entity);
 
 					// オブジェクトの範囲をグリッド座標に変換して、その範囲を壁[255]にする
-					int minX = static_cast<int>((tc.translate.x - tc.scale.x) / cellSize_);
-					int maxX = static_cast<int>((tc.translate.x + tc.scale.x) / cellSize_);
-					int minZ = static_cast<int>((tc.translate.z - tc.scale.z) / cellSize_);
-					int maxZ = static_cast<int>((tc.translate.z + tc.scale.z) / cellSize_);
+					int minX = static_cast<int>(std::floor((tc.translate.x - tc.scale.x - originX_) / cellSize_));
+					int maxX = static_cast<int>(std::floor((tc.translate.x + tc.scale.x - originX_) / cellSize_));
+					int minZ = static_cast<int>(std::floor((tc.translate.z - tc.scale.z - originZ_) / cellSize_));
+					int maxZ = static_cast<int>(std::floor((tc.translate.z + tc.scale.z - originZ_) / cellSize_));
 
 					for (int z = minZ; z <= maxZ; ++z) {
 						for (int x = minX; x <= maxX; ++x) {
@@ -122,26 +122,55 @@ void NavigationManager::CalculateDirections() {
 	for (int z = 0; z < height_; ++z) {
 		for (int x = 0; x < width_; ++x) {
 			int currIndex = GetIndex(x, z);
-			if (grid_[currIndex].cost == 255) continue; // 壁[255]なら何もしない
+			if (grid_[currIndex].cost == 255) {
+				grid_[currIndex].dirX = 0;
+				grid_[currIndex].dirZ = 0;
+				continue;
+			}
 
-			// 周囲のコスト差から勾配を作る
-			// 左(x-1)と右(x+1)、上(z+1)と下(z-1)のコストを比較する
-			float west = (x > 0) ? grid_[GetIndex(x - 1, z)].bestCost : grid_[currIndex].bestCost;
-			float east  = (x < width_ - 1) ? grid_[GetIndex(x + 1, z)].bestCost : grid_[currIndex].bestCost;
-			float north = (z < height_ - 1) ? grid_[GetIndex(x, z + 1)].bestCost : grid_[currIndex].bestCost;
-			float south = (z > 0) ? grid_[GetIndex(x, z - 1)].bestCost : grid_[currIndex].bestCost;
+			float dirX = 0.0f;
+			float dirZ = 0.0f;
 
-			// よりコストの低いほうへ向かうベクトルを計算
-			float dirX = west - east;
-			float dirZ = south - north;
+			// 周囲8マスを見て、最も「下り坂」な方向を探す
+			float currentBestCost = grid_[currIndex].bestCost;
 
-			//正規化して保存
+			for (int dz = -1; dz <= 1; ++dz) {
+				for (int dx = -1; dx <= 1; ++dx) {
+					if (dx == 0 && dz == 0) continue;
+
+					int nx = x + dx;
+					int nz = z + dz;
+
+					if (nx >= 0 && nx < width_ && nz >= 0 && nz < height_) {
+						int targetIdx = GetIndex(nx, nz);
+						float neighborCost;
+
+						if (grid_[targetIdx].cost == 255) {
+							// 壁のコストを「自分のコスト + セルサイズ分」程度に抑える
+							// これにより、壁を避ける力が「適度」になり、ゴールへの力と混ざるようになる
+							neighborCost = grid_[currIndex].bestCost + cellSize_; 
+						} else {
+							neighborCost = grid_[targetIdx].bestCost;
+						}
+
+						// 今のマスよりコストが低い方向があれば、そちらへの向きを加算
+						if (neighborCost < currentBestCost) {
+							// 斜め移動の寄与率を調整（1.0 / 距離）
+							float weight = (dx != 0 && dz != 0) ? 0.707f : 1.0f;
+							dirX += (float)dx * (currentBestCost - neighborCost) * weight;
+							dirZ += (float)dz * (currentBestCost - neighborCost) * weight;
+						}
+					}
+				}
+			}
+
+			// 正規化して保存
 			float length = std::sqrt(dirX * dirX + dirZ * dirZ);
 			if (length > 0.001f) {
 				grid_[currIndex].dirX = dirX / length;
 				grid_[currIndex].dirZ = dirZ / length;
-			}
-			else {
+			} else {
+				// どこにも行けない（またはゴール地点）
 				grid_[currIndex].dirX = 0;
 				grid_[currIndex].dirZ = 0;
 			}
