@@ -50,7 +50,16 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 
 	#if defined(USE_IMGUI) && !defined(NDEBUG) 
 	auto* renderer = Engine::Renderer::GetInstance();
-	if (renderer && scene && !scene->IsPlaying()) {
+	bool shouldDrawPreview = false;
+	if (scene) {
+		if (!scene->IsPlaying()) {
+			shouldDrawPreview = true;
+		} else if (PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase) {
+			shouldDrawPreview = true;
+		}
+	}
+
+	if (renderer && shouldDrawPreview) {
 		for (size_t wi = 0; wi < enemySpawners_.size(); ++wi) {
 			for (entt::entity spawnerEntity : enemySpawners_[wi]) {
 				if (scene->GetRegistry().valid(spawnerEntity)) {
@@ -82,6 +91,17 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 	#endif
 
 	if (currentWave_ != previousWave_) {
+		if (scene->IsPlaying() && currentWave_ == -1) {
+			// 準備フェーズなどに移行した場合、残存している敵を全て消去する
+			const auto& enemies = scene->GetEntitiesByTag(TagType::Enemy);
+			std::vector<entt::entity> toDestroy(enemies.begin(), enemies.end());
+			for (auto e : toDestroy) {
+				if (scene->GetRegistry().valid(e)) {
+					scene->DestroyObject(static_cast<uint32_t>(e));
+				}
+			}
+		}
+
 		SpawnSpanner(currentWave_, scene);
 	}
 	previousWave_ = currentWave_;
@@ -132,6 +152,21 @@ void WaveManagement::OnEditorUI() {
 	if (!cachedScene_) {
 		ImGui::Text("シーンがキャッシュされていません。再生するかエディタで更新してください。");
 		return;
+	}
+
+	// エディタ起動時やプレイ終了時など、エンティティのリストが未構築・無効な場合に名前から復元する
+	if (enemySpawners_.size() != enemySpawnerNames_.size()) {
+		enemySpawners_.resize(enemySpawnerNames_.size());
+	}
+	for (size_t wi = 0; wi < enemySpawners_.size(); ++wi) {
+		if (enemySpawners_[wi].size() != enemySpawnerNames_[wi].size()) {
+			enemySpawners_[wi].resize(enemySpawnerNames_[wi].size(), static_cast<entt::entity>(entt::null));
+		}
+		for (size_t si = 0; si < enemySpawners_[wi].size(); ++si) {
+			if (!cachedScene_->GetRegistry().valid(enemySpawners_[wi][si])) {
+				enemySpawners_[wi][si] = cachedScene_->FindObjectByName(enemySpawnerNames_[wi][si]);
+			}
+		}
 	}
 
 	ImGui::SeparatorText("ウェーブ管理 (Wave Management)");
@@ -240,24 +275,8 @@ void WaveManagement::OnEditorUI() {}
 std::string WaveManagement::SerializeParameters() {
 	json j;
 
-	// 最新のスポナー名リストを構築してから保存
-	enemySpawnerNames_.clear();
-	if (cachedScene_) {
-		for (const auto& wave : enemySpawners_) {
-			std::vector<std::string> names;
-			for (auto e : wave) {
-				if (cachedScene_->GetRegistry().valid(e)) {
-					if (auto* nc = cachedScene_->GetRegistry().try_get<NameComponent>(e)) {
-						names.push_back(nc->name);
-					} else {
-						names.push_back("Unknown");
-					}
-				}
-			}
-			enemySpawnerNames_.push_back(names);
-		}
-	}
-
+	// 最新のスポナー名リストをエディタUI上で構築・維持しているので、そのまま保存する
+	// (ここでキャッシュされたシーンやエンティティを基に再構築すると、プレイ終了時に無効化されて消えてしまう問題を防止)
 	j["spawners"] = enemySpawnerNames_;
 	return j.dump();
 }

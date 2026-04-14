@@ -34,6 +34,11 @@ void EnemySpawnerScript::Start(entt::entity /*entity*/, GameScene* /*scene*/) {
 }
 
 void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, float dt) {
+	// バトルフェーズ以外では敵を出さない
+	if (PhaseSystemScript::IsPhase() != PhaseSystemScript::BattlePhase) {
+		return;
+	}
+
 	// Kを押して今いる敵を消す処理
 	// Kを押して今いる敵を消す処理
 	if (GetAsyncKeyState('K') & 0x8000) {
