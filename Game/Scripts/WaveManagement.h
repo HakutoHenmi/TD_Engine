@@ -17,10 +17,12 @@ public:
 	void SpawnSpanner(int currentWave, GameScene* scene);
 
 	static void SetWave(int waveNumber) { currentWave_ = waveNumber; }
+	static entt::entity GetManagerEntity() { return managerEntity_; }
 
 private:
 	static int currentWave_;
-	int previousWave_ = 0;
+	static inline entt::entity managerEntity_ = static_cast<entt::entity>(entt::null);
+	int previousWave_ = -1;
 
 	// 各ウェーブごとのスポナー（エンティティ名）のリスト (シリアライズ用)
 	std::vector<std::vector<std::string>> enemySpawnerNames_;

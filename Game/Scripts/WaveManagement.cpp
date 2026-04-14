@@ -18,10 +18,14 @@ using json = nlohmann::json;
 
 namespace Game {
 
-int WaveManagement::currentWave_ = 0;
+int WaveManagement::currentWave_ = -1;
 
-void WaveManagement::Start(entt::entity /*entity*/, GameScene* scene) {
+void WaveManagement::Start(entt::entity entity, GameScene* scene) {
 	if (!scene) return;
+
+	managerEntity_ = entity;
+	currentWave_ = -1;
+	previousWave_ = -2;
 
 	// 名前に基づいてエンティティを解決
 	enemySpawners_.clear();
@@ -30,6 +34,9 @@ void WaveManagement::Start(entt::entity /*entity*/, GameScene* scene) {
 		for (const auto& name : waveNames) {
 			entt::entity e = scene->FindObjectByName(name);
 			if (scene->GetRegistry().valid(e)) {
+				if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(e)) {
+					sc->enabled = false;
+				}
 				waveSpawners.push_back(e);
 			}
 		}
@@ -37,12 +44,13 @@ void WaveManagement::Start(entt::entity /*entity*/, GameScene* scene) {
 	}
 }
 
-void WaveManagement::Update(entt::entity /*entity*/, GameScene* scene, float /*dt*/) {
+void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/) {
 	cachedScene_ = scene;
+	managerEntity_ = entity;
 
 	#if defined(USE_IMGUI) && !defined(NDEBUG) 
 	auto* renderer = Engine::Renderer::GetInstance();
-	if (renderer && scene) {
+	if (renderer && scene && !scene->IsPlaying()) {
 		for (size_t wi = 0; wi < enemySpawners_.size(); ++wi) {
 			for (entt::entity spawnerEntity : enemySpawners_[wi]) {
 				if (scene->GetRegistry().valid(spawnerEntity)) {
@@ -81,7 +89,36 @@ void WaveManagement::Update(entt::entity /*entity*/, GameScene* scene, float /*d
 
 void WaveManagement::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
-void WaveManagement::SpawnSpanner(int /*currentWave*/, GameScene* /*scene*/) {}
+void WaveManagement::SpawnSpanner(int currentWave, GameScene* scene) {
+	if (!scene) return;
+
+	// すべてのスポナーを無効化する
+	for (auto& waveSpawners : enemySpawners_) {
+		for (entt::entity e : waveSpawners) {
+			if (scene->GetRegistry().valid(e)) {
+				if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(e)) {
+					sc->enabled = false;
+				}
+			}
+		}
+	}
+
+	if (currentWave < 0 || currentWave >= static_cast<int>(enemySpawners_.size())) return;
+
+	// 現在のウェーブのスポナーだけを有効化する
+	for (entt::entity e : enemySpawners_[currentWave]) {
+		if (scene->GetRegistry().valid(e)) {
+			if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(e)) {
+				sc->enabled = true;
+				for (auto& entry : sc->scripts) {
+					if (entry.instance) {
+						entry.instance->Start(e, scene);
+					}
+				}
+			}
+		}
+	}
+}
 
 #if defined(USE_IMGUI) && !defined(NDEBUG)
 void WaveManagement::OnEditorUI() {
@@ -106,11 +143,11 @@ void WaveManagement::OnEditorUI() {
 
 	for (size_t wi = 0; wi < enemySpawners_.size(); ++wi) {
 		ImGui::PushID(static_cast<int>(wi));
-		bool isNodeOpen = ImGui::TreeNodeEx(("Wave " + std::to_string(wi)).c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+		bool isNodeOpen = ImGui::TreeNodeEx(("Wave " + std::to_string(wi + 1)).c_str(), ImGuiTreeNodeFlags_DefaultOpen);
 
 		if (isNodeOpen) {
 			if (ImGui::Button("スポナーを追加 (Add Spawner)")) {
-				std::string name = "Spawner_W" + std::to_string(wi) + "_" + std::to_string(enemySpawners_[wi].size());
+				std::string name = "Spawner_W" + std::to_string(wi + 1) + "_" + std::to_string(enemySpawners_[wi].size() + 1);
 				entt::entity spawner = cachedScene_->CreateEntity(name);
 
 				if (auto* tc = cachedScene_->GetRegistry().try_get<TransformComponent>(spawner)) {
@@ -146,8 +183,8 @@ void WaveManagement::OnEditorUI() {
 				ImGui::PushID(static_cast<int>(si));
 				bool isSpawnerNodeOpen = ImGui::TreeNode(sname.c_str());
 
-				// 選択（ギズモ用）
-				if (ImGui::IsItemClicked()) {
+				ImGui::SameLine();
+				if (ImGui::Button("選択(Select)")) {
 					cachedScene_->SetSelectedEntity(spawner);
 					cachedScene_->GetSelectedEntities().clear();
 					cachedScene_->GetSelectedEntities().insert(spawner);

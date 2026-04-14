@@ -20,6 +20,8 @@
 // Button UI
 #include "InstallationButton.h"
 
+#include "WaveManagement.h"
+
 namespace Game {
 
 namespace {
@@ -211,6 +213,8 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		if (isPhase_ == BattlePhase) {
 			// 準備から戦闘に切り替わった瞬間
 			// 設置物を反映するためにコストマップを更新
+			
+
 			nav.UpdateCostMap(scene);
 
 			// 敵が目指すコアをゴールの位置としてフローフィールドを計算
@@ -222,18 +226,10 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 			// 敵のスポーン地点の生成
 			currentPhase_++;
-			std::string enemyPrefabPath = "Resources/Prefabs/EnemySpawner" + std::to_string(currentPhase_) + ".prefab";
-			std::vector<entt::entity> spawnedEnemies = EditorUI::LoadPrefab(scene, enemyPrefabPath);
-
-			auto& registry = scene->GetRegistry();
-			for (auto spawnedEntity : spawnedEnemies) {
-				if (registry.all_of<TransformComponent>(spawnedEntity)) {
-					auto& tc = registry.get<TransformComponent>(spawnedEntity);
-					if (!registry.all_of<HierarchyComponent>(spawnedEntity) || registry.get<HierarchyComponent>(spawnedEntity).parentId == entt::null) {
-						tc.translate = {-50.0f, 20.0f, 50.0f};
-					}
-				}
-			}
+			WaveManagement::SetWave(currentPhase_ - 1);
+		} else if (isPhase_ == PreparationPhase) {
+			// 準備フェーズに戻った場合はウェーブを待機状態（スポナー無し）にする
+			WaveManagement::SetWave(-1);
 		}
 
 		// 状態を同期
