@@ -63,10 +63,12 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 		for (size_t wi = 0; wi < enemySpawners_.size(); ++wi) {
 			for (entt::entity spawnerEntity : enemySpawners_[wi]) {
 				if (scene->GetRegistry().valid(spawnerEntity)) {
-					// スポナーの位置にキューブを描画
+					// スポナーの位置にプレビューを描画
 					if (auto* tc = scene->GetRegistry().try_get<TransformComponent>(spawnerEntity)) {
+						Engine::Matrix4x4 wm = scene->GetWorldMatrix(static_cast<int>(spawnerEntity));
+						Engine::Vector3 p = { wm.m[3][0], wm.m[3][1], wm.m[3][2] };
+
 						float s = 0.5f;
-						Engine::Vector3 p = { tc->translate.x, tc->translate.y, tc->translate.z };
 						Engine::Vector4 c = { 1.0f, 0.5f, 0.0f, 1.0f };
 						// 底面
 						renderer->DrawLine3D({p.x - s, p.y - s, p.z - s}, {p.x + s, p.y - s, p.z - s}, c, true);
@@ -83,6 +85,15 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 						renderer->DrawLine3D({p.x + s, p.y - s, p.z - s}, {p.x + s, p.y + s, p.z - s}, c, true);
 						renderer->DrawLine3D({p.x + s, p.y - s, p.z + s}, {p.x + s, p.y + s, p.z + s}, c, true);
 						renderer->DrawLine3D({p.x - s, p.y - s, p.z + s}, {p.x - s, p.y + s, p.z + s}, c, true);
+
+						// EnemySpawnerScript の詳細なプレビューも描画する
+						if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(spawnerEntity)) {
+							for (auto& entry : sc->scripts) {
+								if (entry.scriptPath == "EnemySpawnerScript" && entry.instance) {
+									static_cast<EnemySpawnerScript*>(entry.instance.get())->DrawSpawnPreview({p.x, p.y, p.z});
+								}
+							}
+						}
 					}
 				}
 			}
