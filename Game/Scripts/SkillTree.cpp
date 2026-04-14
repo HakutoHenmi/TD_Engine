@@ -1,13 +1,13 @@
-﻿#include "SkillTree.h"
-#include "../../Engine/Renderer.h"
+#include "SkillTree.h"
 #include "../../Engine/Input.h"
+#include "../../Engine/Renderer.h"
+#include "../../Engine/ThirdParty/nlohmann/json.hpp"
 #include "../../Engine/WindowDX.h"
 #include "../../externals/imgui/imgui.h"
-#include "../../Engine/ThirdParty/nlohmann/json.hpp"
 #include "../Scenes/GameScene.h"
-#include <fstream>
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 
 using json = nlohmann::json;
 
@@ -15,69 +15,72 @@ namespace Game {
 
 // ===== 初期化 =====
 void SkillTree::Init(Engine::Renderer* renderer) {
-	if (initialized_ || !renderer) return;
+	if (initialized_ || !renderer)
+		return;
 
 	// テクスチャの読み込み (白テクスチャを使い回し、色で区別)
-	texBg_            = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-	texNodeLocked_    = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-	texNodeUnlocked_  = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-	texLine_          = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+	texBg_ = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+	texNodeLocked_ = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+	texNodeUnlocked_ = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+	texLine_ = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 
 	initialized_ = true;
 }
 
 void SkillTree::LoadFromJson(const std::string& path, Engine::Renderer* renderer) {
-	std::ifstream f(path);
-	if (!f.is_open()) return;
+	std::ifstream f(path); // jsonファイルの読み込み
+	if (!f.is_open())
+		return; // ファイルが開けなかった場合は終了
 
-	json j;
-	try {
-		f >> j;
-		nodes_.clear();
-		if (j.contains("skills") && j["skills"].is_array()) {
-			for (const auto& s : j["skills"]) {
+	json j;                                                   // Jsonの専用の型
+	try {                                                     // 危ない処理を行うときゲームを落とさないように
+		f >> j;                                               // jsonファイルの内容をjに入れるそのままだとただの文字列なのでダメ―
+		nodes_.clear();                                       // 既存のノードをクリア
+		if (j.contains("skills") && j["skills"].is_array()) { // skillsという項目があって、配列だったら
+			for (const auto& s : j["skills"]) {               // 配列の中身を一つずつ取り出す(参照だから軽いうｗ)
 				SkillNode node;
-				node.id          = s.value("id", 0);
-				node.name        = s.value("name", "Skill");
-				node.cost        = s.value("cost", 1);
-				node.parentId    = s.value("parentId", -1);
-				node.unlocked     = s.value("unlocked", false);
-				node.gridX       = s.value("gridX", 0.0f);
-				node.gridY       = s.value("gridY", 0.0f);
+				node.id = s.value("id", 0); // sの中にidというキーがあったらそれを入れる、なかったら0を入れる
+				node.name = s.value("name", "Skill");
+				node.cost = s.value("cost", 1);
+				node.parentId = s.value("parentId", -1);
+				node.unlocked = s.value("unlocked", false);
+				node.gridX = s.value("gridX", 0.0f);
+				node.gridY = s.value("gridY", 0.0f);
 				node.description = s.value("description", "");
 
 				// アイコンの自動ロード試行 (Resources/Skills/スキル名.png)
-				std::string iconName = s.value("name", "");
-				std::string iconPath = "Resources/Skills/" + iconName + ".png";
+				std::string iconName = s.value("name", "");//jsonにアイコンの名前があったらiconNameを入れる
+				std::string iconPath = "Resources/Skills/" + iconName + ".png"; //iconPathに入れり
 				if (renderer) {
 					node.textureHandle = renderer->LoadTexture2D(iconPath);
 				}
 				node.texturePath = iconPath;
-				
+
 				nodes_.push_back(node);
 			}
 		}
-	} catch (...) {
-		// JSONパースエラー
+	} catch (...) { // 例外をキャッチ
+		            // JSONパースエラー
 	}
 }
 
+
 // ===== メイン更新 =====
 void SkillTree::Update(Engine::Renderer* renderer, float screenW, float screenH, float mouseX, float mouseY) {
-	if (!isOpen_ || !renderer) return;
+	if (!isOpen_ || !renderer)
+		return;
 
 	HandleInput(screenW, screenH, mouseX, mouseY);
 	DrawBackground(renderer, screenW, screenH);
 	DrawConnections(renderer, screenW, screenH);
-	
+
 	int hoveredIndex = -1;
 	// ホバー中のノードを探す
 	for (int i = 0; i < (int)nodes_.size(); ++i) {
 		float nx, ny;
 		GetNodeScreenPos(nodes_[i], screenW, screenH, nx, ny);
 		float halfSize = kNodeSize * 0.5f;
-		if (mouseX >= nx - halfSize && mouseX <= nx + halfSize &&
-			mouseY >= ny - halfSize && mouseY <= ny + halfSize) {
+		if (mouseX >= nx - halfSize && mouseX <= nx + halfSize && mouseY >= ny - halfSize && mouseY <= ny + halfSize) {
 			hoveredIndex = i;
 			break;
 		}
@@ -100,9 +103,11 @@ void SkillTree::Update(Engine::Renderer* renderer, float screenW, float screenH,
 // ===== 入力処理 =====
 void SkillTree::HandleInput(float screenW, float screenH, float mouseX, float mouseY) {
 	auto* input = Engine::Input::GetInstance();
-	if (!input) return;
+	if (!input)
+		return;
 
-	if (!input->IsMouseTrigger(0)) return;
+	if (!input->IsMouseTrigger(0))
+		return;
 
 	// 確認ダイアログ表示中の処理
 	if (pendingUnlockId_ != -1) {
@@ -125,8 +130,7 @@ void SkillTree::HandleInput(float screenW, float screenH, float mouseX, float mo
 		GetNodeScreenPos(nodes_[i], screenW, screenH, nx, ny);
 
 		float halfSize = kNodeSize * 0.5f;
-		if (mouseX >= nx - halfSize && mouseX <= nx + halfSize &&
-			mouseY >= ny - halfSize && mouseY <= ny + halfSize) {
+		if (mouseX >= nx - halfSize && mouseX <= nx + halfSize && mouseY >= ny - halfSize && mouseY <= ny + halfSize) {
 			TryUnlockSkill(i);
 			break;
 		}
@@ -135,8 +139,10 @@ void SkillTree::HandleInput(float screenW, float screenH, float mouseX, float mo
 
 // ===== スキル習得試行 =====
 bool SkillTree::TryUnlockSkill(int index) {
-	if (index < 0 || index >= (int)nodes_.size()) return false;
-	if (nodes_[index].unlocked) return false;
+	if (index < 0 || index >= (int)nodes_.size())
+		return false;
+	if (nodes_[index].unlocked)
+		return false;
 
 	// 必要な前提スキルをリストアップ (一括習得用)
 	std::vector<int> neededIndices;
@@ -147,7 +153,8 @@ bool SkillTree::TryUnlockSkill(int index) {
 		totalCost += nodes_[idx].cost;
 	}
 
-	if (skillPoints_ < totalCost) return false;
+	if (skillPoints_ < totalCost)
+		return false;
 
 	// 確認状態へ
 	pendingUnlockId_ = index;
@@ -156,7 +163,8 @@ bool SkillTree::TryUnlockSkill(int index) {
 
 // ===== 前提条件の再帰取得 =====
 void SkillTree::GetPrerequisites(int index, std::vector<int>& outIndices) {
-	if (nodes_[index].unlocked) return;
+	if (nodes_[index].unlocked)
+		return;
 
 	// 自分を最後に追加（親から順に習得するため）
 	// ただし親を先に見に行く
@@ -178,7 +186,8 @@ void SkillTree::GetPrerequisites(int index, std::vector<int>& outIndices) {
 
 // ===== 習得確定 =====
 void SkillTree::ConfirmUnlock() {
-	if (pendingUnlockId_ == -1) return;
+	if (pendingUnlockId_ == -1)
+		return;
 
 	std::vector<int> neededIndices;
 	GetPrerequisites(pendingUnlockId_, neededIndices);
@@ -199,14 +208,13 @@ void SkillTree::ConfirmUnlock() {
 }
 
 // ===== 習得キャンセル =====
-void SkillTree::CancelUnlock() {
-	pendingUnlockId_ = -1;
-}
+void SkillTree::CancelUnlock() { pendingUnlockId_ = -1; }
 
 // ===== スキル習得チェック =====
 bool SkillTree::IsSkillUnlocked(int skillId) const {
 	for (const auto& n : nodes_) {
-		if (n.id == skillId) return n.unlocked;
+		if (n.id == skillId)
+			return n.unlocked;
 	}
 	return false;
 }
@@ -224,25 +232,29 @@ void SkillTree::DrawBackground(Engine::Renderer* renderer, float screenW, float 
 
 // ===== ノード間の接続線描画 =====
 void SkillTree::DrawConnections(Engine::Renderer* renderer, float screenW, float screenH) {
-	(void)screenW; (void)screenH;
+	(void)screenW;
+	(void)screenH;
 	for (const auto& node : nodes_) {
-		if (node.parentId < 0) continue;
+		if (node.parentId < 0)
+			continue;
 
 		// 親ノードを見つける
 		const SkillNode* parent = nullptr;
 		for (const auto& n : nodes_) {
-			if (n.id == node.parentId) { parent = &n; break; }
+			if (n.id == node.parentId) {
+				parent = &n;
+				break;
+			}
 		}
-		if (!parent) continue;
+		if (!parent)
+			continue;
 
 		float cx, cy, px, py;
 		GetNodeScreenPos(node, screenW, screenH, cx, cy);
 		GetNodeScreenPos(*parent, screenW, screenH, px, py);
 
 		// 線の色: 両方習得済みなら緑、そうでなければグレー
-		Engine::Vector4 lineColor = (node.unlocked && parent->unlocked)
-			? Engine::Vector4{0.2f, 0.9f, 0.3f, 0.9f}
-			: Engine::Vector4{0.4f, 0.4f, 0.4f, 0.7f};
+		Engine::Vector4 lineColor = (node.unlocked && parent->unlocked) ? Engine::Vector4{0.2f, 0.9f, 0.3f, 0.9f} : Engine::Vector4{0.4f, 0.4f, 0.4f, 0.7f};
 
 		// 垂直の線をスプライトで描画
 		float minY = (std::min)(cy, py);
@@ -280,34 +292,38 @@ void SkillTree::DrawNodes(Engine::Renderer* renderer, float screenW, float scree
 
 		// ホバーチェック
 		float halfSize = kNodeSize * 0.5f;
-		bool hovered = (mouseX >= nx - halfSize && mouseX <= nx + halfSize &&
-						mouseY >= ny - halfSize && mouseY <= ny + halfSize);
+		bool hovered = (mouseX >= nx - halfSize && mouseX <= nx + halfSize && mouseY >= ny - halfSize && mouseY <= ny + halfSize);
 
 		// 色の決定
 		Engine::Vector4 color;
 		if (node.unlocked) {
-			color = {0.2f, 0.85f, 0.3f, 1.0f};   // 習得済み: 緑
+			color = {0.2f, 0.85f, 0.3f, 1.0f}; // 習得済み: 緑
 		} else {
 			// 親が習得済みか確認
 			bool canUnlock = true;
 			if (node.parentId >= 0) {
 				canUnlock = false;
 				for (const auto& n : nodes_) {
-					if (n.id == node.parentId && n.unlocked) { canUnlock = true; break; }
+					if (n.id == node.parentId && n.unlocked) {
+						canUnlock = true;
+						break;
+					}
 				}
 			}
 			if (canUnlock && skillPoints_ >= node.cost) {
-				color = hovered
-					? Engine::Vector4{1.0f, 0.9f, 0.3f, 1.0f}   // 習得可能+ホバー: 明るい黄
-					: Engine::Vector4{0.8f, 0.7f, 0.2f, 0.9f};  // 習得可能: 黄色
+				color = hovered ? Engine::Vector4{1.0f, 0.9f, 0.3f, 1.0f}  // 習得可能+ホバー: 明るい黄
+				                : Engine::Vector4{0.8f, 0.7f, 0.2f, 0.9f}; // 習得可能: 黄色
 			} else {
-				color = {0.3f, 0.3f, 0.3f, 0.7f};  // 習得不可: 暗いグレー
+				color = {0.3f, 0.3f, 0.3f, 0.7f}; // 習得不可: 暗いグレー
 			}
 		}
 
 		// 描画
 		Engine::Renderer::SpriteDesc s;
-		s.x = nx - halfSize; s.y = ny - halfSize; s.w = kNodeSize; s.h = kNodeSize;
+		s.x = nx - halfSize;
+		s.y = ny - halfSize;
+		s.w = kNodeSize;
+		s.h = kNodeSize;
 		s.color = color;
 
 		// 固有テクスチャがあれば優先、なければデフォルト
@@ -321,9 +337,7 @@ void SkillTree::DrawNodes(Engine::Renderer* renderer, float screenW, float scree
 		border.y = ny - halfSize - borderPad;
 		border.w = kNodeSize + borderPad * 2.0f;
 		border.h = kNodeSize + borderPad * 2.0f;
-		border.color = node.unlocked
-			? Engine::Vector4{0.1f, 0.6f, 0.2f, 0.8f}
-			: Engine::Vector4{0.5f, 0.5f, 0.5f, 0.5f};
+		border.color = node.unlocked ? Engine::Vector4{0.1f, 0.6f, 0.2f, 0.8f} : Engine::Vector4{0.5f, 0.5f, 0.5f, 0.5f};
 		// 背景(枠)→ノード本体の順に描画するため、先に枠を描く
 		// ただしスプライトは描画順なので、枠をまず描いて上にノードを重ねる
 		// → DrawSpriteの呼び出し順を調整
@@ -366,20 +380,29 @@ void SkillTree::DrawDescriptionPanel(Engine::Renderer* renderer, float screenW, 
 
 	// パネル背景
 	Engine::Renderer::SpriteDesc bg;
-	bg.x = x; bg.y = y; bg.w = panelW; bg.h = panelH;
+	bg.x = x;
+	bg.y = y;
+	bg.w = panelW;
+	bg.h = panelH;
 	bg.color = {0.05f, 0.05f, 0.15f, 0.9f};
 	renderer->DrawSprite(texBg_, bg);
 
 	// 枠線 (上部)
 	Engine::Renderer::SpriteDesc border;
-	border.x = x; border.y = y; border.w = panelW; border.h = 4.0f;
+	border.x = x;
+	border.y = y;
+	border.w = panelW;
+	border.h = 4.0f;
 	border.color = node.unlocked ? Engine::Vector4{0.2f, 0.8f, 0.4f, 1.0f} : Engine::Vector4{0.3f, 0.6f, 1.0f, 1.0f};
 	renderer->DrawSprite(texBg_, border);
 
 	// アイコン表示
 	if (node.textureHandle != 0) {
 		Engine::Renderer::SpriteDesc icon;
-		icon.x = x + 20; icon.y = y + panelH - 80; icon.w = 60; icon.h = 60;
+		icon.x = x + 20;
+		icon.y = y + panelH - 80;
+		icon.w = 60;
+		icon.h = 60;
 		icon.color = {1, 1, 1, 1};
 		renderer->DrawSprite(node.textureHandle, icon);
 	}
@@ -391,7 +414,7 @@ void SkillTree::DrawDescriptionPanel(Engine::Renderer* renderer, float screenW, 
 		ImVec2 pos(x + 20, y + 30);
 		// タイトル
 		drawList->AddText(ImGui::GetFont(), 28.0f, pos, IM_COL32(255, 255, 255, 255), node.name.c_str());
-		
+
 		// コスト
 		pos.y += 45;
 		std::string costStr = "Cost: " + std::to_string(node.cost) + " SP";
@@ -415,7 +438,8 @@ void SkillTree::DrawDescriptionPanel(Engine::Renderer* renderer, float screenW, 
 
 // ===== 確認ダイアログ描画 =====
 void SkillTree::DrawConfirmationDialog(Engine::Renderer* renderer, float screenW, float screenH) {
-	if (pendingUnlockId_ < 0 || pendingUnlockId_ >= (int)nodes_.size()) return;
+	if (pendingUnlockId_ < 0 || pendingUnlockId_ >= (int)nodes_.size())
+		return;
 	const auto& node = nodes_[pendingUnlockId_];
 
 	float diagW = 400.0f;
@@ -425,13 +449,19 @@ void SkillTree::DrawConfirmationDialog(Engine::Renderer* renderer, float screenW
 
 	// 背景
 	Engine::Renderer::SpriteDesc bg;
-	bg.x = cx - diagW * 0.5f; bg.y = cy - diagH * 0.5f; bg.w = diagW; bg.h = diagH;
+	bg.x = cx - diagW * 0.5f;
+	bg.y = cy - diagH * 0.5f;
+	bg.w = diagW;
+	bg.h = diagH;
 	bg.color = {0.1f, 0.1f, 0.2f, 1.0f};
 	renderer->DrawSprite(texBg_, bg);
 
 	// 枠
 	Engine::Renderer::SpriteDesc border;
-	border.x = cx - diagW * 0.5f; border.y = cy - diagH * 0.5f; border.w = diagW; border.h = 2.0f;
+	border.x = cx - diagW * 0.5f;
+	border.y = cy - diagH * 0.5f;
+	border.w = diagW;
+	border.h = 2.0f;
 	border.color = {1, 0.8f, 0.2f, 1.0f};
 	renderer->DrawSprite(texBg_, border);
 
@@ -456,13 +486,19 @@ void SkillTree::DrawConfirmationDialog(Engine::Renderer* renderer, float screenW
 
 	// はいボタン (緑)
 	Engine::Renderer::SpriteDesc btnYes;
-	btnYes.x = cx - 110; btnYes.y = cy + 20; btnYes.w = 100; btnYes.h = 40;
+	btnYes.x = cx - 110;
+	btnYes.y = cy + 20;
+	btnYes.w = 100;
+	btnYes.h = 40;
 	btnYes.color = {0.2f, 0.7f, 0.3f, 0.8f};
 	renderer->DrawSprite(texBg_, btnYes);
 
 	// いいえボタン (赤)
 	Engine::Renderer::SpriteDesc btnNo;
-	btnNo.x = cx + 10; btnNo.y = cy + 20; btnNo.w = 100; btnNo.h = 40;
+	btnNo.x = cx + 10;
+	btnNo.y = cy + 20;
+	btnNo.w = 100;
+	btnNo.h = 40;
 	btnNo.color = {0.8f, 0.2f, 0.2f, 0.8f};
 	renderer->DrawSprite(texBg_, btnNo);
 }
@@ -477,8 +513,10 @@ void SkillTree::GetNodeScreenPos(const SkillNode& node, float screenW, float scr
 	float maxGridX = 0;
 	float maxGridY = 0;
 	for (const auto& n : nodes_) {
-		if (n.gridX > maxGridX) maxGridX = n.gridX;
-		if (n.gridY > maxGridY) maxGridY = n.gridY;
+		if (n.gridX > maxGridX)
+			maxGridX = n.gridX;
+		if (n.gridY > maxGridY)
+			maxGridY = n.gridY;
 	}
 
 	// ツリー全体の幅と高さ
@@ -495,4 +533,3 @@ void SkillTree::GetNodeScreenPos(const SkillNode& node, float screenW, float scr
 }
 
 } // namespace Game
-
