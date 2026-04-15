@@ -171,13 +171,13 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		isSubscribed_ = true;
 	}
 
-	bool hasPhaseSystem = false;
+    bool hasPhaseSystem = false;
 	{
 		auto scView = scene->GetRegistry().view<ScriptComponent>();
 		for (auto e : scView) {
 			auto& sc = scView.get<ScriptComponent>(e);
 			for (auto& entry : sc.scripts) {
-				if (entry.scriptPath == "PhaseSystemScript") {
+              if (entry.scriptPath == "PhaseSystemScript" || entry.scriptPath == "TutorialScript") {
 					hasPhaseSystem = true;
 					break;
 				}
