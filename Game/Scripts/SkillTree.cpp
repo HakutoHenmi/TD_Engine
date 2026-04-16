@@ -51,7 +51,7 @@ void SkillTree::LoadFromJson(const std::string& path, Engine::Renderer* renderer
 				node.gridX = s.value("gridX", 0.0f);
 				node.gridY = s.value("gridY", 0.0f);
 				node.description = s.value("description", "");
-
+				node.pageId = s.value("pageId", 0);
 				// アイコンの自動ロード試行 (Resources/Skills/スキル名.png)
 				std::string iconName = s.value("name", "");                     // jsonにアイコンの名前があったらiconNameを入れる
 				std::string iconPath = "Resources/Skills/" + iconName + ".png"; // iconPathに入れり
