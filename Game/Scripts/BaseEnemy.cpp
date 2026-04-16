@@ -51,6 +51,15 @@ void BaseEnemy::Start(entt::entity entity, GameScene* scene) {
 }
 
 void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
+	auto& registry = scene->GetRegistry();
+
+	// 定期的に索敵(共通)
+	scanTimer_ += dt;
+	if (scanTimer_ > 0.3f) {
+		scanTimer_ = 0.0f;
+		SearchTarget(entity, scene);
+	}
+
 	DefaultMove(entity, scene, dt);
 }
 

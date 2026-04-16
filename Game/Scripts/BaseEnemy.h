@@ -61,11 +61,12 @@ protected: // メンバ変数
 	float separationRadius_ = 1.5f; // 近づきすぎないための半径
 	float separationWeight_ = 2.0f; // 離れる力の強さ
 	
-	//コアに向かう途中の挙動用の変数
+	//敵の動きにの基底クラス部分に使う変数
 	entt::entity currentTarget_ = entt::null;
 	float searchRange_ = 15.0f;
 	float loseTargetRange_ = 25.0f;
 	float attackRange_ = 2.0f; // 攻撃を始める距離
+	float scanTimer_ = 0.0f;
 };
 
 } // namespace Game
