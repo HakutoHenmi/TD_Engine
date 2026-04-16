@@ -269,34 +269,19 @@ public:
 	void DrawSprite9Slice(TextureHandle texH, const Sprite9SliceDesc& s); // ★追加
 	void FlushSprites(); // スプライトの描画実行
 
-	struct TextDrawParams {
-		float wrapWidth = -1.0f;  // 自動改行幅 (-1で無効)
-		float tracking = 0.0f;     // 字間調整
-		float lineSpacing = 1.0f;  // 行間調整
-		int alignment = 0;         // 0:Left, 1:Center, 2:Right
-		bool enableRichText = true;
-		bool enableShadow = false;
-		Vector2 shadowOffset = { 2.0f, 2.0f };
-		Vector4 shadowColor = { 0, 0, 0, 0.5f };
-		int visibleCount = -1;     // 表示文字数 (-1ですべて表示, タイプライター用)
-		int animType = 0;          // 0:None, 1:Wave, 2:Shake
-		float animIntensity = 1.0f;
-		float animSpeed = 1.0f;
-	};
-
 	// ★追加: テキスト描画
 	// text: UTF-8 文字列
 	// x, y: スクリーン座標 (左上基準, ピクセル)
 	// scale: フォントのスケール (1.0 = デフォルトサイズ)
 	// color: 文字色 (RGBA)
-	void DrawString(const std::string& text, float x, float y, float scale = 1.0f, const Vector4& color = {1,1,1,1}, const std::string& fontPath = "C:\\Windows\\Fonts\\msgothic.ttc", const TextDrawParams& params = {});
+	void DrawString(const std::string& text, float x, float y, float scale = 1.0f, const Vector4& color = {1,1,1,1}, const std::string& fontPath = "C:\\Windows\\Fonts\\msgothic.ttc");
 	void FlushText(); // テキストの描画実行
 
 	// テキストシステムの初期化 (フォントファイルの読み込み)
 	bool InitTextSystem(const std::string& fontPath, float pixelHeight = 48.0f);
 
 	// テキスト描画の幅を事前計算 (レイアウト用)
-	float MeasureTextWidth(const std::string& text, float scale = 1.0f, const std::string& fontPath = "C:\\Windows\\Fonts\\msgothic.ttc", bool enableRichText = true);
+	float MeasureTextWidth(const std::string& text, float scale = 1.0f, const std::string& fontPath = "C:\\Windows\\Fonts\\msgothic.ttc");
 	float GetTextLineHeight(float scale = 1.0f, const std::string& fontPath = "C:\\Windows\\Fonts\\msgothic.ttc") const;
 
 	// ★追加: 3Dライン描画（エディタ用ギズモ・グリッドなど）
@@ -475,10 +460,6 @@ private:
 		float x, y;   // position (NDC)
 		float u, v;   // texture coordinate
 		float r, g, b, a; // color
-		float charIndex;  // 文字インデックス (アニメーション用)
-		float charTotal;  // 全文字数 (アニメーション用)
-		uint32_t animType; // アニメーション定数値 (0:None, 1:Wave, 2:Shake)
-		float animParam[2]; // [0]:Intensity, [1]:Speed
 	};
 	// フォントパスごとに頂点を蓄積
 	std::unordered_map<std::string, std::vector<TextVertex>> textVerticesMap_;

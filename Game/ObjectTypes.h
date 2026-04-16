@@ -400,36 +400,11 @@ struct UIImageComponent : public Component {
 	UIImageComponent() { type = ComponentType::UIImage; }
 };
 
-enum class TextAlignment { Left, Center, Right };
-enum class TextAnimation { None, Wave, Shake };
-
 struct UITextComponent : public Component {
 	std::string text = "New Text";
 	float fontSize = 24.0f;
 	DirectX::XMFLOAT4 color = {1, 1, 1, 1};
-	std::string fontPath = "C:\\Windows\\Fonts\\msgothic.ttc";
-
-	// レイアウト
-	TextAlignment alignment = TextAlignment::Left;
-	bool wordWrap = false;
-	float tracking = 0.0f;    // 字間
-	float lineSpacing = 1.0f; // 行間 (倍率)
-
-	// 装飾
-	bool enableRichText = true;
-	bool enableShadow = false;
-	DirectX::XMFLOAT2 shadowOffset = {2.0f, 2.0f};
-	DirectX::XMFLOAT4 shadowColor = {0, 0, 0, 0.5f};
-
-	// 演出
-	bool typewriterEnabled = false;
-	float typewriterSpeed = 20.0f; // 文字/秒
-	float typewriterTimer = 0.0f;
-
-	TextAnimation animationType = TextAnimation::None;
-	float animationIntensity = 1.0f;
-	float animationSpeed = 1.0f;
-
+	std::string fontPath = "C:\\Windows\\Fonts\\msgothic.ttc"; // フォントファイルパス
 	UITextComponent() { type = ComponentType::UIText; }
 };
 
