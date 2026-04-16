@@ -52,7 +52,9 @@ private:
 	float pipeStartX_ = 0.0f;
 	float pipeStartY_ = 0.0f;
 	float pipeStartZ_ = 0.0f;
-	bool hasPlacedInInstallationStep_ = false;
+	bool hasPlacedTank_ = false;
+	bool hasPlacedPipe_ = false;
+	bool hasPlacedCannon_ = false;
 
 	std::string selectedObjPath_ = "Resources/Models/cube/cube.obj";
 	std::string previewObjPath_;

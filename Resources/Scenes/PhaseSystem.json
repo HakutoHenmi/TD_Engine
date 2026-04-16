@@ -119,29 +119,10 @@
       "rotate": [0.785398, -14.043, 0.523599],
       "scale": [0.15, 0.15, 1.8],
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "shaderName": "Default", "color": [0.9,0.9,0.9,1], "uvTiling": [1,1], "uvOffset": [0,0]},
-        {"type": "Tag", "enabled": true, "tag": "PlayerSword"},
-        {"type": "Motion", "enabled": true, "activeClip": "Default", "clips": {
-          "Combo1": {"totalDuration": 0.4, "loop": false, "keyframes": [
-            {"time": 0, "translate": [2.5,0.8,-1], "rotate": [0,1.57,0], "scale": [0.15,0.15,1.8]},
-            {"time": 0.2, "translate": [0,0.8,4], "rotate": [0,0,0], "scale": [0.15,0.15,3.5]},
-            {"time": 0.4, "translate": [-2.5,0.8,-1], "rotate": [0,-1.57,0], "scale": [0.15,0.15,1.8]}
-          ]},
-          "Combo2": {"totalDuration": 0.4, "loop": false, "keyframes": [
-            {"time": 0, "translate": [2.2,4,-0.8], "rotate": [-0.7,0,0.7], "scale": [0.15,0.15,2]},
-            {"time": 0.2, "translate": [0,1.2,4.5], "rotate": [0,0,0], "scale": [0.15,0.15,3.5]},
-            {"time": 0.4, "translate": [-2.2,-1,0.2], "rotate": [0.7,0,-0.7], "scale": [0.15,0.15,1.8]}
-          ]},
-          "Combo3": {"totalDuration": 0.4, "loop": false, "keyframes": [
-            {"time": 0, "translate": [0,0.8,0.5], "rotate": [0,0,0], "scale": [0.15,0.15,1.8]},
-            {"time": 0.15, "translate": [0,0.8,6.5], "rotate": [0,0,6.28], "scale": [0.15,0.15,5]},
-            {"time": 0.4, "translate": [0,0.8,1.5], "rotate": [0,0,12.56], "scale": [0.15,0.15,1.8]}
-          ]},
-          "Default": {"totalDuration": 1, "loop": false, "keyframes": [
-            {"time": 0, "translate": [0,0,0], "rotate": [0,0,0], "scale": [1,1,1]},
-            {"time": 1, "translate": [5,0,0], "rotate": [0,0,0], "scale": [1,1,1]}
-          ]}
-        }}
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":0}"}]},
+        {"type": "RectTransform", "enabled": true, "pos": [-400,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TankButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
@@ -153,7 +134,10 @@
       "rotate": [0.7854, 0.5236, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "DirectionalLight", "enabled": true, "color": [1,0.95,0.8], "intensity": 1.2}
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":0}"}]},
+        {"type": "RectTransform", "enabled": true, "pos": [0,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/PipeButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
@@ -165,16 +149,10 @@
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/cube/cube.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [0.2,0.5,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
-        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [2,2,2], "isTrigger": false},
-        {"type": "Rigidbody", "enabled": true, "velocity": [0,0,0], "useGravity": true, "isKinematic": true},
-        {"type": "Script", "enabled": true, "scripts": [{"path": "PlayerScript", "param": ""}]},
-        {"type": "Health", "enabled": true, "hp": 890, "maxHp": 1000, "isDead": false},
-        {"type": "Tag", "enabled": true, "tag": "Player"},
-        {"type": "PlayerInput", "enabled": false},
-        {"type": "CharacterMovement", "enabled": true, "speed": 7, "jumpPower": 20, "gravity": 9.8},
-        {"type": "CameraTarget", "enabled": false, "distance": 10, "height": 3, "smoothSpeed": 5},
-        {"type": "GpuMeshCollider", "enabled": true, "meshPath": "Resources/Models/cube/cube.obj", "isTrigger": false}
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":0}"}]},
+        {"type": "RectTransform", "enabled": true, "pos": [400,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/CannonButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {

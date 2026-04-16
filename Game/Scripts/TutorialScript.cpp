@@ -80,7 +80,9 @@ void TutorialScript::Start(entt::entity /*entity*/, GameScene* scene) {
     isPlacementMode_ = false;
     isPipeSet_ = false;
     hasPipeStartPoint_ = false;
-    hasPlacedInInstallationStep_ = false;
+    hasPlacedTank_ = false;
+    hasPlacedPipe_ = false;
+    hasPlacedCannon_ = false;
     hasOpenedSkillTreeInGuide_ = false;
     preKeyN_ = false;
     stepGuideShown_ = false;
@@ -104,7 +106,9 @@ void TutorialScript::EnterStep(TutorialStep step) {
     hasPipeStartPoint_ = false;
 
     if (step == TutorialStep::InstallationGuide) {
-        hasPlacedInInstallationStep_ = false;
+        hasPlacedTank_ = false;
+        hasPlacedPipe_ = false;
+        hasPlacedCannon_ = false;
     }
 
     if (step == TutorialStep::SkillTreeGuide) {
@@ -128,7 +132,7 @@ void TutorialScript::ShowStepGuide() {
         EditorUI::Log("Tutorial: 準備フェーズです。Spaceで次の説明へ進みます。");
         break;
     case TutorialStep::InstallationGuide:
-        EditorUI::Log("Tutorial: 設置説明。1/2/3かUIボタンで選択して、左クリックで1つ以上設置してください。");
+        EditorUI::Log("Tutorial: 設置説明。タンク、パイプ、大砲をそれぞれ少なくとも1つずつ設置してください。");
         break;
     case TutorialStep::FirstBattle:
         EditorUI::Log("Tutorial: 戦闘フェーズです。ウェーブ終了後にスキルツリー説明へ進みます。(Pキーでも進行可)");
@@ -239,7 +243,7 @@ void TutorialScript::Update(entt::entity /*entity*/, GameScene* scene, float /*d
         }
 
         Installation(scene, selectedObjPath_);
-        if (hasPlacedInInstallationStep_) {
+        if (hasPlacedTank_ && hasPlacedPipe_ && hasPlacedCannon_) {
             EnterStep(TutorialStep::FirstBattle);
         }
         break;
@@ -606,7 +610,10 @@ void TutorialScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector3& 
             }
         }
 
-        hasPlacedInInstallationStep_ = true;
+        if (objPath.find("BulletTank") != std::string::npos) hasPlacedTank_ = true;
+        if (objPath.find("Pipe") != std::string::npos) hasPlacedPipe_ = true;
+        if (objPath.find("Canon") != std::string::npos) hasPlacedCannon_ = true;
+
         return;
     }
 
@@ -631,7 +638,9 @@ void TutorialScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector3& 
     mr.texturePath = "Resources/Textures/white1x1.png";
     mr.shaderName = "Toon";
 
-    hasPlacedInInstallationStep_ = true;
+    if (objPath.find("BulletTank") != std::string::npos) hasPlacedTank_ = true;
+    if (objPath.find("Pipe") != std::string::npos) hasPlacedPipe_ = true;
+    if (objPath.find("Canon") != std::string::npos) hasPlacedCannon_ = true;
 }
 
 void TutorialScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
