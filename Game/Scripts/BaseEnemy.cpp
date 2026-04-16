@@ -1,4 +1,4 @@
-#include "EnemyBehavior.h"
+#include "BaseEnemy.h"
 #include "../../Engine/ThirdParty/nlohmann/json.hpp"
 #ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
@@ -14,7 +14,7 @@ static bool HasTag(entt::registry& registry, entt::entity entity, TagType tagNam
 	return registry.get<TagComponent>(entity).tag == tagName;
 }
 
-void EnemyBehavior::Start(entt::entity entity, GameScene* scene) {
+void BaseEnemy::Start(entt::entity entity, GameScene* scene) {
 	ownerId_ = static_cast<uint32_t>(entity);
 	pCurrentScene_ = scene;
 	auto& registry = scene->GetRegistry();
@@ -24,9 +24,6 @@ void EnemyBehavior::Start(entt::entity entity, GameScene* scene) {
 	if (registry.all_of<RigidbodyComponent>(entity)) {
 		registry.get<RigidbodyComponent>(entity).isKinematic = false;
 	}
-
-	// 出現時に一度ターゲットを検索
-	SearchTarget(entity, scene);
 
 	// 出現時に地面の高さを即座に計算（初動の埋まり防止）
 	float h = scene->GetHeightAt(tc.translate.x, tc.translate.z, tc.translate.y + 1.0f, static_cast<uint32_t>(entity));
@@ -53,56 +50,15 @@ void EnemyBehavior::Start(entt::entity entity, GameScene* scene) {
 	}
 }
 
-void EnemyBehavior::Update(entt::entity entity, GameScene* scene, float dt) {
-	//if (!scene || !scene->GetRegistry().valid(entity)) return;
-	//auto& registry = scene->GetRegistry();
-	//if (!registry.all_of<TransformComponent>(entity)) return;
-
-	//ownerId_ = static_cast<uint32_t>(entity);
-	//pCurrentScene_ = scene;
-
-	//if (registry.all_of<HealthComponent>(entity)) {
-	//	auto& hc = registry.get<HealthComponent>(entity);
-	//	if (hc.isDead) return;
-	//	if (hc.hitStopTimer > 0.0f) return; // ヒットストップ中は動きを止める
-	//}
-
-	//// ターゲットが実在するか確認
-	//bool targetExists = false;
-	//if (targetId_ != 0) {
-	//	entt::entity targetEntity = static_cast<entt::entity>(targetId_);
-	//	if (registry.valid(targetEntity)) {
-	//		targetExists = true;
-	//	}
-	//}
-	//if (!targetExists) {
-	//	targetId_ = 0;
-	//	SearchTarget(entity, scene);
-	//}
-
-	//// ヒット中（無敵時間中）はスキャンと移動を停止
-	//bool isHit = false;
-	//if (registry.all_of<HealthComponent>(entity)) {
-	//	if (registry.get<HealthComponent>(entity).invincibleTime > 0.0f) isHit = true;
-	//}
-
-	//if (!isHit) {
-	//	scanTimer_ += dt;
-	//	if (scanTimer_ > 0.2f) {
-	//		scanTimer_ = 0.0f;
-	//	}
-
-	//	Move(entity, scene, dt);
-	//}
-
-	Move(entity, scene, dt);
+void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
+	DefaultMove(entity, scene, dt);
 }
 
-void EnemyBehavior::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
+void BaseEnemy::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
 	// 終了時のクリーンアップなどを記述
 }
 
-void EnemyBehavior::OnEditorUI() {
+void BaseEnemy::OnEditorUI() {
 #if defined(USE_IMGUI) && !defined(NDEBUG)
 	// 敵の移動タイプ(地面や空中)
 	int typeNum = static_cast<int>(type_);
@@ -110,81 +66,10 @@ void EnemyBehavior::OnEditorUI() {
 	if (ImGui::Combo("Enemy Type", &typeNum, types, IM_ARRAYSIZE(types))) {
 		type_ = static_cast<MoveType>(typeNum);
 	}
-
-	// 追うオブジェクトのタグを設定
-	int targetNum = static_cast<int>(targetType_);
-	const char* targetTypes[] = {"Player", "Core", "Defender"};
-	if (ImGui::Combo("Target", &targetNum, targetTypes, IM_ARRAYSIZE(targetTypes))) {
-		targetType_ = static_cast<TargetType>(targetNum);
-
-		// タグ名を更新(シーンを動かしたときにすぐに検索できるように)
-		if (targetType_ == Player) {
-			targetName_ = "Player";
-		} else if (targetType_ == Core) {
-			targetName_ = "Core";
-		} else if (targetType_ == Defender) {
-			targetName_ = "Defender";
-		}
-
-		// 追尾するタグが変わったら新たに検索
-		if (ownerId_ != 0 && pCurrentScene_) {
-			entt::entity ownerEntity = static_cast<entt::entity>(ownerId_);
-			if (pCurrentScene_->GetRegistry().valid(ownerEntity)) {
-				SearchTarget(ownerEntity, pCurrentScene_);
-			}
-		}
-	}
-
-	// 複数存在し得るオブジェクトに対して優先順位を選べるように
-	if (targetType_ >= Defender) {
-		int priorityNum = static_cast<int>(priority_);
-		const char* priorities[] = {"Near", "Far"};
-		if (ImGui::Combo("Priority", &priorityNum, priorities, IM_ARRAYSIZE(priorities))) {
-			priority_ = static_cast<TargetPriority>(priorityNum);
-		}
-
-		ImGui::Checkbox("Show Debug Grid", &showDebugGrid_);
-	}
 #endif
 }
 
-void EnemyBehavior::SearchTarget(entt::entity /*entity*/, GameScene* /*scene*/) {
-	//if (scene == nullptr) {
-	//	return;
-	//}
-
-	//entt::entity bestTarget = entt::null;
-	//float bestDistance = (priority_ == TargetPriority::Near) ? FLT_MAX : -1.0f;
-
-	//auto view = scene->GetRegistry().view<TagComponent, TransformComponent>();
-	//auto& myTc = scene->GetRegistry().get<TransformComponent>(entity);
-
-	//for (auto e : view) {
-	//	if (view.get<TagComponent>(e).tag == targetName_) {
-	//		// 距離を計算
-	//		auto& targetTc = view.get<TransformComponent>(e);
-	//		float dx = targetTc.translate.x - myTc.translate.x;
-	//		float dz = targetTc.translate.z - myTc.translate.z;
-	//		float distSq = dx * dx + dz * dz;	// 軽量化のために平方根は取らない
-
-	//		// priorityごとの対応
-	//		if (priority_ == TargetPriority::Near) {
-	//			if (distSq < bestDistance) {
-	//				bestDistance = distSq;
-	//				bestTarget = e;
-	//			}
-	//		} else { // Far
-	//			if (distSq > bestDistance) {
-	//				bestDistance = distSq;
-	//				bestTarget = e;
-	//			}
-	//		}
-	//	}
-	//}
-	//targetId_ = bestTarget != entt::null ? static_cast<uint32_t>(bestTarget) : 0;
-}
-
-void EnemyBehavior::Move(entt::entity entity, GameScene* scene, float /*dt*/) {
+void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float /*dt*/) {
 	auto& registry = scene->GetRegistry();
 	auto& tc = registry.get<TransformComponent>(entity);
 
@@ -235,7 +120,7 @@ void EnemyBehavior::Move(entt::entity entity, GameScene* scene, float /*dt*/) {
 	}
 }
 
-void EnemyBehavior::Debug() {
+void BaseEnemy::Debug() {
 /*
 #ifndef NDEBUG
 #ifdef USE_IMGUI
@@ -281,33 +166,63 @@ void EnemyBehavior::Debug() {
 */
 }
 
-std::string EnemyBehavior::SerializeParameters() {
+std::string BaseEnemy::SerializeParameters() {
 	nlohmann::json j;
 	j["moveType"] = (int)type_;
-	j["targetType"] = (int)targetType_;
-	j["priority"] = (int)priority_;
 	j["speed"] = speed_;
 	return j.dump();
 }
 
-void EnemyBehavior::DeserializeParameters(const std::string& data) {
+void BaseEnemy::DeserializeParameters(const std::string& data) {
 	if (data.empty())
 		return;
 	try {
 		auto j = nlohmann::json::parse(data);
 		if (j.contains("moveType"))
 			type_ = (MoveType)j["moveType"].get<int>();
-		if (j.contains("targetType"))
-			targetType_ = (TargetType)j["targetType"].get<int>();
-		if (j.contains("priority"))
-			priority_ = (TargetPriority)j["priority"].get<int>();
 		if (j.contains("speed"))
 			speed_ = j["speed"].get<float>();
 	} catch (...) {
 	}
 }
 
+void BaseEnemy::SearchTarget(entt::entity entity, GameScene* scene) {
+	auto& registry = scene->GetRegistry();
+	auto& myTc = registry.get<TransformComponent>(entity);
+
+	entt::entity bestTarget = entt::null;
+	float minDistanceSq = searchRange_ * searchRange_;
+
+	// 1. プレイヤーを探す (最優先)
+	const auto& players = scene->GetEntitiesByTag(TagType::Player);
+	for (auto p : players) {
+		auto& t = registry.get<TransformComponent>(p);
+		float distSq = (t.translate.x - myTc.translate.x) * (t.translate.x - myTc.translate.x) + 
+			(t.translate.z - myTc.translate.z) * (t.translate.z - myTc.translate.z);
+		if (distSq < minDistanceSq) {
+			minDistanceSq = distSq;
+			bestTarget = p;
+		}
+	}
+
+	// 2. プレイヤーがいなければ、防衛設備（Defender）を探す
+	if (bestTarget == entt::null) {
+		const auto& defenders = scene->GetEntitiesByTag(TagType::Defender);
+		for (auto d : defenders) {
+			auto& t = registry.get<TransformComponent>(d);
+			float distSq = (t.translate.x - myTc.translate.x) * (t.translate.x - myTc.translate.x) + 
+				(t.translate.z - myTc.translate.z) * (t.translate.z - myTc.translate.z);
+			if (distSq < minDistanceSq) {
+				minDistanceSq = distSq;
+				bestTarget = d;
+			}
+		}
+	}
+
+	currentTarget_ = bestTarget;
+}
+
 // ★ スクリプト自動登録
-REGISTER_SCRIPT(EnemyBehavior);
+REGISTER_SCRIPT(BaseEnemy);
 
 } // namespace Game

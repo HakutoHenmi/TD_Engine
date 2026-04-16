@@ -205,7 +205,7 @@ exit /b 0
     <ClCompile Include="Game\Scripts\PoisonTrap.cpp" />
     <ClCompile Include="Game\Scripts\PreparationCamera.cpp" />
     <ClCompile Include="Game\Scripts\ScriptEngine.cpp" />
-    <ClCompile Include="Game\Scripts\EnemyBehavior.cpp" />
+    <ClCompile Include="Game\Scripts\BaseEnemy.cpp" />
     <ClCompile Include="Game\Scripts\TowerScript.cpp" />
     <ClCompile Include="Game\Scripts\EnemySpawnerScript.cpp" />
     <ClCompile Include="Game\Scripts\IScript.cpp" />
@@ -245,7 +245,7 @@ exit /b 0
     <ClInclude Include="Game\Scripts\PoisonTrap.h" />
     <ClInclude Include="Game\Scripts\PreparationCamera.h" />
     <ClInclude Include="Game\Scripts\ScriptEngine.h" />
-    <ClInclude Include="Game\Scripts\EnemyBehavior.h" />
+    <ClInclude Include="Game\Scripts\BaseEnemy.h" />
     <ClInclude Include="Game\Scripts\TowerScript.h" />
     <ClInclude Include="Game\Scripts\EnemySpawnerScript.h" />
     <ClInclude Include="Game\Scripts\CommunicationTestScript.h" />

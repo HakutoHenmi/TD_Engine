@@ -167,6 +167,7 @@ enum class TagType : uint32_t {
 	Pipe,
 	Canon,
 	Cannon,
+	Defender,
 	Wall,
 	BulletTank,
 	PipeCannon,
@@ -194,6 +195,7 @@ inline const char* TagToString(TagType tag) {
 	case TagType::Pipe: return "Pipe";
 	case TagType::Canon: return "Canon";
 	case TagType::Cannon: return "Cannon";
+	case TagType::Defender: return "Defender";
 	case TagType::Wall: return "Wall";
 	case TagType::BulletTank: return "BulletTank";
 	case TagType::PipeCannon: return "pipe_cannon";
@@ -222,6 +224,7 @@ inline TagType StringToTag(const std::string& s) {
 	if (s == "Pipe" || s == "pipe") return TagType::Pipe;
 	if (s == "Canon") return TagType::Canon;
 	if (s == "Cannon") return TagType::Cannon;
+	if (s == "Defender") return TagType::Defender;
 	if (s == "Wall") return TagType::Wall;
 	if (s == "BulletTank") return TagType::BulletTank;
 	if (s == "pipe_cannon") return TagType::PipeCannon;
