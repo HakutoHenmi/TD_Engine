@@ -6,11 +6,11 @@ namespace Game {
 class InstallationButton : public IScript {
 public:
 
-	enum ButtonTypes {
+	enum FacilityTypes {
 		Cannon = 0,
 		Pipe,
 		Tank, 
-		ButtonTypesNum,
+		FacilityTypesNum,
 	};
 
 	void Start(entt::entity entity, GameScene* scene) override;
@@ -21,16 +21,16 @@ public:
 	std::string SerializeParameters() override;
 	void DeserializeParameters(const std::string& data) override;
 
-	static bool IsButtonPressed(ButtonTypes type);
+	static bool IsButtonPressed(FacilityTypes type);
 
 
 	
 
 private:
 
-	ButtonTypes buttonTypes_ = Cannon;
+	FacilityTypes FacilityTypes_ = Cannon;
 	
-	static bool isButtonPressed_[ButtonTypesNum];
+	static bool isButtonPressed_[FacilityTypesNum];
 
 };
 

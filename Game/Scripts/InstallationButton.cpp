@@ -19,10 +19,10 @@ using json = nlohmann::json;
 namespace Game {
 
 namespace {
-bool isButtonPressed[InstallationButton::ButtonTypes::ButtonTypesNum];
+bool isButtonPressed[InstallationButton::FacilityTypes::FacilityTypesNum];
 }
 
-bool InstallationButton::isButtonPressed_[ButtonTypesNum] = {};
+bool InstallationButton::isButtonPressed_[FacilityTypesNum] = {};
 
 void InstallationButton::Start(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
@@ -35,8 +35,8 @@ void InstallationButton::Update(entt::entity entity, GameScene* scene, float dt)
 	if (!registry.all_of<TransformComponent>(entity))
 		return;
 
-	isButtonPressed_[buttonTypes_] = scene->GetRegistry().all_of<UIButtonComponent>(entity) && scene->GetRegistry().get<UIButtonComponent>(entity).isPressed;
-	isButtonPressed[buttonTypes_] = isButtonPressed_[buttonTypes_];
+	isButtonPressed_[FacilityTypes_] = scene->GetRegistry().all_of<UIButtonComponent>(entity) && scene->GetRegistry().get<UIButtonComponent>(entity).isPressed;
+	isButtonPressed[FacilityTypes_] = isButtonPressed_[FacilityTypes_];
 
 	if (PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase) {
 		if (scene->GetRegistry().all_of<UIImageComponent>(entity))
@@ -59,18 +59,18 @@ void InstallationButton::OnEditorUI() {
 	ImGui::SeparatorText("Installation Button");
 
 	const char* buttonTypeNames[] = {"Cannon", "Pipe", "Tank"};
-	int currentType = static_cast<int>(buttonTypes_);
-	if (ImGui::Combo("Button Type", &currentType, buttonTypeNames, IM_ARRAYSIZE(buttonTypeNames))) {
-		buttonTypes_ = static_cast<ButtonTypes>(currentType);
+	int currentType = static_cast<int>(FacilityTypes_);
+	if (ImGui::Combo("Facility Type", &currentType, buttonTypeNames, IM_ARRAYSIZE(buttonTypeNames))) {
+		FacilityTypes_ = static_cast<FacilityTypes>(currentType);
 	}
 
-	ImGui::Text("isButtonPressed_: %s", isButtonPressed_[buttonTypes_] ? "true" : "false");
+	ImGui::Text("isButtonPressed_: %s", isButtonPressed_[FacilityTypes_] ? "true" : "false");
 #endif
 }
 
 std::string InstallationButton::SerializeParameters() {
 	json j;
-	j["buttonTypes"] = static_cast<int>(buttonTypes_);
+	j["FacilityTypes"] = static_cast<int>(FacilityTypes_);
 	return j.dump();
 }
 
@@ -78,15 +78,15 @@ void InstallationButton::DeserializeParameters(const std::string& data) {
 	if (data.empty()) return;
 	try {
 		json j = json::parse(data);
-		if (j.contains("buttonTypes")) {
-			buttonTypes_ = static_cast<ButtonTypes>(j["buttonTypes"].get<int>());
+		if (j.contains("FacilityTypes")) {
+			FacilityTypes_ = static_cast<FacilityTypes>(j["FacilityTypes"].get<int>());
 		}
 	} catch (...) {
 		// Log or suppress parse errors
 	}
 }
 
-bool InstallationButton::IsButtonPressed(ButtonTypes type) { return isButtonPressed[type]; }
+bool InstallationButton::IsButtonPressed(FacilityTypes type) { return isButtonPressed[type]; }
 
 REGISTER_SCRIPT(InstallationButton);
 
