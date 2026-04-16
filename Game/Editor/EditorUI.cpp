@@ -288,6 +288,25 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 					c.fontSize = comp.value("fontSize", 24.0f);
 					c.fontPath = comp.value("fontPath", "C:\\Windows\\Fonts\\msgothic.ttc");
 					if (comp.contains("color")) c.color = {comp["color"][0], comp["color"][1], comp["color"][2], comp["color"][3]};
+
+					// レイアウト
+					c.alignment = (TextAlignment)comp.value("alignment", (int)TextAlignment::Left);
+					c.wordWrap = comp.value("wordWrap", false);
+					c.tracking = comp.value("tracking", 0.0f);
+					c.lineSpacing = comp.value("lineSpacing", 1.0f);
+
+					// 装飾
+					c.enableRichText = comp.value("enableRichText", true);
+					c.enableShadow = comp.value("enableShadow", false);
+					if (comp.contains("shadowOffset")) c.shadowOffset = {comp["shadowOffset"][0], comp["shadowOffset"][1]};
+					if (comp.contains("shadowColor")) c.shadowColor = {comp["shadowColor"][0], comp["shadowColor"][1], comp["shadowColor"][2], comp["shadowColor"][3]};
+
+					// 演出
+					c.typewriterEnabled = comp.value("typewriterEnabled", false);
+					c.typewriterSpeed = comp.value("typewriterSpeed", 20.0f);
+					c.animationType = (TextAnimation)comp.value("animationType", (int)TextAnimation::None);
+					c.animationIntensity = comp.value("animationIntensity", 1.0f);
+					c.animationSpeed = comp.value("animationSpeed", 1.0f);
 				} else if (type == "UIButton") {
 					auto& c = reg.get_or_emplace<UIButtonComponent>(entity);
 					c.enabled = en;
@@ -664,7 +683,13 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 	}
 	if (auto* cp = registry.try_get<UITextComponent>(entity)) {
 		addComma();
-		ss << "        {\"type\": \"UIText\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"text\": \"" << EscapeJson(cp->text) << "\", \"fontSize\": " << cp->fontSize << ", \"fontPath\": \"" << EscapeJson(cp->fontPath) << "\", \"color\": [" << cp->color.x << "," << cp->color.y << "," << cp->color.z << "," << cp->color.w << "]}";
+		ss << "        {\"type\": \"UIText\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"text\": \"" << EscapeJson(cp->text) << "\", \"fontSize\": " << cp->fontSize << ", \"fontPath\": \"" << EscapeJson(cp->fontPath) << "\", \"color\": [" << cp->color.x << "," << cp->color.y << "," << cp->color.z << "," << cp->color.w << "]";
+		ss << ", \"alignment\": " << static_cast<int>(cp->alignment) << ", \"wordWrap\": " << (cp->wordWrap ? "true" : "false") << ", \"tracking\": " << cp->tracking << ", \"lineSpacing\": " << cp->lineSpacing;
+		ss << ", \"enableRichText\": " << (cp->enableRichText ? "true" : "false");
+		ss << ", \"enableShadow\": " << (cp->enableShadow ? "true" : "false") << ", \"shadowOffset\": [" << cp->shadowOffset.x << "," << cp->shadowOffset.y << "], \"shadowColor\": [" << cp->shadowColor.x << "," << cp->shadowColor.y << "," << cp->shadowColor.z << "," << cp->shadowColor.w << "]";
+		ss << ", \"typewriterEnabled\": " << (cp->typewriterEnabled ? "true" : "false") << ", \"typewriterSpeed\": " << cp->typewriterSpeed;
+		ss << ", \"animationType\": " << static_cast<int>(cp->animationType) << ", \"animationIntensity\": " << cp->animationIntensity << ", \"animationSpeed\": " << cp->animationSpeed;
+		ss << "}";
 	}
 	if (auto* cp = registry.try_get<UIButtonComponent>(entity)) {
 		addComma();
@@ -2317,6 +2342,43 @@ void EditorUI::ShowInspector(GameScene* scene) {
 						ImGui::EndCombo();
 					}
 					AssetField("Custom Font", txt->fontPath, { ".ttf", ".ttc", ".otf" });
+
+					if (ImGui::TreeNode("Layout")) {
+						const char* alignNames[] = { "Left", "Center", "Right" };
+						int curAlign = (int)txt->alignment;
+						if (ImGui::Combo("Alignment", &curAlign, alignNames, 3)) txt->alignment = (TextAlignment)curAlign;
+						ImGui::Checkbox("Word Wrap", &txt->wordWrap);
+						ImGui::DragFloat("Tracking", &txt->tracking, 0.1f);
+						ImGui::DragFloat("Line Spacing", &txt->lineSpacing, 0.1f, 0.0f, 5.0f);
+						ImGui::TreePop();
+					}
+
+					if (ImGui::TreeNode("Decoration")) {
+						ImGui::Checkbox("Enable Rich Text", &txt->enableRichText);
+						ImGui::Checkbox("Enable Shadow", &txt->enableShadow);
+						if (txt->enableShadow) {
+							ImGui::DragFloat2("Shadow Offset", &txt->shadowOffset.x, 1.0f);
+							ImGui::ColorEdit4("Shadow Color", &txt->shadowColor.x);
+						}
+						ImGui::TreePop();
+					}
+
+					if (ImGui::TreeNode("Effects")) {
+						ImGui::Checkbox("Typewriter", &txt->typewriterEnabled);
+						if (txt->typewriterEnabled) {
+							ImGui::DragFloat("Speed##Type", &txt->typewriterSpeed, 0.1f, 0.1f, 100.0f);
+							if (ImGui::Button("Reset Timer")) txt->typewriterTimer = 0.0f;
+						}
+
+						const char* animNames[] = { "None", "Wave", "Shake" };
+						int curAnim = (int)txt->animationType;
+						if (ImGui::Combo("Vertex Animation", &curAnim, animNames, 3)) txt->animationType = (TextAnimation)curAnim;
+						if (txt->animationType != TextAnimation::None) {
+							ImGui::DragFloat("Intensity", &txt->animationIntensity, 0.1f);
+							ImGui::DragFloat("Speed##Anim", &txt->animationSpeed, 0.1f);
+						}
+						ImGui::TreePop();
+					}
 
 					if (!registry.all_of<RectTransformComponent>(entity)) {
 						ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.4f, 0.0f, 1.0f));

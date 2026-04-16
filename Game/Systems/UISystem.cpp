@@ -12,8 +12,14 @@
 
 namespace Game {
 
-void UISystem::Update(entt::registry& /*registry*/, GameContext& /*ctx*/) {
-    // ボタンの更新や入力判定はワールド座標が確定するDrawフェーズ (RenderNodeWithRect) で実行するため、ここでは何もしない
+void UISystem::Update(entt::registry& registry, GameContext& ctx) {
+    auto view = registry.view<UITextComponent>();
+    for (auto e : view) {
+        auto& text = view.get<UITextComponent>(e);
+        if (text.enabled && text.typewriterEnabled) {
+            text.typewriterTimer += ctx.dt;
+        }
+    }
 }
 
 UISystem::WorldRect UISystem::CalculateWorldRect(entt::entity entity, entt::registry& registry, float screenW, float screenH) {
@@ -285,20 +291,41 @@ void UISystem::RenderNodeWithRect(entt::entity entity, entt::registry& registry,
 void UISystem::DrawTextW(entt::entity /*entity*/, entt::registry& /*registry*/, const UITextComponent& text, float worldX, float worldY, float worldW, float worldH, Engine::Renderer* renderer) {
 	if (!renderer || text.text.empty() || text.color.w <= 0.01f) return;
 
-	// フォントレンダラーの初期化サイズ (Renderer 内で 64.0f) を基準にスケール
 	float fontScale = text.fontSize / 64.0f;
 
-	float tw = renderer->MeasureTextWidth(text.text, fontScale, text.fontPath);
-	float th = renderer->GetTextLineHeight(fontScale, text.fontPath);
+	Engine::Renderer::TextDrawParams p;
+	p.alignment = (int)text.alignment;
+	p.tracking = text.tracking;
+	p.lineSpacing = text.lineSpacing;
+	p.enableRichText = text.enableRichText;
+	p.enableShadow = text.enableShadow;
+	p.shadowOffset = { text.shadowOffset.x, text.shadowOffset.y };
+	p.shadowColor = { text.shadowColor.x, text.shadowColor.y, text.shadowColor.z, text.shadowColor.w };
+	p.animType = (int)text.animationType;
+	p.animIntensity = text.animationIntensity;
+	p.animSpeed = text.animationSpeed;
 
-	// 中央揃え (worldW/worldHが0の場合は左上揃え)
-	float px = worldX;
+	if (text.typewriterEnabled) {
+		p.visibleCount = (int)(text.typewriterTimer * text.typewriterSpeed);
+	}
+
+	// RectTransformがある場合はその幅をワードラップ幅として使用可能
+	if (text.wordWrap && worldW > 0.1f) {
+		p.wrapWidth = worldW;
+	}
+
+	// 中央揃えなどの計算は Renderer::DrawString 内部で行われるが、
+	// Y座標の垂直中央揃えは現状 Renderer 側で実装していないため UISystem 側で行う
 	float py = worldY;
-	if (worldW > 0.0f) px += (worldW - tw) * 0.5f;
-	if (worldH > 0.0f) py += (worldH - th) * 0.5f;
+	if (worldH > 0.0f) {
+		// 行数を考慮した全高さを計算 (リッチテキスト対応の MeasureWidth はあるが Height は未対応のため概算)
+		float th = renderer->GetTextLineHeight(fontScale, text.fontPath) * text.lineSpacing;
+		// ※複数行の場合は本来ここで再計算が必要だが、一旦1行分の中央揃えとする
+		py += (worldH - th) * 0.5f;
+	}
 
 	Engine::Vector4 colorVec = { text.color.x, text.color.y, text.color.z, text.color.w };
-	renderer->DrawString(text.text, px, py, fontScale, colorVec, text.fontPath);
+	renderer->DrawString(text.text, worldX, py, fontScale, colorVec, text.fontPath, p);
 }
 
 void UISystem::ProcessButton(entt::entity entity, entt::registry& registry, UIButtonComponent& btn, float worldX, float worldY, float worldW, float worldH, GameContext& ctx) {

@@ -1788,9 +1788,11 @@ float4 main(VSIn v, uint instanceID : SV_InstanceID) : SV_POSITION {
 
 		CD3DX12_DESCRIPTOR_RANGE rangeSRV;
 		rangeSRV.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
-		CD3DX12_ROOT_PARAMETER params[2]{};
-		params[0].InitAsConstantBufferView(0);
-		params[1].InitAsDescriptorTable(1, &rangeSRV, D3D12_SHADER_VISIBILITY_PIXEL);
+		CD3DX12_ROOT_PARAMETER params[3]{};
+		params[0].InitAsConstantBufferView(0); // b0: CBSprite
+		params[1].InitAsDescriptorTable(1, &rangeSRV, D3D12_SHADER_VISIBILITY_PIXEL); // t0: Texture
+		params[2].InitAsConstantBufferView(1); // b1: CBFrame (Time等)
+
 		CD3DX12_STATIC_SAMPLER_DESC samp(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
 		CD3DX12_ROOT_SIGNATURE_DESC rsDesc;
 		rsDesc.Init(_countof(params), params, 1, &samp, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -2579,11 +2581,31 @@ bool Renderer::InitTextSystem(const std::string& fontPath, float pixelHeight) {
 		if (!rootSig2D_) return false;
 
 		static const char* kVSText = R"(
-struct VSIn { float2 pos : POSITION; float2 uv : TEXCOORD0; float4 color : COLOR0; };
+cbuffer CBFrame : register(b1) { row_major float4x4 gView; row_major float4x4 gProj; row_major float4x4 gViewProj; float3 gCamPos; float gTime; };
+struct VSIn { 
+    float2 pos : POSITION; 
+    float2 uv : TEXCOORD0; 
+    float4 color : COLOR0;
+    float charIndex : CHAR_INDEX;
+    float charTotal : CHAR_TOTAL;
+    uint animType : ANIM_TYPE;  // 0:None, 1:Wave, 2:Shake
+    float2 animParam : ANIM_PARAM; // x:Intensity, y:Speed
+};
 struct VSOut { float4 svpos : SV_POSITION; float2 uv : TEXCOORD0; float4 color : COLOR0; };
+
+float hash(float n) { return frac(sin(n) * 43758.5453123); }
+
 VSOut main(VSIn v) {
     VSOut o;
-    o.svpos = float4(v.pos, 0, 1);
+    float2 offset = float2(0, 0);
+    if (v.animType == 1) { // Wave
+        offset.y = sin(gTime * v.animParam.y * 5.0 + v.charIndex * 0.5) * v.animParam.x * 0.02;
+    } else if (v.animType == 2) { // Shake
+        float t = floor(gTime * v.animParam.y * 15.0);
+        offset.x = (hash(v.charIndex + t) - 0.5) * v.animParam.x * 0.01;
+        offset.y = (hash(v.charIndex + t + 100.0) - 0.5) * v.animParam.x * 0.01;
+    }
+    o.svpos = float4(v.pos + offset, 0, 1);
     o.uv = v.uv;
     o.color = v.color;
     return o;
@@ -2595,6 +2617,7 @@ SamplerState gSmp : register(s0);
 struct PSIn { float4 svpos : SV_POSITION; float2 uv : TEXCOORD0; float4 color : COLOR0; };
 float4 main(PSIn i) : SV_TARGET {
     float alpha = gTex.Sample(gSmp, i.uv).r;
+    if (alpha <= 0.0) discard;
     return float4(i.color.rgb, i.color.a * alpha);
 })";
 
@@ -2603,9 +2626,13 @@ float4 main(PSIn i) : SV_TARGET {
 		if (!vsBlob || !psBlob) return false;
 
 		D3D12_INPUT_ELEMENT_DESC layout[] = {
-			{"POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-			{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 8,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-			{"COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+			{"POSITION",   0, DXGI_FORMAT_R32G32_FLOAT,       0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+			{"TEXCOORD",   0, DXGI_FORMAT_R32G32_FLOAT,       0, 8,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+			{"COLOR",      0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+			{"CHAR_INDEX", 0, DXGI_FORMAT_R32_FLOAT,          0, 32, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+			{"CHAR_TOTAL", 0, DXGI_FORMAT_R32_FLOAT,          0, 36, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+			{"ANIM_TYPE",  0, DXGI_FORMAT_R32_UINT,           0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+			{"ANIM_PARAM", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 44, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
 		};
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC pso{};
@@ -2643,8 +2670,7 @@ float4 main(PSIn i) : SV_TARGET {
 	return true;
 }
 
-void Renderer::DrawString(const std::string& text, float x, float y, float scale, const Vector4& color, const std::string& fontPath) {
-	// フォントが未ロードなら遅延初期化
+void Renderer::DrawString(const std::string& text, float x, float y, float scale, const Vector4& color, const std::string& fontPath, const TextDrawParams& params) {
 	if (!glyphCaches_.count(fontPath)) {
 		if (!InitTextSystem(fontPath, 64.0f)) return;
 	}
@@ -2653,69 +2679,155 @@ void Renderer::DrawString(const std::string& text, float x, float y, float scale
 
 	const float W = static_cast<float>(Engine::WindowDX::kW);
 	const float H = static_cast<float>(Engine::WindowDX::kH);
+	auto toNdcX = [W](float px) { return (px / W) * 2.0f - 1.0f; };
+	auto toNdcY = [H](float py) { return 1.0f - (py / H) * 2.0f; };
 
-	auto codepoints = Utf8ToCodepoints(text);
+	// 1. リッチテキスト解析 & 文字リスト作成
+	struct CharInfo {
+		uint32_t cp;
+		Vector4 color;
+		float scale;
+	};
+	std::vector<CharInfo> characters;
+	Vector4 curColor = color;
+	float curScale = scale;
+	std::vector<Vector4> colorStack;
+	std::vector<float> scaleStack;
 
-	float cursorX = x;
+	if (params.enableRichText) {
+		for (size_t i = 0; i < text.size(); ) {
+			if (text[i] == '<') {
+				size_t end = text.find('>', i);
+				if (end != std::string::npos) {
+					std::string tag = text.substr(i + 1, end - i - 1);
+					if (tag == "/color") {
+						if (!colorStack.empty()) { curColor = colorStack.back(); colorStack.pop_back(); }
+						else curColor = color;
+					} else if (tag.starts_with("color=")) {
+						colorStack.push_back(curColor);
+						std::string cstr = tag.substr(6);
+						if (cstr.starts_with("#")) {
+							std::string hexStr = cstr.substr(1);
+							uint32_t hex = (uint32_t)std::stoul(hexStr, nullptr, 16);
+							if (hexStr.size() == 6) { // #RRGGBB
+								curColor.x = ((hex >> 16) & 0xFF) / 255.0f;
+								curColor.y = ((hex >> 8) & 0xFF) / 255.0f;
+								curColor.z = (hex & 0xFF) / 255.0f;
+								curColor.w = color.w;
+							} else if (hexStr.size() == 8) { // #RRGGBBAA
+								curColor.x = ((hex >> 24) & 0xFF) / 255.0f;
+								curColor.y = ((hex >> 16) & 0xFF) / 255.0f;
+								curColor.z = ((hex >> 8) & 0xFF) / 255.0f;
+								curColor.w = (hex & 0xFF) / 255.0f;
+							}
+						}
+					} else if (tag == "/size") {
+						if (!scaleStack.empty()) { curScale = scaleStack.back(); scaleStack.pop_back(); }
+						else curScale = scale;
+					} else if (tag.starts_with("size=")) {
+						scaleStack.push_back(curScale);
+						curScale = scale * (std::stof(tag.substr(5)) / 24.0f); // 24.0基準
+					} else {
+						characters.push_back({ (uint32_t)'<', curColor, curScale });
+						i++; continue;
+					}
+					i = end + 1;
+					continue;
+				}
+			}
+			// UTF-8 デコード
+			unsigned char c = (unsigned char)text[i];
+			uint32_t cp = 0;
+			int len = 0;
+			if (c < 0x80) { cp = c; len = 1; }
+			else if ((c & 0xE0) == 0xC0) { cp = c & 0x1F; len = 2; }
+			else if ((c & 0xF0) == 0xE0) { cp = c & 0x0F; len = 3; }
+			else if ((c & 0xF8) == 0xF0) { cp = c & 0x07; len = 4; }
+			for (int j = 1; j < len; ++j) {
+				if (i + j < text.size()) cp = (cp << 6) | ((unsigned char)text[i + j] & 0x3F);
+			}
+			characters.push_back({ cp, curColor, curScale });
+			i += (len > 0 ? len : 1);
+		}
+	} else {
+		auto cps = Utf8ToCodepoints(text);
+		for (auto cp : cps) characters.push_back({ cp, color, scale });
+	}
+
+	// 2. 行分割 & ワードラップ
+	struct Line { std::vector<CharInfo> chars; float width; };
+	std::vector<Line> lines;
+	lines.push_back({ {}, 0.0f });
+
+	float curLineWidth = 0.0f;
+	for (const auto& ci : characters) {
+		if (ci.cp == '\n') {
+			lines.push_back({ {}, 0.0f });
+			curLineWidth = 0.0f;
+			continue;
+		}
+		const CachedGlyph* g = cache->GetGlyph(ci.cp);
+		float adv = (g ? g->metrics.advance : 0.0f) * ci.scale + params.tracking;
+		
+		if (params.wrapWidth > 0 && curLineWidth + adv > params.wrapWidth && !lines.back().chars.empty()) {
+			lines.push_back({ {}, 0.0f });
+			curLineWidth = 0.0f;
+		}
+		lines.back().chars.push_back(ci);
+		lines.back().width += adv;
+		curLineWidth += adv;
+	}
+
+	// 3. 描画
 	float cursorY = y;
-
-	int ascent = cache->GetAscent();
-	float scaledAscent = ascent * scale;
+	int totalCharsFound = 0;
+	int verticesMapSize = (int)characters.size();
 
 	auto& vertices = textVerticesMap_[fontPath];
+	float ascent = (float)cache->GetAscent();
+	float baseLineHeight = (float)cache->GetLineHeight();
 
-	for (uint32_t cp : codepoints) {
-		// 改行処理
-		if (cp == '\n') {
-			cursorX = x;
-			cursorY += cache->GetLineHeight() * scale;
-			continue;
-		}
-		// タブ → 4スペース分
-		if (cp == '\t') {
-			const CachedGlyph* spaceGlyph = cache->GetGlyph(' ');
-			if (spaceGlyph) {
-				cursorX += spaceGlyph->metrics.advance * scale * 4.0f;
+	for (const auto& line : lines) {
+		float cursorX = x;
+		if (params.alignment == 1) cursorX = x - line.width * 0.5f;
+		else if (params.alignment == 2) cursorX = x - line.width;
+
+		for (const auto& ci : line.chars) {
+			if (params.visibleCount >= 0 && totalCharsFound >= params.visibleCount) break;
+
+			const CachedGlyph* glyph = cache->GetGlyph(ci.cp);
+			if (!glyph) continue;
+
+			auto buildQuad = [&](float qx, float qy, const Vector4& qCol, bool isShadow) {
+				if (!glyph->hasBitmap) return;
+				float xPos = qx + glyph->metrics.bearingX * ci.scale;
+				float yPos = qy + (ascent * ci.scale - glyph->metrics.bearingY * ci.scale);
+				float qw = glyph->metrics.width * ci.scale;
+				float qh = glyph->metrics.height * ci.scale;
+
+				float nx0 = toNdcX(xPos); float ny0 = toNdcY(yPos);
+				float nx1 = toNdcX(xPos + qw); float ny1 = toNdcY(yPos + qh);
+
+				TextVertex v[6];
+				float u0 = glyph->u0, v0 = glyph->v0, u1 = glyph->u1, v1 = glyph->v1;
+				uint32_t aType = isShadow ? 0 : (uint32_t)params.animType;
+				v[0] = { nx0, ny0, u0, v0, qCol.x, qCol.y, qCol.z, qCol.w, (float)totalCharsFound, (float)verticesMapSize, aType, {params.animIntensity, params.animSpeed} };
+				v[1] = { nx1, ny0, u1, v0, qCol.x, qCol.y, qCol.z, qCol.w, (float)totalCharsFound, (float)verticesMapSize, aType, {params.animIntensity, params.animSpeed} };
+				v[2] = { nx0, ny1, u0, v1, qCol.x, qCol.y, qCol.z, qCol.w, (float)totalCharsFound, (float)verticesMapSize, aType, {params.animIntensity, params.animSpeed} };
+				v[3] = v[2]; v[4] = v[1];
+				v[5] = { nx1, ny1, u1, v1, qCol.x, qCol.y, qCol.z, qCol.w, (float)totalCharsFound, (float)verticesMapSize, aType, {params.animIntensity, params.animSpeed} };
+				for (int n = 0; n < 6; ++n) vertices.push_back(v[n]);
+			};
+
+			if (params.enableShadow) {
+				buildQuad(cursorX + params.shadowOffset.x, cursorY + params.shadowOffset.y, params.shadowColor, true);
 			}
-			continue;
+			buildQuad(cursorX, cursorY, ci.color, false);
+
+			cursorX += glyph->metrics.advance * ci.scale + params.tracking;
+			totalCharsFound++;
 		}
-
-		const CachedGlyph* glyph = cache->GetGlyph(cp);
-		if (!glyph) continue;
-
-		if (glyph->hasBitmap) {
-			// Quadの位置を計算 (ピクセル座標)
-			float xPos = cursorX + glyph->metrics.bearingX * scale;
-			float yPos = cursorY + (scaledAscent - glyph->metrics.bearingY * scale);
-			float w = glyph->metrics.width * scale;
-			float h = glyph->metrics.height * scale;
-
-			// ピクセル座標 → NDC
-			auto toNdcX = [W](float px) { return (px / W) * 2.0f - 1.0f; };
-			auto toNdcY = [H](float py) { return 1.0f - (py / H) * 2.0f; };
-
-			float nx0 = toNdcX(xPos);
-			float ny0 = toNdcY(yPos);
-			float nx1 = toNdcX(xPos + w);
-			float ny1 = toNdcY(yPos + h);
-
-			// 6頂点 (2三角形)
-			TextVertex v0 = { nx0, ny0, glyph->u0, glyph->v0, color.x, color.y, color.z, color.w };
-			TextVertex v1 = { nx1, ny0, glyph->u1, glyph->v0, color.x, color.y, color.z, color.w };
-			TextVertex v2 = { nx0, ny1, glyph->u0, glyph->v1, color.x, color.y, color.z, color.w };
-			TextVertex v3 = { nx0, ny1, glyph->u0, glyph->v1, color.x, color.y, color.z, color.w };
-			TextVertex v4 = { nx1, ny0, glyph->u1, glyph->v0, color.x, color.y, color.z, color.w };
-			TextVertex v5 = { nx1, ny1, glyph->u1, glyph->v1, color.x, color.y, color.z, color.w };
-
-			vertices.push_back(v0);
-			vertices.push_back(v1);
-			vertices.push_back(v2);
-			vertices.push_back(v3);
-			vertices.push_back(v4);
-			vertices.push_back(v5);
-		}
-
-		cursorX += glyph->metrics.advance * scale;
+		cursorY += baseLineHeight * scale * params.lineSpacing;
 	}
 }
 
@@ -2751,6 +2863,11 @@ void Renderer::FlushText() {
 	if (cbOff != UINT32_MAX) {
 		std::memcpy(upload_[fi].mapped + cbOff, &cb, sizeof(CBSprite));
 		list_->SetGraphicsRootConstantBufferView(0, upload_[fi].buffer->GetGPUVirtualAddress() + cbOff);
+	}
+
+	// ★追加: スロット2に CBFrame (Time等) をバインド
+	if (cbFrameAddr_ != 0) {
+		list_->SetGraphicsRootConstantBufferView(2, cbFrameAddr_);
 	}
 
 	// フォントごとにアトラスSRVをバインドして描画
@@ -2789,31 +2906,51 @@ void Renderer::FlushText() {
 	textVerticesMap_.clear();
 }
 
-float Renderer::MeasureTextWidth(const std::string& text, float scale, const std::string& fontPath) {
-	// フォントが未ロードなら遅延初期化
-	if (!glyphCaches_.count(fontPath)) {
-		if (!InitTextSystem(fontPath, 64.0f)) return 0.0f;
-	}
-	auto it = glyphCaches_.find(fontPath);
-	if (it == glyphCaches_.end() || !it->second || !it->second->IsInitialized()) return 0.0f;
-	auto& cache = it->second;
+float Renderer::MeasureTextWidth(const std::string& text, float scale, const std::string& fontPath, bool enableRichText) {
+	if (!glyphCaches_.count(fontPath)) { if (!InitTextSystem(fontPath, 64.0f)) return 0.0f; }
+	auto& cache = glyphCaches_[fontPath]; if (!cache || !cache->IsInitialized()) return 0.0f;
 
-	auto codepoints = Utf8ToCodepoints(text);
-	float width = 0.0f;
+	float maxWidth = 0.0f;
+	float curWidth = 0.0f;
+	float curScale = scale;
+	std::vector<float> scaleStack;
 
-	for (uint32_t cp : codepoints) {
-		if (cp == '\n') break;
-		if (cp == '\t') {
-			const CachedGlyph* spaceGlyph = cache->GetGlyph(' ');
-			if (spaceGlyph) width += spaceGlyph->metrics.advance * scale * 4.0f;
-			continue;
+	for (size_t i = 0; i < text.size(); ) {
+		if (enableRichText && text[i] == '<') {
+			size_t end = text.find('>', i);
+			if (end != std::string::npos) {
+				std::string tag = text.substr(i + 1, end - i - 1);
+				if (tag == "/size") {
+					if (!scaleStack.empty()) { curScale = scaleStack.back(); scaleStack.pop_back(); }
+					else curScale = scale;
+				} else if (tag.starts_with("size=")) {
+					scaleStack.push_back(curScale);
+					curScale = scale * (std::stof(tag.substr(5)) / 24.0f);
+				} else if (tag.starts_with("color=") || tag == "/color") { /* ignore */ }
+				else { goto process_char; }
+				i = end + 1; continue;
+			}
 		}
-		const CachedGlyph* glyph = cache->GetGlyph(cp);
-		if (glyph) {
-			width += glyph->metrics.advance * scale;
+
+	process_char:
+		unsigned char c = (unsigned char)text[i];
+		uint32_t cp = 0; int len = 0;
+		if (c < 0x80) { cp = c; len = 1; }
+		else if ((c & 0xE0) == 0xC0) { cp = c & 0x1F; len = 2; }
+		else if ((c & 0xF0) == 0xE0) { cp = c & 0x0F; len = 3; }
+		else if ((c & 0xF8) == 0xF0) { cp = c & 0x07; len = 4; }
+		for (int j = 1; j < len; ++j) {
+			if (i + j < text.size()) cp = (cp << 6) | ((unsigned char)text[i + j] & 0x3F);
 		}
+
+		if (cp == '\n') { maxWidth = (std::max)(maxWidth, curWidth); curWidth = 0; }
+		else {
+			const CachedGlyph* g = cache->GetGlyph(cp);
+			if (g) curWidth += g->metrics.advance * curScale;
+		}
+		i += (len > 0 ? len : 1);
 	}
-	return width;
+	return (std::max)(maxWidth, curWidth);
 }
 
 float Renderer::GetTextLineHeight(float scale, const std::string& fontPath) const {
