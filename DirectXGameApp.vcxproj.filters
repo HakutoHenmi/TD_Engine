@@ -195,6 +195,7 @@
     <ClInclude Include="Game\Scripts\MissileCanonScript.h" />
     <ClInclude Include="Game\Scripts\ExplosionAttackArea.h" />
     <ClInclude Include="Game\Scripts\PhaseTransition.h" />
+    <ClInclude Include="Game\Scripts\Canon.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">
@@ -607,18 +608,6 @@
       <Filter>Resources\Models\Signboard</Filter>
     </None>
     <None Include="Resources\Models\Signboard\ThisIsSwitch.png">
-      <Filter>Resources\Models\Signboard</Filter>
-    </None>
-    <None Include="Resources\Models\Signboard\‚±‚ê‚ª.png">
-      <Filter>Resources\Models\Signboard</Filter>
-    </None>
-    <None Include="Resources\Models\Signboard\‚½‚Ü‚³‚ñ.png">
-      <Filter>Resources\Models\Signboard</Filter>
-    </None>
-    <None Include="Resources\Models\Signboard\‚Í‚Ë‚é‚æ.png">
-      <Filter>Resources\Models\Signboard</Filter>
-    </None>
-    <None Include="Resources\Models\Signboard\ƒXƒCƒbƒ`.png">
       <Filter>Resources\Models\Signboard</Filter>
     </None>
     <None Include="Resources\Models\Signboard\Signboard\Padjumpm.png">
@@ -1149,15 +1138,6 @@
     <None Include="Resources\Textures\fonts\AppliMincho\ReadMe.txt">
       <Filter>Resources\Textures\fonts\AppliMincho</Filter>
     </None>
-    <None Include="Resources\Textures\fonts\AppliMincho\ƒAƒvƒŠ–¾’©.otf">
-      <Filter>Resources\Textures\fonts\AppliMincho</Filter>
-    </None>
-    <None Include="Resources\Textures\fonts\AppliMincho\ƒAƒvƒŠ–¾’©Old.otf">
-      <Filter>Resources\Textures\fonts\AppliMincho</Filter>
-    </None>
-    <None Include="Resources\Textures\fonts\AppliMincho\ƒAƒvƒŠ–¾’©UD.otf">
-      <Filter>Resources\Textures\fonts\AppliMincho</Filter>
-    </None>
     <None Include="Resources\Textures\fonts\Huninn\Huninn-Regular.ttf">
       <Filter>Resources\Textures\fonts\Huninn</Filter>
     </None>
@@ -1296,5 +1276,15 @@
     <None Include="Resources\Textures\UI\uvChecker.png">
       <Filter>Resources\Textures\UI</Filter>
     </None>
+    <None Include="Resources\Models\Signboard\ç¸ºè–™ï½Œç¸ºãƒ»png" />
+    <None Include="Resources\Models\Signboard\ç¸ºæº˜âˆªç¸ºè¼”ï½“.png" />
+    <None Include="Resources\Models\Signboard\ç¸ºï½¯ç¸ºï½­ç¹§ä¹ï½ˆ.png" />
+    <None Include="Resources\Models\Signboard\ç¹§ï½¹ç¹§ï½¤ç¹ãƒ»ãƒ¡.png" />
+    <None Include="Resources\shaders\TextVS.hlsl" />
+    <None Include="Resources\shaders\TextPS.hlsl" />
+    <None Include="Resources\shaders\Text.hlsli" />
+    <None Include="Resources\Textures\fonts\AppliMincho\ç¹§ï½¢ç¹åŠ±Îœè­å–æ‚ƒ.otf" />
+    <None Include="Resources\Textures\fonts\AppliMincho\ç¹§ï½¢ç¹åŠ±Îœè­å–æ‚ƒOld.otf" />
+    <None Include="Resources\Textures\fonts\AppliMincho\ç¹§ï½¢ç¹åŠ±Îœè­å–æ‚ƒUD.otf" />
   </ItemGroup>
 </Project>

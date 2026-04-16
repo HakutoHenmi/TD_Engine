@@ -26,7 +26,7 @@
       "parentId": 0,
       "gridX": 1.0,
       "gridY": 1.0,
-      "description": "移動速度が 15% 上昇します。"
+      "description": "攻撃速度が 15% 上昇します。"
     },
     {
       "id": 3,
@@ -71,6 +71,15 @@
       "parentId": 5,
       "gridX": 1.0,
       "gridY": 3.0,
+      "description": "究極の力を解放し、全ステータスを大幅に強化します。"
+    },
+    {
+      "id": 8,
+      "name": "GOD",
+      "cost": 9,
+      "parentId": 7,
+      "gridX": 2.0,
+      "gridY": 4.0,
       "description": "究極の力を解放し、全ステータスを大幅に強化します。"
     }
   ]

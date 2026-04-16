@@ -8,11 +8,12 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
-
+#include "PlayerScript.h"
 using json = nlohmann::json;
 
 namespace Game {
 
+#pragma region 初期化
 // ===== 初期化 =====
 void SkillTree::Init(Engine::Renderer* renderer) {
 	if (initialized_ || !renderer)
@@ -27,6 +28,9 @@ void SkillTree::Init(Engine::Renderer* renderer) {
 	initialized_ = true;
 }
 
+#pragma endregion
+
+#pragma region データロード
 void SkillTree::LoadFromJson(const std::string& path, Engine::Renderer* renderer) {
 	std::ifstream f(path); // jsonファイルの読み込み
 	if (!f.is_open())
@@ -49,8 +53,8 @@ void SkillTree::LoadFromJson(const std::string& path, Engine::Renderer* renderer
 				node.description = s.value("description", "");
 
 				// アイコンの自動ロード試行 (Resources/Skills/スキル名.png)
-				std::string iconName = s.value("name", "");//jsonにアイコンの名前があったらiconNameを入れる
-				std::string iconPath = "Resources/Skills/" + iconName + ".png"; //iconPathに入れり
+				std::string iconName = s.value("name", "");                     // jsonにアイコンの名前があったらiconNameを入れる
+				std::string iconPath = "Resources/Skills/" + iconName + ".png"; // iconPathに入れり
 				if (renderer) {
 					node.textureHandle = renderer->LoadTexture2D(iconPath);
 				}
@@ -64,6 +68,59 @@ void SkillTree::LoadFromJson(const std::string& path, Engine::Renderer* renderer
 	}
 }
 
+#pragma endregion
+
+
+
+//void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) {
+//	if (!scene) {
+//		return;
+//	}
+//
+//	float attackPowerRate = 1.0f;
+//	float moveSpeedRate = 1.0f;
+//	float attackRangeRate = 1.0f;
+//	float attackSpeedRate = 1.0f;
+//	float criticalRateBonus = 0.0f;
+//
+//	if (IsSkillUnlocked(1)) {
+//		attackPowerRate *= 100.10f;
+//	}
+//
+//	if (IsSkillUnlocked(2)) {
+//		moveSpeedRate *= 1.15f;
+//	}
+//
+//	if (IsSkillUnlocked(3)) {
+//		attackRangeRate *= 1.20f;
+//	}
+//
+//	if (IsSkillUnlocked(4)) {
+//		attackPowerRate *= 1.20f;
+//	}
+//
+//	if (IsSkillUnlocked(5)) {
+//		attackSpeedRate *= 1.25f;
+//	}
+//
+//	if (IsSkillUnlocked(6)) {
+//		criticalRateBonus += 0.10f;
+//	}
+//
+//	if (IsSkillUnlocked(7)) {
+//		attackPowerRate *= 1.30f;
+//		moveSpeedRate *= 1.30f;
+//		attackRangeRate *= 1.30f;
+//		attackSpeedRate *= 1.30f;
+//		criticalRateBonus += 0.20f;
+//	}
+//
+//	SetVar(entity, scene, "AttackPowerRate", attackPowerRate);
+//	SetVar(entity, scene, "MoveSpeedRate", moveSpeedRate);
+//	SetVar(entity, scene, "AttackRangeRate", attackRangeRate);
+//	SetVar(entity, scene, "AttackSpeedRate", attackSpeedRate);
+//	SetVar(entity, scene, "CriticalRateBonus", criticalRateBonus);
+//}
 
 // ===== メイン更新 =====
 void SkillTree::Update(Engine::Renderer* renderer, float screenW, float screenH, float mouseX, float mouseY) {
@@ -100,26 +157,29 @@ void SkillTree::Update(Engine::Renderer* renderer, float screenW, float screenH,
 	}
 }
 
+
+#pragma region 入力処理
 // ===== 入力処理 =====
 void SkillTree::HandleInput(float screenW, float screenH, float mouseX, float mouseY) {
-	auto* input = Engine::Input::GetInstance();
-	if (!input)
+	auto* input = Engine::Input::GetInstance(); // 入力システムのインスタンスを取得
+	if (!input)                                 // 入力システムが存在しない場合は処理しない
 		return;
 
-	if (!input->IsMouseTrigger(0))
+	if (!input->IsMouseTrigger(0)) // 左クリックトリガーがない場合は処理しない
 		return;
 
-	// 確認ダイアログ表示中の処理
-	if (pendingUnlockId_ != -1) {
-		float cx = screenW * 0.5f;
+
+	// 確認ダイアログ表示中の処理(スキル習得しますか YES/NO)
+	if (pendingUnlockId_ != -1) { // Id何入っていたら処理をする
+		float cx = screenW * 0.5f;//画面中心
 		float cy = screenH * 0.5f;
 		// Yesボタン (左)
 		if (mouseX >= cx - 110 && mouseX <= cx - 10 && mouseY >= cy + 20 && mouseY <= cy + 60) {
-			ConfirmUnlock();
+			ConfirmUnlock();//スキル習得
 		}
 		// Noボタン (右)
 		else if (mouseX >= cx + 10 && mouseX <= cx + 110 && mouseY >= cy + 20 && mouseY <= cy + 60) {
-			CancelUnlock();
+			CancelUnlock(); // 習得キャンセル
 		}
 		return;
 	}
@@ -136,6 +196,9 @@ void SkillTree::HandleInput(float screenW, float screenH, float mouseX, float mo
 		}
 	}
 }
+
+#pragma endregion
+
 
 // ===== スキル習得試行 =====
 bool SkillTree::TryUnlockSkill(int index) {
@@ -161,55 +224,69 @@ bool SkillTree::TryUnlockSkill(int index) {
 	return true;
 }
 
+#pragma region 再起関数地獄
 // ===== 前提条件の再帰取得 =====
 void SkillTree::GetPrerequisites(int index, std::vector<int>& outIndices) {
-	if (nodes_[index].unlocked)
+	if (nodes_[index].unlocked)//指定されたindexのノードが取得済みだったら早期リターン
 		return;
+
+	// id 1 親　id -1
+	// id 2 親　id 1
+	// これでfor文の中で 親がid1だったら　id1のindexを見つけてそれが0以下になるまで親をたどっていく　そして最後に自分を追加する
 
 	// 自分を最後に追加（親から順に習得するため）
 	// ただし親を先に見に行く
-	int parentId = nodes_[index].parentId;
-	if (parentId >= 0) {
+	int parentId = nodes_[index].parentId; // 親IDを取得 例えばindexが2のノードの親IDが1だったらparentIdに1が入る
+	if (parentId >= 0) { // 0以上だったら
 		for (int i = 0; i < (int)nodes_.size(); ++i) {
-			if (nodes_[i].id == parentId) {
+			if (nodes_[i].id == parentId) { // ノードのIDが親IDと一致するノードを探す
 				GetPrerequisites(i, outIndices);
-				break;
+				break;//抜ける
 			}
 		}
+		//ここ来る
 	}
-
+	
 	// 既にリストに入っていないか確認して追加
 	if (std::find(outIndices.begin(), outIndices.end(), index) == outIndices.end()) {
 		outIndices.push_back(index);
 	}
 }
+#pragma endregion
 
+
+#pragma region スキル取得関数
 // ===== 習得確定 =====
 void SkillTree::ConfirmUnlock() {
-	if (pendingUnlockId_ == -1)
+	if (pendingUnlockId_ == -1) // Idに何も入っていなかったら処理しない(inputHandleで確認しているので一応かな)事故防止のため
 		return;
 
-	std::vector<int> neededIndices;
+	std::vector<int> neededIndices; // 必要な前提スキルをリストアップ (一括習得用)
 	GetPrerequisites(pendingUnlockId_, neededIndices);
 
 	int totalCost = 0;
 	for (int idx : neededIndices) {
-		totalCost += nodes_[idx].cost;
+		totalCost += nodes_[idx].cost; // 必要なスキルポイントを合計する
 	}
 
-	if (skillPoints_ >= totalCost) {
-		skillPoints_ -= totalCost;
-		for (int idx : neededIndices) {
-			nodes_[idx].unlocked = true;
+	if (skillPoints_ >= totalCost) { // スキルポイントが足りているか確認
+		skillPoints_ -= totalCost;   // 足りていたらポイントを減らす
+		for (int idx : neededIndices) { // 必要なスキルをすべて習得状態にする
+			nodes_[idx].unlocked = true; // 習得状態にする
 		}
 	}
 
-	pendingUnlockId_ = -1;
+	pendingUnlockId_ = -1; // 確認状態をリセット
 }
+#pragma endregion
 
+#pragma region スキル習得キャンセル関数
 // ===== 習得キャンセル =====
 void SkillTree::CancelUnlock() { pendingUnlockId_ = -1; }
+#pragma endregion
 
+
+#pragma region スキル習得チェック関数
 // ===== スキル習得チェック =====
 bool SkillTree::IsSkillUnlocked(int skillId) const {
 	for (const auto& n : nodes_) {
@@ -219,6 +296,7 @@ bool SkillTree::IsSkillUnlocked(int skillId) const {
 	return false;
 }
 
+#pragma endregion
 // ===== 背景描画 =====
 void SkillTree::DrawBackground(Engine::Renderer* renderer, float screenW, float screenH) {
 	Engine::Renderer::SpriteDesc bg;

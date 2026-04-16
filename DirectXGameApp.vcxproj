@@ -220,6 +220,7 @@ exit /b 0
     <ClCompile Include="Game\Scripts\PhaseTransition.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Game\Scripts\Canon.h" />
     <ClInclude Include="Game\Scripts\ExplosionAttackArea.h" />
     <ClInclude Include="Game\Scripts\InstallationButton.h" />
     <ClInclude Include="Game\Editor\EditorUI.h" />

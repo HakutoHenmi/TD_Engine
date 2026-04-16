@@ -32,7 +32,7 @@ public:
 	void Init(Engine::Renderer* renderer);
 	void LoadFromJson(const std::string& path, Engine::Renderer* renderer);
 	void Update(Engine::Renderer* renderer, float screenW, float screenH, float mouseX, float mouseY);
-
+	//void ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene);
 	// 開閉切り替え
 	void Toggle() { isOpen_ = !isOpen_; if(!isOpen_) pendingUnlockId_ = -1; }
 	bool IsOpen() const { return isOpen_; }
