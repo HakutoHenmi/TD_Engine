@@ -106,7 +106,7 @@ void SkillTree::LoadFromJson(const std::string& path, Engine::Renderer* renderer
 //	if (IsSkillUnlocked(6)) {
 //		criticalRateBonus += 0.10f;
 //	}
-//
+//　
 //	if (IsSkillUnlocked(7)) {
 //		attackPowerRate *= 1.30f;
 //		moveSpeedRate *= 1.30f;
