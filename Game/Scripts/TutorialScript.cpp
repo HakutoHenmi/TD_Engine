@@ -8,6 +8,7 @@
 #include "PhaseTransition.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
+#include "WaveManagement.h"
 #include <cfloat>
 #include <cmath>
 #include <fstream>
@@ -272,7 +273,7 @@ void TutorialScript::Update(entt::entity /*entity*/, GameScene* scene, float /*d
         preKeyN_ = false;
     }
 
-    UpdatePhaseTransition();
+    UpdatePhaseTransition(scene);
 }
 
 void TutorialScript::RequestPhaseChange(PhaseSystemScript::PhaseState nextPhase) {
@@ -292,7 +293,7 @@ void TutorialScript::RequestPhaseChange(PhaseSystemScript::PhaseState nextPhase)
     }
 }
 
-void TutorialScript::UpdatePhaseTransition() {
+void TutorialScript::UpdatePhaseTransition(GameScene* scene) {
     if (!isPhaseTransitioning_)
         return;
 
@@ -307,6 +308,25 @@ void TutorialScript::UpdatePhaseTransition() {
         isPhaseTransitioning_ = false;
         isFadeFinished_ = false;
         PhaseSystemScript::ForcePhaseState(phaseState_);
+
+        if (phaseState_ == PhaseSystemScript::BattlePhase && scene) {
+            auto& nav = scene->GetNavigationManager();
+            nav.UpdateCostMap(scene);
+
+            auto core = scene->FindObjectByName("Core");
+            if (scene->GetRegistry().valid(core)) {
+                auto& tc = scene->GetRegistry().get<TransformComponent>(core);
+                nav.GenerateFlowField(tc.translate.x, tc.translate.z);
+            }
+
+            if (tutorialStep_ == TutorialStep::FirstBattle) {
+                WaveManagement::SetWave(0);
+            } else if (tutorialStep_ == TutorialStep::FinalBattle) {
+                WaveManagement::SetWave(1);
+            }
+        } else if (phaseState_ == PhaseSystemScript::PreparationPhase) {
+            WaveManagement::SetWave(-1);
+        }
     }
 }
 

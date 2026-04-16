@@ -26,7 +26,7 @@ public:
 private:
 	void EnterStep(TutorialStep step);
 	void RequestPhaseChange(PhaseSystemScript::PhaseState nextPhase);
-	void UpdatePhaseTransition();
+	void UpdatePhaseTransition(GameScene* scene);
 	void ShowStepGuide();
 	void UpdateSkillTree(GameScene* scene, bool& outKeyN);
 
