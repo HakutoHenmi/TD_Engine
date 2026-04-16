@@ -122,6 +122,7 @@ void SkillTree::LoadFromJson(const std::string& path, Engine::Renderer* renderer
 //	SetVar(entity, scene, "CriticalRateBonus", criticalRateBonus);
 //}
 
+
 // ===== メイン更新 =====
 void SkillTree::Update(Engine::Renderer* renderer, float screenW, float screenH, float mouseX, float mouseY) {
 	if (!isOpen_ || !renderer)
@@ -184,14 +185,14 @@ void SkillTree::HandleInput(float screenW, float screenH, float mouseX, float mo
 		return;
 	}
 
-	// 各ノードとのヒットテスト
+	// 各ノードとのヒットテスト　//実はこっちが先に度のノードがクリックされたかを判定
 	for (int i = 0; i < (int)nodes_.size(); ++i) {
 		float nx, ny;
 		GetNodeScreenPos(nodes_[i], screenW, screenH, nx, ny);
 
 		float halfSize = kNodeSize * 0.5f;
-		if (mouseX >= nx - halfSize && mouseX <= nx + halfSize && mouseY >= ny - halfSize && mouseY <= ny + halfSize) {
-			TryUnlockSkill(i);
+		if (mouseX >= nx - halfSize && mouseX <= nx + halfSize && mouseY >= ny - halfSize && mouseY <= ny + halfSize) {//当たり判定がtrueになったら入る
+			TryUnlockSkill(i);//trueになった瞬間のindex
 			break;
 		}
 	}
@@ -199,7 +200,7 @@ void SkillTree::HandleInput(float screenW, float screenH, float mouseX, float mo
 
 #pragma endregion
 
-
+#pragma region ノード習得試行
 // ===== スキル習得試行 =====
 bool SkillTree::TryUnlockSkill(int index) {
 	if (index < 0 || index >= (int)nodes_.size())
@@ -209,20 +210,22 @@ bool SkillTree::TryUnlockSkill(int index) {
 
 	// 必要な前提スキルをリストアップ (一括習得用)
 	std::vector<int> neededIndices;
-	GetPrerequisites(index, neededIndices);
+	GetPrerequisites(index, neededIndices);//スキルの合計ポイントを取得
 
 	int totalCost = 0;
 	for (int idx : neededIndices) {
-		totalCost += nodes_[idx].cost;
+		totalCost += nodes_[idx].cost; // 必要なスキルポイントを合計する
 	}
 
-	if (skillPoints_ < totalCost)
+	if (skillPoints_ < totalCost) // スキルポイントが足りていない場合は習得できない
 		return false;
 
 	// 確認状態へ
-	pendingUnlockId_ = index;
+	pendingUnlockId_ = index; // 習得しようとしているスキルのindexを入れる
 	return true;
 }
+
+#pragma endregion
 
 #pragma region 再起関数地獄
 // ===== 前提条件の再帰取得 =====
@@ -297,6 +300,7 @@ bool SkillTree::IsSkillUnlocked(int skillId) const {
 }
 
 #pragma endregion
+
 // ===== 背景描画 =====
 void SkillTree::DrawBackground(Engine::Renderer* renderer, float screenW, float screenH) {
 	Engine::Renderer::SpriteDesc bg;
@@ -307,6 +311,7 @@ void SkillTree::DrawBackground(Engine::Renderer* renderer, float screenW, float 
 	bg.color = {0.05f, 0.05f, 0.15f, 0.85f}; // 暗い青半透明
 	renderer->DrawSprite(texBg_, bg);
 }
+
 
 // ===== ノード間の接続線描画 =====
 void SkillTree::DrawConnections(Engine::Renderer* renderer, float screenW, float screenH) {
