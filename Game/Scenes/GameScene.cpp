@@ -1044,18 +1044,33 @@ void GameScene::SetIsPlaying(bool play) {
 					std::string oldParam = entry.parameterData;
 					entry.parameterData = entry.instance->SerializeParameters();
 					if (entry.parameterData != oldParam) {
-						OutputDebugStringA(("[GameScene] Script synced: " + entry.scriptPath + " from " + oldParam + " to " + entry.parameterData + "\n").c_str());
+						char logBuf[2048];
+						sprintf_s(logBuf, "[GameScene] Script synced: %s from %s to %s\n", entry.scriptPath.c_str(), oldParam.c_str(), entry.parameterData.c_str());
+						OutputDebugStringA(logBuf);
+					} else {
+						char logBuf[1024];
+						sprintf_s(logBuf, "[GameScene] Script already in sync: %s (%s)\n", entry.scriptPath.c_str(), entry.parameterData.c_str());
+						OutputDebugStringA(logBuf);
 					}
+				} else {
+					char logBuf[1024];
+					sprintf_s(logBuf, "[GameScene] Script instance NULL, skipping sync: %s (current param: %s)\n", entry.scriptPath.c_str(), entry.parameterData.c_str());
+					OutputDebugStringA(logBuf);
 				}
 			}
 		}
 
-		// 現在のエディタ状態をスナップショット保存（Stop時に戻すため）
-		sceneSnapshot_ = EditorUI::SaveToMemory(this);
-
-		// 各Systemのリセット（スクリプトの再初期化など）を実行
+		// 各Systemのリセット（スクリプトの再初期化、インスタンスのクリアなど）を先に実行
 		for (auto& sys : systems_) {
 			sys->Reset(registry_);
+		}
+
+		// リセット後のクリーンな状態をスナップショット保存（Stop時にこの状態に完全に戻すため）
+		sceneSnapshot_ = EditorUI::SaveToMemory(this);
+		{
+			char logBuf[128];
+			sprintf_s(logBuf, "[GameScene] Saved snapshot for PLAY mode (size: %zu)\n", sceneSnapshot_.size());
+			OutputDebugStringA(logBuf);
 		}
 
 		isPlaying_ = true;
@@ -1098,6 +1113,8 @@ void GameScene::SetIsPlaying(bool play) {
 				EditorUI::LoadFromMemory(this, initialSceneSnapshot_);
 			}
 		}
+		// sceneSnapshot_ = ""; // これを消すと、再開時に残ってしまう可能性があるが、念のため残すか？
+		// 一旦、毎回保存するようにするのでクリアしても良いはず
 		sceneSnapshot_ = "";
 
 		// ★追加: 川のメッシュなど、動的メッシュの再生成

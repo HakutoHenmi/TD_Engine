@@ -137,14 +137,38 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 						for (auto& s : comp["scripts"]) {
 							std::string scriptPath = s.value("path", "");
 							std::string paramData = s.value("param", "");
-							OutputDebugStringA(("[EditorUI] Restoring script: " + scriptPath + " params=" + paramData + "\n").c_str());
-							c.scripts.push_back({ scriptPath, paramData, nullptr });
+							
+							ScriptEntry entry;
+							entry.scriptPath = scriptPath;
+							entry.parameterData = paramData;
+							entry.instance = ScriptEngine::GetInstance()->CreateScript(scriptPath);
+							entry.isStarted = false;
+							
+							if (entry.instance && !entry.parameterData.empty()) {
+								char logBuf2[2048];
+								sprintf_s(logBuf2, "[EditorUI] Immediate Restore: Applying params to %s: %s\n", scriptPath.c_str(), paramData.c_str());
+								OutputDebugStringA(logBuf2);
+								entry.instance->DeserializeParameters(entry.parameterData);
+							}
+							
+							c.scripts.push_back(entry);
 						}
 					} else {
 						// Backward compatibility: old format
 						std::string path = comp.value("scriptPath", "");
 						if (!path.empty()) {
-							c.scripts.push_back({ path, comp.value("parameterData", ""), nullptr });
+							std::string paramData = comp.value("parameterData", "");
+							ScriptEntry entry;
+							entry.scriptPath = path;
+							entry.parameterData = paramData;
+							entry.instance = ScriptEngine::GetInstance()->CreateScript(path);
+							entry.isStarted = false;
+							
+							if (entry.instance && !entry.parameterData.empty()) {
+								entry.instance->DeserializeParameters(entry.parameterData);
+							}
+							
+							c.scripts.push_back(entry);
 						}
 					}
 				} else if (type == "Variable") {
@@ -548,6 +572,11 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 			auto& entry = cp->scripts[i];
 			std::string params = entry.parameterData;
 			if (entry.instance) params = entry.instance->SerializeParameters();
+			
+			char logBuf[2048];
+			sprintf_s(logBuf, "[EditorUI] SerializeEntity [Script]: %s, params: %s (instance=%p)\n", entry.scriptPath.c_str(), params.c_str(), entry.instance.get());
+			OutputDebugStringA(logBuf);
+
 			ss << "{\"path\": \"" << EscapeJson(entry.scriptPath) << "\", \"param\": \"" << EscapeJson(params) << "\"}";
 			if (i < cp->scripts.size() - 1) ss << ", ";
 		}
@@ -968,7 +997,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	// Global Shortcuts
 	if (!io.WantTextInput) {
 		if (io.KeyCtrl) {
-			if (ImGui::IsKeyPressed(ImGuiKey_S)) SaveScene(gameScene, "Resources/Scenes/scene.json");
+			if (ImGui::IsKeyPressed(ImGuiKey_S)) SaveScene(gameScene, currentScenePath);
 			if (ImGui::IsKeyPressed(ImGuiKey_Z)) Undo();
 			if (ImGui::IsKeyPressed(ImGuiKey_Y)) Redo();
 			if (ImGui::IsKeyPressed(ImGuiKey_N)) {
@@ -2120,18 +2149,52 @@ void EditorUI::ShowInspector(GameScene* scene) {
 
 							if (!entry.instance && !entry.scriptPath.empty()) {
 								entry.instance = ScriptEngine::GetInstance()->CreateScript(entry.scriptPath);
-								if (entry.instance && !entry.parameterData.empty()) {
-									entry.instance->DeserializeParameters(entry.parameterData);
+								if (entry.instance) {
+									char logBuf[1024];
+									sprintf_s(logBuf, "[EditorUI] Inspector: Created instance for %s, Restoring params: %s\n", entry.scriptPath.c_str(), entry.parameterData.c_str());
+									OutputDebugStringA(logBuf);
+									
+									// パラメータが空でなければデシリアライズ
+									if (!entry.parameterData.empty()) {
+										entry.instance->DeserializeParameters(entry.parameterData);
+									}
+								} else if (entry.instance) {
+									// パラメータが空の場合は初期状態をセット
+									entry.parameterData = entry.instance->SerializeParameters();
+									char logBuf[1024];
+									sprintf_s(logBuf, "[EditorUI] Inspector: Creating instance for %s, Param was empty, setting default: %s\n", entry.scriptPath.c_str(), entry.parameterData.c_str());
+									OutputDebugStringA(logBuf);
 								}
 							}
 
 							if (entry.instance) {
 								ImGui::PushID("ScriptEditor");
+								
+								std::string oldParams = entry.parameterData;
 								entry.instance->OnEditorUI();
-								// エディタでの変更を即座に文字列パラメータに反映 (同期漏れ防止)
-								// ただし PLAY 中は実行状態を書き戻さないようにガード
+								std::string newParams = entry.instance->SerializeParameters();
+
+								// 比較を少し賢くする
+								// プレイ中以外で、かつ実際に中身が意味のある変更をされた場合のみ更新
 								if (!scene->GetIsPlaying()) {
-									entry.parameterData = entry.instance->SerializeParameters();
+									bool shouldUpdate = false;
+									if (oldParams != newParams) {
+										// "{}" から具体的な値への変化、または値同士の変化
+										if (oldParams == "{}" || oldParams.empty()) {
+											// 初期状態からの設定
+											shouldUpdate = true;
+										} else if (newParams != "{}" && !newParams.empty()) {
+											// 値が変更された
+											shouldUpdate = true;
+										}
+									}
+
+									if (shouldUpdate) {
+										entry.parameterData = newParams;
+										char logBuf[1024];
+										sprintf_s(logBuf, "[EditorUI] Parameter Changed: %s -> %s\n", oldParams.c_str(), newParams.c_str());
+										OutputDebugStringA(logBuf);
+									}
 								}
 								ImGui::PopID();
 							}

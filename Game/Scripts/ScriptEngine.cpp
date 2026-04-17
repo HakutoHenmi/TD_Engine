@@ -21,6 +21,9 @@
 #include "ExperienceHopper.h"
 #include "CommunicationTestScript.h"
 #include "HitDistortionScript.h" // ★追加
+#include "InstallationButton.h"
+#include "PhaseTransition.h"
+#include "WaveManagement.h"
 
 namespace Game {
 
@@ -54,6 +57,9 @@ void ScriptEngine::Initialize() {
 	RegisterScript("ExperienceHopper", []() { return std::make_shared<ExperienceHopper>(); });
 	RegisterScript("CommunicationTestScript", []() { return std::make_shared<CommunicationTestScript>(); });
 	RegisterScript("HitDistortionScript", []() { return std::make_shared<HitDistortionScript>(); }); // ★追加
+	RegisterScript("InstallationButton", []() { return std::make_shared<InstallationButton>(); });
+	RegisterScript("PhaseTransition", []() { return std::make_shared<PhaseTransition>(); });
+	RegisterScript("WaveManagement", []() { return std::make_shared<WaveManagement>(); });
 }
 
 void ScriptEngine::Shutdown() {
@@ -90,10 +96,13 @@ void ScriptEngine::Execute(entt::entity entity, GameScene* scene, float dt) {
 	for (auto& entry : comp.scripts) {
 		if (entry.scriptPath.empty()) continue;
 
-		if (!entry.instance) {
+		if (entry.instance) {
+			// すでにインスタンスがある場合は、そのパラメータを尊重する
+			// 復元時（RestoreSceneFromJson）に作成・デシリアライズ済みのはず
+			// 必要に応じてここで追加の同期を行えるが、基本はデシリアライズ済み
+		} else {
 			entry.instance = CreateScript(entry.scriptPath);
 			if (entry.instance) {
-				// ★追加: 保持されているパラメータをデシリアライズして反映
 				if (!entry.parameterData.empty()) {
 					entry.instance->DeserializeParameters(entry.parameterData);
 				}
