@@ -5,6 +5,7 @@ namespace Game {
 
 class InstallationButton : public IScript {
 public:
+	InstallationButton();
 
 	enum ButtonTypes {
 		Cannon = 0,
