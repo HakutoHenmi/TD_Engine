@@ -127,7 +127,16 @@ void SkillTree::LoadFromJson(const std::string& path, Engine::Renderer* renderer
 void SkillTree::Update(Engine::Renderer* renderer, float screenW, float screenH, float mouseX, float mouseY) {
 	if (!isOpen_ || !renderer)
 		return;
+	Engine::Input* input = Engine::Input::GetInstance();
+	if (input) {
+		if (input->Trigger(DIK_RIGHT)) {
+			NextPage();
+		}
 
+		if (input->Trigger(DIK_LEFT)) {
+			PrevPage();
+		}
+	}
 	HandleInput(screenW, screenH, mouseX, mouseY);
 	DrawBackground(renderer, screenW, screenH);
 	DrawConnections(renderer, screenW, screenH);
@@ -135,6 +144,9 @@ void SkillTree::Update(Engine::Renderer* renderer, float screenW, float screenH,
 	int hoveredIndex = -1;
 	// ホバー中のノードを探す
 	for (int i = 0; i < (int)nodes_.size(); ++i) {
+		if (nodes_[i].pageId != currentPageId_) {
+			continue;
+		}
 		float nx, ny;
 		GetNodeScreenPos(nodes_[i], screenW, screenH, nx, ny);
 		float halfSize = kNodeSize * 0.5f;
@@ -156,6 +168,9 @@ void SkillTree::Update(Engine::Renderer* renderer, float screenW, float screenH,
 	if (pendingUnlockId_ != -1) {
 		DrawConfirmationDialog(renderer, screenW, screenH);
 	}
+	ImGui::Begin("SkillTree Debug");
+	ImGui::Text("currentPageId = %d", currentPageId_);
+	ImGui::End();
 }
 
 
@@ -187,6 +202,9 @@ void SkillTree::HandleInput(float screenW, float screenH, float mouseX, float mo
 
 	// 各ノードとのヒットテスト　//実はこっちが先に度のノードがクリックされたかを判定
 	for (int i = 0; i < (int)nodes_.size(); ++i) {
+			if (nodes_[i].pageId != currentPageId_) {
+				continue;
+			}
 		float nx, ny;
 		GetNodeScreenPos(nodes_[i], screenW, screenH, nx, ny);
 
@@ -242,7 +260,7 @@ void SkillTree::GetPrerequisites(int index, std::vector<int>& outIndices) {
 	int parentId = nodes_[index].parentId; // 親IDを取得 例えばindexが2のノードの親IDが1だったらparentIdに1が入る
 	if (parentId >= 0) { // 0以上だったら
 		for (int i = 0; i < (int)nodes_.size(); ++i) {
-			if (nodes_[i].id == parentId) { // ノードのIDが親IDと一致するノードを探す
+			if (nodes_[i].id == parentId && nodes_[i].pageId == currentPageId_) { // ノードのIDが親IDと一致するノードを探す
 				GetPrerequisites(i, outIndices);
 				break;//抜ける
 			}
@@ -320,11 +338,13 @@ void SkillTree::DrawConnections(Engine::Renderer* renderer, float screenW, float
 	for (const auto& node : nodes_) {
 		if (node.parentId < 0)
 			continue;
-
+		if (node.pageId != currentPageId_) {
+			continue;
+		}
 		// 親ノードを見つける
 		const SkillNode* parent = nullptr;
 		for (const auto& n : nodes_) {
-			if (n.id == node.parentId) {
+			if (n.id == node.parentId && n.pageId == currentPageId_) {
 				parent = &n;
 				break;
 			}
@@ -370,6 +390,9 @@ void SkillTree::DrawConnections(Engine::Renderer* renderer, float screenW, float
 // ===== ノード描画 =====
 void SkillTree::DrawNodes(Engine::Renderer* renderer, float screenW, float screenH, float mouseX, float mouseY) {
 	for (const auto& node : nodes_) {
+		if (node.pageId != currentPageId_) {
+			continue;
+		}
 		float nx, ny;
 		GetNodeScreenPos(node, screenW, screenH, nx, ny);
 
@@ -387,7 +410,7 @@ void SkillTree::DrawNodes(Engine::Renderer* renderer, float screenW, float scree
 			if (node.parentId >= 0) {
 				canUnlock = false;
 				for (const auto& n : nodes_) {
-					if (n.id == node.parentId && n.unlocked) {
+					if (n.id == node.parentId && n.pageId == currentPageId_ && n.unlocked) {
 						canUnlock = true;
 						break;
 					}
@@ -596,6 +619,9 @@ void SkillTree::GetNodeScreenPos(const SkillNode& node, float screenW, float scr
 	float maxGridX = 0;
 	float maxGridY = 0;
 	for (const auto& n : nodes_) {
+		if (n.pageId != currentPageId_) {
+			continue;
+		}
 		if (n.gridX > maxGridX)
 			maxGridX = n.gridX;
 		if (n.gridY > maxGridY)
@@ -614,5 +640,32 @@ void SkillTree::GetNodeScreenPos(const SkillNode& node, float screenW, float scr
 	outX = startX + node.gridX * kNodeSpacingX;
 	outY = startY + (maxGridY - node.gridY) * kNodeSpacingY;
 }
+void SkillTree::SetCurrentPageId(int pageId) {
+	if (pageId < 0) {
+		return;
+	}
 
+	if (pageId >= pageCount_) {
+		return;
+	}
+
+	currentPageId_ = pageId;
+	pendingUnlockId_ = -1;
+}
+void SkillTree::NextPage() {
+	currentPageId_++;
+
+	if (currentPageId_ >= pageCount_) {
+		currentPageId_ = pageCount_ - 1;
+	}
+
+	pendingUnlockId_ = -1;
+}
+void SkillTree::PrevPage() {
+	if (currentPageId_ > 0) {
+		currentPageId_--;
+	}
+
+	pendingUnlockId_ = -1;
+}
 } // namespace Game

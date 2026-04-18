@@ -70,13 +70,17 @@ private:
 
 	// スクリーン座標に変換
 	void GetNodeScreenPos(const SkillNode& node, float screenW, float screenH, float& outX, float& outY) const;
+	void SetCurrentPageId(int pageId);
+	void NextPage();
+	void PrevPage();
 
 private:
 	bool isOpen_ = false;
 	bool initialized_ = false;
 	int skillPoints_ = 5;      // 初期スキルポイント
 	int pendingUnlockId_ = -1; // 確認中のノードID
-
+	int currentPageId_ = 0;
+	int pageCount_ = 3;
 	std::vector<SkillNode> nodes_;
 
 	// テクスチャハンドル
