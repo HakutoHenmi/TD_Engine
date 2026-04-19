@@ -105,7 +105,7 @@ void TutorialScript::EnterStep(TutorialStep step) {
     isPipeSet_ = false;
     hasPipeStartPoint_ = false;
 
-    if (step == TutorialStep::InstallationGuide) {
+    if (step == TutorialStep::InstallCannonGuide) {
         hasPlacedTank_ = false;
         hasPlacedPipe_ = false;
         hasPlacedCannon_ = false;
@@ -116,7 +116,7 @@ void TutorialScript::EnterStep(TutorialStep step) {
         skillTree_.Close();
     }
 
-    if (step == TutorialStep::Preparation || step == TutorialStep::InstallationGuide || step == TutorialStep::SkillTreeGuide) {
+    if (step == TutorialStep::Preparation || step == TutorialStep::InstallCannonGuide || step == TutorialStep::InstallTankGuide || step == TutorialStep::InstallPipeGuide || step == TutorialStep::SkillTreeGuide) {
         RequestPhaseChange(PhaseSystemScript::PreparationPhase);
     } else {
         RequestPhaseChange(PhaseSystemScript::BattlePhase);
@@ -131,8 +131,14 @@ void TutorialScript::ShowStepGuide() {
     case TutorialStep::Preparation:
         EditorUI::Log("Tutorial: 準備フェーズです。Spaceで次の説明へ進みます。");
         break;
-    case TutorialStep::InstallationGuide:
-        EditorUI::Log("Tutorial: 設置説明。タンク、パイプ、大砲をそれぞれ少なくとも1つずつ設置してください。");
+    case TutorialStep::InstallCannonGuide:
+        EditorUI::Log("Tutorial: 大砲の設置説明。大砲を1つ設置してください。(3キー)");
+        break;
+    case TutorialStep::InstallTankGuide:
+        EditorUI::Log("Tutorial: タンクの設置説明。弾丸タンクを1つ設置してください。(1キー)");
+        break;
+    case TutorialStep::InstallPipeGuide:
+        EditorUI::Log("Tutorial: パイプの設置説明。タンクの緑の位置から大砲へパイプを繋いでください。(2キー)");
         break;
     case TutorialStep::FirstBattle:
         EditorUI::Log("Tutorial: 戦闘フェーズです。ウェーブ終了後にスキルツリー説明へ進みます。(Pキーでも進行可)");
@@ -207,11 +213,28 @@ void TutorialScript::Update(entt::entity /*entity*/, GameScene* scene, float /*d
     switch (tutorialStep_) {
     case TutorialStep::Preparation:
         if (keySpace) {
-            EnterStep(TutorialStep::InstallationGuide);
+            EnterStep(TutorialStep::InstallCannonGuide);
         }
         break;
 
-    case TutorialStep::InstallationGuide:
+    case TutorialStep::InstallCannonGuide:
+        if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
+            break;
+
+        if (key3 || InstallationButton::IsButtonPressed(InstallationButton::Cannon)) {
+            selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
+            isPlacementMode_ = true;
+            isPipeSet_ = false;
+            hasPipeStartPoint_ = false;
+        }
+
+        Installation(scene, selectedObjPath_);
+        if (hasPlacedCannon_) {
+            EnterStep(TutorialStep::InstallTankGuide);
+        }
+        break;
+
+    case TutorialStep::InstallTankGuide:
         if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
             break;
 
@@ -222,6 +245,55 @@ void TutorialScript::Update(entt::entity /*entity*/, GameScene* scene, float /*d
             hasPipeStartPoint_ = false;
         }
 
+        Installation(scene, selectedObjPath_);
+        if (hasPlacedTank_) {
+            EnterStep(TutorialStep::InstallPipeGuide);
+        }
+        break;
+
+    case TutorialStep::InstallPipeGuide:
+        if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
+            break;
+
+        {
+            auto* renderer = scene->GetRenderer();
+            if (renderer) {
+                static uint32_t hlModel = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+                static uint32_t hlTex = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+                
+                scene->GetRegistry().view<NameComponent, TransformComponent>().each([&](const NameComponent& nc, const TransformComponent& tc) {
+                    if (nc.name.find("BulletTank") != std::string::npos || nc.name.find("Canon") != std::string::npos) {
+                        float basex = SnapTo2x2Grid(tc.translate.x);
+                        float basez = SnapTo2x2Grid(tc.translate.z);
+                        
+                        Engine::Vector3 offsets[4] = {
+                            {2.0f, 0.0f, 0.0f},
+                            {-2.0f, 0.0f, 0.0f},
+                            {0.0f, 0.0f, 2.0f},
+                            {0.0f, 0.0f, -2.0f}
+                        };
+                        
+                        for (auto& offset : offsets) {
+                            Engine::Vector3 pos = {basex + offset.x, tc.translate.y, basez + offset.z};
+                            
+                            // Skip highlighting if the spot is already blocked
+                            if (this->IsPlacementBlocked(scene, pos)) {
+                                continue;
+                            }
+                            
+                            Engine::Transform tr;
+                            // ground level highlight
+                            tr.translate = {pos.x, pos.y - 0.45f, pos.z};
+                            tr.rotate = {0.0f, 0.0f, 0.0f};
+                            tr.scale = {1.9f, 0.1f, 1.9f}; // Flat square on the ground, slightly smaller than 2x2 grid
+                            Engine::Vector4 color = {0.2f, 1.0f, 0.2f, 0.5f};
+                            renderer->DrawMesh(hlModel, hlTex, tr, color, "Toon");
+                        }
+                    }
+                });
+            }
+        }
+
         if (key2 || InstallationButton::IsButtonPressed(InstallationButton::Pipe)) {
             selectedObjPath_ = "Resources/Prefabs/Pipe.prefab";
             isPipeSet_ = true;
@@ -229,21 +301,8 @@ void TutorialScript::Update(entt::entity /*entity*/, GameScene* scene, float /*d
             hasPipeStartPoint_ = false;
         }
 
-        if (key3 || InstallationButton::IsButtonPressed(InstallationButton::Cannon)) {
-            selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
-            isPlacementMode_ = true;
-            isPipeSet_ = false;
-            hasPipeStartPoint_ = false;
-        }
-
-        if (input->IsMouseTrigger(1) && isPlacementMode_) {
-            isPlacementMode_ = false;
-            isPipeSet_ = false;
-            hasPipeStartPoint_ = false;
-        }
-
         Installation(scene, selectedObjPath_);
-        if (hasPlacedTank_ && hasPlacedPipe_ && hasPlacedCannon_) {
+        if (hasPlacedPipe_) {
             EnterStep(TutorialStep::FirstBattle);
         }
         break;
@@ -347,8 +406,9 @@ void TutorialScript::Installation(GameScene* scene, const std::string& objPath) 
         return;
 
     Engine::Vector3 snappedHitPoint = hitPoint;
-    snappedHitPoint.x = std::floor(snappedHitPoint.x);
-    snappedHitPoint.z = std::floor(snappedHitPoint.z);
+    // Align all placements in the tutorial to the 2x2 grid to prevent diagonal misalignment between tanks/cannons and pipes
+    snappedHitPoint.x = SnapTo2x2Grid(snappedHitPoint.x);
+    snappedHitPoint.z = SnapTo2x2Grid(snappedHitPoint.z);
 
     if (isPipeSet_) {
         snappedHitPoint.x = SnapTo2x2Grid(snappedHitPoint.x);

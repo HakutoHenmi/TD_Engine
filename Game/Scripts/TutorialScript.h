@@ -13,7 +13,9 @@ class TutorialScript : public IScript {
 public:
 	enum class TutorialStep {
 		Preparation,
-		InstallationGuide,
+		InstallCannonGuide,
+		InstallTankGuide,
+		InstallPipeGuide,
 		FirstBattle,
 		SkillTreeGuide,
 		FinalBattle
