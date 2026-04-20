@@ -26,6 +26,7 @@ void WaveManagement::Start(entt::entity entity, GameScene* scene) {
 	managerEntity_ = entity;
 	currentWave_ = -1;
 	previousWave_ = -2;
+	isEnded_ = false;
 
 	// 名前に基づいてエンティティを解決
 	enemySpawners_.clear();
@@ -110,6 +111,11 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 				if (scene->GetRegistry().valid(e)) {
 					scene->DestroyObject(static_cast<uint32_t>(e));
 				}
+			}
+
+			// ★ 戦闘フェーズ終わり（ウェーブ終了時）で、直前のウェーブが最終ウェーブだったらクリアにする
+			if (previousWave_ >= static_cast<int>(enemySpawners_.size()) - 1 && !enemySpawners_.empty()) {
+				isEnded_ = true;
 			}
 		}
 

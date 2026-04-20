@@ -2,6 +2,8 @@
 #include "TutorialScript.h"
 #include "../../Engine/Input.h"
 #include "../../Engine/PathUtils.h"
+#include "../../Engine/SceneManager.h"
+#include "../../Engine/SceneParameters.h"
 #include "../../Engine/WindowDX.h"
 #include "Editor/EditorUI.h"
 #include "InstallationButton.h"
@@ -20,8 +22,10 @@
 namespace Game {
 
 namespace {
+// 2x2のグリッドに値をスナップさせる（2の倍数に丸める）
 float SnapTo2x2Grid(float value) { return std::floor(value / 2.0f) * 2.0f; }
 
+// 指定された始点から終点までのパイプの配置経路を2x2グリッドに沿って計算し、ポイントのリストを返す
 std::vector<Engine::Vector3> BuildPipePathPoints(const Engine::Vector3& start, const Engine::Vector3& end) {
     std::vector<Engine::Vector3> points;
 
@@ -70,6 +74,7 @@ std::vector<Engine::Vector3> BuildPipePathPoints(const Engine::Vector3& start, c
     return points;
 }
 
+// 指定された座標と範囲内にある施設（大砲やタンク）を検索し、エンティティを返す
 entt::entity GetFacilityInRange(GameScene* scene, float x, float z, float range = 2.5f) {
     auto& registry = scene->GetRegistry();
     entt::entity found = entt::null;
@@ -86,6 +91,7 @@ entt::entity GetFacilityInRange(GameScene* scene, float x, float z, float range 
 }
 } // namespace
 
+// チュートリアルスクリプトの初期化処理。フェーズや変数の初期化、スキルツリーの読み込みなどを行う
 void TutorialScript::Start(entt::entity /*entity*/, GameScene* scene) {
     tutorialStep_ = TutorialStep::Preparation;
     phaseState_ = PhaseSystemScript::PreparationPhase;
@@ -113,6 +119,7 @@ void TutorialScript::Start(entt::entity /*entity*/, GameScene* scene) {
     }
 }
 
+// チュートリアルの指定されたステップへ移行し、必要な状態やフラグをリセット・設定する
 void TutorialScript::EnterStep(TutorialStep step) {
     tutorialStep_ = step;
     stepGuideShown_ = false;
@@ -138,6 +145,7 @@ void TutorialScript::EnterStep(TutorialStep step) {
     }
 }
 
+// 現在のチュートリアルステップに応じたガイドテキストをUIに表示する
 void TutorialScript::ShowStepGuide() {
     if (stepGuideShown_)
         return;
@@ -161,14 +169,15 @@ void TutorialScript::ShowStepGuide() {
     case TutorialStep::SkillTreeGuide:
         EditorUI::Log("Tutorial: スキルツリー説明。Nで開いて確認後、Spaceで最終戦闘へ進みます。");
         break;
-    case TutorialStep::FinalBattle:
-        EditorUI::Log("Tutorial: 最終戦闘フェーズ開始。");
+	case TutorialStep::Finish:
+        EditorUI::Log("Tutorial: 最終");
         break;
     }
 
     stepGuideShown_ = true;
 }
 
+// スキルツリーのUIの表示トグルや、開いている場合の入力およびマウス状態のアップデート処理を行う
 void TutorialScript::UpdateSkillTree(GameScene* scene, bool& outKeyN) {
     auto* input = Engine::Input::GetInstance();
     if (!input || !scene)
@@ -207,6 +216,7 @@ void TutorialScript::UpdateSkillTree(GameScene* scene, bool& outKeyN) {
     }
 }
 
+// 毎フレーム呼ばれる更新処理。入力の監視、チュートリアルステップの進行チェック、オブジェクトの設置モード制御などを行う
 void TutorialScript::Update(entt::entity /*entity*/, GameScene* scene, float /*dt*/) {
     auto* input = Engine::Input::GetInstance();
     if (!scene || !input)
@@ -327,14 +337,23 @@ void TutorialScript::Update(entt::entity /*entity*/, GameScene* scene, float /*d
         UpdateSkillTree(scene, keyN);
         if (hasOpenedSkillTreeInGuide_ && keySpace) {
             skillTree_.Close();
-            EnterStep(TutorialStep::FinalBattle);
+			EnterStep(TutorialStep::Finish);
         }
         preKeyN_ = keyN;
         break;
     }
 
-    case TutorialStep::FinalBattle:
+    case TutorialStep::Finish:
         skillTree_.Close();
+        if (scene) {
+			// 次のシーン（リザルト画面）に引き継ぐためのパラメータを作成します
+            Engine::SceneParameters res;
+            res.isWin = true;
+            res.score = 99999;
+            res.clearTime = 0.0f;
+			// シーンマネージャーを使って、パラメータと共に「Result」シーンへの切り替えを要求します
+            Engine::SceneManager::GetInstance()->RequestChange("Result", res);
+        }
         break;
     }
 
@@ -345,6 +364,7 @@ void TutorialScript::Update(entt::entity /*entity*/, GameScene* scene, float /*d
     UpdatePhaseTransition(scene);
 }
 
+// フェーズ変更（準備フェーズ・戦闘フェーズなど）のリクエストを出し、フェード演出の準備を行う
 void TutorialScript::RequestPhaseChange(PhaseSystemScript::PhaseState nextPhase) {
     if (phaseState_ == PhaseSystemScript::Transition || isPhaseTransitioning_)
         return;
@@ -362,6 +382,7 @@ void TutorialScript::RequestPhaseChange(PhaseSystemScript::PhaseState nextPhase)
     }
 }
 
+// フェーズ切り替えのトランジション（フェード等）の更新処理と、切り替え完了後のウェーブ設定や経路探索マップ更新等の処理を行う
 void TutorialScript::UpdatePhaseTransition(GameScene* scene) {
     if (!isPhaseTransitioning_)
         return;
@@ -390,8 +411,7 @@ void TutorialScript::UpdatePhaseTransition(GameScene* scene) {
 
             if (tutorialStep_ == TutorialStep::FirstBattle) {
                 WaveManagement::SetWave(0);
-            } else if (tutorialStep_ == TutorialStep::FinalBattle) {
-                WaveManagement::SetWave(1);
+			} else if (tutorialStep_ == TutorialStep::Finish) {
             }
         } else if (phaseState_ == PhaseSystemScript::PreparationPhase) {
             WaveManagement::SetWave(-1);
@@ -399,6 +419,34 @@ void TutorialScript::UpdatePhaseTransition(GameScene* scene) {
     }
 }
 
+void TutorialScript::ShowGuideText() {
+
+	switch (tutorialStep_) {
+	case TutorialStep::Preparation:
+
+		break;
+	case TutorialStep::InstallCannonGuide:
+
+		break;
+	case TutorialStep::InstallTankGuide:
+
+		break;
+	case TutorialStep::InstallPipeGuide:
+
+		break;
+	case TutorialStep::FirstBattle:
+
+		break;
+	case TutorialStep::SkillTreeGuide:
+
+		break;
+	case TutorialStep::Finish:
+
+		break;
+	}
+}
+
+// 施設やパイプを設置する処理。座標のグリッドスナップや設置条件の判定、プレビュー描画を行う
 void TutorialScript::Installation(GameScene* scene, const std::string& objPath) {
     if (!isPlacementMode_)
         return;
@@ -476,6 +524,7 @@ void TutorialScript::Installation(GameScene* scene, const std::string& objPath) 
     }
 }
 
+// マウスクリック位置からレイキャストを行い、地形（Terrain、Floor等）との交点を取得する
 bool TutorialScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3& outHitPoint) const {
     float localX = 0, localY = 0;
     float tW = 0, tH = 0;
@@ -568,6 +617,7 @@ bool TutorialScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3& ou
     return hitTerrain;
 }
 
+// 設置プレビューを描画する。パイプの接続可能範囲や大砲の攻撃範囲の可視化も行う
 void TutorialScript::DrawPlacementPreview(GameScene* scene, const Engine::Vector3& hitPoint, const std::string& objPath, bool canPlace) {
     auto* renderer = scene->GetRenderer();
     if (!renderer)
@@ -636,12 +686,14 @@ void TutorialScript::DrawPlacementPreview(GameScene* scene, const Engine::Vector
     }
 }
 
+// 指定されたパスがプレハブファイル（.prefab）かどうかを判定する
 bool TutorialScript::IsPrefabPath(const std::string& path) const {
     if (path.size() < 7)
         return false;
     return path.compare(path.size() - 7, 7, ".prefab") == 0;
 }
 
+// プレハブファイルからモデルとテクスチャのパスを抽出する
 bool TutorialScript::ExtractPrefabRenderPaths(const std::string& prefabPath, std::string& outModelPath, std::string& outTexturePath) const {
     std::string absPath = EditorUI::GetUnifiedProjectPath(prefabPath);
     std::ifstream f(Engine::PathUtils::FromUTF8(absPath));
@@ -676,6 +728,7 @@ bool TutorialScript::ExtractPrefabRenderPaths(const std::string& prefabPath, std
     return !outModelPath.empty();
 }
 
+// 指定した位置に既に他のオブジェクトが存在し、設置がブロックされるかどうかを判定する
 bool TutorialScript::IsPlacementBlocked(GameScene* scene, const Engine::Vector3& hitPoint) const {
     constexpr float kBlockHalfExtent = 2.0f;
 
@@ -705,6 +758,7 @@ bool TutorialScript::IsPlacementBlocked(GameScene* scene, const Engine::Vector3&
     return false;
 }
 
+// オブジェクト（プレハブまたはモデル）を実際にワールドに生成し、初期位置を設定する
 void TutorialScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector3& hitPoint, const std::string& objPath) {
     auto* renderer = scene->GetRenderer();
     if (!renderer)
@@ -760,6 +814,7 @@ void TutorialScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector3& 
     if (objPath.find("Canon") != std::string::npos) hasPlacedCannon_ = true;
 }
 
+// スクリプト破棄時の処理。スキルツリーを閉じ、フェーズを初期状態にリセットする
 void TutorialScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
     skillTree_.Close();
     PhaseSystemScript::ForcePhaseState(PhaseSystemScript::PreparationPhase);
