@@ -1,22 +1,36 @@
 #pragma once
-#include "../../externals/entt/entt.hpp"
 #include "IScript.h"
+#include "PhaseSystemScript.h"
 #include "SkillTree.h"
 
-struct ImVec2; // 前方宣言
 namespace Engine {
 struct Vector3;
 }
 
 namespace Game {
 
-class PhaseSystemScript : public IScript {
+class TutorialScript : public IScript {
 public:
-	enum PhaseState { PreparationPhase, BattlePhase, Transition };
+	enum class TutorialStep {
+		Preparation,
+		InstallCannonGuide,
+		InstallTankGuide,
+		InstallPipeGuide,
+		FirstBattle,
+		SkillTreeGuide,
+		FinalBattle
+	};
 
 	void Start(entt::entity entity, GameScene* scene) override;
 	void Update(entt::entity entity, GameScene* scene, float dt) override;
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
+
+private:
+	void EnterStep(TutorialStep step);
+	void RequestPhaseChange(PhaseSystemScript::PhaseState nextPhase);
+	void UpdatePhaseTransition(GameScene* scene);
+	void ShowStepGuide();
+	void UpdateSkillTree(GameScene* scene, bool& outKeyN);
 
 	void Installation(GameScene* scene, const std::string& objPath);
 	bool TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3& outHitPoint) const;
@@ -25,47 +39,33 @@ public:
 	bool IsPlacementBlocked(GameScene* scene, const Engine::Vector3& hitPoint) const;
 	bool IsPrefabPath(const std::string& path) const;
 	bool ExtractPrefabRenderPaths(const std::string& prefabPath, std::string& outModelPath, std::string& outTexturePath) const;
-	void RequestPhaseChange(PhaseState nextPhase);
-	void UpdatePhaseTransition();
 
-	static PhaseState IsPhase() { return isPhase_; };
-	static void SetPreparation(PhaseState prep) { NextPhase_ = prep; }
-	static PhaseState GetRequestedPhase() { return NextPhase_; }
-	static void ForcePhaseState(PhaseState phase) {
-		isPhase_ = phase;
-		NextPhase_ = phase;
-	}
+	TutorialStep tutorialStep_ = TutorialStep::Preparation;
+	bool stepGuideShown_ = false;
 
-	static void PlusCoinCount(int PlusCoin) { CoinCount += PlusCoin; } // 追加: コイン数を増減させる関数
-
-private:
-	inline static PhaseState isPhase_ = PreparationPhase;
-	inline static PhaseState NextPhase_ = PreparationPhase;
-	PhaseState preIsPhase_ = PreparationPhase; // フェーズ切り替わり検知用
-	int currentPhase_ = 0;
-
-	inline static int CoinCount = 0; // コインの数を管理する静的変数
-
-	bool preKeyP_ = false; // 初期化しておく
-	bool preKeySpace_ = false;
-	bool isPlacementMode_ = false;
+	PhaseSystemScript::PhaseState phaseState_ = PhaseSystemScript::PreparationPhase;
+	PhaseSystemScript::PhaseState nextPhaseState_ = PhaseSystemScript::PreparationPhase;
 	bool isPhaseTransitioning_ = false;
 	bool isFadeFinished_ = false;
 
+	bool isPlacementMode_ = false;
 	bool isPipeSet_ = false;
 	bool hasPipeStartPoint_ = false;
 	float pipeStartX_ = 0.0f;
 	float pipeStartY_ = 0.0f;
 	float pipeStartZ_ = 0.0f;
+	bool hasPlacedTank_ = false;
+	bool hasPlacedPipe_ = false;
+	bool hasPlacedCannon_ = false;
 
 	std::string selectedObjPath_ = "Resources/Models/cube/cube.obj";
 	std::string previewObjPath_;
 	uint32_t previewModelHandle_ = 0;
 	uint32_t previewTextureHandle_ = 0;
 
-	// スキルツリー
 	SkillTree skillTree_;
 	bool preKeyN_ = false;
+	bool hasOpenedSkillTreeInGuide_ = false;
 };
 
 } // namespace Game

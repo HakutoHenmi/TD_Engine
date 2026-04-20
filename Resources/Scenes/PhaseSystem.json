@@ -9,6 +9,41 @@
     {
       "id": 2097162,
       "parentId": 4294967295,
+      "name": "Player",
+      "locked": true,
+      "translate": [32.3661, 29.309, -32.542],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/cube/cube.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [0.2,0.5,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [2,2,2], "isTrigger": false},
+        {"type": "Rigidbody", "enabled": true, "velocity": [0,0,0], "useGravity": true, "isKinematic": true},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "PlayerScript", "param": ""}]},
+        {"type": "Health", "enabled": true, "hp": 890, "maxHp": 1000, "isDead": false},
+        {"type": "Tag", "enabled": true, "tag": "Player"},
+        {"type": "PlayerInput", "enabled": false},
+        {"type": "CharacterMovement", "enabled": true, "speed": 7, "jumpPower": 20, "gravity": 9.8},
+        {"type": "CameraTarget", "enabled": false, "distance": 10, "height": 3, "smoothSpeed": 5},
+        {"type": "GpuMeshCollider", "enabled": true, "meshPath": "Resources/Models/cube/cube.obj", "isTrigger": false}
+      ]
+    },
+    {
+      "id": 2097161,
+      "parentId": 4294967295,
+      "name": "Floor",
+      "locked": true,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/Stages/kariMap3.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Hologram", "color": [0.0684247,0.0779424,0.11583,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Untagged"},
+        {"type": "GpuMeshCollider", "enabled": true, "meshPath": "Resources/Models/Stages/kariMap3.obj", "isTrigger": false}
+      ]
+    },
+    {
+      "id": 2097171,
+      "parentId": 4294967295,
       "name": "Fede",
       "locked": false,
       "translate": [0, 0, 0],
@@ -21,7 +56,7 @@
       ]
     },
     {
-      "id": 2097161,
+      "id": 2097170,
       "parentId": 4294967295,
       "name": "CannonButton",
       "locked": false,
@@ -29,14 +64,14 @@
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":0}"}]},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"FacilityTypes\":0}"}]},
         {"type": "RectTransform", "enabled": true, "pos": [400,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/CannonButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/CannonButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
-      "id": 2097160,
+      "id": 2097169,
       "parentId": 4294967295,
       "name": "PipeButton",
       "locked": false,
@@ -44,14 +79,14 @@
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":1}"}]},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"FacilityTypes\":0}"}]},
         {"type": "RectTransform", "enabled": true, "pos": [0,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/PipeButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/PipeButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
-      "id": 2097159,
+      "id": 2097168,
       "parentId": 4294967295,
       "name": "TankButton",
       "locked": false,
@@ -59,14 +94,14 @@
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":2}"}]},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"FacilityTypes\":0}"}]},
         {"type": "RectTransform", "enabled": true, "pos": [-400,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TankButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/TankButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
-      "id": 2097158,
+      "id": 2097167,
       "parentId": 4294967295,
       "name": "PhysicsSystem",
       "locked": true,
@@ -78,8 +113,8 @@
       ]
     },
     {
-      "id": 2097157,
-      "parentId": 2097156,
+      "id": 2097166,
+      "parentId": 2097165,
       "name": "PreparationCamera",
       "locked": false,
       "translate": [2.28225, 40, -2.48776],
@@ -96,7 +131,7 @@
       ]
     },
     {
-      "id": 2097156,
+      "id": 2097165,
       "parentId": 4294967295,
       "name": "Core",
       "locked": false,
@@ -111,7 +146,7 @@
       ]
     },
     {
-      "id": 2097155,
+      "id": 2097164,
       "parentId": 4294967295,
       "name": "PlayerSword",
       "locked": false,
@@ -145,7 +180,7 @@
       ]
     },
     {
-      "id": 2097154,
+      "id": 2097163,
       "parentId": 4294967295,
       "name": "Sun",
       "locked": true,
@@ -154,41 +189,6 @@
       "scale": [1, 1, 1],
       "components": [
         {"type": "DirectionalLight", "enabled": true, "color": [1,0.95,0.8], "intensity": 1.2}
-      ]
-    },
-    {
-      "id": 2097153,
-      "parentId": 4294967295,
-      "name": "Player",
-      "locked": true,
-      "translate": [32.3661, 29.309, -32.542],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/cube/cube.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [0.2,0.5,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
-        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [2,2,2], "isTrigger": false},
-        {"type": "Rigidbody", "enabled": true, "velocity": [0,0,0], "useGravity": true, "isKinematic": true},
-        {"type": "Script", "enabled": true, "scripts": [{"path": "PlayerScript", "param": ""}]},
-        {"type": "Health", "enabled": true, "hp": 890, "maxHp": 1000, "isDead": false},
-        {"type": "Tag", "enabled": true, "tag": "Player"},
-        {"type": "PlayerInput", "enabled": false},
-        {"type": "CharacterMovement", "enabled": true, "speed": 7, "jumpPower": 20, "gravity": 9.8},
-        {"type": "CameraTarget", "enabled": false, "distance": 10, "height": 3, "smoothSpeed": 5},
-        {"type": "GpuMeshCollider", "enabled": true, "meshPath": "Resources/Models/cube/cube.obj", "isTrigger": false}
-      ]
-    },
-    {
-      "id": 2097152,
-      "parentId": 4294967295,
-      "name": "Floor",
-      "locked": true,
-      "translate": [0, 0, 0],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/Stages/kariMap3.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Hologram", "color": [0.0684247,0.0779424,0.11583,1], "uvTiling": [1,1], "uvOffset": [0,0]},
-        {"type": "Tag", "enabled": true, "tag": "Untagged"},
-        {"type": "GpuMeshCollider", "enabled": true, "meshPath": "Resources/Models/Stages/kariMap3.obj", "isTrigger": false}
       ]
     }
   ]

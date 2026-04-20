@@ -62,18 +62,18 @@ void InstallationButton::OnEditorUI() {
 	ImGui::SeparatorText("Installation Button");
 
 	const char* buttonTypeNames[] = {"Cannon", "Pipe", "Tank"};
-	int currentType = static_cast<int>(buttonTypes_);
-	if (ImGui::Combo("Button Type", &currentType, buttonTypeNames, IM_ARRAYSIZE(buttonTypeNames))) {
-		buttonTypes_ = static_cast<ButtonTypes>(currentType);
+	int currentType = static_cast<int>(FacilityTypes_);
+	if (ImGui::Combo("Facility Type", &currentType, buttonTypeNames, IM_ARRAYSIZE(buttonTypeNames))) {
+		FacilityTypes_ = static_cast<FacilityTypes>(currentType);
 	}
 
-	ImGui::Text("isButtonPressed_: %s", isButtonPressed_[buttonTypes_] ? "true" : "false");
+	ImGui::Text("isButtonPressed_: %s", isButtonPressed_[FacilityTypes_] ? "true" : "false");
 #endif
 }
 
 std::string InstallationButton::SerializeParameters() {
 	json j;
-	j["buttonTypes"] = static_cast<int>(buttonTypes_);
+	j["FacilityTypes"] = static_cast<int>(FacilityTypes_);
 	return j.dump();
 }
 

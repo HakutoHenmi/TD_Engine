@@ -1,8 +1,10 @@
 #include "EnemySpawnerScript.h"
 #include "ScriptEngine.h"
 #include "PhaseSystemScript.h"
+#include "WaveManagement.h"
 #include "../Scenes/GameScene.h"
 #include "../../Engine/Renderer.h"
+#include "../../Engine/SceneManager.h"
 #ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
 #endif
@@ -32,6 +34,11 @@ void EnemySpawnerScript::Start(entt::entity /*entity*/, GameScene* /*scene*/) {
 }
 
 void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, float dt) {
+	// バトルフェーズ以外では敵を出さない
+	if (PhaseSystemScript::IsPhase() != PhaseSystemScript::BattlePhase) {
+		return;
+	}
+
 	// Kを押して今いる敵を消す処理
 	// Kを押して今いる敵を消す処理
 	if (GetAsyncKeyState('K') & 0x8000) {
@@ -192,6 +199,21 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 void EnemySpawnerScript::OnEditorUI() {
 #if defined(USE_IMGUI) && !defined(NDEBUG)
 	ImGui::SeparatorText("Enemy Spawner");
+
+	if (WaveManagement::GetManagerEntity() != static_cast<entt::entity>(entt::null)) {
+		if (ImGui::Button("ウェーブ管理(Wave Manager)の詳細に戻る")) {
+			auto* sm = Engine::SceneManager::GetInstance();
+			if (sm && sm->Current()) {
+				auto* gs = dynamic_cast<GameScene*>(sm->Current());
+				if (gs) {
+					gs->SetSelectedEntity(WaveManagement::GetManagerEntity());
+					gs->GetSelectedEntities().clear();
+					gs->GetSelectedEntities().insert(WaveManagement::GetManagerEntity());
+				}
+			}
+		}
+		ImGui::Spacing();
+	}
 
 	// --- 基本パラメータ ---
 	ImGui::DragInt("ウェーブ総数", &waveCount, 0.1f, 1, 100);

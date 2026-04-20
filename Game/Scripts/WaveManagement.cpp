@@ -209,7 +209,12 @@ void WaveManagement::OnEditorUI() {
 			}
 			ImGui::SameLine();
 			if (ImGui::Button("ウェーブを削除")) {
-				// スポナーエンティティは破棄せずリストからのみ外す（必要ならDestroyObjectを呼ぶ）
+				// ウェーブに含まれるすべてのスポナーエンティティを破棄する
+				for (entt::entity spawner : enemySpawners_[wi]) {
+					if (cachedScene_->GetRegistry().valid(spawner)) {
+						cachedScene_->DestroyObject(static_cast<uint32_t>(spawner));
+					}
+				}
 				enemySpawners_.erase(enemySpawners_.begin() + wi);
 				enemySpawnerNames_.erase(enemySpawnerNames_.begin() + wi);
 				ImGui::TreePop();
