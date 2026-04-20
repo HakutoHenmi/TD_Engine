@@ -179,9 +179,13 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			hasPipeStartPoint_ = false;
 		}
 		if (input->IsMouseTrigger(1) && isPlacementMode_) {
-			isPlacementMode_ = false;
-			isPipeSet_ = false;
-			hasPipeStartPoint_ = false;
+			if (isPipeSet_ && hasPipeStartPoint_) {
+				hasPipeStartPoint_ = false;
+			} else {
+				isPlacementMode_ = false;
+				isPipeSet_ = false;
+				hasPipeStartPoint_ = false;
+			}
 		}
 
 		Installation(scene, selectedObjPath_);
@@ -457,6 +461,31 @@ void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vec
 	tr.scale = {1.0f, 1.0f, 1.0f};
 	const Engine::Vector4 previewColor = canPlace ? Engine::Vector4{0.6f, 1.0f, 0.6f, 0.6f} : Engine::Vector4{1.0f, 0.3f, 0.3f, 0.6f};
 	renderer->DrawMesh(previewModelHandle_, previewTextureHandle_, tr, previewColor, "Toon");
+
+	// タンク、パイプ、大砲の配置設定時に反応（接続）する範囲を緑の円で描画
+	if (objPath.find("Pipe") != std::string::npos || objPath.find("Canon") != std::string::npos || objPath.find("Tank") != std::string::npos) {
+		float connectRange = 2.5f;
+		int segments = 36;
+		for (int i = 0; i < segments; ++i) {
+			float theta1 = (i * 2.0f * 3.1415926f) / segments;
+			float theta2 = ((i + 1) * 2.0f * 3.1415926f) / segments;
+			Engine::Vector3 p1 = { hitPoint.x + std::cos(theta1) * connectRange, hitPoint.y + 0.05f, hitPoint.z + std::sin(theta1) * connectRange };
+			Engine::Vector3 p2 = { hitPoint.x + std::cos(theta2) * connectRange, hitPoint.y + 0.05f, hitPoint.z + std::sin(theta2) * connectRange };
+			renderer->DrawLine3D(p1, p2, { 0.0f, 1.0f, 0.0f, 1.0f }, true);
+		}
+	}
+
+	// 大砲の場合は攻撃範囲も描画する
+	if (objPath.find("Canon") != std::string::npos) {
+		float attackRange = 50.0f;
+		for (int i = 0; i < 72; ++i) {
+			float theta1 = (i * 2.0f * 3.1415926f) / 72.0f;
+			float theta2 = ((i + 1) * 2.0f * 3.1415926f) / 72.0f;
+			Engine::Vector3 p1 = { hitPoint.x + std::cos(theta1) * attackRange, hitPoint.y + 0.05f, hitPoint.z + std::sin(theta1) * attackRange };
+			Engine::Vector3 p2 = { hitPoint.x + std::cos(theta2) * attackRange, hitPoint.y + 0.05f, hitPoint.z + std::sin(theta2) * attackRange };
+			renderer->DrawLine3D(p1, p2, { 0.0f, 0.8f, 0.0f, 1.0f }, true); // やや暗めの緑などに
+		}
+	}
 }
 
 bool PhaseSystemScript::IsPrefabPath(const std::string& path) const {

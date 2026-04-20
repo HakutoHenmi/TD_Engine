@@ -228,6 +228,16 @@ void TutorialScript::Update(entt::entity /*entity*/, GameScene* scene, float /*d
             hasPipeStartPoint_ = false;
         }
 
+        if (input->IsMouseTrigger(1) && isPlacementMode_) {
+            if (isPipeSet_ && hasPipeStartPoint_) {
+                hasPipeStartPoint_ = false;
+            } else {
+                isPlacementMode_ = false;
+                isPipeSet_ = false;
+                hasPipeStartPoint_ = false;
+            }
+        }
+
         Installation(scene, selectedObjPath_);
         if (hasPlacedCannon_) {
             EnterStep(TutorialStep::InstallTankGuide);
@@ -245,6 +255,16 @@ void TutorialScript::Update(entt::entity /*entity*/, GameScene* scene, float /*d
             hasPipeStartPoint_ = false;
         }
 
+        if (input->IsMouseTrigger(1) && isPlacementMode_) {
+            if (isPipeSet_ && hasPipeStartPoint_) {
+                hasPipeStartPoint_ = false;
+            } else {
+                isPlacementMode_ = false;
+                isPipeSet_ = false;
+                hasPipeStartPoint_ = false;
+            }
+        }
+
         Installation(scene, selectedObjPath_);
         if (hasPlacedTank_) {
             EnterStep(TutorialStep::InstallPipeGuide);
@@ -255,50 +275,21 @@ void TutorialScript::Update(entt::entity /*entity*/, GameScene* scene, float /*d
         if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
             break;
 
-        {
-            auto* renderer = scene->GetRenderer();
-            if (renderer) {
-                static uint32_t hlModel = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
-                static uint32_t hlTex = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-                
-                scene->GetRegistry().view<NameComponent, TransformComponent>().each([&](const NameComponent& nc, const TransformComponent& tc) {
-                    if (nc.name.find("BulletTank") != std::string::npos || nc.name.find("Canon") != std::string::npos) {
-                        float basex = SnapTo2x2Grid(tc.translate.x);
-                        float basez = SnapTo2x2Grid(tc.translate.z);
-                        
-                        Engine::Vector3 offsets[4] = {
-                            {2.0f, 0.0f, 0.0f},
-                            {-2.0f, 0.0f, 0.0f},
-                            {0.0f, 0.0f, 2.0f},
-                            {0.0f, 0.0f, -2.0f}
-                        };
-                        
-                        for (auto& offset : offsets) {
-                            Engine::Vector3 pos = {basex + offset.x, tc.translate.y, basez + offset.z};
-                            
-                            // Skip highlighting if the spot is already blocked
-                            if (this->IsPlacementBlocked(scene, pos)) {
-                                continue;
-                            }
-                            
-                            Engine::Transform tr;
-                            // ground level highlight
-                            tr.translate = {pos.x, pos.y - 0.45f, pos.z};
-                            tr.rotate = {0.0f, 0.0f, 0.0f};
-                            tr.scale = {1.9f, 0.1f, 1.9f}; // Flat square on the ground, slightly smaller than 2x2 grid
-                            Engine::Vector4 color = {0.2f, 1.0f, 0.2f, 0.5f};
-                            renderer->DrawMesh(hlModel, hlTex, tr, color, "Toon");
-                        }
-                    }
-                });
-            }
-        }
-
         if (key2 || InstallationButton::IsButtonPressed(InstallationButton::Pipe)) {
             selectedObjPath_ = "Resources/Prefabs/Pipe.prefab";
             isPipeSet_ = true;
             isPlacementMode_ = true;
             hasPipeStartPoint_ = false;
+        }
+
+        if (input->IsMouseTrigger(1) && isPlacementMode_) {
+            if (isPipeSet_ && hasPipeStartPoint_) {
+                hasPipeStartPoint_ = false;
+            } else {
+                isPlacementMode_ = false;
+                isPipeSet_ = false;
+                hasPipeStartPoint_ = false;
+            }
         }
 
         Installation(scene, selectedObjPath_);
@@ -577,6 +568,31 @@ void TutorialScript::DrawPlacementPreview(GameScene* scene, const Engine::Vector
     tr.scale = {1.0f, 1.0f, 1.0f};
     const Engine::Vector4 previewColor = canPlace ? Engine::Vector4{0.6f, 1.0f, 0.6f, 0.6f} : Engine::Vector4{1.0f, 0.3f, 0.3f, 0.6f};
     renderer->DrawMesh(previewModelHandle_, previewTextureHandle_, tr, previewColor, "Toon");
+
+    // タンク、パイプ、大砲の配置設定時に反応（接続）する範囲を緑の円で描画
+    if (objPath.find("Pipe") != std::string::npos || objPath.find("Canon") != std::string::npos || objPath.find("Tank") != std::string::npos) {
+        float connectRange = 2.5f;
+        int segments = 36;
+        for (int i = 0; i < segments; ++i) {
+            float theta1 = (i * 2.0f * 3.1415926f) / segments;
+            float theta2 = ((i + 1) * 2.0f * 3.1415926f) / segments;
+            Engine::Vector3 p1 = { hitPoint.x + std::cos(theta1) * connectRange, hitPoint.y + 0.05f, hitPoint.z + std::sin(theta1) * connectRange };
+            Engine::Vector3 p2 = { hitPoint.x + std::cos(theta2) * connectRange, hitPoint.y + 0.05f, hitPoint.z + std::sin(theta2) * connectRange };
+            renderer->DrawLine3D(p1, p2, { 0.0f, 1.0f, 0.0f, 1.0f }, true);
+        }
+    }
+
+    // 大砲の場合は攻撃範囲も描画する
+    if (objPath.find("Canon") != std::string::npos) {
+        float attackRange = 50.0f;
+        for (int i = 0; i < 72; ++i) {
+            float theta1 = (i * 2.0f * 3.1415926f) / 72.0f;
+            float theta2 = ((i + 1) * 2.0f * 3.1415926f) / 72.0f;
+            Engine::Vector3 p1 = { hitPoint.x + std::cos(theta1) * attackRange, hitPoint.y + 0.05f, hitPoint.z + std::sin(theta1) * attackRange };
+            Engine::Vector3 p2 = { hitPoint.x + std::cos(theta2) * attackRange, hitPoint.y + 0.05f, hitPoint.z + std::sin(theta2) * attackRange };
+            renderer->DrawLine3D(p1, p2, { 0.0f, 0.8f, 0.0f, 1.0f }, true);
+        }
+    }
 }
 
 bool TutorialScript::IsPrefabPath(const std::string& path) const {
