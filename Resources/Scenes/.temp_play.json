@@ -59,7 +59,7 @@
       "extraTexturePaths": [],
       "shaderName": "Default",
       "components": [
-        {"type": "Script", "enabled": true, "scriptPath": "EnemySpawnerScript", "paramData": "{\"enemyScriptParams\":\"\",\"enemyScriptPath\":\"EnemyBehavior\",\"enemyType\":0,\"maxCount\":10,\"pattern\":1,\"patternRadius\":4.099999904632568,\"spawnDuration\":21.399999618530273,\"startWave\":0,\"waveCount\":3,\"waveDelay\":2.0}"}
+        {"type": "Script", "enabled": true, "scriptPath": "EnemySpawnerScript", "paramData": "{\"enemyScriptParams\":\"\",\"enemyScriptPath\":\"BaseEnemy\",\"enemyType\":0,\"maxCount\":10,\"pattern\":1,\"patternRadius\":4.099999904632568,\"spawnDuration\":21.399999618530273,\"startWave\":0,\"waveCount\":3,\"waveDelay\":2.0}"}
       ]
     },
     {

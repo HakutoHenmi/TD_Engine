@@ -35,7 +35,7 @@ public:
 	int startWave = 0;            // 開始ウェーブ (0-indexed)
 	float waveDelay = 2.0f;       // ウェーブ開始時の待機時間 (秒)
 	int enemyType = 0;            // エネミー種類 (ID) - 後方互換のため維持
-	std::string enemyScriptPath = "EnemyBehavior"; // 出現させるエネミーのスクリプト名
+	std::string enemyScriptPath = "Warrior"; // 出現させるエネミーのスクリプト名
 	std::string enemyScriptParams = "";            // 出現させる敵スクリプトのパラメータ(JSON)
 	float spawnDuration = 10.0f;  // 開始～終了までの全体時間 (秒)
 	SpawnPattern pattern = SpawnPattern::Point; // 配列パターン

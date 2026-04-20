@@ -7,7 +7,7 @@
 #include "BaseScript.h"
 #include "PlayerScript.h"
 #include "EnemyAIScript.h"
-#include "EnemyBehavior.h"
+#include "Enemy/Enemies.h"
 #include "EnemySpawnerScript.h"
 #include "Canon.h"
 // ★追加: リリースビルドでリンク漏れ防止のため全スクリプトをinclude
@@ -40,7 +40,7 @@ void ScriptEngine::Initialize() {
 	RegisterScript("BaseScript", []() { return std::make_shared<BaseScript>(); });
 	RegisterScript("PlayerScript", []() { return std::make_shared<PlayerScript>(); });
 	RegisterScript("EnemyAIScript", []() { return std::make_shared<EnemyAIScript>(); });
-	RegisterScript("EnemyBehavior", []() { return std::make_shared<EnemyBehavior>(); });
+	RegisterScript("Warrior", []() { return std::make_shared<Warrior>(); });
 	RegisterScript("EnemySpawnerScript", []() { return std::make_shared<EnemySpawnerScript>(); });
 	RegisterScript("Canon", []() { return std::make_shared<Canon>(); });
 	// ★追加: 不足していたスクリプトの明示登録

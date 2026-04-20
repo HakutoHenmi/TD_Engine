@@ -5,7 +5,7 @@
 #endif
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
-#include "ScriptEngine.h"
+#include "../ScriptEngine.h"
 
 namespace Game {
 
@@ -60,7 +60,33 @@ void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
 		SearchTarget(entity, scene);
 	}
 
-	DefaultMove(entity, scene, dt);
+	// ターゲットとの距離をチェック
+	bool inAttackRange = false;
+	if (registry.valid(currentTarget_)) {
+		auto& myTc = registry.get<TransformComponent>(entity);
+		auto& tarTc = registry.get<TransformComponent>(currentTarget_);
+		float dx = tarTc.translate.x - myTc.translate.x;
+		float dz = tarTc.translate.z - myTc.translate.z;
+		float distSq = dx * dx + dz * dz;
+
+		if (distSq <= attackRange_ * attackRange_) {
+			inAttackRange = true;
+		}
+
+		// 遠すぎたらターゲットを外す
+		if (distSq > loseTargetRange_ * loseTargetRange_) {
+			currentTarget_ = entt::null;
+		}
+	}
+
+	// 実際の行動
+	if (inAttackRange) {
+		// 攻撃範囲内なら足を止めて攻撃
+		ExecuteAttack(entity, scene, dt);
+	}
+	else {
+		DefaultMove(entity, scene, dt);
+	}
 }
 
 void BaseEnemy::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
@@ -230,8 +256,5 @@ void BaseEnemy::SearchTarget(entt::entity entity, GameScene* scene) {
 
 	currentTarget_ = bestTarget;
 }
-
-// ★ スクリプト自動登録
-REGISTER_SCRIPT(BaseEnemy);
 
 } // namespace Game

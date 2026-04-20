@@ -120,7 +120,7 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 		bcComponent.enabled = true;
 
 		auto& rbComponent = scene->GetRegistry().emplace<RigidbodyComponent>(enemy);
-		bool isFly = (enemyScriptPath == "EnemyBehavior" && enemyScriptParams.find("\"moveType\":1") != std::string::npos);
+		bool isFly = (enemyScriptPath == "Warrior" && enemyScriptParams.find("\"moveType\":1") != std::string::npos);
 		rbComponent.useGravity = !isFly;
 
 		// ★追加: 接地判定と地形追従のために CharacterMovementComponent を付与

@@ -205,7 +205,7 @@ exit /b 0
     <ClCompile Include="Game\Scripts\PoisonTrap.cpp" />
     <ClCompile Include="Game\Scripts\PreparationCamera.cpp" />
     <ClCompile Include="Game\Scripts\ScriptEngine.cpp" />
-    <ClCompile Include="Game\Scripts\BaseEnemy.cpp" />
+    <ClCompile Include="Game\Scripts\Enemy\BaseEnemy.cpp" />
     <ClCompile Include="Game\Scripts\TowerScript.cpp" />
     <ClCompile Include="Game\Scripts\EnemySpawnerScript.cpp" />
     <ClCompile Include="Game\Scripts\IScript.cpp" />
@@ -217,8 +217,10 @@ exit /b 0
     <ClCompile Include="Game\EnemySystem\NavigationManager.cpp" />
     <ClCompile Include="Game\Scripts\MissileBulletScript.cpp" />
     <ClCompile Include="Game\Scripts\MissileCanonScript.cpp" />
+    <ClCompile Include="Game\Scripts\Enemy\Warrior.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Game\Scripts\Enemy\Enemies.h" />
     <ClInclude Include="Game\Scripts\ExplosionAttackArea.h" />
     <ClInclude Include="Game\Scripts\InstallationButton.h" />
     <ClInclude Include="Game\Editor\EditorUI.h" />
@@ -245,7 +247,7 @@ exit /b 0
     <ClInclude Include="Game\Scripts\PoisonTrap.h" />
     <ClInclude Include="Game\Scripts\PreparationCamera.h" />
     <ClInclude Include="Game\Scripts\ScriptEngine.h" />
-    <ClInclude Include="Game\Scripts\BaseEnemy.h" />
+    <ClInclude Include="Game\Scripts\Enemy\BaseEnemy.h" />
     <ClInclude Include="Game\Scripts\TowerScript.h" />
     <ClInclude Include="Game\Scripts\EnemySpawnerScript.h" />
     <ClInclude Include="Game\Scripts\CommunicationTestScript.h" />
@@ -267,6 +269,7 @@ exit /b 0
     <ClInclude Include="Game\EnemySystem\NavigationManager.h" />
     <ClInclude Include="Game\Scripts\MissileBulletScript.h" />
     <ClInclude Include="Game\Scripts\MissileCanonScript.h" />
+    <ClInclude Include="Game\Scripts\Enemy\Warrior.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\level_data.csv" />
