@@ -109,6 +109,10 @@ private:
 
     float playTime_ = 0.0f; // クリアタイム計測用
 
+    DirectX::XMFLOAT3 editorCameraPos_ = {0.0f, 2.0f, -5.0f};
+    DirectX::XMFLOAT3 editorCameraRot_ = {0.2f, 0.0f, 0.0f};
+    int lastViewMode_ = 0; // 0=Scene, 1=Game
+
     friend class EditorUI;
     friend class PipeEditor;
     friend class EnemySpawnerEditor;

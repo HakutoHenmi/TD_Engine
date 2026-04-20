@@ -151,7 +151,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 #else
 			input->GetMousePos(mx, my);
 #endif
-			skillTree_.Update(renderer, tW, tH, mx, my);
+			// 描画とロジックは DrawUI() 側で処理させるように移動
 			preKeyN_ = keyN;
 			return; // 設置モードの入力を抑制
 		}
@@ -627,6 +627,48 @@ void PhaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector
 	mr.modelPath = objPath;
 	mr.texturePath = "Resources/Textures/white1x1.png";
 	mr.shaderName = "Toon";
+}
+
+void PhaseSystemScript::Draw(entt::entity /*entity*/, GameScene* scene) {
+	if (skillTree_.IsOpen()) {
+		auto* renderer = scene->GetRenderer();
+		if (!renderer) return;
+
+		// Editor状態で Start() が呼ばれていない場合でも描画できるように初期化を保証
+		if (!skillTree_.IsInitialized()) {
+			skillTree_.Init(renderer);
+			skillTree_.LoadFromJson("Resources/Scenes/skills.json", renderer);
+		}
+
+		float mx = 0, my = 0;
+		float tW = (float)Engine::WindowDX::kW;
+		float tH = (float)Engine::WindowDX::kH;
+
+#if defined(USE_IMGUI) && !defined(NDEBUG)
+		ImVec2 mousePos = ImGui::GetMousePos();
+		ImVec2 gameMin = EditorUI::GetGameImageMin();
+		ImVec2 gameMax = EditorUI::GetGameImageMax();
+		float viewW = gameMax.x - gameMin.x;
+		float viewH = gameMax.y - gameMin.y;
+		if (viewW > 0 && viewH > 0) {
+			mx = (mousePos.x - gameMin.x) * (tW / viewW);
+			my = (mousePos.y - gameMin.y) * (tH / viewH);
+		}
+#else
+		if (auto* input = Engine::Input::GetInstance()) {
+			input->GetMousePos(mx, my);
+		}
+#endif
+		skillTree_.Update(renderer, tW, tH, mx, my);
+	}
+}
+
+void PhaseSystemScript::OnEditorUI() {
+#ifdef USE_IMGUI
+	if (ImGui::Button(skillTree_.IsOpen() ? "Close SkillTree Preview" : "Open SkillTree Preview")) {
+		skillTree_.Toggle();
+	}
+#endif
 }
 
 void PhaseSystemScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}

@@ -28,6 +28,12 @@ enum class GizmoMode {
 	Scale,
 };
 
+// ビューモード
+enum class ViewMode {
+	Scene,
+	Game
+};
+
 // ★ Consoleログエントリ
 enum class LogLevel { Info, Warning, Error };
 struct LogEntry {
@@ -62,6 +68,8 @@ public:
 	static std::string SaveToMemory(GameScene* scene);
 	static void LoadScene(GameScene* scene, const std::string& path);
 	static void LoadFromMemory(GameScene* scene, const std::string& data);
+
+	static ViewMode GetViewMode();
 	
 	// ★追加: 実行ファイルの場所に関わらず必ずTD_Engineプロジェクトを指す絶対パスを取得
 	static std::string GetUnifiedProjectPath(const std::string& path);

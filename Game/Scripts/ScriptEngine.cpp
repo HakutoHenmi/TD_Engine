@@ -122,4 +122,34 @@ void ScriptEngine::Execute(entt::entity entity, GameScene* scene, float dt) {
 	}
 }
 
+void ScriptEngine::ExecuteDraw(entt::entity entity, GameScene* scene) {
+	auto& registry = scene->GetRegistry();
+	if (!registry.valid(entity) || !registry.all_of<ScriptComponent>(entity))
+		return;
+
+	auto& comp = registry.get<ScriptComponent>(entity);
+	if (!comp.enabled) return;
+
+	for (auto& entry : comp.scripts) {
+		if (entry.instance) {
+			entry.instance->Draw(entity, scene);
+		}
+	}
+}
+
+void ScriptEngine::ExecuteDrawUI(entt::entity entity, GameScene* scene) {
+	if (!scene) return;
+	auto& registry = scene->GetRegistry();
+	if (!registry.valid(entity) || !registry.all_of<ScriptComponent>(entity)) return;
+
+	auto& comp = registry.get<ScriptComponent>(entity);
+	if (!comp.enabled) return;
+
+	for (auto& entry : comp.scripts) {
+		if (entry.instance) {
+			entry.instance->DrawUI(entity, scene);
+		}
+	}
+}
+
 } // namespace Game

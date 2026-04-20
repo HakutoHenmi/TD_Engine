@@ -30,6 +30,22 @@ public:
 		}
 	}
 
+	void Draw(entt::registry& registry, GameContext& /*ctx*/) override {
+		auto* scriptEngine = ScriptEngine::GetInstance();
+		auto view = registry.view<ScriptComponent>();
+		for (auto entity : view) {
+			scriptEngine->ExecuteDraw(entity, scene_);
+		}
+	}
+
+	void DrawUI(entt::registry& registry, GameContext& /*ctx*/) override {
+		auto* scriptEngine = ScriptEngine::GetInstance();
+		auto view = registry.view<ScriptComponent>();
+		for (auto entity : view) {
+			scriptEngine->ExecuteDrawUI(entity, scene_);
+		}
+	}
+
 	void Reset(entt::registry& registry) override {
 		auto view = registry.view<ScriptComponent>();
 		for (auto entity : view) {

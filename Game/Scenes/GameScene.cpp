@@ -9,6 +9,7 @@
 #include "../Scripts/ScriptEngine.h"
 #include "../Systems/AudioSystem.h"
 #include "../Systems/CameraFollowSystem.h"
+#include "Editor/EditorUI.h" // ★追加
 #include "../Systems/CharacterMovementSystem.h"
 #include "../Systems/CleanupSystem.h"
 #include "../Systems/CombatSystem.h"
@@ -306,16 +307,38 @@ void GameScene::Update() {
 	// パーティクルエディター
 	particleEditor_.Update(dt);
 
+	// ★ カメラ状態の切り替え (Scene/Game)
+	int currentViewMode = (int)EditorUI::GetViewMode();
+	if (!isPlaying_ && currentViewMode != lastViewMode_) {
+		if (currentViewMode == 1) { // Scene -> Game
+			editorCameraPos_ = camera_.Position();
+			editorCameraRot_ = camera_.Rotation();
+		} else { // Game -> Scene
+			camera_.SetPosition(editorCameraPos_);
+			camera_.SetRotation(editorCameraRot_);
+		}
+		lastViewMode_ = currentViewMode;
+	}
+
 	// ★ 全Systemを順に実行
 	for (auto& system : systems_) {
-		// リザルト遷移中などはシステムを動かさない (エンティティが削除されている可能性があるため)
-		if (!isPlaying_)
-			break;
+		if (!isPlaying_) {
+			// Gameビュー時はカメラシステムだけ例外的に動かしてプレビューさせる
+			if (currentViewMode == 1) {
+				if (dynamic_cast<CameraFollowSystem*>(system.get())) {
+					bool oldIsPlaying = ctx_.isPlaying;
+					ctx_.isPlaying = true;
+					system->Update(registry_, ctx_);
+					ctx_.isPlaying = oldIsPlaying;
+				}
+			}
+			continue;
+		}
 		system->Update(registry_, ctx_);
 	}
 
-	// ★ 追加: 停止中のみデバッグカメラを有効化
-	if (!isPlaying_) {
+	// ★ 追加: 手動デバッグカメラ操作はSceneビューかつ停止中のみ
+	if (!isPlaying_ && currentViewMode == 0) {
 		camera_.Update(*Engine::Input::GetInstance());
 	}
 	camera_.Tick(dt);
@@ -733,11 +756,17 @@ void GameScene::Draw() {
 
 extern GizmoMode currentGizmoMode;
 void GameScene::DrawUI() {
-	if (!isPlaying_)
+	if (!isPlaying_ && EditorUI::GetViewMode() != ViewMode::Game)
 		return;
+
+	bool oldIsPlaying = ctx_.isPlaying;
+	if (!isPlaying_) ctx_.isPlaying = true;
+
 	for (auto& sys : systems_) {
 		sys->DrawUI(registry_, ctx_);
 	}
+
+	ctx_.isPlaying = oldIsPlaying;
 }
 
 extern bool gizmoDragging;
