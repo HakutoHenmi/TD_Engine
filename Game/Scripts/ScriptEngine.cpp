@@ -41,6 +41,8 @@ void ScriptEngine::Initialize() {
 	RegisterScript("PlayerScript", []() { return std::make_shared<PlayerScript>(); });
 	RegisterScript("EnemyAIScript", []() { return std::make_shared<EnemyAIScript>(); });
 	RegisterScript("Warrior", []() { return std::make_shared<Warrior>(); });
+	RegisterScript("Guardian", []() { return std::make_shared<Guardian>(); });
+	RegisterScript("Gunner", []() { return std::make_shared<Gunner>(); });
 	RegisterScript("EnemySpawnerScript", []() { return std::make_shared<EnemySpawnerScript>(); });
 	RegisterScript("Canon", []() { return std::make_shared<Canon>(); });
 	// ★追加: 不足していたスクリプトの明示登録

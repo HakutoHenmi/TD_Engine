@@ -82,6 +82,8 @@
     <ClCompile Include="Game\Scripts\MissileCanonScript.cpp" />
     <ClCompile Include="Game\Scripts\ExplosionAttackArea.cpp" />
     <ClCompile Include="Game\Scripts\Enemy\Warrior.cpp" />
+    <ClCompile Include="Game\Scripts\Enemy\Guardian.cpp" />
+    <ClCompile Include="Game\Scripts\Enemy\Gunner.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\TitleScene.h">
@@ -196,6 +198,8 @@
     <ClInclude Include="Game\Scripts\ExplosionAttackArea.h" />
     <ClInclude Include="Game\Scripts\Enemy\Warrior.h" />
     <ClInclude Include="Game\Scripts\Enemy\Enemies.h" />
+    <ClInclude Include="Game\Scripts\Enemy\Guardian.h" />
+    <ClInclude Include="Game\Scripts\Enemy\Gunner.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">
