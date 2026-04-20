@@ -569,17 +569,22 @@ void TutorialScript::DrawPlacementPreview(GameScene* scene, const Engine::Vector
     const Engine::Vector4 previewColor = canPlace ? Engine::Vector4{0.6f, 1.0f, 0.6f, 0.6f} : Engine::Vector4{1.0f, 0.3f, 0.3f, 0.6f};
     renderer->DrawMesh(previewModelHandle_, previewTextureHandle_, tr, previewColor, "Toon");
 
-    // タンク、パイプ、大砲の配置設定時に反応（接続）する範囲を緑の円で描画
-    if (objPath.find("Pipe") != std::string::npos || objPath.find("Canon") != std::string::npos || objPath.find("Tank") != std::string::npos) {
+    // パイプ設置時のみ、既存のタンク・大砲の接続エリア（緑の円）を描画する
+    if (objPath.find("Pipe") != std::string::npos) {
         float connectRange = 2.5f;
         int segments = 36;
-        for (int i = 0; i < segments; ++i) {
-            float theta1 = (i * 2.0f * 3.1415926f) / segments;
-            float theta2 = ((i + 1) * 2.0f * 3.1415926f) / segments;
-            Engine::Vector3 p1 = { hitPoint.x + std::cos(theta1) * connectRange, hitPoint.y + 0.05f, hitPoint.z + std::sin(theta1) * connectRange };
-            Engine::Vector3 p2 = { hitPoint.x + std::cos(theta2) * connectRange, hitPoint.y + 0.05f, hitPoint.z + std::sin(theta2) * connectRange };
-            renderer->DrawLine3D(p1, p2, { 0.0f, 1.0f, 0.0f, 1.0f }, true);
-        }
+        auto& registry = scene->GetRegistry();
+        registry.view<NameComponent, TransformComponent>().each([&](entt::entity, const NameComponent& nc, const TransformComponent& tc) {
+            if (nc.name.find("Canon") != std::string::npos || nc.name.find("Cannon") != std::string::npos || nc.name.find("Tank") != std::string::npos) {
+                for (int i = 0; i < segments; ++i) {
+                    float theta1 = (i * 2.0f * 3.1415926f) / segments;
+                    float theta2 = ((i + 1) * 2.0f * 3.1415926f) / segments;
+                    Engine::Vector3 p1 = { tc.translate.x + std::cos(theta1) * connectRange, tc.translate.y + 0.05f, tc.translate.z + std::sin(theta1) * connectRange };
+                    Engine::Vector3 p2 = { tc.translate.x + std::cos(theta2) * connectRange, tc.translate.y + 0.05f, tc.translate.z + std::sin(theta2) * connectRange };
+                    renderer->DrawLine3D(p1, p2, { 0.0f, 1.0f, 0.0f, 1.0f }, true);
+                }
+            }
+        });
     }
 
     // 大砲の場合は攻撃範囲も描画する
