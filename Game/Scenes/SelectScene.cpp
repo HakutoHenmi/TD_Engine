@@ -17,7 +17,7 @@ void SelectScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters
 
 	// ステージリストのセットアップ
 	stages_.push_back({"Stage 1: Main City", "Resources/Scenes/scene.json", "Standard TD map"});
-	stages_.push_back({"Stage 2: TPS Arena", "Resources/Scenes/TPS_Scene.json", "Action oriented map"});
+	stages_.push_back({"Stage 2: TPS Arena", "Resources/Scenes/PhaseSystem.json", "Action oriented map"});
 	stages_.push_back({"Stage 3: Tower Defense", "Resources/Scenes/TowerScene.json", "Defend the core"});
 
 	// システムのセットアップ
