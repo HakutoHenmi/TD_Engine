@@ -16,6 +16,8 @@ public:
 
 	void Start(entt::entity entity, GameScene* scene) override;
 	void Update(entt::entity entity, GameScene* scene, float dt) override;
+	void Draw(entt::entity entity, GameScene* scene) override;
+	void OnEditorUI() override;
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
 
 	void Installation(GameScene* scene, const std::string& objPath);

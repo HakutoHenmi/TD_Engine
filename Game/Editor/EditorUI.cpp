@@ -381,6 +381,10 @@ static int currentAspect = 0;
 static const float aspectValues[] = { 0.0f, 16.0f/9.0f, 4.0f/3.0f, 1.0f/1.0f, -1.0f };
 static const char* aspects[] = { "Free", "16:9", "4:3", "1:1", "Auto" };
 
+static ViewMode currentViewMode = ViewMode::Scene;
+static DirectX::XMFLOAT3 editorCamPos = {0, 2, -5};
+static DirectX::XMFLOAT3 editorCamRot = {0.2f, 0, 0};
+
 GizmoMode currentGizmoMode = GizmoMode::Translate;
 static std::deque<LogEntry> consoleLog;
 static constexpr size_t kMaxConsoleLines = 500;
@@ -452,6 +456,8 @@ static std::string GenerateCopyName(const std::string& baseName, entt::registry&
 	}
 	return base + "_" + std::to_string(maxNum + 1);
 }
+
+ViewMode EditorUI::GetViewMode() { return currentViewMode; }
 
 // ====== Undo/Redo ======
 void EditorUI::PushUndo(const UndoCommand& cmd) {
@@ -1311,9 +1317,26 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 
 	ShowProject(renderer, gameScene);
 
-	// Game Viewport
+	// Viewport
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-	ImGui::Begin("Game");
+	ImGui::Begin("Viewport", nullptr, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+	
+	if (ImGui::BeginTabBar("ViewTabBar")) {
+		if (ImGui::BeginTabItem("Scene")) {
+			if (currentViewMode != ViewMode::Scene) {
+				currentViewMode = ViewMode::Scene;
+			}
+			ImGui::EndTabItem();
+		}
+		if (ImGui::BeginTabItem("Game")) {
+			if (currentViewMode != ViewMode::Game) {
+				currentViewMode = ViewMode::Game;
+				// trigger camera snapshot handled in GameScene.cpp
+			}
+			ImGui::EndTabItem();
+		}
+		ImGui::EndTabBar();
+	}
 	
 	ImVec2 av = ImGui::GetContentRegionAvail();
 	float tW = av.x, tH = av.y;

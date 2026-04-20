@@ -25,8 +25,13 @@ public:
 	// オブジェクト破棄時やスクリプトが外れた時に呼ばれる
 	virtual void OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
-	// エディターUI描画用
+	// === 描画フック ===
+	// メイン描画ループ用 (3D描画やRenderer::DrawSprite等、EndFrame前に実行が必要なもの)
+	virtual void Draw(entt::entity /*entity*/, GameScene* /*scene*/) {}
+
+	// エディターUI描画用 / プレビュー対応用GUI (ImGui等オーバーレイ描画用)
 	virtual void OnEditorUI() {}
+	virtual void DrawUI(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 	// パラメーターの個別保存・読み込み用 (エディター用)
 	virtual std::string SerializeParameters() { return ""; }

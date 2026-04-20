@@ -168,9 +168,6 @@ void SkillTree::Update(Engine::Renderer* renderer, float screenW, float screenH,
 	if (pendingUnlockId_ != -1) {
 		DrawConfirmationDialog(renderer, screenW, screenH);
 	}
-	ImGui::Begin("SkillTree Debug");
-	ImGui::Text("currentPageId = %d", currentPageId_);
-	ImGui::End();
 }
 
 

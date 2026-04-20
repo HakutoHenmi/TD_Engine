@@ -21,6 +21,8 @@ public:
 	void Shutdown();
 
 	void Execute(entt::entity entity, GameScene* scene, float dt);
+	void ExecuteDraw(entt::entity entity, GameScene* scene);
+	void ExecuteDrawUI(entt::entity entity, GameScene* scene);
 
 	using ScriptCreator = std::function<std::shared_ptr<IScript>()>;
 	void RegisterScript(const std::string& className, ScriptCreator creator);
