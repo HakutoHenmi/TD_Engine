@@ -1047,15 +1047,7 @@ void GameScene::SetIsPlaying(bool play) {
 						char logBuf[2048];
 						sprintf_s(logBuf, "[GameScene] Script synced: %s from %s to %s\n", entry.scriptPath.c_str(), oldParam.c_str(), entry.parameterData.c_str());
 						OutputDebugStringA(logBuf);
-					} else {
-						char logBuf[1024];
-						sprintf_s(logBuf, "[GameScene] Script already in sync: %s (%s)\n", entry.scriptPath.c_str(), entry.parameterData.c_str());
-						OutputDebugStringA(logBuf);
 					}
-				} else {
-					char logBuf[1024];
-					sprintf_s(logBuf, "[GameScene] Script instance NULL, skipping sync: %s (current param: %s)\n", entry.scriptPath.c_str(), entry.parameterData.c_str());
-					OutputDebugStringA(logBuf);
 				}
 			}
 		}

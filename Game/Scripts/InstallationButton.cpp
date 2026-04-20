@@ -23,11 +23,9 @@ namespace Game {
 bool InstallationButton::isButtonPressed_[ButtonTypesNum] = {};
 
 InstallationButton::InstallationButton() {
-	OutputDebugStringA("[InstallationButton] Constructor called\n");
 }
 
 void InstallationButton::Start(entt::entity /*entity*/, GameScene* /*scene*/) {
-	OutputDebugStringA("[InstallationButton] Start called\n");
 }
 
 void InstallationButton::Update(entt::entity entity, GameScene* scene, float dt) {
@@ -76,15 +74,7 @@ void InstallationButton::OnEditorUI() {
 std::string InstallationButton::SerializeParameters() {
 	json j;
 	j["buttonTypes"] = static_cast<int>(buttonTypes_);
-	// compact型で出力
-	std::string data = j.dump();
-
-	// ログ追加
-	char logBuf[1024];
-	sprintf_s(logBuf, "[InstallationButton] SerializeParameters (Type=%d): %s\n", (int)buttonTypes_, data.c_str());
-	OutputDebugStringA(logBuf);
-
-	return data;
+	return j.dump();
 }
 
 void InstallationButton::DeserializeParameters(const std::string& data) {

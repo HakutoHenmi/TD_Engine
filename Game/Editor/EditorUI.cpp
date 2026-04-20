@@ -572,10 +572,6 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 			auto& entry = cp->scripts[i];
 			std::string params = entry.parameterData;
 			if (entry.instance) params = entry.instance->SerializeParameters();
-			
-			char logBuf[2048];
-			sprintf_s(logBuf, "[EditorUI] SerializeEntity [Script]: %s, params: %s (instance=%p)\n", entry.scriptPath.c_str(), params.c_str(), entry.instance.get());
-			OutputDebugStringA(logBuf);
 
 			ss << "{\"path\": \"" << EscapeJson(entry.scriptPath) << "\", \"param\": \"" << EscapeJson(params) << "\"}";
 			if (i < cp->scripts.size() - 1) ss << ", ";
