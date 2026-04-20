@@ -28,6 +28,10 @@
 #include <sstream>
 #include <string>
 #include <Windows.h>
+#include <Psapi.h>
+#include <dxgi1_4.h>
+#pragma comment(lib, "Psapi.lib")
+#pragma comment(lib, "dxgi.lib")
 #include <commdlg.h>
 #include "../../Engine/ThirdParty/nlohmann/json.hpp"
 using json = nlohmann::json;
@@ -2655,9 +2659,175 @@ void EditorUI::ShowAnimationWindow([[maybe_unused]] Engine::Renderer* renderer, 
 	ImGui::Text("Animation Controls (WIP)");
 }
 void EditorUI::ShowPlayModeMonitor([[maybe_unused]] GameScene* scene) { 
-	ImGui::TextColored(ImVec4(0, 1, 0, 1), "FPS: %.1f", ImGui::GetIO().Framerate);
+	// ========== パフォーマンスプロファイラー ==========
+	static constexpr int kHistorySize = 120; // 2秒分 (60fps)
+	static float fpsHistory[kHistorySize] = {};
+	static float frameTimeHistory[kHistorySize] = {};
+	static float drawCallHistory[kHistorySize] = {};
+	static float instanceHistory[kHistorySize] = {};
+	static float memoryHistory[kHistorySize] = {};
+	static float uploadHistory[kHistorySize] = {};
+	static int historyOffset = 0;
+
+	float fps = ImGui::GetIO().Framerate;
+	float frameTimeMs = 1000.0f / (fps > 0.001f ? fps : 0.001f);
+
+	// 履歴更新 (毎フレーム)
+	fpsHistory[historyOffset] = fps;
+	frameTimeHistory[historyOffset] = frameTimeMs;
+
+	// Renderer統計
+	auto* renderer = Engine::Renderer::GetInstance();
+	const auto& stats = renderer ? renderer->GetFrameStats() : Engine::Renderer::FrameStats{};
+
+	drawCallHistory[historyOffset] = (float)(stats.drawCalls + stats.instancedBatches);
+	instanceHistory[historyOffset] = (float)stats.totalInstances;
+	uploadHistory[historyOffset] = stats.uploadBufferTotal > 0 ? (float)stats.uploadBufferUsed / (float)stats.uploadBufferTotal * 100.0f : 0.0f;
+
+	// メモリ使用量 (Windows API)
+	float memoryMB = 0.0f;
+	{
+		PROCESS_MEMORY_COUNTERS_EX pmc{};
+		pmc.cb = sizeof(pmc);
+		if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
+			memoryMB = (float)(pmc.WorkingSetSize / (1024.0 * 1024.0));
+		}
+	}
+	memoryHistory[historyOffset] = memoryMB;
+
+	historyOffset = (historyOffset + 1) % kHistorySize;
+
+	// --- FPS セクション ---
+	ImVec4 fpsColor = fps >= 58.0f ? ImVec4(0.2f, 1.0f, 0.4f, 1.0f) :
+	                  fps >= 30.0f ? ImVec4(1.0f, 0.9f, 0.2f, 1.0f) :
+	                                 ImVec4(1.0f, 0.3f, 0.2f, 1.0f);
+	ImGui::TextColored(fpsColor, "FPS: %.1f", fps);
+	ImGui::SameLine();
+	ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "(%.2f ms)", frameTimeMs);
+
+	// FPSグラフ
+	{
+		float reordered[kHistorySize];
+		for (int i = 0; i < kHistorySize; ++i)
+			reordered[i] = fpsHistory[(historyOffset + i) % kHistorySize];
+		ImGui::PlotLines("##fps_graph", reordered, kHistorySize, 0, "FPS", 0.0f, 120.0f, ImVec2(-1, 35));
+	}
+
+	ImGui::Separator();
+
+	// --- フレームタイム ---
+	if (ImGui::CollapsingHeader("Frame Time", ImGuiTreeNodeFlags_DefaultOpen)) {
+		float reordered[kHistorySize];
+		for (int i = 0; i < kHistorySize; ++i)
+			reordered[i] = frameTimeHistory[(historyOffset + i) % kHistorySize];
+		ImGui::PlotLines("##frametime", reordered, kHistorySize, 0, "ms/frame", 0.0f, 50.0f, ImVec2(-1, 35));
+		
+		// 平均・最大フレームタイム
+		float maxFT = 0.0f, avgFT = 0.0f;
+		for (int i = 0; i < kHistorySize; ++i) { avgFT += reordered[i]; if (reordered[i] > maxFT) maxFT = reordered[i]; }
+		avgFT /= kHistorySize;
+		ImGui::Text("Avg: %.2f ms  Max: %.2f ms", avgFT, maxFT);
+	}
+
+	// --- ドローコール ---
+	if (ImGui::CollapsingHeader("Draw Calls", ImGuiTreeNodeFlags_DefaultOpen)) {
+		ImGui::Text("Individual: %u", stats.drawCalls);
+		ImGui::Text("Instanced Batches: %u", stats.instancedBatches);
+		ImGui::Text("Total Instances: %u", stats.totalInstances);
+		ImGui::Text("Sprites: %u", stats.spriteDrawCalls);
+		ImGui::Text("Line Verts: %u", stats.lineVertices);
+
+		float reordered[kHistorySize];
+		for (int i = 0; i < kHistorySize; ++i)
+			reordered[i] = drawCallHistory[(historyOffset + i) % kHistorySize];
+		ImGui::PlotHistogram("##drawcalls", reordered, kHistorySize, 0, "Draw Calls", 0.0f, 0.0f, ImVec2(-1, 35));
+	}
+
+	// --- メモリ使用量 ---
+	if (ImGui::CollapsingHeader("Memory", ImGuiTreeNodeFlags_DefaultOpen)) {
+		ImGui::Text("Working Set: %.1f MB", memoryMB);
+		
+		// VRAM使用量 (DXGI)
+		if (renderer && renderer->GetDevice()) {
+			Microsoft::WRL::ComPtr<IDXGIDevice3> dxgiDevice;
+			Microsoft::WRL::ComPtr<IDXGIAdapter> dxgiAdapter;
+			if (SUCCEEDED(renderer->GetDevice()->QueryInterface(IID_PPV_ARGS(&dxgiDevice))) &&
+			    SUCCEEDED(dxgiDevice->GetAdapter(&dxgiAdapter))) {
+				DXGI_ADAPTER_DESC adapterDesc{};
+				dxgiAdapter->GetDesc(&adapterDesc);
+				
+				Microsoft::WRL::ComPtr<IDXGIAdapter3> adapter3;
+				if (SUCCEEDED(dxgiAdapter.As(&adapter3))) {
+					DXGI_QUERY_VIDEO_MEMORY_INFO vramInfo{};
+					if (SUCCEEDED(adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &vramInfo))) {
+						float usedMB = (float)(vramInfo.CurrentUsage / (1024.0 * 1024.0));
+						float budgetMB = (float)(vramInfo.Budget / (1024.0 * 1024.0));
+						ImGui::Text("VRAM: %.0f / %.0f MB", usedMB, budgetMB);
+						float ratio = budgetMB > 0 ? usedMB / budgetMB : 0.0f;
+						ImVec4 barCol = ratio < 0.7f ? ImVec4(0.2f, 0.8f, 0.4f, 1.0f) :
+						               ratio < 0.9f ? ImVec4(0.9f, 0.8f, 0.2f, 1.0f) :
+						                              ImVec4(1.0f, 0.3f, 0.2f, 1.0f);
+						ImGui::PushStyleColor(ImGuiCol_PlotHistogram, barCol);
+						ImGui::ProgressBar(ratio, ImVec2(-1, 14), "");
+						ImGui::PopStyleColor();
+					}
+				}
+			}
+		}
+		
+		float reordered[kHistorySize];
+		for (int i = 0; i < kHistorySize; ++i)
+			reordered[i] = memoryHistory[(historyOffset + i) % kHistorySize];
+		ImGui::PlotLines("##memory", reordered, kHistorySize, 0, "RAM (MB)", 0.0f, 0.0f, ImVec2(-1, 35));
+	}
+
+	// --- GPU リソース ---
+	if (ImGui::CollapsingHeader("GPU Resources")) {
+		ImGui::Text("Models: %u", stats.loadedModels);
+		ImGui::Text("Textures: %u", stats.loadedTextures);
+		ImGui::Text("SRV Used: %u", stats.srvUsed);
+		
+		// Upload Buffer使用率
+		float uploadUsedMB = stats.uploadBufferUsed / (1024.0f * 1024.0f);
+		float uploadTotalMB = stats.uploadBufferTotal / (1024.0f * 1024.0f);
+		ImGui::Text("Upload Buffer: %.2f / %.1f MB", uploadUsedMB, uploadTotalMB);
+		float uploadRatio = uploadTotalMB > 0 ? uploadUsedMB / uploadTotalMB : 0.0f;
+		ImVec4 uploadCol = uploadRatio < 0.5f ? ImVec4(0.2f, 0.8f, 0.4f, 1.0f) :
+		                   uploadRatio < 0.8f ? ImVec4(0.9f, 0.8f, 0.2f, 1.0f) :
+		                                        ImVec4(1.0f, 0.3f, 0.2f, 1.0f);
+		ImGui::PushStyleColor(ImGuiCol_PlotHistogram, uploadCol);
+		ImGui::ProgressBar(uploadRatio, ImVec2(-1, 14), "");
+		ImGui::PopStyleColor();
+		
+		float reordered[kHistorySize];
+		for (int i = 0; i < kHistorySize; ++i)
+			reordered[i] = uploadHistory[(historyOffset + i) % kHistorySize];
+		ImGui::PlotLines("##upload", reordered, kHistorySize, 0, "Upload %", 0.0f, 100.0f, ImVec2(-1, 35));
+	}
+
+	// --- エンティティ統計 ---
+	if (scene && ImGui::CollapsingHeader("Scene Stats")) {
+		auto& reg = scene->GetRegistry();
+		uint32_t totalEntities = 0;
+		uint32_t meshEntities = 0;
+		uint32_t scriptEntities = 0;
+		uint32_t colliderEntities = 0;
+		uint32_t uiEntities = 0;
+		
+		for (auto e : reg.view<NameComponent>()) { (void)e; totalEntities++; }
+		for (auto e : reg.view<MeshRendererComponent>()) { (void)e; meshEntities++; }
+		for (auto e : reg.view<ScriptComponent>()) { (void)e; scriptEntities++; }
+		for (auto e : reg.view<BoxColliderComponent>()) { (void)e; colliderEntities++; }
+		for (auto e : reg.view<RectTransformComponent>()) { (void)e; uiEntities++; }
+		
+		ImGui::Text("Entities: %u", totalEntities);
+		ImGui::Text("  Mesh: %u  Script: %u", meshEntities, scriptEntities);
+		ImGui::Text("  Collider: %u  UI: %u", colliderEntities, uiEntities);
+	}
+
 	ImGui::Separator();
 	
+	// --- Player Monitor (既存) ---
 	if (scene) {
 		auto& reg = scene->GetRegistry();
 		auto view = reg.view<PlayerInputComponent, TransformComponent>();
