@@ -14,19 +14,13 @@
 
 using json = nlohmann::json;
 
-
-
 namespace Game {
-
-
 
 bool InstallationButton::isButtonPressed_[ButtonTypesNum] = {};
 
-InstallationButton::InstallationButton() {
-}
+InstallationButton::InstallationButton() {}
 
-void InstallationButton::Start(entt::entity /*entity*/, GameScene* /*scene*/) {
-}
+void InstallationButton::Start(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 void InstallationButton::Update(entt::entity entity, GameScene* scene, float dt) {
 	(void)dt;
@@ -62,18 +56,18 @@ void InstallationButton::OnEditorUI() {
 	ImGui::SeparatorText("Installation Button");
 
 	const char* buttonTypeNames[] = {"Cannon", "Pipe", "Tank"};
-	int currentType = static_cast<int>(FacilityTypes_);
-	if (ImGui::Combo("Facility Type", &currentType, buttonTypeNames, IM_ARRAYSIZE(buttonTypeNames))) {
-		FacilityTypes_ = static_cast<FacilityTypes>(currentType);
+	int currentType = static_cast<int>(buttonTypes_);
+	if (ImGui::Combo("Button Type", &currentType, buttonTypeNames, IM_ARRAYSIZE(buttonTypeNames))) {
+		buttonTypes_ = static_cast<ButtonTypes>(currentType);
 	}
 
-	ImGui::Text("isButtonPressed_: %s", isButtonPressed_[FacilityTypes_] ? "true" : "false");
+	ImGui::Text("isButtonPressed_: %s", isButtonPressed_[buttonTypes_] ? "true" : "false");
 #endif
 }
 
 std::string InstallationButton::SerializeParameters() {
 	json j;
-	j["FacilityTypes"] = static_cast<int>(FacilityTypes_);
+	j["buttonTypes"] = static_cast<int>(buttonTypes_);
 	return j.dump();
 }
 
