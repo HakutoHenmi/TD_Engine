@@ -69,6 +69,21 @@ std::vector<Engine::Vector3> BuildPipePathPoints(const Engine::Vector3& start, c
 
     return points;
 }
+
+entt::entity GetFacilityInRange(GameScene* scene, float x, float z, float range = 2.5f) {
+    auto& registry = scene->GetRegistry();
+    entt::entity found = entt::null;
+    registry.view<NameComponent, TransformComponent>().each([&](entt::entity entity, const NameComponent& nc, const TransformComponent& tc) {
+        if (nc.name.find("Canon") != std::string::npos || nc.name.find("Cannon") != std::string::npos || nc.name.find("Tank") != std::string::npos) {
+            float dx = tc.translate.x - x;
+            float dz = tc.translate.z - z;
+            if (std::sqrt(dx * dx + dz * dz) <= range) {
+                found = entity;
+            }
+        }
+    });
+    return found;
+}
 } // namespace
 
 void TutorialScript::Start(entt::entity /*entity*/, GameScene* scene) {
@@ -406,7 +421,8 @@ void TutorialScript::Installation(GameScene* scene, const std::string& objPath) 
         snappedHitPoint.z = SnapTo2x2Grid(snappedHitPoint.z);
 
         if (!hasPipeStartPoint_) {
-            const bool canPlaceStart = !IsPlacementBlocked(scene, snappedHitPoint);
+            const bool withinFacility = (GetFacilityInRange(scene, snappedHitPoint.x, snappedHitPoint.z) != entt::null);
+            const bool canPlaceStart = !IsPlacementBlocked(scene, snappedHitPoint) && withinFacility;
             DrawPlacementPreview(scene, snappedHitPoint, objPath, canPlaceStart);
 
             if (input->IsMouseTrigger(0) && canPlaceStart) {
@@ -421,9 +437,18 @@ void TutorialScript::Installation(GameScene* scene, const std::string& objPath) 
         Engine::Vector3 startPoint{pipeStartX_, pipeStartY_, pipeStartZ_};
         auto pathPoints = BuildPipePathPoints(startPoint, snappedHitPoint);
         bool canPlaceAll = !pathPoints.empty();
+
+        entt::entity startFacility = GetFacilityInRange(scene, pipeStartX_, pipeStartZ_);
+        entt::entity endFacility = GetFacilityInRange(scene, snappedHitPoint.x, snappedHitPoint.z);
+        bool validFacilityDrop = (endFacility != entt::null && endFacility != startFacility);
+
+        if (!validFacilityDrop) {
+            canPlaceAll = false;
+        }
+
         for (const auto& p : pathPoints) {
             const bool canPlacePoint = !IsPlacementBlocked(scene, p);
-            DrawPlacementPreview(scene, p, objPath, canPlacePoint);
+            DrawPlacementPreview(scene, p, objPath, canPlacePoint && validFacilityDrop);
             if (!canPlacePoint) {
                 canPlaceAll = false;
             }
