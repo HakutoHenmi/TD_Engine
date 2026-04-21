@@ -41,7 +41,7 @@ std::vector<Engine::Vector3> BuildPipePathPoints(const Engine::Vector3& start, c
 
 	int x = x0;
 	int z = z0;
-   const int stepX = (x1 > x0) ? kStep : -kStep;
+	const int stepX = (x1 > x0) ? kStep : -kStep;
 	const int stepZ = (z1 > z0) ? kStep : -kStep;
 	const int totalX = std::abs((x1 - x0) / kStep);
 	const int totalZ = std::abs((z1 - z0) / kStep);
@@ -135,10 +135,10 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		// スキルツリーが開いている間はスキルツリーの更新のみ
 		if (skillTree_.IsOpen()) {
 			float mx = 0, my = 0;
-			float tW = (float)Engine::WindowDX::kW;
-			float tH = (float)Engine::WindowDX::kH;
 
 #if defined(USE_IMGUI) && !defined(NDEBUG)
+			float tW = (float)Engine::WindowDX::kW;
+			float tH = (float)Engine::WindowDX::kH;
 			ImVec2 mousePos = ImGui::GetMousePos();
 			ImVec2 gameMin = EditorUI::GetGameImageMin();
 			ImVec2 gameMax = EditorUI::GetGameImageMax();
@@ -217,7 +217,6 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		if (isPhase_ == BattlePhase) {
 			// 準備から戦闘に切り替わった瞬間
 			// 設置物を反映するためにコストマップを更新
-			
 
 			nav.UpdateCostMap(scene);
 
@@ -472,20 +471,20 @@ void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vec
 		registry.view<NameComponent, TransformComponent>().each([&](entt::entity, const NameComponent& nc, const TransformComponent& tc) {
 			if (nc.name.find("Canon") != std::string::npos || nc.name.find("Cannon") != std::string::npos || nc.name.find("Tank") != std::string::npos) {
 				Engine::Transform planeTr;
-				planeTr.scale = { 1.0f, 0.05f, 1.0f };
-				Engine::Vector4 colorPlane = { 0.0f, 1.0f, 0.0f, 0.4f };
+				planeTr.scale = {1.0f, 0.05f, 1.0f};
+				Engine::Vector4 colorPlane = {0.0f, 1.0f, 0.0f, 0.4f};
 
 				// X+ direction
-				planeTr.translate = { tc.translate.x + 2.0f, tc.translate.y + 0.05f, tc.translate.z };
+				planeTr.translate = {tc.translate.x + 2.0f, tc.translate.y + 0.05f, tc.translate.z};
 				renderer->DrawMesh(crossPlaneHandle, previewTextureHandle_, planeTr, colorPlane, "Toon");
 				// X- direction
-				planeTr.translate = { tc.translate.x - 2.0f, tc.translate.y + 0.05f, tc.translate.z };
+				planeTr.translate = {tc.translate.x - 2.0f, tc.translate.y + 0.05f, tc.translate.z};
 				renderer->DrawMesh(crossPlaneHandle, previewTextureHandle_, planeTr, colorPlane, "Toon");
 				// Z+ direction
-				planeTr.translate = { tc.translate.x, tc.translate.y + 0.05f, tc.translate.z + 2.0f };
+				planeTr.translate = {tc.translate.x, tc.translate.y + 0.05f, tc.translate.z + 2.0f};
 				renderer->DrawMesh(crossPlaneHandle, previewTextureHandle_, planeTr, colorPlane, "Toon");
 				// Z- direction
-				planeTr.translate = { tc.translate.x, tc.translate.y + 0.05f, tc.translate.z - 2.0f };
+				planeTr.translate = {tc.translate.x, tc.translate.y + 0.05f, tc.translate.z - 2.0f};
 				renderer->DrawMesh(crossPlaneHandle, previewTextureHandle_, planeTr, colorPlane, "Toon");
 			}
 		});
@@ -497,9 +496,9 @@ void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vec
 		for (int i = 0; i < 72; ++i) {
 			float theta1 = (i * 2.0f * 3.1415926f) / 72.0f;
 			float theta2 = ((i + 1) * 2.0f * 3.1415926f) / 72.0f;
-			Engine::Vector3 p1 = { hitPoint.x + std::cos(theta1) * attackRange, hitPoint.y + 0.05f, hitPoint.z + std::sin(theta1) * attackRange };
-			Engine::Vector3 p2 = { hitPoint.x + std::cos(theta2) * attackRange, hitPoint.y + 0.05f, hitPoint.z + std::sin(theta2) * attackRange };
-			renderer->DrawLine3D(p1, p2, { 0.0f, 0.8f, 0.0f, 1.0f }, true); // やや暗めの緑などに
+			Engine::Vector3 p1 = {hitPoint.x + std::cos(theta1) * attackRange, hitPoint.y + 0.05f, hitPoint.z + std::sin(theta1) * attackRange};
+			Engine::Vector3 p2 = {hitPoint.x + std::cos(theta2) * attackRange, hitPoint.y + 0.05f, hitPoint.z + std::sin(theta2) * attackRange};
+			renderer->DrawLine3D(p1, p2, {0.0f, 0.8f, 0.0f, 1.0f}, true); // やや暗めの緑などに
 		}
 	}
 }
@@ -632,7 +631,8 @@ void PhaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector
 void PhaseSystemScript::Draw(entt::entity /*entity*/, GameScene* scene) {
 	if (skillTree_.IsOpen()) {
 		auto* renderer = scene->GetRenderer();
-		if (!renderer) return;
+		if (!renderer)
+			return;
 
 		// Editor状態で Start() が呼ばれていない場合でも描画できるように初期化を保証
 		if (!skillTree_.IsInitialized()) {
