@@ -175,6 +175,27 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 
 	//ステージロード直後に一度地形を読み込む
 	flowField_->UpdateCostMap(this);
+
+	// ★追加: ポーズメニューの初期化
+	isPaused_ = false;
+	pauseMenuState_ = PauseMenuState::Main;
+	pauseRegistry_.clear();
+	pauseMainEntities_.clear();
+	pauseSettingsEntities_.clear();
+	pauseUISystem_ = std::make_unique<UISystem>();
+	pauseCtx_.dt = 1.0f / 60.0f;
+	pauseCtx_.camera = &camera_;
+	pauseCtx_.renderer = renderer_;
+	pauseCtx_.input = Engine::Input::GetInstance();
+	pauseCtx_.isPlaying = true;
+	pauseCtx_.scene = nullptr;
+	pauseCtx_.viewportOffset = {0.0f, 0.0f};
+	pauseCtx_.viewportSize = {(float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH};
+	CreatePauseMenu();
+	CreatePauseSettingsMenu();
+	// 初期状態はメニュー非表示
+	for (auto e : pauseMainEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+	for (auto e : pauseSettingsEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
 }
 
 // =====================================================
@@ -223,6 +244,28 @@ void GameScene::Update() {
 
 	// コンテキストを更新
 	ctx_.dt = dt;
+
+	// ★追加: ESCキーでポーズ切り替え (プレイ中のみ)
+	if (isPlaying_ && Engine::Input::GetInstance()->Trigger(DIK_ESCAPE)) {
+		isPaused_ = !isPaused_;
+		if (isPaused_) {
+			// ポーズ開始: メインメニュー表示
+			pauseMenuState_ = PauseMenuState::Main;
+			for (auto e : pauseMainEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = true;
+			for (auto e : pauseSettingsEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+		} else {
+			// ポーズ解除: 全メニュー非表示
+			for (auto e : pauseMainEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+			for (auto e : pauseSettingsEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+		}
+	}
+
+	// ★追加: ポーズ中はゲームロジックをスキップし、メニューのみ更新
+	if (isPaused_) {
+		UpdatePauseMenu();
+		return;
+	}
+
 	if (isPlaying_)
 		playTime_ += dt;
 
@@ -777,6 +820,22 @@ void GameScene::DrawUI() {
 	}
 
 	ctx_.isPlaying = oldIsPlaying;
+
+	// ★追加: ポーズメニューの描画
+	if (isPaused_ && pauseUISystem_) {
+		// 半透明の暗い背景オーバーレイ
+		if (renderer_) {
+			Engine::Renderer::SpriteDesc overlay;
+			overlay.x = 0.0f;
+			overlay.y = 0.0f;
+			overlay.w = (float)Engine::WindowDX::kW;
+			overlay.h = (float)Engine::WindowDX::kH;
+			overlay.color = {0.0f, 0.0f, 0.0f, 0.6f};
+			overlay.layer = 100; // 最前面に描画
+			renderer_->DrawSprite(0, overlay);
+		}
+		pauseUISystem_->DrawUI(pauseRegistry_, pauseCtx_);
+	}
 }
 
 extern bool gizmoDragging;
@@ -1224,6 +1283,217 @@ const std::vector<entt::entity>& GameScene::GetEntitiesByTag(const std::string& 
 
 void GameScene::SetTag(entt::entity entity, const std::string& tagStr) {
 	SetTag(entity, StringToTag(tagStr));
+}
+
+// =====================================================
+// ★追加: ポーズメニュー
+// =====================================================
+
+entt::entity GameScene::CreatePauseButton(const std::string& text, float yPos, entt::entity parent) {
+	auto entity = pauseRegistry_.create();
+
+	auto& rect = pauseRegistry_.emplace<RectTransformComponent>(entity);
+	rect.pos = {0.0f, yPos};
+	rect.size = {300.0f, 60.0f};
+	rect.anchor = {0.0f, 0.0f};
+	rect.pivot = {0.0f, 0.5f};
+	rect.enabled = true;
+
+	if (parent != entt::null) {
+		pauseRegistry_.emplace<HierarchyComponent>(entity, parent);
+	}
+
+	auto& btn = pauseRegistry_.emplace<UIButtonComponent>(entity);
+	btn.normalColor = {0.15f, 0.15f, 0.2f, 0.9f};
+	btn.hoverColor = {0.3f, 0.3f, 0.45f, 1.0f};
+	btn.pressedColor = {0.1f, 0.1f, 0.15f, 1.0f};
+
+	auto& txt = pauseRegistry_.emplace<UITextComponent>(entity);
+	txt.text = text;
+	txt.fontSize = 32.0f;
+	txt.color = {1.0f, 1.0f, 1.0f, 1.0f};
+
+	pauseRegistry_.emplace<UIImageComponent>(entity).color = {1.0f, 1.0f, 1.0f, 1.0f};
+
+	return entity;
+}
+
+void GameScene::CreatePauseMenu() {
+	auto parent = pauseRegistry_.create();
+	auto& pRect = pauseRegistry_.emplace<RectTransformComponent>(parent);
+	// 画面中央に配置
+	pRect.pos = {(float)Engine::WindowDX::kW / 2.0f - 150.0f, (float)Engine::WindowDX::kH / 2.0f - 100.0f};
+	pRect.size = {0, 0};
+	pRect.anchor = {0.0f, 0.0f};
+	pauseMainEntities_.push_back(parent);
+
+	// タイトルテキスト
+	auto titleText = pauseRegistry_.create();
+	auto& titleRect = pauseRegistry_.emplace<RectTransformComponent>(titleText);
+	titleRect.pos = {30.0f, -80.0f};
+	pauseRegistry_.emplace<HierarchyComponent>(titleText, parent);
+	auto& txt = pauseRegistry_.emplace<UITextComponent>(titleText);
+	txt.text = "PAUSE";
+	txt.fontSize = 64.0f;
+	txt.color = {1.0f, 0.9f, 0.3f, 1.0f};
+	pauseMainEntities_.push_back(titleText);
+
+	pauseBtnResume_ = CreatePauseButton(reinterpret_cast<const char*>(u8"\u30B2\u30FC\u30E0\u306B\u623B\u308B"), 0.0f, parent);
+	pauseBtnSettings_ = CreatePauseButton(reinterpret_cast<const char*>(u8"\u8A2D\u5B9A"), 80.0f, parent);
+	pauseBtnTitle_ = CreatePauseButton(reinterpret_cast<const char*>(u8"\u30BF\u30A4\u30C8\u30EB\u306B\u623B\u308B"), 160.0f, parent);
+
+	pauseMainEntities_.push_back(pauseBtnResume_);
+	pauseMainEntities_.push_back(pauseBtnSettings_);
+	pauseMainEntities_.push_back(pauseBtnTitle_);
+}
+
+void GameScene::CreatePauseSettingsMenu() {
+	auto parent = pauseRegistry_.create();
+	auto& pRect = pauseRegistry_.emplace<RectTransformComponent>(parent);
+	pRect.pos = {(float)Engine::WindowDX::kW / 2.0f - 150.0f, (float)Engine::WindowDX::kH / 2.0f - 100.0f};
+	pRect.size = {0, 0};
+	pRect.anchor = {0.0f, 0.0f};
+	pRect.enabled = false;
+	pauseSettingsEntities_.push_back(parent);
+
+	// タイトルテキスト
+	auto titleText = pauseRegistry_.create();
+	auto& titleRect = pauseRegistry_.emplace<RectTransformComponent>(titleText);
+	titleRect.pos = {30.0f, -80.0f};
+	titleRect.enabled = false;
+	pauseRegistry_.emplace<HierarchyComponent>(titleText, parent);
+	auto& txt = pauseRegistry_.emplace<UITextComponent>(titleText);
+	txt.text = "Settings";
+	txt.fontSize = 64.0f;
+	txt.color = {1.0f, 0.9f, 0.3f, 1.0f};
+	pauseSettingsEntities_.push_back(titleText);
+
+	// フルスクリーン
+	pauseBtnFullscreen_ = CreatePauseButton("Fullscreen: OFF", 0.0f, parent);
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnFullscreen_).enabled = false;
+	pauseTextFullscreen_ = pauseBtnFullscreen_;
+
+	// BGM 音量
+	auto bgmLabel = pauseRegistry_.create();
+	auto& bgmRect = pauseRegistry_.emplace<RectTransformComponent>(bgmLabel);
+	bgmRect.pos = {0.0f, 80.0f};
+	bgmRect.enabled = false;
+	pauseRegistry_.emplace<HierarchyComponent>(bgmLabel, parent);
+	auto& bgmTxt = pauseRegistry_.emplace<UITextComponent>(bgmLabel);
+	bgmTxt.text = "BGM Volume";
+	bgmTxt.fontSize = 32.0f;
+	pauseTextBGM_ = bgmLabel;
+
+	pauseBtnBGMMinus_ = CreatePauseButton("-", 80.0f, parent);
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMMinus_).size = {60.0f, 60.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMMinus_).pos = {310.0f, 80.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMMinus_).enabled = false;
+
+	pauseBtnBGMPlus_ = CreatePauseButton("+", 80.0f, parent);
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMPlus_).size = {60.0f, 60.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMPlus_).pos = {380.0f, 80.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMPlus_).enabled = false;
+
+	// SE 音量
+	auto seLabel = pauseRegistry_.create();
+	auto& seRect = pauseRegistry_.emplace<RectTransformComponent>(seLabel);
+	seRect.pos = {0.0f, 160.0f};
+	seRect.enabled = false;
+	pauseRegistry_.emplace<HierarchyComponent>(seLabel, parent);
+	auto& seTxt = pauseRegistry_.emplace<UITextComponent>(seLabel);
+	seTxt.text = "SE Volume";
+	seTxt.fontSize = 32.0f;
+	pauseTextSE_ = seLabel;
+
+	pauseBtnSEMinus_ = CreatePauseButton("-", 160.0f, parent);
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEMinus_).size = {60.0f, 60.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEMinus_).pos = {310.0f, 160.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEMinus_).enabled = false;
+
+	pauseBtnSEPlus_ = CreatePauseButton("+", 160.0f, parent);
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEPlus_).size = {60.0f, 60.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEPlus_).pos = {380.0f, 160.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEPlus_).enabled = false;
+
+	pauseBtnBack_ = CreatePauseButton(reinterpret_cast<const char*>(u8"\u623B\u308B"), 260.0f, parent);
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBack_).enabled = false;
+
+	pauseSettingsEntities_.push_back(bgmLabel);
+	pauseSettingsEntities_.push_back(pauseBtnFullscreen_);
+	pauseSettingsEntities_.push_back(pauseBtnBGMMinus_);
+	pauseSettingsEntities_.push_back(pauseBtnBGMPlus_);
+	pauseSettingsEntities_.push_back(seLabel);
+	pauseSettingsEntities_.push_back(pauseBtnSEMinus_);
+	pauseSettingsEntities_.push_back(pauseBtnSEPlus_);
+	pauseSettingsEntities_.push_back(pauseBtnBack_);
+}
+
+void GameScene::UpdatePauseMenu() {
+	// ポーズメニューのUIシステム更新（ボタンhover状態等）
+	pauseCtx_.dt = 1.0f / 60.0f;
+	pauseCtx_.input = Engine::Input::GetInstance();
+	pauseCtx_.viewportOffset = ctx_.viewportOffset;
+	pauseCtx_.viewportSize = ctx_.viewportSize;
+	pauseUISystem_->Draw(pauseRegistry_, pauseCtx_);
+
+	auto* input = Engine::Input::GetInstance();
+	bool isClicked = input->IsMouseTrigger(0);
+
+	if (pauseMenuState_ == PauseMenuState::Main) {
+		if (isClicked) {
+			if (pauseRegistry_.get<UIButtonComponent>(pauseBtnResume_).isHovered) {
+				// ゲームに戻る
+				isPaused_ = false;
+				for (auto e : pauseMainEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+				for (auto e : pauseSettingsEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnSettings_).isHovered) {
+				// 設定画面へ
+				pauseMenuState_ = PauseMenuState::Settings;
+				for (auto e : pauseMainEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+				for (auto e : pauseSettingsEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = true;
+			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnTitle_).isHovered) {
+				// タイトルに戻る
+				isPaused_ = false;
+				isPlaying_ = false;
+				Engine::SceneManager::GetInstance()->RequestChange("Title");
+			}
+		}
+	} else if (pauseMenuState_ == PauseMenuState::Settings) {
+		auto* audio = Engine::Audio::GetInstance();
+
+		// フルスクリーンテキスト更新
+		if (dx_) {
+			std::string fsText = dx_->IsFullscreen() ? "Fullscreen: ON" : "Fullscreen: OFF";
+			pauseRegistry_.get<UITextComponent>(pauseTextFullscreen_).text = fsText;
+		}
+
+		// 音量テキスト更新
+		if (audio) {
+			int bgmVol = static_cast<int>(audio->GetMasterBGMVolume() * 100);
+			pauseRegistry_.get<UITextComponent>(pauseTextBGM_).text = "BGM Volume: " + std::to_string(bgmVol) + "%";
+			int seVol = static_cast<int>(audio->GetMasterSEVolume() * 100);
+			pauseRegistry_.get<UITextComponent>(pauseTextSE_).text = "SE Volume: " + std::to_string(seVol) + "%";
+		}
+
+		if (isClicked) {
+			if (pauseRegistry_.get<UIButtonComponent>(pauseBtnBack_).isHovered) {
+				// メインメニューに戻る
+				pauseMenuState_ = PauseMenuState::Main;
+				for (auto e : pauseMainEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = true;
+				for (auto e : pauseSettingsEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnFullscreen_).isHovered) {
+				if (dx_) dx_->ToggleFullscreen();
+			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnBGMMinus_).isHovered) {
+				if (audio) audio->SetMasterBGMVolume(audio->GetMasterBGMVolume() - 0.1f);
+			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnBGMPlus_).isHovered) {
+				if (audio) audio->SetMasterBGMVolume(audio->GetMasterBGMVolume() + 0.1f);
+			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnSEMinus_).isHovered) {
+				if (audio) audio->SetMasterSEVolume(audio->GetMasterSEVolume() - 0.1f);
+			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnSEPlus_).isHovered) {
+				if (audio) audio->SetMasterSEVolume(audio->GetMasterSEVolume() + 0.1f);
+			}
+		}
+	}
 }
 
 } // namespace Game
