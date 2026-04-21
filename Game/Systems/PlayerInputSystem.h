@@ -9,6 +9,8 @@ class PlayerInputSystem : public ISystem {
 public:
 	void Update(entt::registry& registry, GameContext& ctx) override {
 		if (!ctx.isPlaying) return;
+		// ★追加: エディタUI操作中はゲーム入力を無視
+		if (ctx.input && ctx.input->IsGameInputBlocked()) return;
 
 		auto view = registry.view<PlayerInputComponent>();
 		for (auto entity : view) {

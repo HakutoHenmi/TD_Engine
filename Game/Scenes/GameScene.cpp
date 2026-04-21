@@ -228,8 +228,9 @@ void GameScene::Update() {
 
 	// ★ 勝利/敗北判定 (テスト用)
 	if (isPlaying_) {
-		bool win = Engine::Input::GetInstance()->Trigger(DIK_G) || WaveManagement::IsWaveEnded();
-		bool loss = Engine::Input::GetInstance()->Trigger(DIK_J);
+		bool inputBlocked = Engine::Input::GetInstance()->IsGameInputBlocked();
+		bool win = (!inputBlocked && Engine::Input::GetInstance()->Trigger(DIK_G)) || WaveManagement::IsWaveEnded();
+		bool loss = (!inputBlocked && Engine::Input::GetInstance()->Trigger(DIK_J));
 
 		// プレイヤーの生存確認 (Viewを直接参照して同期ズレを防ぐ)
 		// プレイヤーの生存確認
@@ -259,6 +260,11 @@ void GameScene::Update() {
 	ctx_.renderer = renderer_;
 	ctx_.input = Engine::Input::GetInstance();
 	ctx_.isPlaying = isPlaying_;
+
+	// ★追加: プレイ中はゲーム入力ブロックを解除（エディタパネルが表示されていてもゲーム操作を優先）
+	if (isPlaying_ && ctx_.input) {
+		ctx_.input->SetGameInputBlocked(false);
+	}
 	ctx_.scene = this;
 	ctx_.eventSystem = &eventSystem_;
 	ctx_.pendingSpawns = &pendingSpawns_;
@@ -339,8 +345,8 @@ void GameScene::Update() {
 		system->Update(registry_, ctx_);
 	}
 
-	// ★ 追加: 手動デバッグカメラ操作はSceneビューかつ停止中のみ
-	if (!isPlaying_ && currentViewMode == 0) {
+	// ★ 追加: 手動デバッグカメラ操作はSceneビューかつ停止中かつビューポートにマウスがある時のみ
+	if (!isPlaying_ && currentViewMode == 0 && EditorUI::IsViewportHovered()) {
 		camera_.Update(*Engine::Input::GetInstance());
 	}
 	camera_.Tick(dt);

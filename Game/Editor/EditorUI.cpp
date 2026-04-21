@@ -316,6 +316,9 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 					c.fontSize = comp.value("fontSize", 24.0f);
 					c.fontPath = comp.value("fontPath", "C:\\Windows\\Fonts\\msgothic.ttc");
 					if (comp.contains("color")) c.color = {comp["color"][0], comp["color"][1], comp["color"][2], comp["color"][3]};
+					c.outlineEnabled = comp.value("outlineEnabled", false);
+					if (comp.contains("outlineColor")) c.outlineColor = {comp["outlineColor"][0], comp["outlineColor"][1], comp["outlineColor"][2], comp["outlineColor"][3]};
+					c.outlineThickness = comp.value("outlineThickness", 2.0f);
 				} else if (type == "UIButton") {
 					auto& c = reg.get_or_emplace<UIButtonComponent>(entity);
 					c.enabled = en;
@@ -458,6 +461,8 @@ static std::string GenerateCopyName(const std::string& baseName, entt::registry&
 }
 
 ViewMode EditorUI::GetViewMode() { return currentViewMode; }
+static bool s_viewportHovered = false;
+bool EditorUI::IsViewportHovered() { return s_viewportHovered; }
 
 // ====== Undo/Redo ======
 void EditorUI::PushUndo(const UndoCommand& cmd) {
@@ -699,7 +704,7 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 	}
 	if (auto* cp = registry.try_get<UITextComponent>(entity)) {
 		addComma();
-		ss << "        {\"type\": \"UIText\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"text\": \"" << EscapeJson(cp->text) << "\", \"fontSize\": " << cp->fontSize << ", \"fontPath\": \"" << EscapeJson(cp->fontPath) << "\", \"color\": [" << cp->color.x << "," << cp->color.y << "," << cp->color.z << "," << cp->color.w << "]}";
+		ss << "        {\"type\": \"UIText\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"text\": \"" << EscapeJson(cp->text) << "\", \"fontSize\": " << cp->fontSize << ", \"fontPath\": \"" << EscapeJson(cp->fontPath) << "\", \"color\": [" << cp->color.x << "," << cp->color.y << "," << cp->color.z << "," << cp->color.w << "], \"outlineEnabled\": " << (cp->outlineEnabled ? "true" : "false") << ", \"outlineThickness\": " << cp->outlineThickness << ", \"outlineColor\": [" << cp->outlineColor.x << "," << cp->outlineColor.y << "," << cp->outlineColor.z << "," << cp->outlineColor.w << "]}";
 	}
 	if (auto* cp = registry.try_get<UIButtonComponent>(entity)) {
 		addComma();
@@ -1091,9 +1096,14 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	}
 
 	// Global Shortcuts
+	// ★ Ctrl+S は常に有効（テキスト入力中でも保存可能にする）
+	if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
+		SaveScene(gameScene, currentScenePath);
+	}
+
+	// テキスト入力中は他のショートカットを無効化（誤操作防止）
 	if (!io.WantTextInput) {
 		if (io.KeyCtrl) {
-			if (ImGui::IsKeyPressed(ImGuiKey_S)) SaveScene(gameScene, currentScenePath);
 			if (ImGui::IsKeyPressed(ImGuiKey_Z)) Undo();
 			if (ImGui::IsKeyPressed(ImGuiKey_Y)) Redo();
 			if (ImGui::IsKeyPressed(ImGuiKey_N)) {
@@ -1391,6 +1401,8 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	// ★修正: 実際に画像が描画された正確なスクリーン座標を取得
 	gameImageMin = ImGui::GetItemRectMin();
 	gameImageMax = ImGui::GetItemRectMax();
+	// ★追加: ビューポートのホバー状態を更新（Unityライクなカメラ操作用）
+	s_viewportHovered = ImGui::IsItemHovered();
 	
 	// ★追加: UISystemなどの座標変換用にコンテキストへ設定
 	auto& gctx = gameScene->GetContext();
@@ -1762,33 +1774,48 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 
 				if (uiDragging) {
 					gizmoHovered = true;
-					ImVec2 delta = ImGui::GetMouseDragDelta(0);
-					float dx = delta.x / scaleX;
-					float dy = delta.y / scaleY;
+					ImVec2 mDelta = ImGui::GetIO().MouseDelta;
+					float dx = mDelta.x / scaleX;
+					float dy = mDelta.y / scaleY;
 
 					if (uiDragHandle == 0) { // UI Pos
-						rt->pos.x = uiDragStartPos.x + dx;
-						rt->pos.y = uiDragStartPos.y + dy;
+						rt->pos.x += dx;
+						rt->pos.y += dy;
 					} else if (uiDragHandle == 1) { // UI Size
-						rt->size.x = (std::max)(1.0f, uiDragStartSize.x + dx);
-						rt->size.y = (std::max)(1.0f, uiDragStartSize.y + dy);
+						float oldW = rt->size.x;
+						float oldH = rt->size.y;
+						rt->size.x = (std::max)(1.0f, oldW + dx);
+						rt->size.y = (std::max)(1.0f, oldH + dy);
+
+						// ピボットによるズレを補正 (pMinを固定)
+						float addedW = rt->size.x - oldW;
+						float addedH = rt->size.y - oldH;
+						rt->pos.x += rt->pivot.x * addedW;
+						rt->pos.y += rt->pivot.y * addedH;
+
+						// UITextが含まれていればフォントサイズも同期してスケーリングする
+						if (auto* text = reg.try_get<UITextComponent>(selectedEnt)) {
+							if (oldH > 1.0f) {
+								text->fontSize = (std::max)(1.0f, text->fontSize * (rt->size.y / oldH));
+							}
+						}
 					} else if (uiDragHandle == 10) { // Hitbox Offset
 						if (auto* btn = reg.try_get<UIButtonComponent>(selectedEnt)) {
-							btn->hitboxOffset.x = uiDragStartHitOffset.x + dx;
-							btn->hitboxOffset.y = uiDragStartHitOffset.y + dy;
+							btn->hitboxOffset.x += dx;
+							btn->hitboxOffset.y += dy;
 						}
 					} else if (uiDragHandle == 11) { // Hitbox Scale
 						if (auto* btn = reg.try_get<UIButtonComponent>(selectedEnt)) {
-							btn->hitboxScale.x = (std::max)(0.01f, uiDragStartHitScale.x + dx / wr.w);
-							btn->hitboxScale.y = (std::max)(0.01f, uiDragStartHitScale.y + dy / wr.h);
+							btn->hitboxScale.x = (std::max)(0.01f, btn->hitboxScale.x + dx / wr.w);
+							btn->hitboxScale.y = (std::max)(0.01f, btn->hitboxScale.y + dy / wr.h);
 						}
 					}
 
 					if (ImGui::IsMouseReleased(0)) {
 						uiDragging = false;
 						uiDragHandle = -1;
+					}
 				}
-			}
 		}
 	}
 
@@ -1829,6 +1856,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				// 1. UI Picking Pass
 				int maxLayer = -10000;
 				gameScene->GetRegistry().view<RectTransformComponent>().each([&](entt::entity e, const RectTransformComponent&) {
+					if (auto* esc = gameScene->GetRegistry().try_get<EditorStateComponent>(e)) { if (esc->locked) return; }
 					UISystem::WorldRect wr = UISystem::CalculateWorldRect(e, gameScene->GetRegistry(), (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH);
 					if (internalMouseX >= wr.x && internalMouseX <= wr.x + wr.w &&
 						internalMouseY >= wr.y && internalMouseY <= wr.y + wr.h) {
@@ -2679,10 +2707,23 @@ void EditorUI::ShowInspector(GameScene* scene) {
 			if (auto* txt = registry.try_get<UITextComponent>(entity)) {
 				if (ImGui::CollapsingHeader("UIText", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##TXT", &txt->enabled);
-					char tbuf[256]; strcpy_s(tbuf, txt->text.c_str());
-					if (ImGui::InputText("Text", tbuf, sizeof(tbuf))) txt->text = tbuf;
+					char tbuf[2048] = {0}; 
+					strcpy_s(tbuf, sizeof(tbuf), txt->text.c_str());
+					if (ImGui::InputTextMultiline("Text", tbuf, sizeof(tbuf), ImVec2(0, 60), ImGuiInputTextFlags_AllowTabInput)) {
+						txt->text = tbuf;
+					}
+					ImGui::TextDisabled("Help: Use <color=#RRGGBB>Text</color> for colored inline text.");
 					ImGui::DragFloat("Font Size", &txt->fontSize, 1.0f, 1, 100);
 					ImGui::ColorEdit4("Color##TXT", &txt->color.x);
+
+					// ★追加: アウトライン設定
+					ImGui::Checkbox("Outline", &txt->outlineEnabled);
+					if (txt->outlineEnabled) {
+						ImGui::Indent();
+						ImGui::ColorEdit4("Outline Color", &txt->outlineColor.x);
+						ImGui::DragFloat("Thickness", &txt->outlineThickness, 0.1f, 0.1f, 10.0f);
+						ImGui::Unindent();
+					}
 
 					// フォント選択ドロップダウン
 					std::vector<std::string> fonts = { "C:\\Windows\\Fonts\\msgothic.ttc" };

@@ -70,6 +70,7 @@ public:
 	static void LoadFromMemory(GameScene* scene, const std::string& data);
 
 	static ViewMode GetViewMode();
+	static bool IsViewportHovered(); // ★追加: ビューポートにマウスがあるかどうか
 	
 	// ★追加: 実行ファイルの場所に関わらず必ずTD_Engineプロジェクトを指す絶対パスを取得
 	static std::string GetUnifiedProjectPath(const std::string& path);
