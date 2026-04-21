@@ -75,6 +75,7 @@ private:
 	void PrevPage();
 	bool HandlePageButtonInput(float screenW, float screenH, float mouseX, float mouseY);
 	void DrawPageButtons(Engine::Renderer* renderer, float screenW, float screenH);
+	void UpdatePageButtonRect(float screenW, float screenH);
 
 private:
 	bool isOpen_ = false;
@@ -83,7 +84,7 @@ private:
 	int skillPoints_ = 100;
 	int pendingUnlockId_ = -1;
 	int currentPageId_ = 0;
-	int pageCount_ = 3;
+	int pageCount_ = 10;
 
 	std::vector<SkillNode> nodes_;
 
@@ -104,15 +105,15 @@ private:
 	static constexpr float kNodeSpacingY = 100.0f;
 	static constexpr float kLineWidth = 4.0f;
 
-	float prevButtonLeft_ = 50.0f;
-	float prevButtonTop_ = 600.0f;
-	float prevButtonRight_ = 130.0f;
-	float prevButtonBottom_ = 650.0f;
+	float prevButtonLeft_ = 100.0f;
+	float prevButtonTop_ = 520.0f;
+	float prevButtonRight_ = 180.0f;
+	float prevButtonBottom_ = 570.0f;
 
-	float nextButtonLeft_ = 1150.0f;
-	float nextButtonTop_ = 600.0f;
-	float nextButtonRight_ = 1230.0f;
-	float nextButtonBottom_ = 650.0f;
+	float nextButtonLeft_ = 1000.0f;
+	float nextButtonTop_ = 520.0f;
+	float nextButtonRight_ = 1080.0f;
+	float nextButtonBottom_ = 570.0f;
 };
 
 } // namespace Game

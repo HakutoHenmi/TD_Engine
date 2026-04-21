@@ -93,7 +93,7 @@ void SkillTree::Start(entt::entity entity, GameScene* scene) {
 
 void SkillTree::Update(entt::entity entity, GameScene* scene, float dt) {
 	(void)dt;
-
+	UpdatePageButtonRect(screenW_, screenH_);
 	if (!scene) {
 		return;
 	}
@@ -256,6 +256,9 @@ void SkillTree::HandleInput(float screenW, float screenH, float mouseX, float mo
 }
 
 bool SkillTree::HandlePageButtonInput(float screenW, float screenH, float mouseX, float mouseY) {
+	(void)screenW;
+	(void)screenH;
+
 	Engine::Input* input = Engine::Input::GetInstance();
 	if (!input) {
 		return false;
@@ -265,24 +268,14 @@ bool SkillTree::HandlePageButtonInput(float screenW, float screenH, float mouseX
 		return false;
 	}
 
-	float prevButtonLeft = 50.0f;
-	float prevButtonTop = screenH - 100.0f;
-	float prevButtonRight = 150.0f;
-	float prevButtonBottom = screenH - 40.0f;
-
-	float nextButtonLeft = screenW - 150.0f;
-	float nextButtonTop = screenH - 100.0f;
-	float nextButtonRight = screenW - 50.0f;
-	float nextButtonBottom = screenH - 40.0f;
-
-	if (mouseX >= prevButtonLeft && mouseX <= prevButtonRight && mouseY >= prevButtonTop && mouseY <= prevButtonBottom) {
+	if (mouseX >= prevButtonLeft_ && mouseX <= prevButtonRight_ && mouseY >= prevButtonTop_ && mouseY <= prevButtonBottom_) {
 		if (currentPageId_ > 0) {
 			currentPageId_ -= 1;
 		}
 		return true;
 	}
 
-	if (mouseX >= nextButtonLeft && mouseX <= nextButtonRight && mouseY >= nextButtonTop && mouseY <= nextButtonBottom) {
+	if (mouseX >= nextButtonLeft_ && mouseX <= nextButtonRight_ && mouseY >= nextButtonTop_ && mouseY <= nextButtonBottom_) {
 		if (currentPageId_ < pageCount_ - 1) {
 			currentPageId_ += 1;
 		}
@@ -291,6 +284,8 @@ bool SkillTree::HandlePageButtonInput(float screenW, float screenH, float mouseX
 
 	return false;
 }
+
+
 bool SkillTree::TryUnlockSkill(int index) {
 	if (index < 0 || index >= (int)nodes_.size()) {
 		return false;
@@ -657,7 +652,24 @@ void SkillTree::DrawConfirmationDialog(Engine::Renderer* renderer, float screenW
 	noButton.color = {0.8f, 0.2f, 0.2f, 0.8f};
 	renderer->DrawSprite(texBg_, noButton);
 }
+void SkillTree::UpdatePageButtonRect(float screenW, float screenH) {
+	float padding = 20.0f;
+	float buttonWidth = 80.0f;
+	float buttonHeight = 50.0f;
+	float offsetY = 770.0f;
 
+	// 左ボタン
+	prevButtonLeft_ = kPanelMargin + padding;
+	prevButtonTop_ = screenH - kPanelMargin - padding - buttonHeight - offsetY;
+	prevButtonRight_ = prevButtonLeft_ + buttonWidth;
+	prevButtonBottom_ = prevButtonTop_ + buttonHeight;
+
+	// 右ボタン
+	nextButtonLeft_ = screenW - kPanelMargin - padding - buttonWidth;
+	nextButtonTop_ = screenH - kPanelMargin - padding - buttonHeight - offsetY;
+	nextButtonRight_ = nextButtonLeft_ + buttonWidth;
+	nextButtonBottom_ = nextButtonTop_ + buttonHeight;
+}
 void SkillTree::GetNodeScreenPos(const SkillNode& node, float screenW, float screenH, float& outX, float& outY) const {
 	float panelHeight = screenH - kPanelMargin * 2.0f;
 	float panelCenterX = screenW * 0.5f;
@@ -720,22 +732,14 @@ void SkillTree::PrevPage() {
 }
 
 void SkillTree::DrawPageButtons(Engine::Renderer* renderer, float screenW, float screenH) {
-	float prevButtonLeft = 50.0f;
-	float prevButtonTop = screenH - 100.0f;
-	float prevButtonWidth = 100.0f;
-	float prevButtonHeight = 60.0f;
+	(void)screenW;
+	(void)screenH;
 
-	float nextButtonLeft = screenW - 150.0f;
-	float nextButtonTop = screenH - 100.0f;
-	float nextButtonWidth = 100.0f;
-	float nextButtonHeight = 60.0f;
-
-	// 左ボタン
 	Engine::Renderer::SpriteDesc prev;
-	prev.x = prevButtonLeft;
-	prev.y = prevButtonTop;
-	prev.w = prevButtonWidth;
-	prev.h = prevButtonHeight;
+	prev.x = prevButtonLeft_;
+	prev.y = prevButtonTop_;
+	prev.w = prevButtonRight_ - prevButtonLeft_;
+	prev.h = prevButtonBottom_ - prevButtonTop_;
 
 	if (currentPageId_ <= 0) {
 		prev.color = {0.3f, 0.3f, 0.3f, 0.8f};
@@ -745,12 +749,11 @@ void SkillTree::DrawPageButtons(Engine::Renderer* renderer, float screenW, float
 
 	renderer->DrawSprite(texBg_, prev);
 
-	// 右ボタン
 	Engine::Renderer::SpriteDesc next;
-	next.x = nextButtonLeft;
-	next.y = nextButtonTop;
-	next.w = nextButtonWidth;
-	next.h = nextButtonHeight;
+	next.x = nextButtonLeft_;
+	next.y = nextButtonTop_;
+	next.w = nextButtonRight_ - nextButtonLeft_;
+	next.h = nextButtonBottom_ - nextButtonTop_;
 
 	if (currentPageId_ >= pageCount_ - 1) {
 		next.color = {0.3f, 0.3f, 0.3f, 0.8f};
@@ -763,8 +766,8 @@ void SkillTree::DrawPageButtons(Engine::Renderer* renderer, float screenW, float
 #ifdef USE_IMGUI
 	ImDrawList* drawList = ImGui::GetBackgroundDrawList();
 	if (drawList) {
-		drawList->AddText(ImVec2(prevButtonLeft + 35.0f, prevButtonTop + 20.0f), IM_COL32(255, 255, 255, 255), "<");
-		drawList->AddText(ImVec2(nextButtonLeft + 35.0f, nextButtonTop + 20.0f), IM_COL32(255, 255, 255, 255), ">");
+		drawList->AddText(ImVec2(prevButtonLeft_ + 35.0f, prevButtonTop_ + 20.0f), IM_COL32(255, 255, 255, 255), "<");
+		drawList->AddText(ImVec2(nextButtonLeft_ + 35.0f, nextButtonTop_ + 20.0f), IM_COL32(255, 255, 255, 255), ">");
 
 		std::string pageText = "Page " + std::to_string(currentPageId_ + 1) + " / " + std::to_string(pageCount_);
 		drawList->AddText(ImVec2(screenW * 0.5f - 50.0f, screenH - 80.0f), IM_COL32(255, 255, 255, 255), pageText.c_str());
