@@ -92,7 +92,7 @@ entt::entity GetFacilityInRange(GameScene* scene, float x, float z, float range 
 } // namespace
 
 // チュートリアルスクリプトの初期化処理。フェーズや変数の初期化、スキルツリーの読み込みなどを行う
-void TutorialScript::Start(entt::entity /*entity*/, GameScene* scene) {
+void TutorialScript::Start(entt::entity entity, GameScene* scene) {
     tutorialStep_ = TutorialStep::Preparation;
     phaseState_ = PhaseSystemScript::PreparationPhase;
     nextPhaseState_ = PhaseSystemScript::PreparationPhase;
@@ -108,12 +108,11 @@ void TutorialScript::Start(entt::entity /*entity*/, GameScene* scene) {
     preKeyN_ = false;
     stepGuideShown_ = false;
     PhaseSystemScript::ForcePhaseState(phaseState_);
-
     if (auto* renderer = Engine::Renderer::GetInstance()) {
-        skillTree_.Init(renderer);
-        skillTree_.LoadFromJson("Resources/Scenes/skills.json", renderer);
+        skillTree_.SetUIContext(renderer, (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH, 0.0f, 0.0f);
+        skillTree_.Start(entity, scene);
+        skillTree_.LoadFromJson("Resources/Scenes/skills.json");
     }
-
     if (scene) {
         ShowStepGuide();
     }
@@ -178,7 +177,7 @@ void TutorialScript::ShowStepGuide() {
 }
 
 // スキルツリーのUIの表示トグルや、開いている場合の入力およびマウス状態のアップデート処理を行う
-void TutorialScript::UpdateSkillTree(GameScene* scene, bool& outKeyN) {
+void TutorialScript::UpdateSkillTree(entt::entity entity, GameScene* scene, bool& outKeyN) {
     auto* input = Engine::Input::GetInstance();
     if (!input || !scene)
         return;
@@ -208,16 +207,15 @@ void TutorialScript::UpdateSkillTree(GameScene* scene, bool& outKeyN) {
             mx = (mousePos.x - gameMin.x) * (tW / viewW);
             my = (mousePos.y - gameMin.y) * (tH / viewH);
         }
-#else
-        input->GetMousePos(mx, my);
 #endif
 
-        skillTree_.Update(renderer, tW, tH, mx, my);
+        skillTree_.SetUIContext(renderer, tW, tH, mx, my);
+        skillTree_.Update(entity, scene, 0.0f);
     }
 }
 
 // 毎フレーム呼ばれる更新処理。入力の監視、チュートリアルステップの進行チェック、オブジェクトの設置モード制御などを行う
-void TutorialScript::Update(entt::entity /*entity*/, GameScene* scene, float /*dt*/) {
+void TutorialScript::Update(entt::entity entity, GameScene* scene, float /*dt*/) {
     auto* input = Engine::Input::GetInstance();
     if (!scene || !input)
         return;
@@ -334,7 +332,7 @@ void TutorialScript::Update(entt::entity /*entity*/, GameScene* scene, float /*d
             break;
 
         bool keyN = false;
-        UpdateSkillTree(scene, keyN);
+        UpdateSkillTree(entity, scene, keyN);
         if (hasOpenedSkillTreeInGuide_ && keySpace) {
             skillTree_.Close();
 			EnterStep(TutorialStep::Finish);
