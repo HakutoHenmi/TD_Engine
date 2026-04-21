@@ -151,7 +151,9 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 #else
 			input->GetMousePos(mx, my);
 #endif
-			// 描画とロジックは DrawUI() 側で処理させるように移動
+			skillTree_.Update(renderer, tW, tH, mx, my);
+			// スキルツリーのUI描画用にマウス座標を変換して渡す
+			skillTree_.SetUIContext(renderer, tW, tH, mx, my);
 			preKeyN_ = keyN;
 			return; // 設置モードの入力を抑制
 		}

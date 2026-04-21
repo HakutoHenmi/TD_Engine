@@ -1,4 +1,6 @@
 #pragma once
+#include "../../externals/entt/entt.hpp"
+#include "IScript.h"
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -11,49 +13,49 @@ namespace Game {
 
 class GameScene;
 
-// スキルノード構造体
 struct SkillNode {
 	int id = 0;
 	std::string name;
-	std::string texturePath;    // スキルアイコンのテクスチャパス
-	int cost = 1;               // 習得に必要なスキルポイント
-	int parentId = -1;          // 親スキルID (-1 = ルートノード)
-	bool unlocked = false;      // 習得済みか
-	float gridX = 0.0f;         // ツリー内の列位置 (0〜)
-	float gridY = 0.0f;         // ツリー内の行位置 (0=最下段)
-	std::string description;    // スキルの説明文
-	uint32_t textureHandle = 0; // スキル固有のアイコン（あれば）
-	int pageId = 0;             // pageId
+	std::string texturePath;
+	int cost = 1;
+	int parentId = -1;
+	bool unlocked = false;
+	float gridX = 0.0f;
+	float gridY = 0.0f;
+	std::string description;
+	uint32_t textureHandle = 0;
+	int pageId = 0;
 };
 
-// スキルツリー管理クラス
-// PhaseSystemScript などのメンバとして置くだけで使えます
-class SkillTree {
+class SkillTree : public IScript {
 public:
-	void Init(Engine::Renderer* renderer);
-	void LoadFromJson(const std::string& path, Engine::Renderer* renderer);
-	void Update(Engine::Renderer* renderer, float screenW, float screenH, float mouseX, float mouseY);
-	// void ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene);
-	//  開閉切り替え
+	void Start(entt::entity entity, GameScene* scene) override;
+	void Update(entt::entity entity, GameScene* scene, float dt) override;
+	void OnDestroy(entt::entity entity, GameScene* scene) override;
+
+	void SetUIContext(Engine::Renderer* renderer, float screenW, float screenH, float mouseX, float mouseY);
+	void ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene);
+
 	void Toggle() {
 		isOpen_ = !isOpen_;
-		if (!isOpen_)
+		if (!isOpen_) {
 			pendingUnlockId_ = -1;
+		}
 	}
+
 	bool IsOpen() const { return isOpen_; }
+
 	void Close() {
 		isOpen_ = false;
 		pendingUnlockId_ = -1;
 	}
 
-	bool IsInitialized() const { return initialized_; }
-
-	// スキルポイント管理
 	int GetSkillPoints() const { return skillPoints_; }
+
 	void AddSkillPoints(int pts) { skillPoints_ += pts; }
 
-	// スキルが習得済みかチェック
 	bool IsSkillUnlocked(int skillId) const;
+	void LoadFromJson(const std::string& path);
 
 private:
 	void DrawBackground(Engine::Renderer* renderer, float screenW, float screenH);
@@ -66,11 +68,7 @@ private:
 	bool TryUnlockSkill(int index);
 	void ConfirmUnlock();
 	void CancelUnlock();
-
-	// 前提条件の再帰取得 (一括解放用)
 	void GetPrerequisites(int index, std::vector<int>& outIndices);
-
-	// スクリーン座標に変換
 	void GetNodeScreenPos(const SkillNode& node, float screenW, float screenH, float& outX, float& outY) const;
 	void SetCurrentPageId(int pageId);
 	void NextPage();
@@ -79,24 +77,29 @@ private:
 private:
 	bool isOpen_ = false;
 	bool initialized_ = false;
-	int skillPoints_ = 100;      // 初期スキルポイント
-	int pendingUnlockId_ = -1; // 確認中のノードID
+	bool dataLoaded_ = false;
+	int skillPoints_ = 100;
+	int pendingUnlockId_ = -1;
 	int currentPageId_ = 0;
 	int pageCount_ = 3;
 	std::vector<SkillNode> nodes_;
 
-	// テクスチャハンドル
-	uint32_t texBg_ = 0;           // パネル背景
-	uint32_t texNodeLocked_ = 0;   // 未習得ノード
-	uint32_t texNodeUnlocked_ = 0; // 習得済ノード
-	uint32_t texLine_ = 0;         // 接続線用
+	uint32_t texBg_ = 0;
+	uint32_t texNodeLocked_ = 0;
+	uint32_t texNodeUnlocked_ = 0;
+	uint32_t texLine_ = 0;
 
-	// レイアウト定数
-	static constexpr float kPanelMargin = 100.0f;  // 画面端からのマージン
-	static constexpr float kNodeSize = 64.0f;      // ノードの描画サイズ
-	static constexpr float kNodeSpacingX = 100.0f; // ノード間のX間隔
-	static constexpr float kNodeSpacingY = 100.0f; // ノード間のY間隔
-	static constexpr float kLineWidth = 4.0f;      // 接続線の幅
+	Engine::Renderer* renderer_ = nullptr;
+	float screenW_ = 0.0f;
+	float screenH_ = 0.0f;
+	float mouseX_ = 0.0f;
+	float mouseY_ = 0.0f;
+
+	static constexpr float kPanelMargin = 100.0f;
+	static constexpr float kNodeSize = 64.0f;
+	static constexpr float kNodeSpacingX = 100.0f;
+	static constexpr float kNodeSpacingY = 100.0f;
+	static constexpr float kLineWidth = 4.0f;
 };
 
 } // namespace Game

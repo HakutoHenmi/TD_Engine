@@ -59,7 +59,7 @@ static bool IsHopperConnectedToMiner(entt::registry& registry, entt::entity hopp
 		std::vector<entt::entity> visited;
 		if (IsPipeConnectedToExperienceMinerRecursive(registry, other, visited, connectRange)) return true;
 	}
-	return false;
+	return false; 
 }
 
 void ExperienceHopper::Start(entt::entity /*entity*/, GameScene* /*scene*/) {
