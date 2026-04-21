@@ -313,6 +313,9 @@ void Renderer::BeginFrame(const float clearColorRGBA[4]) {
 	cbFrameAddr_ = 0;
 	backBufferBarrierState_ = false;
 
+	// ★追加: フレーム統計リセット
+	frameStats_ = FrameStats{};
+
 	framePPEnabled_ = ppEnabled_ && ppSceneColor_;
 
 	cbFrame_.time += 1.0f / 60.0f;
@@ -762,6 +765,21 @@ void Renderer::EndFrame() {
 			it = instancedDrawCalls_.erase(it);
 		} else ++it;
 	}
+
+	// ★追加: 統計データ収集 (FlushDrawCalls前)
+	frameStats_.drawCalls = static_cast<uint32_t>(drawCalls_.size());
+	frameStats_.instancedBatches = static_cast<uint32_t>(instancedDrawCalls_.size() + instancedParticleDrawCalls_.size());
+	for (const auto& idc : instancedDrawCalls_)
+		frameStats_.totalInstances += static_cast<uint32_t>(idc.instances.size());
+	for (const auto& idc : instancedParticleDrawCalls_)
+		frameStats_.totalInstances += static_cast<uint32_t>(idc.instances.size());
+	frameStats_.spriteDrawCalls = static_cast<uint32_t>(spriteDrawCalls_.size());
+	frameStats_.lineVertices = static_cast<uint32_t>(lineVertices_.size() + lineVerticesXRay_.size());
+	frameStats_.loadedModels = static_cast<uint32_t>(models_.size());
+	frameStats_.loadedTextures = static_cast<uint32_t>(textures_.size());
+	frameStats_.uploadBufferUsed = upload_[fi].offset;
+	frameStats_.uploadBufferTotal = upload_[fi].sizeBytes;
+	frameStats_.srvUsed = srvCursor_;
 
 	FlushDrawCalls();
 	

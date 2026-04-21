@@ -46,6 +46,8 @@ public:
 		pendingUnlockId_ = -1;
 	}
 
+	bool IsInitialized() const { return initialized_; }
+
 	// スキルポイント管理
 	int GetSkillPoints() const { return skillPoints_; }
 	void AddSkillPoints(int pts) { skillPoints_ += pts; }

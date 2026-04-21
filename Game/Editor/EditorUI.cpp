@@ -28,6 +28,10 @@
 #include <sstream>
 #include <string>
 #include <Windows.h>
+#include <Psapi.h>
+#include <dxgi1_4.h>
+#pragma comment(lib, "Psapi.lib")
+#pragma comment(lib, "dxgi.lib")
 #include <commdlg.h>
 #include "../../Engine/ThirdParty/nlohmann/json.hpp"
 using json = nlohmann::json;
@@ -377,6 +381,10 @@ static int currentAspect = 0;
 static const float aspectValues[] = { 0.0f, 16.0f/9.0f, 4.0f/3.0f, 1.0f/1.0f, -1.0f };
 static const char* aspects[] = { "Free", "16:9", "4:3", "1:1", "Auto" };
 
+static ViewMode currentViewMode = ViewMode::Scene;
+static DirectX::XMFLOAT3 editorCamPos = {0, 2, -5};
+static DirectX::XMFLOAT3 editorCamRot = {0.2f, 0, 0};
+
 GizmoMode currentGizmoMode = GizmoMode::Translate;
 static std::deque<LogEntry> consoleLog;
 static constexpr size_t kMaxConsoleLines = 500;
@@ -448,6 +456,8 @@ static std::string GenerateCopyName(const std::string& baseName, entt::registry&
 	}
 	return base + "_" + std::to_string(maxNum + 1);
 }
+
+ViewMode EditorUI::GetViewMode() { return currentViewMode; }
 
 // ====== Undo/Redo ======
 void EditorUI::PushUndo(const UndoCommand& cmd) {
@@ -572,10 +582,6 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 			auto& entry = cp->scripts[i];
 			std::string params = entry.parameterData;
 			if (entry.instance) params = entry.instance->SerializeParameters();
-			
-			char logBuf[2048];
-			sprintf_s(logBuf, "[EditorUI] SerializeEntity [Script]: %s, params: %s (instance=%p)\n", entry.scriptPath.c_str(), params.c_str(), entry.instance.get());
-			OutputDebugStringA(logBuf);
 
 			ss << "{\"path\": \"" << EscapeJson(entry.scriptPath) << "\", \"param\": \"" << EscapeJson(params) << "\"}";
 			if (i < cp->scripts.size() - 1) ss << ", ";
@@ -807,6 +813,82 @@ static void ExecuteDuplicate(GameScene* scene) {
 	ExecutePaste(scene);
 }
 
+// ★ 複数選択対応: まとめて削除
+static void ExecuteDeleteSelected(GameScene* scene) {
+	if (!scene) return;
+	auto& selSet = scene->GetSelectedEntities();
+	if (selSet.empty()) {
+		// 単一選択のフォールバック
+		auto ent = scene->GetSelectedEntity();
+		if (ent != entt::null && scene->GetRegistry().valid(ent)) {
+			scene->DestroyObject(static_cast<uint32_t>(ent));
+			scene->SetSelectedEntity(entt::null);
+		}
+		return;
+	}
+	// コピーしてイテレート（削除中にsetが変わるため）
+	std::vector<entt::entity> toDelete(selSet.begin(), selSet.end());
+	selSet.clear();
+	scene->SetSelectedEntity(entt::null);
+	for (auto e : toDelete) {
+		if (scene->GetRegistry().valid(e)) {
+			scene->DestroyObject(static_cast<uint32_t>(e));
+		}
+	}
+	EditorUI::Log("Deleted " + std::to_string(toDelete.size()) + " entities.");
+}
+
+// ★ 複数選択対応: まとめてコピー
+static void ExecuteCopySelected(GameScene* scene) {
+	if (!scene) return;
+	auto& selSet = scene->GetSelectedEntities();
+	if (selSet.size() <= 1) { ExecuteCopy(scene); return; }
+	std::string combined;
+	for (auto e : selSet) {
+		if (!scene->GetRegistry().valid(e)) continue;
+		if (!combined.empty()) combined += ",\n";
+		combined += SerializeEntity(scene->GetRegistry(), e);
+	}
+	s_clipboardJson = combined;
+	EditorUI::Log("Copied " + std::to_string(selSet.size()) + " entities.");
+}
+
+// ★ 複数選択対応: まとめてペースト
+static void ExecutePasteSelected(GameScene* scene) {
+	if (!scene || s_clipboardJson.empty()) return;
+	try {
+		json j = json::parse("{\"objects\": [" + s_clipboardJson + "]}");
+		auto createdEnts = RestoreSceneFromJson(scene, j, true);
+		auto& selSet = scene->GetSelectedEntities();
+		selSet.clear();
+		auto& reg = scene->GetRegistry();
+		for (auto e : createdEnts) {
+			if (reg.all_of<NameComponent>(e)) {
+				auto& nc = reg.get<NameComponent>(e);
+				nc.name = GenerateCopyName(nc.name, reg);
+			}
+			if (reg.all_of<TransformComponent>(e)) {
+				auto& tc = reg.get<TransformComponent>(e);
+				tc.translate.x += 0.5f;
+				tc.translate.y += 0.5f;
+				tc.translate.z -= 0.5f;
+			}
+			selSet.insert(e);
+		}
+		if (!selSet.empty()) {
+			scene->SetSelectedEntity(*selSet.rbegin());
+		}
+		EditorUI::Log("Pasted " + std::to_string(createdEnts.size()) + " entities.");
+	} catch (...) { EditorUI::LogError("Failed to paste entities"); }
+}
+
+// ★ 複数選択対応: まとめて複製
+static void ExecuteDuplicateSelected(GameScene* scene) {
+	if (!scene) return;
+	ExecuteCopySelected(scene);
+	ExecutePasteSelected(scene);
+}
+
 void EditorUI::SaveScene(GameScene* scene, const std::string& path) {
 	if (!scene) return;
 	std::string targetPath = path;
@@ -839,6 +921,7 @@ static std::string OpenFileDialog(const char* filter) {
 	OPENFILENAMEW ofn;
 	WCHAR szFile[260] = {0};
 	std::wstring wfilter = Engine::PathUtils::FromUTF8(filter);
+	for (auto& c : wfilter) { if (c == L'|') c = L'\0'; }
 	ZeroMemory(&ofn, sizeof(OPENFILENAMEW));
 	ofn.lStructSize = sizeof(OPENFILENAMEW);
 	ofn.hwndOwner = nullptr;
@@ -855,6 +938,7 @@ static std::string SaveFileDialog(const char* filter, const char* defExt) {
 	OPENFILENAMEW ofn;
 	WCHAR szFile[260] = {0};
 	std::wstring wfilter = Engine::PathUtils::FromUTF8(filter);
+	for (auto& c : wfilter) { if (c == L'|') c = L'\0'; }
 	std::wstring wdefExt = Engine::PathUtils::FromUTF8(defExt);
 	ZeroMemory(&ofn, sizeof(OPENFILENAMEW));
 	ofn.lStructSize = sizeof(OPENFILENAMEW);
@@ -1006,16 +1090,32 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				gameScene->SetSelectedEntity(entt::null);
 			}
 			if (ImGui::IsKeyPressed(ImGuiKey_O)) {
-				std::string path = OpenFileDialog("JSON Files (*.json)\0*.json\0All Files (*.*)\0*.*\0");
+				std::string path = OpenFileDialog("JSON Files (*.json)|*.json|All Files (*.*)|*.*|");
 				if (!path.empty()) LoadScene(gameScene, path);
 			}
-			if (ImGui::IsKeyPressed(ImGuiKey_C)) ExecuteCopy(gameScene);
-			if (ImGui::IsKeyPressed(ImGuiKey_V)) ExecutePaste(gameScene);
-			if (ImGui::IsKeyPressed(ImGuiKey_D)) ExecuteDuplicate(gameScene);
+			if (ImGui::IsKeyPressed(ImGuiKey_C)) ExecuteCopySelected(gameScene);
+			if (ImGui::IsKeyPressed(ImGuiKey_V)) ExecutePasteSelected(gameScene);
+			if (ImGui::IsKeyPressed(ImGuiKey_D)) ExecuteDuplicateSelected(gameScene);
+			// Ctrl+A: 全選択
+			if (ImGui::IsKeyPressed(ImGuiKey_A)) {
+				auto& selSet = gameScene->GetSelectedEntities();
+				selSet.clear();
+				auto view = gameScene->GetRegistry().view<NameComponent>();
+				for (auto e : view) { selSet.insert(e); }
+				if (!selSet.empty()) gameScene->SetSelectedEntity(*selSet.rbegin());
+				Log("Selected all (" + std::to_string(selSet.size()) + " entities)");
+			}
 		} else {
 			if (ImGui::IsKeyPressed(ImGuiKey_W)) currentGizmoMode = GizmoMode::Translate;
 			if (ImGui::IsKeyPressed(ImGuiKey_E)) currentGizmoMode = GizmoMode::Rotate;
 			if (ImGui::IsKeyPressed(ImGuiKey_R)) currentGizmoMode = GizmoMode::Scale;
+			// Delete: まとめて削除
+			if (ImGui::IsKeyPressed(ImGuiKey_Delete)) ExecuteDeleteSelected(gameScene);
+			// Escape: 選択解除
+			if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+				gameScene->GetSelectedEntities().clear();
+				gameScene->SetSelectedEntity(entt::null);
+			}
 		}
 	}
 
@@ -1029,19 +1129,61 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 			}
 			ImGui::Separator();
 			if (ImGui::MenuItem("Open Scene", "Ctrl+O")) {
-				std::string path = OpenFileDialog("JSON Files (*.json)\0*.json\0All Files (*.*)\0*.*\0");
+				std::string path = OpenFileDialog("JSON Files (*.json)|*.json|All Files (*.*)|*.*|");
 				if (!path.empty()) LoadScene(gameScene, path);
 			}
 			if (ImGui::MenuItem("Append Scene", "Ctrl+Shift+O")) {
-				std::string path = OpenFileDialog("JSON Files (*.json)\0*.json\0All Files (*.*)\0*.*\0");
+				std::string path = OpenFileDialog("JSON Files (*.json)|*.json|All Files (*.*)|*.*|");
 				if (!path.empty()) AddScene(gameScene, path);
+			}
+			ImGui::Separator();
+			if (ImGui::MenuItem("Import TD Map Layout", "")) {
+				std::string path = OpenFileDialog("JSON Files (*.json)|*.json|All Files (*.*)|*.*|");
+				if (!path.empty()) {
+					auto fsPath = std::filesystem::path(path);
+					std::ifstream f(fsPath);
+					if (f.is_open()) {
+						json j;
+						f >> j;
+						if (j.contains("objects")) {
+							for (const auto& objData : j["objects"]) {
+								std::string name = objData["name"];
+								entt::entity e = gameScene->CreateEntity(name);
+								
+								auto& tc = gameScene->GetRegistry().get<TransformComponent>(e);
+								tc.translate = {objData["position"][0].get<float>(), objData["position"][1].get<float>(), objData["position"][2].get<float>()};
+								
+								// Blenderの回転角はラジアンなのでそのまま使用 (YとZが反転している可能性はスクリプトで対策済み)
+								tc.rotate = {objData["rotation"][0].get<float>(), objData["rotation"][1].get<float>(), objData["rotation"][2].get<float>()};
+								tc.scale = {objData["scale"][0].get<float>(), objData["scale"][1].get<float>(), objData["scale"][2].get<float>()};
+								
+								std::string meshFile = objData["mesh"];
+								std::string tagStr = objData.value("tag", "Default");
+								
+								auto& mr = gameScene->GetRegistry().emplace<MeshRendererComponent>(e);
+								mr.modelPath = "Resources/Scenes/Map/" + meshFile;
+								mr.modelHandle = Engine::Renderer::GetInstance()->LoadObjMesh(mr.modelPath);
+								
+								auto& tag = gameScene->GetRegistry().get_or_emplace<TagComponent>(e);
+								if (tagStr == "ground" || tagStr == "wall" || tagStr == "mountain" || tagStr == "structure" || tagStr == "bridge") {
+									tag.tag = TagType::Wall; // 障害物・床として扱う
+									// 物理シミュが必要ならコライダーも付与
+									auto& col = gameScene->GetRegistry().emplace<BoxColliderComponent>(e);
+									col.size = tc.scale; // 簡易的にスケールベース
+								} else if (tagStr == "path") {
+									tag.tag = TagType::Default;
+								}
+							}
+						}
+					}
+				}
 			}
 			ImGui::Separator();
 			if (ImGui::MenuItem("Save Scene", "Ctrl+S")) {
 				SaveScene(gameScene);
 			}
 			if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S")) {
-				std::string path = SaveFileDialog("JSON Files (*.json)\0*.json\0All Files (*.*)\0*.*\0", "json");
+				std::string path = SaveFileDialog("JSON Files (*.json)|*.json|All Files (*.*)|*.*|", "json");
 				if (!path.empty()) SaveScene(gameScene, path);
 			}
 			ImGui::EndMenu();
@@ -1069,9 +1211,22 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 			if (ImGui::MenuItem("Undo", "Ctrl+Z")) Undo();
 			if (ImGui::MenuItem("Redo", "Ctrl+Y")) Redo();
 			ImGui::Separator();
-			if (ImGui::MenuItem("Copy", "Ctrl+C")) ExecuteCopy(gameScene);
-			if (ImGui::MenuItem("Paste", "Ctrl+V", false, !s_clipboardJson.empty())) ExecutePaste(gameScene);
-			if (ImGui::MenuItem("Duplicate", "Ctrl+D")) ExecuteDuplicate(gameScene);
+			if (ImGui::MenuItem("Copy", "Ctrl+C")) ExecuteCopySelected(gameScene);
+			if (ImGui::MenuItem("Paste", "Ctrl+V", false, !s_clipboardJson.empty())) ExecutePasteSelected(gameScene);
+			if (ImGui::MenuItem("Duplicate", "Ctrl+D")) ExecuteDuplicateSelected(gameScene);
+			ImGui::Separator();
+			if (ImGui::MenuItem("Delete Selected", "Delete")) ExecuteDeleteSelected(gameScene);
+			if (ImGui::MenuItem("Select All", "Ctrl+A")) {
+				auto& selSet = gameScene->GetSelectedEntities();
+				selSet.clear();
+				auto view = gameScene->GetRegistry().view<NameComponent>();
+				for (auto e : view) { selSet.insert(e); }
+				if (!selSet.empty()) gameScene->SetSelectedEntity(*selSet.rbegin());
+			}
+			if (ImGui::MenuItem("Deselect All", "Escape")) {
+				gameScene->GetSelectedEntities().clear();
+				gameScene->SetSelectedEntity(entt::null);
+			}
 			ImGui::Separator();
 			if (ImGui::MenuItem("Translate", "W", currentGizmoMode == GizmoMode::Translate)) currentGizmoMode = GizmoMode::Translate;
 			if (ImGui::MenuItem("Rotate", "E", currentGizmoMode == GizmoMode::Rotate)) currentGizmoMode = GizmoMode::Rotate;
@@ -1162,9 +1317,26 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 
 	ShowProject(renderer, gameScene);
 
-	// Game Viewport
+	// Viewport
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-	ImGui::Begin("Game");
+	ImGui::Begin("Viewport", nullptr, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+	
+	if (ImGui::BeginTabBar("ViewTabBar")) {
+		if (ImGui::BeginTabItem("Scene")) {
+			if (currentViewMode != ViewMode::Scene) {
+				currentViewMode = ViewMode::Scene;
+			}
+			ImGui::EndTabItem();
+		}
+		if (ImGui::BeginTabItem("Game")) {
+			if (currentViewMode != ViewMode::Game) {
+				currentViewMode = ViewMode::Game;
+				// trigger camera snapshot handled in GameScene.cpp
+			}
+			ImGui::EndTabItem();
+		}
+		ImGui::EndTabBar();
+	}
 	
 	ImVec2 av = ImGui::GetContentRegionAvail();
 	float tW = av.x, tH = av.y;
@@ -1564,70 +1736,133 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 		}
 	}
 
+	// ★ 矩形選択用の静的変数
+	static bool s_rectSelecting = false;
+	static ImVec2 s_rectStart = {0, 0};
+
 	// Scene Picking - Also disabled during PLAY
 	if (!isPlaying && ImGui::IsItemHovered() && !gizmoHovered) {
-		if (ImGui::IsMouseClicked(0)) {
-			ImVec2 mousePos = ImGui::GetMousePos();
-			float sx = mousePos.x - gameImageMin.x;
-			float sy = mousePos.y - gameImageMin.y;
-			
-			if (sx >= 0 && sx <= renderW && sy >= 0 && sy <= renderH) {
+		ImVec2 mousePos = ImGui::GetMousePos();
+		float sx = mousePos.x - gameImageMin.x;
+		float sy = mousePos.y - gameImageMin.y;
+
+		// --- 左クリック開始: 矩形選択開始 or 単体ピッキング ---
+		if (ImGui::IsMouseClicked(0) && sx >= 0 && sx <= renderW && sy >= 0 && sy <= renderH) {
+			s_rectSelecting = true;
+			s_rectStart = mousePos;
+		}
+
+		// --- 左ボタン離した時: 矩形の大きさで判定 ---
+		if (ImGui::IsMouseReleased(0) && s_rectSelecting) {
+			s_rectSelecting = false;
+			ImVec2 rectEnd = mousePos;
+			float dragW = std::fabs(rectEnd.x - s_rectStart.x);
+			float dragH = std::fabs(rectEnd.y - s_rectStart.y);
+
+			bool isShift = ImGui::GetIO().KeyShift;
+
+			if (dragW < 5.0f && dragH < 5.0f) {
+				// --- 小さいドラッグ = クリックピッキング ---
+				float pickSx = s_rectStart.x - gameImageMin.x;
+				float pickSy = s_rectStart.y - gameImageMin.y;
 				float internalMouseX = gctx.overrideMouseX;
 				float internalMouseY = gctx.overrideMouseY;
 
 				entt::entity hitE = entt::null;
-				
-				// 1. UI Picking Pass (Priority)
+
+				// 1. UI Picking Pass
 				int maxLayer = -10000;
 				gameScene->GetRegistry().view<RectTransformComponent>().each([&](entt::entity e, const RectTransformComponent&) {
 					UISystem::WorldRect wr = UISystem::CalculateWorldRect(e, gameScene->GetRegistry(), (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH);
 					if (internalMouseX >= wr.x && internalMouseX <= wr.x + wr.w &&
 						internalMouseY >= wr.y && internalMouseY <= wr.y + wr.h) {
-						
 						int layer = 0;
-						if (auto* img = gameScene->GetRegistry().try_get<UIImageComponent>(e)) {
-							layer = img->layer;
-						}
-						// より手前（レイヤーが大きい）のUIを優先
-						if (hitE == entt::null || layer >= maxLayer) {
-							maxLayer = layer;
-							hitE = e;
-						}
+						if (auto* img = gameScene->GetRegistry().try_get<UIImageComponent>(e)) layer = img->layer;
+						if (hitE == entt::null || layer >= maxLayer) { maxLayer = layer; hitE = e; }
 					}
 				});
 
-				// 2. 3D Picking Pass (If no UI hit)
+				// 2. 3D Picking Pass
 				if (hitE == entt::null) {
 					DirectX::XMVECTOR rayOrig, rayDir;
-					ScreenToWorldRay(sx, sy, (float)renderW, (float)renderH, gameScene->GetCamera().View(), gameScene->GetCamera().Proj(), rayOrig, rayDir);
-					
+					ScreenToWorldRay(pickSx, pickSy, (float)renderW, (float)renderH, gameScene->GetCamera().View(), gameScene->GetCamera().Proj(), rayOrig, rayDir);
 					float minD = FLT_MAX;
 					gameScene->GetRegistry().view<MeshRendererComponent, TransformComponent>().each([&](entt::entity e, const MeshRendererComponent& mr, [[maybe_unused]] const TransformComponent& tc) {
 						if (mr.modelHandle == 0) return;
 						auto* m = renderer->GetModel(mr.modelHandle);
 						if (!m) return;
-
+						if (auto* esc = gameScene->GetRegistry().try_get<EditorStateComponent>(e)) { if (esc->locked) return; }
 						float d; Engine::Vector3 p;
-						// ロックされているオブジェクトはピッキング（クリック選択）させない
-						if (auto* esc = gameScene->GetRegistry().try_get<EditorStateComponent>(e)) {
-							if (esc->locked) return;
-						}
-
 						if (m->RayCast(rayOrig, rayDir, gameScene->GetWorldMatrix(static_cast<int>(e)), d, p)) {
 							if (d < minD) { minD = d; hitE = e; }
 						}
 					});
 				}
 
+				auto& selSet = gameScene->GetSelectedEntities();
 				if (hitE != entt::null) {
-					gameScene->SetSelectedEntity(hitE);
-					gameScene->GetSelectedEntities() = {hitE};
+					if (isShift) {
+						if (selSet.count(hitE)) { selSet.erase(hitE); }
+						else { selSet.insert(hitE); }
+						gameScene->SetSelectedEntity(selSet.empty() ? entt::null : *selSet.rbegin());
+					} else {
+						gameScene->SetSelectedEntity(hitE);
+						selSet = {hitE};
+					}
 				} else {
+					if (!isShift) {
+						gameScene->SetSelectedEntity(entt::null);
+						selSet.clear();
+					}
+				}
+			} else {
+				// --- 大きなドラッグ = 矩形選択 ---
+				float rx0 = (std::min)(s_rectStart.x, rectEnd.x) - gameImageMin.x;
+				float ry0 = (std::min)(s_rectStart.y, rectEnd.y) - gameImageMin.y;
+				float rx1 = (std::max)(s_rectStart.x, rectEnd.x) - gameImageMin.x;
+				float ry1 = (std::max)(s_rectStart.y, rectEnd.y) - gameImageMin.y;
+
+				auto& selSet = gameScene->GetSelectedEntities();
+				if (!isShift) selSet.clear();
+
+				// 各エンティティのワールド位置をスクリーン座標に変換して矩形内か判定
+				DirectX::XMMATRIX viewMat = gameScene->GetCamera().View();
+				DirectX::XMMATRIX projMat = gameScene->GetCamera().Proj();
+				DirectX::XMMATRIX vpMat = DirectX::XMMatrixMultiply(viewMat, projMat);
+
+				gameScene->GetRegistry().view<TransformComponent, NameComponent>().each([&](entt::entity e, const TransformComponent& tc, [[maybe_unused]] const NameComponent&) {
+					if (auto* esc = gameScene->GetRegistry().try_get<EditorStateComponent>(e)) { if (esc->locked) return; }
+					DirectX::XMVECTOR worldPos = DirectX::XMVectorSet(tc.translate.x, tc.translate.y, tc.translate.z, 1.0f);
+					DirectX::XMVECTOR clipPos = DirectX::XMVector4Transform(worldPos, vpMat);
+					float w = DirectX::XMVectorGetW(clipPos);
+					if (w <= 0.001f) return; // カメラ後ろはスキップ
+					float ndcX = DirectX::XMVectorGetX(clipPos) / w;
+					float ndcY = DirectX::XMVectorGetY(clipPos) / w;
+					float screenX = (ndcX * 0.5f + 0.5f) * renderW;
+					float screenY = (-ndcY * 0.5f + 0.5f) * renderH;
+
+					if (screenX >= rx0 && screenX <= rx1 && screenY >= ry0 && screenY <= ry1) {
+						selSet.insert(e);
+					}
+				});
+
+				if (!selSet.empty()) {
+					gameScene->SetSelectedEntity(*selSet.rbegin());
+				} else if (!isShift) {
 					gameScene->SetSelectedEntity(entt::null);
-					gameScene->GetSelectedEntities().clear();
 				}
 			}
 		}
+	}
+
+	// ★ 矩形選択中の描画（半透明の青い矩形）
+	if (s_rectSelecting && ImGui::IsMouseDown(0)) {
+		ImVec2 curMouse = ImGui::GetMousePos();
+		ImDrawList* dl = ImGui::GetForegroundDrawList();
+		ImVec2 mn = ImVec2((std::min)(s_rectStart.x, curMouse.x), (std::min)(s_rectStart.y, curMouse.y));
+		ImVec2 mx = ImVec2((std::max)(s_rectStart.x, curMouse.x), (std::max)(s_rectStart.y, curMouse.y));
+		dl->AddRectFilled(mn, mx, IM_COL32(80, 140, 255, 40));
+		dl->AddRect(mn, mx, IM_COL32(80, 140, 255, 200), 0.0f, 0, 1.5f);
 	}
 
 	// -- Overlay removed (Clean Viewport) --
@@ -1639,6 +1874,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 
 void EditorUI::ShowHierarchy(GameScene* scene) {
 	ImGui::Begin("Hierarchy");
+	static entt::entity s_hierarchyAnchor = entt::null; // 範囲選択のアンカー
 	if (scene) {
 		auto& registry = scene->GetRegistry();
 		
@@ -1658,11 +1894,41 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 			else ImGui::TextDisabled(" ");
 			ImGui::SameLine();
 
-			bool selected = (scene->GetSelectedEntity() == entity);
+			auto& selSet = scene->GetSelectedEntities();
+			bool selected = selSet.count(entity) > 0 || (scene->GetSelectedEntity() == entity);
 			std::string name = view.get<NameComponent>(entity).name;
 			if (ImGui::Selectable((name + "##" + std::to_string((uint32_t)entity)).c_str(), selected)) {
-				scene->SetSelectedEntity(entity);
-				scene->GetSelectedEntities() = {entity};
+				if (ImGui::GetIO().KeyShift && s_hierarchyAnchor != entt::null) {
+					// Shift+Click: アンカーからここまでの範囲を全て選択
+					bool inRange = false;
+					bool found = false;
+					for (auto e2 : view) {
+						if (e2 == s_hierarchyAnchor || e2 == entity) {
+							if (!inRange) { inRange = true; }
+							else { found = true; } // 2つ目に到達
+						}
+						if (inRange) { selSet.insert(e2); }
+						if (found) break;
+					}
+					scene->SetSelectedEntity(entity);
+				} else if (ImGui::GetIO().KeyAlt) {
+					// Alt+Click: 1つずつトグル（追加/除去）
+					if (selSet.count(entity)) {
+						selSet.erase(entity);
+						if (scene->GetSelectedEntity() == entity) {
+							scene->SetSelectedEntity(selSet.empty() ? entt::null : *selSet.begin());
+						}
+					} else {
+						selSet.insert(entity);
+						scene->SetSelectedEntity(entity);
+					}
+					s_hierarchyAnchor = entity;
+				} else {
+					// 通常クリック: 単一選択
+					scene->SetSelectedEntity(entity);
+					selSet = {entity};
+					s_hierarchyAnchor = entity;
+				}
 			}
 
 			// Right-click menu for a specific entity
@@ -1672,19 +1938,22 @@ void EditorUI::ShowHierarchy(GameScene* scene) {
 					std::string snapshot = SerializeEntity(registry, entity);
 					PushUndo({"Delete Entity",
 						[=, &reg = scene->GetRegistry()](){ 
-							// Restore from snapshot
 							json j = json::parse("{\"objects\": [" + snapshot + "]}");
 							RestoreSceneFromJson(scene, j, true);
 						},
 						[=](){ scene->DestroyObject(id); }
 					});
 					scene->DestroyObject(id);
+					scene->GetSelectedEntities().erase(entity);
 					if (scene->GetSelectedEntity() == entity) scene->SetSelectedEntity(entt::null);
 				}
+				if (scene->GetSelectedEntities().size() > 1) {
+					if (ImGui::MenuItem("Delete Selected", "Delete")) ExecuteDeleteSelected(scene);
+				}
 				ImGui::Separator();
-				if (ImGui::MenuItem("Copy", "Ctrl+C")) ExecuteCopy(scene);
-				if (ImGui::MenuItem("Paste", "Ctrl+V", false, !s_clipboardJson.empty())) ExecutePaste(scene);
-				if (ImGui::MenuItem("Duplicate", "Ctrl+D")) ExecuteDuplicate(scene);
+				if (ImGui::MenuItem("Copy", "Ctrl+C")) ExecuteCopySelected(scene);
+				if (ImGui::MenuItem("Paste", "Ctrl+V", false, !s_clipboardJson.empty())) ExecutePasteSelected(scene);
+				if (ImGui::MenuItem("Duplicate", "Ctrl+D")) ExecuteDuplicateSelected(scene);
 				ImGui::EndPopup();
 			}
 
@@ -2659,9 +2928,175 @@ void EditorUI::ShowAnimationWindow([[maybe_unused]] Engine::Renderer* renderer, 
 	ImGui::Text("Animation Controls (WIP)");
 }
 void EditorUI::ShowPlayModeMonitor([[maybe_unused]] GameScene* scene) { 
-	ImGui::TextColored(ImVec4(0, 1, 0, 1), "FPS: %.1f", ImGui::GetIO().Framerate);
+	// ========== パフォーマンスプロファイラー ==========
+	static constexpr int kHistorySize = 120; // 2秒分 (60fps)
+	static float fpsHistory[kHistorySize] = {};
+	static float frameTimeHistory[kHistorySize] = {};
+	static float drawCallHistory[kHistorySize] = {};
+	static float instanceHistory[kHistorySize] = {};
+	static float memoryHistory[kHistorySize] = {};
+	static float uploadHistory[kHistorySize] = {};
+	static int historyOffset = 0;
+
+	float fps = ImGui::GetIO().Framerate;
+	float frameTimeMs = 1000.0f / (fps > 0.001f ? fps : 0.001f);
+
+	// 履歴更新 (毎フレーム)
+	fpsHistory[historyOffset] = fps;
+	frameTimeHistory[historyOffset] = frameTimeMs;
+
+	// Renderer統計
+	auto* renderer = Engine::Renderer::GetInstance();
+	const auto& stats = renderer ? renderer->GetFrameStats() : Engine::Renderer::FrameStats{};
+
+	drawCallHistory[historyOffset] = (float)(stats.drawCalls + stats.instancedBatches);
+	instanceHistory[historyOffset] = (float)stats.totalInstances;
+	uploadHistory[historyOffset] = stats.uploadBufferTotal > 0 ? (float)stats.uploadBufferUsed / (float)stats.uploadBufferTotal * 100.0f : 0.0f;
+
+	// メモリ使用量 (Windows API)
+	float memoryMB = 0.0f;
+	{
+		PROCESS_MEMORY_COUNTERS_EX pmc{};
+		pmc.cb = sizeof(pmc);
+		if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
+			memoryMB = (float)(pmc.WorkingSetSize / (1024.0 * 1024.0));
+		}
+	}
+	memoryHistory[historyOffset] = memoryMB;
+
+	historyOffset = (historyOffset + 1) % kHistorySize;
+
+	// --- FPS セクション ---
+	ImVec4 fpsColor = fps >= 58.0f ? ImVec4(0.2f, 1.0f, 0.4f, 1.0f) :
+	                  fps >= 30.0f ? ImVec4(1.0f, 0.9f, 0.2f, 1.0f) :
+	                                 ImVec4(1.0f, 0.3f, 0.2f, 1.0f);
+	ImGui::TextColored(fpsColor, "FPS: %.1f", fps);
+	ImGui::SameLine();
+	ImGui::TextColored(ImVec4(0.6f, 0.6f, 0.6f, 1.0f), "(%.2f ms)", frameTimeMs);
+
+	// FPSグラフ
+	{
+		float reordered[kHistorySize];
+		for (int i = 0; i < kHistorySize; ++i)
+			reordered[i] = fpsHistory[(historyOffset + i) % kHistorySize];
+		ImGui::PlotLines("##fps_graph", reordered, kHistorySize, 0, "FPS", 0.0f, 120.0f, ImVec2(-1, 35));
+	}
+
+	ImGui::Separator();
+
+	// --- フレームタイム ---
+	if (ImGui::CollapsingHeader("Frame Time", ImGuiTreeNodeFlags_DefaultOpen)) {
+		float reordered[kHistorySize];
+		for (int i = 0; i < kHistorySize; ++i)
+			reordered[i] = frameTimeHistory[(historyOffset + i) % kHistorySize];
+		ImGui::PlotLines("##frametime", reordered, kHistorySize, 0, "ms/frame", 0.0f, 50.0f, ImVec2(-1, 35));
+		
+		// 平均・最大フレームタイム
+		float maxFT = 0.0f, avgFT = 0.0f;
+		for (int i = 0; i < kHistorySize; ++i) { avgFT += reordered[i]; if (reordered[i] > maxFT) maxFT = reordered[i]; }
+		avgFT /= kHistorySize;
+		ImGui::Text("Avg: %.2f ms  Max: %.2f ms", avgFT, maxFT);
+	}
+
+	// --- ドローコール ---
+	if (ImGui::CollapsingHeader("Draw Calls", ImGuiTreeNodeFlags_DefaultOpen)) {
+		ImGui::Text("Individual: %u", stats.drawCalls);
+		ImGui::Text("Instanced Batches: %u", stats.instancedBatches);
+		ImGui::Text("Total Instances: %u", stats.totalInstances);
+		ImGui::Text("Sprites: %u", stats.spriteDrawCalls);
+		ImGui::Text("Line Verts: %u", stats.lineVertices);
+
+		float reordered[kHistorySize];
+		for (int i = 0; i < kHistorySize; ++i)
+			reordered[i] = drawCallHistory[(historyOffset + i) % kHistorySize];
+		ImGui::PlotHistogram("##drawcalls", reordered, kHistorySize, 0, "Draw Calls", 0.0f, 0.0f, ImVec2(-1, 35));
+	}
+
+	// --- メモリ使用量 ---
+	if (ImGui::CollapsingHeader("Memory", ImGuiTreeNodeFlags_DefaultOpen)) {
+		ImGui::Text("Working Set: %.1f MB", memoryMB);
+		
+		// VRAM使用量 (DXGI)
+		if (renderer && renderer->GetDevice()) {
+			Microsoft::WRL::ComPtr<IDXGIDevice3> dxgiDevice;
+			Microsoft::WRL::ComPtr<IDXGIAdapter> dxgiAdapter;
+			if (SUCCEEDED(renderer->GetDevice()->QueryInterface(IID_PPV_ARGS(&dxgiDevice))) &&
+			    SUCCEEDED(dxgiDevice->GetAdapter(&dxgiAdapter))) {
+				DXGI_ADAPTER_DESC adapterDesc{};
+				dxgiAdapter->GetDesc(&adapterDesc);
+				
+				Microsoft::WRL::ComPtr<IDXGIAdapter3> adapter3;
+				if (SUCCEEDED(dxgiAdapter.As(&adapter3))) {
+					DXGI_QUERY_VIDEO_MEMORY_INFO vramInfo{};
+					if (SUCCEEDED(adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &vramInfo))) {
+						float usedMB = (float)(vramInfo.CurrentUsage / (1024.0 * 1024.0));
+						float budgetMB = (float)(vramInfo.Budget / (1024.0 * 1024.0));
+						ImGui::Text("VRAM: %.0f / %.0f MB", usedMB, budgetMB);
+						float ratio = budgetMB > 0 ? usedMB / budgetMB : 0.0f;
+						ImVec4 barCol = ratio < 0.7f ? ImVec4(0.2f, 0.8f, 0.4f, 1.0f) :
+						               ratio < 0.9f ? ImVec4(0.9f, 0.8f, 0.2f, 1.0f) :
+						                              ImVec4(1.0f, 0.3f, 0.2f, 1.0f);
+						ImGui::PushStyleColor(ImGuiCol_PlotHistogram, barCol);
+						ImGui::ProgressBar(ratio, ImVec2(-1, 14), "");
+						ImGui::PopStyleColor();
+					}
+				}
+			}
+		}
+		
+		float reordered[kHistorySize];
+		for (int i = 0; i < kHistorySize; ++i)
+			reordered[i] = memoryHistory[(historyOffset + i) % kHistorySize];
+		ImGui::PlotLines("##memory", reordered, kHistorySize, 0, "RAM (MB)", 0.0f, 0.0f, ImVec2(-1, 35));
+	}
+
+	// --- GPU リソース ---
+	if (ImGui::CollapsingHeader("GPU Resources")) {
+		ImGui::Text("Models: %u", stats.loadedModels);
+		ImGui::Text("Textures: %u", stats.loadedTextures);
+		ImGui::Text("SRV Used: %u", stats.srvUsed);
+		
+		// Upload Buffer使用率
+		float uploadUsedMB = stats.uploadBufferUsed / (1024.0f * 1024.0f);
+		float uploadTotalMB = stats.uploadBufferTotal / (1024.0f * 1024.0f);
+		ImGui::Text("Upload Buffer: %.2f / %.1f MB", uploadUsedMB, uploadTotalMB);
+		float uploadRatio = uploadTotalMB > 0 ? uploadUsedMB / uploadTotalMB : 0.0f;
+		ImVec4 uploadCol = uploadRatio < 0.5f ? ImVec4(0.2f, 0.8f, 0.4f, 1.0f) :
+		                   uploadRatio < 0.8f ? ImVec4(0.9f, 0.8f, 0.2f, 1.0f) :
+		                                        ImVec4(1.0f, 0.3f, 0.2f, 1.0f);
+		ImGui::PushStyleColor(ImGuiCol_PlotHistogram, uploadCol);
+		ImGui::ProgressBar(uploadRatio, ImVec2(-1, 14), "");
+		ImGui::PopStyleColor();
+		
+		float reordered[kHistorySize];
+		for (int i = 0; i < kHistorySize; ++i)
+			reordered[i] = uploadHistory[(historyOffset + i) % kHistorySize];
+		ImGui::PlotLines("##upload", reordered, kHistorySize, 0, "Upload %", 0.0f, 100.0f, ImVec2(-1, 35));
+	}
+
+	// --- エンティティ統計 ---
+	if (scene && ImGui::CollapsingHeader("Scene Stats")) {
+		auto& reg = scene->GetRegistry();
+		uint32_t totalEntities = 0;
+		uint32_t meshEntities = 0;
+		uint32_t scriptEntities = 0;
+		uint32_t colliderEntities = 0;
+		uint32_t uiEntities = 0;
+		
+		for (auto e : reg.view<NameComponent>()) { (void)e; totalEntities++; }
+		for (auto e : reg.view<MeshRendererComponent>()) { (void)e; meshEntities++; }
+		for (auto e : reg.view<ScriptComponent>()) { (void)e; scriptEntities++; }
+		for (auto e : reg.view<BoxColliderComponent>()) { (void)e; colliderEntities++; }
+		for (auto e : reg.view<RectTransformComponent>()) { (void)e; uiEntities++; }
+		
+		ImGui::Text("Entities: %u", totalEntities);
+		ImGui::Text("  Mesh: %u  Script: %u", meshEntities, scriptEntities);
+		ImGui::Text("  Collider: %u  UI: %u", colliderEntities, uiEntities);
+	}
+
 	ImGui::Separator();
 	
+	// --- Player Monitor (既存) ---
 	if (scene) {
 		auto& reg = scene->GetRegistry();
 		auto view = reg.view<PlayerInputComponent, TransformComponent>();

@@ -16,6 +16,8 @@ public:
 
 	void Start(entt::entity entity, GameScene* scene) override;
 	void Update(entt::entity entity, GameScene* scene, float dt) override;
+	void Draw(entt::entity entity, GameScene* scene) override;
+	void OnEditorUI() override;
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
 
 	void Installation(GameScene* scene, const std::string& objPath);
@@ -30,6 +32,13 @@ public:
 
 	static PhaseState IsPhase() { return isPhase_; };
 	static void SetPreparation(PhaseState prep) { NextPhase_ = prep; }
+	static PhaseState GetRequestedPhase() { return NextPhase_; }
+	static void ForcePhaseState(PhaseState phase) {
+		isPhase_ = phase;
+		NextPhase_ = phase;
+	}
+
+	static void PlusCoinCount(int PlusCoin) { CoinCount += PlusCoin; } // 追加: コイン数を増減させる関数
 
 private:
 	inline static PhaseState isPhase_ = PreparationPhase;
@@ -37,8 +46,10 @@ private:
 	PhaseState preIsPhase_ = PreparationPhase; // フェーズ切り替わり検知用
 	int currentPhase_ = 0;
 
+	inline static int CoinCount = 0; // コインの数を管理する静的変数
+
 	bool preKeyP_ = false; // 初期化しておく
-	bool prekeySpace_ = false;
+	bool preKeySpace_ = false;
 	bool isPlacementMode_ = false;
 	bool isPhaseTransitioning_ = false;
 	bool isFadeFinished_ = false;

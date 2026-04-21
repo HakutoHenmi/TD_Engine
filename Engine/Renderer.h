@@ -148,6 +148,20 @@ public:
 		float san = 0.0f;
 	};
 
+	// ★追加: フレーム統計情報
+	struct FrameStats {
+		uint32_t drawCalls = 0;           // 個別ドローコール数
+		uint32_t instancedBatches = 0;    // インスタンスバッチ数
+		uint32_t totalInstances = 0;      // 総インスタンス数
+		uint32_t spriteDrawCalls = 0;     // スプライト描画数
+		uint32_t lineVertices = 0;        // ライン頂点数
+		uint32_t loadedModels = 0;        // ロード済みモデル数
+		uint32_t loadedTextures = 0;      // ロード済みテクスチャ数
+		uint32_t uploadBufferUsed = 0;    // アップロードバッファ使用量(bytes)
+		uint32_t uploadBufferTotal = 0;   // アップロードバッファ総量(bytes)
+		uint32_t srvUsed = 0;             // SRV使用数
+	};
+
 public:
 	Renderer() = default;
 	~Renderer();
@@ -340,6 +354,9 @@ public:
 	uint32_t AllocateTextSrvIndex() { return AllocateSrvIndex(1); }
 	WindowDX* GetWindow() const { return window_; }
 	ID3D12CommandQueue* GetQueue() const { return queue_; }
+
+	// ★追加: フレーム統計情報の取得
+	const FrameStats& GetFrameStats() const { return frameStats_; }
 
 private:
 	struct Mesh {
@@ -560,6 +577,9 @@ private:
 	// ★追加: コリジョン同期用
 	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> collisionAlloc_;
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> collisionList_;
+
+	// ★追加: フレーム統計
+	FrameStats frameStats_{};
 };
 
 } // namespace Engine

@@ -20,6 +20,8 @@
 // Button UI
 #include "InstallationButton.h"
 
+#include "WaveManagement.h"
+
 namespace Game {
 
 namespace {
@@ -149,7 +151,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 #else
 			input->GetMousePos(mx, my);
 #endif
-			skillTree_.Update(renderer, tW, tH, mx, my);
+			// 描画とロジックは DrawUI() 側で処理させるように移動
 			preKeyN_ = keyN;
 			return; // 設置モードの入力を抑制
 		}
@@ -177,9 +179,13 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			hasPipeStartPoint_ = false;
 		}
 		if (input->IsMouseTrigger(1) && isPlacementMode_) {
-			isPlacementMode_ = false;
-			isPipeSet_ = false;
-			hasPipeStartPoint_ = false;
+			if (isPipeSet_ && hasPipeStartPoint_) {
+				hasPipeStartPoint_ = false;
+			} else {
+				isPlacementMode_ = false;
+				isPipeSet_ = false;
+				hasPipeStartPoint_ = false;
+			}
 		}
 
 		Installation(scene, selectedObjPath_);
@@ -211,6 +217,8 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		if (isPhase_ == BattlePhase) {
 			// 準備から戦闘に切り替わった瞬間
 			// 設置物を反映するためにコストマップを更新
+			
+
 			nav.UpdateCostMap(scene);
 
 			// 敵が目指すコアをゴールの位置としてフローフィールドを計算
@@ -222,18 +230,10 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 			// 敵のスポーン地点の生成
 			currentPhase_++;
-			std::string enemyPrefabPath = "Resources/Prefabs/EnemySpawner" + std::to_string(currentPhase_) + ".prefab";
-			std::vector<entt::entity> spawnedEnemies = EditorUI::LoadPrefab(scene, enemyPrefabPath);
-
-			auto& registry = scene->GetRegistry();
-			for (auto spawnedEntity : spawnedEnemies) {
-				if (registry.all_of<TransformComponent>(spawnedEntity)) {
-					auto& tc = registry.get<TransformComponent>(spawnedEntity);
-					if (!registry.all_of<HierarchyComponent>(spawnedEntity) || registry.get<HierarchyComponent>(spawnedEntity).parentId == entt::null) {
-						tc.translate = {-50.0f, 20.0f, 50.0f};
-					}
-				}
-			}
+			WaveManagement::SetWave(currentPhase_ - 1);
+		} else if (isPhase_ == PreparationPhase) {
+			// 準備フェーズに戻った場合はウェーブを待機状態（スポナー無し）にする
+			WaveManagement::SetWave(-1);
 		}
 
 		// 状態を同期
@@ -288,8 +288,8 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 		return;
 
 	Engine::Vector3 snappedHitPoint = hitPoint;
-	snappedHitPoint.x = std::floor(snappedHitPoint.x);
-	snappedHitPoint.z = std::floor(snappedHitPoint.z);
+	snappedHitPoint.x = SnapTo2x2Grid(snappedHitPoint.x);
+	snappedHitPoint.z = SnapTo2x2Grid(snappedHitPoint.z);
 
 	if (isPipeSet_) {
 		snappedHitPoint.x = SnapTo2x2Grid(snappedHitPoint.x);
@@ -461,6 +461,47 @@ void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vec
 	tr.scale = {1.0f, 1.0f, 1.0f};
 	const Engine::Vector4 previewColor = canPlace ? Engine::Vector4{0.6f, 1.0f, 0.6f, 0.6f} : Engine::Vector4{1.0f, 0.3f, 0.3f, 0.6f};
 	renderer->DrawMesh(previewModelHandle_, previewTextureHandle_, tr, previewColor, "Toon");
+
+	// パイプ設置時のみ、既存のタンク・大砲の接続エリア（緑の平面十字）を描画する
+	if (objPath.find("Pipe") != std::string::npos) {
+		static uint32_t crossPlaneHandle = 0;
+		if (crossPlaneHandle == 0) {
+			crossPlaneHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+		}
+		auto& registry = scene->GetRegistry();
+		registry.view<NameComponent, TransformComponent>().each([&](entt::entity, const NameComponent& nc, const TransformComponent& tc) {
+			if (nc.name.find("Canon") != std::string::npos || nc.name.find("Cannon") != std::string::npos || nc.name.find("Tank") != std::string::npos) {
+				Engine::Transform planeTr;
+				planeTr.scale = { 1.0f, 0.05f, 1.0f };
+				Engine::Vector4 colorPlane = { 0.0f, 1.0f, 0.0f, 0.4f };
+
+				// X+ direction
+				planeTr.translate = { tc.translate.x + 2.0f, tc.translate.y + 0.05f, tc.translate.z };
+				renderer->DrawMesh(crossPlaneHandle, previewTextureHandle_, planeTr, colorPlane, "Toon");
+				// X- direction
+				planeTr.translate = { tc.translate.x - 2.0f, tc.translate.y + 0.05f, tc.translate.z };
+				renderer->DrawMesh(crossPlaneHandle, previewTextureHandle_, planeTr, colorPlane, "Toon");
+				// Z+ direction
+				planeTr.translate = { tc.translate.x, tc.translate.y + 0.05f, tc.translate.z + 2.0f };
+				renderer->DrawMesh(crossPlaneHandle, previewTextureHandle_, planeTr, colorPlane, "Toon");
+				// Z- direction
+				planeTr.translate = { tc.translate.x, tc.translate.y + 0.05f, tc.translate.z - 2.0f };
+				renderer->DrawMesh(crossPlaneHandle, previewTextureHandle_, planeTr, colorPlane, "Toon");
+			}
+		});
+	}
+
+	// 大砲の場合は攻撃範囲も描画する
+	if (objPath.find("Canon") != std::string::npos) {
+		float attackRange = 50.0f;
+		for (int i = 0; i < 72; ++i) {
+			float theta1 = (i * 2.0f * 3.1415926f) / 72.0f;
+			float theta2 = ((i + 1) * 2.0f * 3.1415926f) / 72.0f;
+			Engine::Vector3 p1 = { hitPoint.x + std::cos(theta1) * attackRange, hitPoint.y + 0.05f, hitPoint.z + std::sin(theta1) * attackRange };
+			Engine::Vector3 p2 = { hitPoint.x + std::cos(theta2) * attackRange, hitPoint.y + 0.05f, hitPoint.z + std::sin(theta2) * attackRange };
+			renderer->DrawLine3D(p1, p2, { 0.0f, 0.8f, 0.0f, 1.0f }, true); // やや暗めの緑などに
+		}
+	}
 }
 
 bool PhaseSystemScript::IsPrefabPath(const std::string& path) const {
@@ -586,6 +627,48 @@ void PhaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector
 	mr.modelPath = objPath;
 	mr.texturePath = "Resources/Textures/white1x1.png";
 	mr.shaderName = "Toon";
+}
+
+void PhaseSystemScript::Draw(entt::entity /*entity*/, GameScene* scene) {
+	if (skillTree_.IsOpen()) {
+		auto* renderer = scene->GetRenderer();
+		if (!renderer) return;
+
+		// Editor状態で Start() が呼ばれていない場合でも描画できるように初期化を保証
+		if (!skillTree_.IsInitialized()) {
+			skillTree_.Init(renderer);
+			skillTree_.LoadFromJson("Resources/Scenes/skills.json", renderer);
+		}
+
+		float mx = 0, my = 0;
+		float tW = (float)Engine::WindowDX::kW;
+		float tH = (float)Engine::WindowDX::kH;
+
+#if defined(USE_IMGUI) && !defined(NDEBUG)
+		ImVec2 mousePos = ImGui::GetMousePos();
+		ImVec2 gameMin = EditorUI::GetGameImageMin();
+		ImVec2 gameMax = EditorUI::GetGameImageMax();
+		float viewW = gameMax.x - gameMin.x;
+		float viewH = gameMax.y - gameMin.y;
+		if (viewW > 0 && viewH > 0) {
+			mx = (mousePos.x - gameMin.x) * (tW / viewW);
+			my = (mousePos.y - gameMin.y) * (tH / viewH);
+		}
+#else
+		if (auto* input = Engine::Input::GetInstance()) {
+			input->GetMousePos(mx, my);
+		}
+#endif
+		skillTree_.Update(renderer, tW, tH, mx, my);
+	}
+}
+
+void PhaseSystemScript::OnEditorUI() {
+#ifdef USE_IMGUI
+	if (ImGui::Button(skillTree_.IsOpen() ? "Close SkillTree Preview" : "Open SkillTree Preview")) {
+		skillTree_.Toggle();
+	}
+#endif
 }
 
 void PhaseSystemScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
