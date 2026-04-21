@@ -33,7 +33,7 @@ private:
 	void UpdateSkillTree(GameScene* scene, bool& outKeyN);
 
 	// 説明文の表示
-	void ShowGuideText();
+	void ShowGuideText(entt::entity entity, GameScene* scene);
 
 	void Installation(GameScene* scene, const std::string& objPath);
 	bool TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3& outHitPoint) const;
