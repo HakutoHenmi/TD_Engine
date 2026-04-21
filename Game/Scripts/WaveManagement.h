@@ -18,11 +18,14 @@ public:
 
 	static void SetWave(int waveNumber) { currentWave_ = waveNumber; }
 	static entt::entity GetManagerEntity() { return managerEntity_; }
+	static bool IsWaveEnded() { return isEnded_; }
 
 private:
 	static int currentWave_;
 	static inline entt::entity managerEntity_ = static_cast<entt::entity>(entt::null);
 	int previousWave_ = -1;
+
+	static inline bool isEnded_ = false;
 
 	// 各ウェーブごとのスポナー（エンティティ名）のリスト (シリアライズ用)
 	std::vector<std::vector<std::string>> enemySpawnerNames_;
