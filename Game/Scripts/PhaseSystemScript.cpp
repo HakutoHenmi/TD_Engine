@@ -242,6 +242,9 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		preIsPhase_ = isPhase_;
 	}
 
+	if (scene->GetRegistry().all_of<UITextComponent>(entity))
+		scene->GetRegistry().get<UITextComponent>(entity).text = std::to_string(CoinCount);
+
 	preKeyN_ = keyN;
 }
 

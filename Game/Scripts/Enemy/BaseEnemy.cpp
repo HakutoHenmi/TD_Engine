@@ -7,6 +7,8 @@
 #include "Scenes/GameScene.h"
 #include "../ScriptEngine.h"
 
+#include "../PhaseSystemScript.h"
+
 namespace Game {
 
 static bool HasTag(entt::registry& registry, entt::entity entity, TagType tagName) {
@@ -97,10 +99,23 @@ void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
 
 		DefaultMove(entity, scene, dt);
 	}
+
+	
+
 }
 
-void BaseEnemy::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
-	// 終了時のクリーンアップなどを記述
+void BaseEnemy::OnDestroy(entt::entity entity, GameScene* scene) {
+	// エンティティがHealthComponentを持っているか確認
+	if (scene->GetRegistry().all_of<HealthComponent>(entity)) {
+		float hp = scene->GetRegistry().get<HealthComponent>(entity).hp;
+
+		// ちゃんとHPが0以下になって倒された場合のみコインを増やす
+		if (hp <= 0.0f) {
+			PhaseSystemScript::PlusCoinCount(10);///////ますやごう
+		}
+	}
+
+	// その他、終了時のクリーンアップなどを記述
 }
 
 void BaseEnemy::OnEditorUI() {
