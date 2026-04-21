@@ -14,7 +14,6 @@ void Game::Warrior::ExecuteAttack(entt::entity entity, GameScene* scene, float /
 		hb.isActive = true;
 		hb.damage = 20.0f;
 		hb.size = { 2.0f, 2.0f, 2.0f };
-		hb.tag = TagType::Enemy;
 	}
 }
 
