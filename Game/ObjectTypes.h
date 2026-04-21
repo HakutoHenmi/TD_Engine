@@ -408,6 +408,9 @@ struct UITextComponent : public Component {
 	float fontSize = 24.0f;
 	DirectX::XMFLOAT4 color = {1, 1, 1, 1};
 	std::string fontPath = "C:\\Windows\\Fonts\\msgothic.ttc"; // フォントファイルパス
+	bool outlineEnabled = false; // ★追加: アウトラインの有効化
+	DirectX::XMFLOAT4 outlineColor = {0, 0, 0, 1}; // ★追加: アウトライン色
+	float outlineThickness = 2.0f; // ★追加: アウトラインの太さ
 	UITextComponent() { type = ComponentType::UIText; }
 };
 

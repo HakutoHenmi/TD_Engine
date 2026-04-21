@@ -30,6 +30,11 @@ public:
 	bool IsMouseDown(int button) const { return (mouseState_.rgbButtons[button] & 0x80) != 0; }
 	bool IsMouseTrigger(int button) const { return IsMouseDown(button) && !(prevMouseState_.rgbButtons[button] & 0x80); }
 
+	// ★追加: エディタがゲーム入力をブロックするフラグ
+	// エディタUI操作中にゲームスクリプト側の入力を無効化するが、カメラ操作は別途制御する
+	void SetGameInputBlocked(bool blocked) { gameInputBlocked_ = blocked; }
+	bool IsGameInputBlocked() const { return gameInputBlocked_; }
+
 private:
 	// --- DirectInput Core ---
 	Microsoft::WRL::ComPtr<IDirectInput8> di_;
@@ -50,6 +55,7 @@ private:
 	float absMouseY_ = 0.0f; // ★追加
 	float wheel_ = 0.0f;
 	HWND hwnd_ = nullptr; // ★追加
+	bool gameInputBlocked_ = false; // ★追加: エディタがゲーム入力をブロック中か
 
 	static Input* instance_;
 };

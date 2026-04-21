@@ -289,13 +289,31 @@ void UISystem::DrawTextW(entt::entity /*entity*/, entt::registry& /*registry*/, 
 	float fontScale = text.fontSize / 64.0f;
 
 	float tw = renderer->MeasureTextWidth(text.text, fontScale, text.fontPath);
-	float th = renderer->GetTextLineHeight(fontScale, text.fontPath);
+	int lineCount = 1;
+	for (char c : text.text) {
+		if (c == '\n') lineCount++;
+	}
+	float th = renderer->GetTextLineHeight(fontScale, text.fontPath) * lineCount;
 
 	// 中央揃え (worldW/worldHが0の場合は左上揃え)
 	float px = worldX;
 	float py = worldY;
 	if (worldW > 0.0f) px += (worldW - tw) * 0.5f;
 	if (worldH > 0.0f) py += (worldH - th) * 0.5f;
+
+	// アウトライン描画
+	if (text.outlineEnabled && text.outlineColor.w > 0.01f && text.outlineThickness > 0.0f) {
+		Engine::Vector4 oCol = { text.outlineColor.x, text.outlineColor.y, text.outlineColor.z, text.outlineColor.w };
+		float ot = text.outlineThickness;
+		renderer->DrawString(text.text, px - ot, py, fontScale, oCol, text.fontPath);
+		renderer->DrawString(text.text, px + ot, py, fontScale, oCol, text.fontPath);
+		renderer->DrawString(text.text, px, py - ot, fontScale, oCol, text.fontPath);
+		renderer->DrawString(text.text, px, py + ot, fontScale, oCol, text.fontPath);
+		renderer->DrawString(text.text, px - ot, py - ot, fontScale, oCol, text.fontPath);
+		renderer->DrawString(text.text, px + ot, py - ot, fontScale, oCol, text.fontPath);
+		renderer->DrawString(text.text, px - ot, py + ot, fontScale, oCol, text.fontPath);
+		renderer->DrawString(text.text, px + ot, py + ot, fontScale, oCol, text.fontPath);
+	}
 
 	Engine::Vector4 colorVec = { text.color.x, text.color.y, text.color.z, text.color.w };
 	renderer->DrawString(text.text, px, py, fontScale, colorVec, text.fontPath);
