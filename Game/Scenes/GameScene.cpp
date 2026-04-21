@@ -20,6 +20,7 @@
 #include "../Systems/RiverSystem.h" // ★追加
 #include "../Systems/ScriptSystem.h"
 #include "../Systems/UISystem.h"
+#include "../Scripts/WaveManagement.h"
 #include "imgui.h"
 #include <Windows.h> // OutputDebugStringA
 #include <algorithm>
@@ -226,7 +227,7 @@ void GameScene::Update() {
 
 	// ★ 勝利/敗北判定 (テスト用)
 	if (isPlaying_) {
-		bool win = Engine::Input::GetInstance()->Trigger(DIK_G);
+		bool win = Engine::Input::GetInstance()->Trigger(DIK_G) || WaveManagement::IsWaveEnded();
 		bool loss = Engine::Input::GetInstance()->Trigger(DIK_J);
 
 		// プレイヤーの生存確認 (Viewを直接参照して同期ズレを防ぐ)

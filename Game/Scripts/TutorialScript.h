@@ -18,7 +18,7 @@ public:
 		InstallPipeGuide,
 		FirstBattle,
 		SkillTreeGuide,
-		FinalBattle
+		Finish, // 終了
 	};
 
 	void Start(entt::entity entity, GameScene* scene) override;
@@ -32,6 +32,9 @@ private:
 	void ShowStepGuide();
 	void UpdateSkillTree(GameScene* scene, bool& outKeyN);
 
+	// 説明文の表示
+	void ShowGuideText();
+
 	void Installation(GameScene* scene, const std::string& objPath);
 	bool TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3& outHitPoint) const;
 	void DrawPlacementPreview(GameScene* scene, const Engine::Vector3& hitPoint, const std::string& objPath, bool canPlace);
@@ -39,6 +42,8 @@ private:
 	bool IsPlacementBlocked(GameScene* scene, const Engine::Vector3& hitPoint) const;
 	bool IsPrefabPath(const std::string& path) const;
 	bool ExtractPrefabRenderPaths(const std::string& prefabPath, std::string& outModelPath, std::string& outTexturePath) const;
+
+
 
 	TutorialStep tutorialStep_ = TutorialStep::Preparation;
 	bool stepGuideShown_ = false;

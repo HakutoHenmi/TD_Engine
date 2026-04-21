@@ -137,7 +137,7 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 		bcComponent.enabled = true;
 
 		auto& rbComponent = scene->GetRegistry().emplace<RigidbodyComponent>(enemy);
-		bool isFly = (enemyScriptPath == "EnemyBehavior" && enemyScriptParams.find("\"moveType\":1") != std::string::npos);
+		bool isFly = (enemyScriptPath == "Warrior" && enemyScriptParams.find("\"moveType\":1") != std::string::npos);
 		rbComponent.useGravity = !isFly;
 
 		// ★追加: 接地判定と地形追従のために CharacterMovementComponent を付与
@@ -159,13 +159,6 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 
 		// ★ 高速タグシステム経由でタグを設定
 		scene->SetTag(enemy, TagType::Enemy);
-
-		auto& hbComponent = scene->GetRegistry().emplace<HitboxComponent>(enemy);
-		hbComponent.isActive = true;
-		hbComponent.tag = TagType::Enemy;
-		hbComponent.damage = 10.0f;
-		hbComponent.size = { 2.0f, 2.0f, 2.0f };
-		hbComponent.enabled = true;
 
 		// ★追加: 敵HPUI（頭上HPバー）の付与
 		auto& ui = scene->GetRegistry().emplace<WorldSpaceUIComponent>(enemy);

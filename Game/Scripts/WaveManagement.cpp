@@ -26,6 +26,7 @@ void WaveManagement::Start(entt::entity entity, GameScene* scene) {
 	managerEntity_ = entity;
 	currentWave_ = -1;
 	previousWave_ = -2;
+	isEnded_ = false;
 
 	// 名前に基づいてエンティティを解決
 	enemySpawners_.clear();
@@ -110,6 +111,11 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 				if (scene->GetRegistry().valid(e)) {
 					scene->DestroyObject(static_cast<uint32_t>(e));
 				}
+			}
+
+			// ★ 戦闘フェーズ終わり（ウェーブ終了時）で、直前のウェーブが最終ウェーブだったらクリアにする
+			if (previousWave_ >= static_cast<int>(enemySpawners_.size()) - 1 && !enemySpawners_.empty()) {
+				isEnded_ = true;
 			}
 		}
 
@@ -291,8 +297,22 @@ void WaveManagement::OnEditorUI() {}
 std::string WaveManagement::SerializeParameters() {
 	json j;
 
-	// 最新のスポナー名リストをエディタUI上で構築・維持しているので、そのまま保存する
-	// (ここでキャッシュされたシーンやエンティティを基に再構築すると、プレイ終了時に無効化されて消えてしまう問題を防止)
+	// キャッシュされているシーンが存在し、エンティティが有効であれば名前を最新のものに更新する
+	// （ヒエラルキー等でスポナーの名前が変更された場合に対応するため）
+	if (cachedScene_) {
+		for (size_t wi = 0; wi < enemySpawners_.size(); ++wi) {
+			for (size_t si = 0; si < enemySpawners_[wi].size(); ++si) {
+				entt::entity spawner = enemySpawners_[wi][si];
+				if (cachedScene_->GetRegistry().valid(spawner)) {
+					if (auto* nc = cachedScene_->GetRegistry().try_get<NameComponent>(spawner)) {
+						enemySpawnerNames_[wi][si] = nc->name;
+					}
+				}
+			}
+		}
+	}
+
+	// 最新のスポナー名リストを保存する
 	j["spawners"] = enemySpawnerNames_;
 	return j.dump();
 }
