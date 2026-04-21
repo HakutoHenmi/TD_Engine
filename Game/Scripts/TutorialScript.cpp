@@ -221,6 +221,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float /*dt*/)
         return;
 
     ShowStepGuide();
+	ShowGuideText(entity, scene);
 
     const bool key1 = input->Trigger(DIK_1) || (GetAsyncKeyState('1') & 0x8001);
     const bool key2 = input->Trigger(DIK_2) || (GetAsyncKeyState('2') & 0x8001);
@@ -317,7 +318,9 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 
         Installation(scene, selectedObjPath_);
         if (hasPlacedPipe_) {
-            EnterStep(TutorialStep::FirstBattle);
+            if (keySpace) {
+                EnterStep(TutorialStep::FirstBattle);
+            }
         }
         break;
 
@@ -417,26 +420,32 @@ void TutorialScript::UpdatePhaseTransition(GameScene* scene) {
     }
 }
 
-void TutorialScript::ShowGuideText() {
+void TutorialScript::ShowGuideText(entt::entity entity, GameScene* scene) {
 
 	switch (tutorialStep_) {
 	case TutorialStep::Preparation:
-
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "チュートリアルです。ゲームは準備フェーズと戦闘フェーズで構成されています。:SPACE";
 		break;
 	case TutorialStep::InstallCannonGuide:
-
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "設置について！大砲を設置しましょう。アイコンをタップして設置したい場所に置こう";
 		break;
 	case TutorialStep::InstallTankGuide:
-
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "大砲には動力源が必要！動力を設置しよう！";
 		break;
 	case TutorialStep::InstallPipeGuide:
-
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "動力を送る溜めにパイプを設置しよう！";
 		break;
 	case TutorialStep::FirstBattle:
-
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "後ろの青いタワーを敵から守ろう、敵を倒すと経験値とお金が落ちます。";
 		break;
 	case TutorialStep::SkillTreeGuide:
-
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "Nを押したらスキルツリーが開きます。レベルに応じてスキルを取得できます。チュートリアルはここで終了です:SPACE";
 		break;
 	case TutorialStep::Finish:
 
