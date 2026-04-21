@@ -56,6 +56,7 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 			OutputDebugStringA(("[GameScene] " + scenePath + " found. Loading...\n").c_str());
 			EditorUI::LoadScene(this, scenePath);
 			isPlaying_ = true; // リリース/起動時はプレイ状態から開始する
+			sceneSnapshot_ = EditorUI::SaveToMemory(this); // ★追加: 初期ロード直後の状態を保存
 			loaded = true;
 		} else {
 			OutputDebugStringA(("[GameScene] " + scenePath + " NOT found.\n").c_str());
@@ -1150,6 +1151,16 @@ void GameScene::SetIsPlaying(bool play) {
 		std::lock_guard<std::mutex> lock(spawnMutex_);
 		pendingDestroys_.clear();
 		pendingSpawns_.clear();
+
+		// タグキャッシュの完全リセットと再構築（大量のエンティティ削除・追加によるフリーズ防止）
+		pendingTagSync_.clear();
+		pendingTagRemoved_.clear();
+		tagCache_.clear();
+		auto tagView = registry_.view<TagComponent>();
+		for (auto entity : tagView) {
+			const auto tag = tagView.get<TagComponent>(entity).tag;
+			tagCache_[tag].push_back(entity);
+		}
 	}
 }
 

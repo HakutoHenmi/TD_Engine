@@ -953,8 +953,8 @@ static std::string SaveFileDialog(const char* filter, const char* defExt) {
 	return "";
 }
 
-static void LoadSceneInternal(GameScene* scene, const std::string& path, bool append) {
-	if (!scene) return;
+static bool LoadSceneInternal(GameScene* scene, const std::string& path, bool append) {
+	if (!scene) return false;
 	std::string absPath = EditorUI::GetUnifiedProjectPath(path);
 	OutputDebugStringA(("[EditorUI] LoadSceneInternal: " + absPath + "\n").c_str());
 
@@ -964,24 +964,36 @@ static void LoadSceneInternal(GameScene* scene, const std::string& path, bool ap
 		if (!f.is_open()) {
 			EditorUI::LogError("Load failed: " + absPath);
 			MessageBoxA(NULL, ("Failed to open scene file:\n" + absPath).c_str(), "Load Error", MB_OK | MB_ICONERROR);
-			return;
+			return false;
 		}
 	}
 	json j;
 	try {
 		f >> j;
+		
+		// データ用JSON等をシーン扱いで読み込まないようにチェック
+		if (!j.contains("objects") && !j.contains("settings")) {
+			std::string msg = "This JSON file is not a valid scene format:\n" + absPath;
+			EditorUI::LogError(msg);
+			MessageBoxA(NULL, msg.c_str(), "Format Error", MB_OK | MB_ICONWARNING);
+			return false;
+		}
+
 		RestoreSceneFromJson(scene, j, append);
 		EditorUI::Log((append ? "Scene appended: " : "Scene loaded: ") + absPath);
+		return true;
 	} catch (const std::exception& e) {
 		std::string msg = "JSON Parse Error in " + absPath + ": " + std::string(e.what());
 		EditorUI::LogError(msg);
 		MessageBoxA(NULL, msg.c_str(), "JSON Error", MB_OK | MB_ICONERROR);
+		return false;
 	}
 }
 
 void EditorUI::LoadScene(GameScene* scene, const std::string& path) {
-	currentScenePath = path;
-	(void)LoadSceneInternal(scene, path, false);
+	if (LoadSceneInternal(scene, path, false)) {
+		currentScenePath = path;
+	}
 }
 void EditorUI::AddScene(GameScene* scene, const std::string& path) { (void)LoadSceneInternal(scene, path, true); }
 
@@ -1195,6 +1207,10 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				for (const auto& entry : fs::directory_iterator(Engine::PathUtils::FromUTF8(absSceneDir))) {
 					if (entry.path().extension() == ".json") {
 						std::string fileName = entry.path().filename().string();
+						// データ用JSONをシーンリストから除外する
+						if (fileName == "skills.json" || fileName == "level_data.json" || fileName == "settings.json") {
+							continue;
+						}
 						std::string fullPath = sceneDir + "/" + fileName;
 						bool selected = (currentScenePath == fullPath);
 						if (ImGui::MenuItem(fileName.c_str(), nullptr, selected)) {
@@ -1397,6 +1413,21 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROJECT_ASSET")) {
 			std::string sPath = (const char*)payload->Data;
 			std::replace(sPath.begin(), sPath.end(), '\\', '/'); // 正規化
+			// Calculate Drop Position via Raycast
+			float pickSx = ImGui::GetMousePos().x - gameImageMin.x;
+			float pickSy = ImGui::GetMousePos().y - gameImageMin.y;
+			DirectX::XMVECTOR rayOrig, rayDir;
+			ScreenToWorldRay(pickSx, pickSy, (float)renderW, (float)renderH, gameScene->GetCamera().View(), gameScene->GetCamera().Proj(), rayOrig, rayDir);
+			float dirY = DirectX::XMVectorGetY(rayDir);
+			Engine::Vector3 dropPos(0, 0, 0);
+			if (std::abs(dirY) > 0.001f) {
+				float t = -DirectX::XMVectorGetY(rayOrig) / dirY;
+				if (t > 0.0f) {
+					DirectX::XMVECTOR hit = DirectX::XMVectorAdd(rayOrig, DirectX::XMVectorScale(rayDir, t));
+					dropPos = { DirectX::XMVectorGetX(hit), DirectX::XMVectorGetY(hit), DirectX::XMVectorGetZ(hit) };
+				}
+			}
+
 			if (sPath.find(".obj") != std::string::npos || sPath.find(".fbx") != std::string::npos) {
 				auto e = gameScene->CreateEntity(fs::path(sPath).stem().string());
 				auto& mr = gameScene->GetRegistry().emplace<MeshRendererComponent>(e);
@@ -1404,7 +1435,32 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				mr.modelHandle = renderer->LoadObjMesh(sPath);
 				mr.texturePath = "Resources/Textures/white1x1.png";
 				mr.textureHandle = renderer->LoadTexture2D(mr.texturePath);
+				
+				auto& tc = gameScene->GetRegistry().get<TransformComponent>(e);
+				tc.translate = { dropPos.x, dropPos.y, dropPos.z };
+
 				gameScene->SetSelectedEntity(e);
+			} else if (sPath.find(".prefab") != std::string::npos) {
+				auto entities = LoadPrefab(gameScene, sPath);
+				if (!entities.empty()) {
+					for (auto e : entities) {
+						bool isRoot = true;
+						if (auto* hc = gameScene->GetRegistry().try_get<HierarchyComponent>(e)) {
+							if (hc->parentId != entt::null) {
+								isRoot = false;
+							}
+						}
+						if (isRoot) {
+							if (auto* tc = gameScene->GetRegistry().try_get<TransformComponent>(e)) {
+								// Move only root entities to preserve relative child positions
+								tc->translate.x += dropPos.x;
+								tc->translate.y += dropPos.y;
+								tc->translate.z += dropPos.z;
+							}
+						}
+					}
+					gameScene->SetSelectedEntity(entities.back());
+				}
 			}
 		}
 		ImGui::EndDragDropTarget();
