@@ -66,6 +66,7 @@ protected: // メンバ変数
 	float searchRange_ = 15.0f;
 	float loseTargetRange_ = 25.0f;
 	float attackRange_ = 2.0f; // 攻撃を始める距離
+	float attackCooltime_ = 0.0f;
 
 	float scanTimer_ = 0.0f;
 	float groundHeight_ = 0.0f;	// FlyTypeが地面の高さを取るため

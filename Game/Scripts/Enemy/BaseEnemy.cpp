@@ -60,6 +60,11 @@ void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
 		SearchTarget(entity, scene);
 	}
 
+	// 攻撃のクールタイムを減らす
+	if (attackCooltime_ > 0.0f) {
+		attackCooltime_ -= dt;
+	}
+
 	// ターゲットとの距離をチェック
 	bool inAttackRange = false;
 	if (registry.valid(currentTarget_)) {
@@ -80,11 +85,16 @@ void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 
 	// 実際の行動
-	if (inAttackRange) {
-		// 攻撃範囲内なら足を止めて攻撃
+	if (inAttackRange&& attackCooltime_ == 0.0f) {
+		// 攻撃範囲内且つクールタイムを満たしていれば足を止めて攻撃
 		ExecuteAttack(entity, scene, dt);
 	}
 	else {
+		// 攻撃関数を呼んでない時は攻撃判定を消す
+		if (registry.all_of<HitboxComponent>(entity)) {
+			registry.get<HitboxComponent>(entity).isActive = false;
+		}
+
 		DefaultMove(entity, scene, dt);
 	}
 }
@@ -108,14 +118,30 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float /*dt*/)
 	auto& registry = scene->GetRegistry();
 	auto& tc = registry.get<TransformComponent>(entity);
 
-	// 1. NavigationManager を取得
-	auto& nav = scene->GetNavigationManager();
-
 	float dirX = 0.0f;
 	float dirZ = 0.0f;
 
-	// 2. 自分の足元の「進むべき方向」をマネージャーに聞く
-	nav.GetDirection(tc.translate.x, tc.translate.z, dirX, dirZ);
+	// ターゲットが有効なら追尾
+	bool chaseTarget = false;
+	if (registry.valid(currentTarget_) && registry.all_of<TransformComponent>(currentTarget_)) {
+		auto& tarTc = registry.get<TransformComponent>(currentTarget_);
+		float dx = tarTc.translate.x - tc.translate.x;
+		float dz = tarTc.translate.z - tc.translate.z;
+		float dist = std::sqrt(dx * dx + dz * dz);
+		if (dist > 0.001f) {
+			dirX = dx / dist;
+			dirZ = dz / dist;
+			chaseTarget = true;
+		}
+	}
+
+	if (!chaseTarget) {
+		// 1. NavigationManager を取得
+		auto& nav = scene->GetNavigationManager();
+
+		// 2. 自分の足元の「進むべき方向」をマネージャーに聞く
+		nav.GetDirection(tc.translate.x, tc.translate.z, dirX, dirZ);
+	}
 
 	// 3. 物理コンポーネントがあるかチェック
 	if (registry.all_of<RigidbodyComponent>(entity)) {
@@ -133,11 +159,11 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float /*dt*/)
 			// 地面の高さに合わせて y 座標を補正（埋まり・浮き防止）
 			float h = scene->GetHeightAt(tc.translate.x, tc.translate.z, tc.translate.y + 1.0f, static_cast<uint32_t>(entity));
 			if (h > -9000.0f) {
-				tc.translate.y = h + 0.1f; // 少しだけ浮かせて接地させるやんす
+				tc.translate.y = h + 0.1f; // 少しだけ浮かせて接地させる
 			}
 		} 
 		//else {
-		//	// 飛行タイプ（y軸はふわふわさせるやんす）
+		//	// 飛行タイプ（y軸はふわふわさせる）
 		//	rb.velocity.x = vx;
 		//	rb.velocity.z = vz;
 
@@ -146,10 +172,10 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float /*dt*/)
 		//	tc.translate.y += (targetY - tc.translate.y) * 2.0f * dt;
 		//}
 
-		// 4. 進んでいる方向を向く（滑らかに回転させるとより『スローンフォール』っぽいやんす！）
+		// 4. 進んでいる方向を向く
 		if (std::abs(vx) > 0.1f || std::abs(vz) > 0.1f) {
 			float targetAngle = std::atan2(vx, vz);
-			// 角度の線形補間（Lerp）を自作エンジン側で持ってればそれを使うのがベストやんす
+			// 角度の線形補間
 			tc.rotate.y = targetAngle; 
 		}
 	}
@@ -228,7 +254,9 @@ void BaseEnemy::SearchTarget(entt::entity entity, GameScene* scene) {
 	entt::entity bestTarget = entt::null;
 	float minDistanceSq = searchRange_ * searchRange_;
 
-	// 1. プレイヤーを探す (最優先)
+
+	// プレイヤーとDefenderの中から一番近いものを探す
+	// プレイヤーを探す
 	const auto& players = scene->GetEntitiesByTag(TagType::Player);
 	for (auto p : players) {
 		auto& t = registry.get<TransformComponent>(p);
@@ -240,17 +268,15 @@ void BaseEnemy::SearchTarget(entt::entity entity, GameScene* scene) {
 		}
 	}
 
-	// 2. プレイヤーがいなければ、防衛設備（Defender）を探す
-	if (bestTarget == entt::null) {
-		const auto& defenders = scene->GetEntitiesByTag(TagType::Defender);
-		for (auto d : defenders) {
-			auto& t = registry.get<TransformComponent>(d);
-			float distSq = (t.translate.x - myTc.translate.x) * (t.translate.x - myTc.translate.x) + 
-				(t.translate.z - myTc.translate.z) * (t.translate.z - myTc.translate.z);
-			if (distSq < minDistanceSq) {
-				minDistanceSq = distSq;
-				bestTarget = d;
-			}
+	// 防衛設備（Defender）を探す(プレイヤーより近ければターゲットを上書き)
+	const auto& defenders = scene->GetEntitiesByTag(TagType::Defender);
+	for (auto d : defenders) {
+		auto& t = registry.get<TransformComponent>(d);
+		float distSq = (t.translate.x - myTc.translate.x) * (t.translate.x - myTc.translate.x) + 
+			(t.translate.z - myTc.translate.z) * (t.translate.z - myTc.translate.z);
+		if (distSq < minDistanceSq) {
+			minDistanceSq = distSq;
+			bestTarget = d;
 		}
 	}
 
