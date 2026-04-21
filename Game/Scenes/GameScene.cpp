@@ -621,6 +621,8 @@ void GameScene::Draw() {
 			stressTestGridSize = 0; // Stop時にリセット
 		static bool prevH = false;
 		bool currH = (GetAsyncKeyState('H') & 0x8000) != 0;
+		// ★修正: エディタUI操作中は誤発火を防止
+		if (Engine::Input::GetInstance()->IsGameInputBlocked()) currH = false;
 		if (currH && !prevH) {
 			stressTestGridSize += 32; // add 32x32 = 1024 objects each press
 			std::string msg = "[StressTest] Triggered! Grid size: " + std::to_string(stressTestGridSize) + "x" + std::to_string(stressTestGridSize) + " (" +
