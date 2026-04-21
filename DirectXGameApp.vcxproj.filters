@@ -41,7 +41,7 @@
       <Filter>Scripts</Filter>
     </ClCompile>
     <ClCompile Include="Game\main.cpp" />
-    <ClCompile Include="Game\Scripts\EnemyBehavior.cpp" />
+    <ClCompile Include="Game\Scripts\Enemy\BaseEnemy.cpp" />
     <ClCompile Include="Game\Systems\RiverSystem.cpp" />
     <ClCompile Include="Game\Scripts\Canon.cpp">
       <Filter>Scripts</Filter>
@@ -81,6 +81,9 @@
     <ClCompile Include="Game\Scripts\MissileBulletScript.cpp" />
     <ClCompile Include="Game\Scripts\MissileCanonScript.cpp" />
     <ClCompile Include="Game\Scripts\ExplosionAttackArea.cpp" />
+    <ClCompile Include="Game\Scripts\Enemy\Warrior.cpp" />
+    <ClCompile Include="Game\Scripts\Enemy\Guardian.cpp" />
+    <ClCompile Include="Game\Scripts\Enemy\Gunner.cpp" />
     <ClCompile Include="Game\Scripts\PhaseTransition.cpp" />
     <ClCompile Include="Game\Scripts\WaveManagement.cpp" />
     <ClCompile Include="Game\Scripts\TutorialScript.cpp" />
@@ -161,7 +164,7 @@
     <ClInclude Include="Game\Systems\ScriptSystem.h">
       <Filter>Systems</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Scripts\EnemyBehavior.h" />
+    <ClInclude Include="Game\Scripts\Enemy\BaseEnemy.h" />
     <ClInclude Include="Game\Systems\RiverSystem.h" />
     <ClInclude Include="Game\Scripts\PipeScript.h" />
     <ClInclude Include="Game\Scripts\PhaseSystemScript.h" />
@@ -196,6 +199,10 @@
     <ClInclude Include="Game\Scripts\MissileBulletScript.h" />
     <ClInclude Include="Game\Scripts\MissileCanonScript.h" />
     <ClInclude Include="Game\Scripts\ExplosionAttackArea.h" />
+    <ClInclude Include="Game\Scripts\Enemy\Warrior.h" />
+    <ClInclude Include="Game\Scripts\Enemy\Enemies.h" />
+    <ClInclude Include="Game\Scripts\Enemy\Guardian.h" />
+    <ClInclude Include="Game\Scripts\Enemy\Gunner.h" />
     <ClInclude Include="Game\Scripts\PhaseTransition.h" />
     <ClInclude Include="Game\Scripts\WaveManagement.h" />
     <ClInclude Include="Game\Scripts\TutorialScript.h" />
