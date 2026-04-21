@@ -29,6 +29,9 @@ private:
 private:
 	void Debug(bool connected);
 	void UpdateConnection(entt::entity entity, GameScene* scene);
+	float skillPowerRate = 1.0f;
+	float skillSpeedRate = 1.0f;
+	float skillRangeRate = 1.0f;
 };
 
 } // namespace Game

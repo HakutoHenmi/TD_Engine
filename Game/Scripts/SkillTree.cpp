@@ -121,7 +121,7 @@ void SkillTree::Update(entt::entity entity, GameScene* scene, float dt) {
 	DrawBackground(renderer_, screenW_, screenH_);
 	DrawConnections(renderer_, screenW_, screenH_);
 	ApplyToBaseDefenseScript(entity, scene);
-
+	DrawPageButtons(renderer_, screenW_, screenH_);
 	int hoveredIndex = -1;
 
 	for (int i = 0; i < (int)nodes_.size(); ++i) {
@@ -173,19 +173,17 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 	if (!scene) {
 		return;
 	}
-
+	// Canon
 	float attackPowerRate = 1.0f;
-	float moveSpeedRate = 1.0f;
 	float attackRangeRate = 1.0f;
 	float attackSpeedRate = 1.0f;
-	float criticalRateBonus = 0.0f;
 
 	if (IsSkillUnlocked(1)) {
 		attackPowerRate *= 1.10f;
 	}
 
 	if (IsSkillUnlocked(2)) {
-		moveSpeedRate *= 1.15f;
+		attackPowerRate *= 1.10f;
 	}
 
 	if (IsSkillUnlocked(3)) {
@@ -201,22 +199,18 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 	}
 
 	if (IsSkillUnlocked(6)) {
-		criticalRateBonus += 0.10f;
+		attackSpeedRate *= 1.25f;
 	}
 
 	if (IsSkillUnlocked(7)) {
 		attackPowerRate *= 1.30f;
-		moveSpeedRate *= 1.30f;
 		attackRangeRate *= 1.30f;
 		attackSpeedRate *= 1.30f;
-		criticalRateBonus += 0.20f;
 	}
 
 	SetVar(entity, scene, "AttackPowerRate", attackPowerRate);
-	SetVar(entity, scene, "MoveSpeedRate", moveSpeedRate);
-	SetVar(entity, scene, "AttackRangeRate", attackRangeRate);
 	SetVar(entity, scene, "AttackSpeedRate", attackSpeedRate);
-	SetVar(entity, scene, "CriticalRateBonus", criticalRateBonus);
+	SetVar(entity, scene, "AttackRangeRate", attackRangeRate);
 }
 
 void SkillTree::HandleInput(float screenW, float screenH, float mouseX, float mouseY) {
@@ -225,6 +219,9 @@ void SkillTree::HandleInput(float screenW, float screenH, float mouseX, float mo
 		return;
 	}
 
+	if (HandlePageButtonInput(screenW, screenH, mouseX, mouseY)) {
+		return;
+	}
 	if (!input->IsMouseTrigger(0)) {
 		return;
 	}
@@ -258,6 +255,42 @@ void SkillTree::HandleInput(float screenW, float screenH, float mouseX, float mo
 	}
 }
 
+bool SkillTree::HandlePageButtonInput(float screenW, float screenH, float mouseX, float mouseY) {
+	Engine::Input* input = Engine::Input::GetInstance();
+	if (!input) {
+		return false;
+	}
+
+	if (!input->IsMouseTrigger(0)) {
+		return false;
+	}
+
+	float prevButtonLeft = 50.0f;
+	float prevButtonTop = screenH - 100.0f;
+	float prevButtonRight = 150.0f;
+	float prevButtonBottom = screenH - 40.0f;
+
+	float nextButtonLeft = screenW - 150.0f;
+	float nextButtonTop = screenH - 100.0f;
+	float nextButtonRight = screenW - 50.0f;
+	float nextButtonBottom = screenH - 40.0f;
+
+	if (mouseX >= prevButtonLeft && mouseX <= prevButtonRight && mouseY >= prevButtonTop && mouseY <= prevButtonBottom) {
+		if (currentPageId_ > 0) {
+			currentPageId_ -= 1;
+		}
+		return true;
+	}
+
+	if (mouseX >= nextButtonLeft && mouseX <= nextButtonRight && mouseY >= nextButtonTop && mouseY <= nextButtonBottom) {
+		if (currentPageId_ < pageCount_ - 1) {
+			currentPageId_ += 1;
+		}
+		return true;
+	}
+
+	return false;
+}
 bool SkillTree::TryUnlockSkill(int index) {
 	if (index < 0 || index >= (int)nodes_.size()) {
 		return false;
@@ -684,6 +717,59 @@ void SkillTree::PrevPage() {
 	}
 
 	pendingUnlockId_ = -1;
+}
+
+void SkillTree::DrawPageButtons(Engine::Renderer* renderer, float screenW, float screenH) {
+	float prevButtonLeft = 50.0f;
+	float prevButtonTop = screenH - 100.0f;
+	float prevButtonWidth = 100.0f;
+	float prevButtonHeight = 60.0f;
+
+	float nextButtonLeft = screenW - 150.0f;
+	float nextButtonTop = screenH - 100.0f;
+	float nextButtonWidth = 100.0f;
+	float nextButtonHeight = 60.0f;
+
+	// 左ボタン
+	Engine::Renderer::SpriteDesc prev;
+	prev.x = prevButtonLeft;
+	prev.y = prevButtonTop;
+	prev.w = prevButtonWidth;
+	prev.h = prevButtonHeight;
+
+	if (currentPageId_ <= 0) {
+		prev.color = {0.3f, 0.3f, 0.3f, 0.8f};
+	} else {
+		prev.color = {0.8f, 0.8f, 0.2f, 0.9f};
+	}
+
+	renderer->DrawSprite(texBg_, prev);
+
+	// 右ボタン
+	Engine::Renderer::SpriteDesc next;
+	next.x = nextButtonLeft;
+	next.y = nextButtonTop;
+	next.w = nextButtonWidth;
+	next.h = nextButtonHeight;
+
+	if (currentPageId_ >= pageCount_ - 1) {
+		next.color = {0.3f, 0.3f, 0.3f, 0.8f};
+	} else {
+		next.color = {0.8f, 0.8f, 0.2f, 0.9f};
+	}
+
+	renderer->DrawSprite(texBg_, next);
+
+#ifdef USE_IMGUI
+	ImDrawList* drawList = ImGui::GetBackgroundDrawList();
+	if (drawList) {
+		drawList->AddText(ImVec2(prevButtonLeft + 35.0f, prevButtonTop + 20.0f), IM_COL32(255, 255, 255, 255), "<");
+		drawList->AddText(ImVec2(nextButtonLeft + 35.0f, nextButtonTop + 20.0f), IM_COL32(255, 255, 255, 255), ">");
+
+		std::string pageText = "Page " + std::to_string(currentPageId_ + 1) + " / " + std::to_string(pageCount_);
+		drawList->AddText(ImVec2(screenW * 0.5f - 50.0f, screenH - 80.0f), IM_COL32(255, 255, 255, 255), pageText.c_str());
+	}
+#endif
 }
 
 REGISTER_SCRIPT(SkillTree);

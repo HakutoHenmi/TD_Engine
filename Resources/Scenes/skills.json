@@ -1,5 +1,7 @@
 {
   "skills": [
+
+
     {
       "id": 0,
       "name": "Base",
@@ -8,7 +10,8 @@
       "unlocked": true,
       "gridX": 1.0,
       "gridY": 0.0,
-      "description": "すべてのスキルの起点となる基本能力。"
+      "description": "基本能力",
+      "pageId": 0
     },
     {
       "id": 1,
@@ -17,7 +20,8 @@
       "parentId": 0,
       "gridX": 0.0,
       "gridY": 1.0,
-      "description": "攻撃力が 10% 上昇します。"
+      "description": "攻撃力アップ",
+      "pageId": 0
     },
     {
       "id": 2,
@@ -26,7 +30,8 @@
       "parentId": 0,
       "gridX": 1.0,
       "gridY": 1.0,
-      "description": "攻撃速度が 15% 上昇します。"
+      "description": "速度アップ",
+      "pageId": 0
     },
     {
       "id": 3,
@@ -35,7 +40,8 @@
       "parentId": 0,
       "gridX": 2.0,
       "gridY": 1.0,
-      "description": "射程距離が 20% 上昇します。"
+      "description": "射程アップ",
+      "pageId": 0
     },
     {
       "id": 4,
@@ -44,25 +50,28 @@
       "parentId": 1,
       "gridX": 0.0,
       "gridY": 2.0,
-      "description": "さらに攻撃力が 20% 上昇します。"
+      "description": "攻撃力強化",
+      "pageId": 0
     },
     {
       "id": 5,
-      "name": "Rapid",
+      "name": "Speed+",
       "cost": 2,
       "parentId": 2,
       "gridX": 1.0,
       "gridY": 2.0,
-      "description": "攻撃速度が 25% 上昇します。"
+      "description": "速度強化",
+      "pageId": 0
     },
     {
       "id": 6,
-      "name": "Sniper",
+      "name": "Range+",
       "cost": 2,
       "parentId": 3,
       "gridX": 2.0,
       "gridY": 2.0,
-      "description": "クリティカル率が 10% 上昇します。"
+      "description": "射程強化",
+      "pageId": 0
     },
     {
       "id": 7,
@@ -71,16 +80,205 @@
       "parentId": 5,
       "gridX": 1.0,
       "gridY": 3.0,
-      "description": "究極の力を解放し、全ステータスを大幅に強化します。"
+      "description": "全体強化",
+      "pageId": 0
     },
     {
       "id": 8,
       "name": "GOD",
-      "cost": 9,
+      "cost": 5,
       "parentId": 7,
-      "gridX": 2.0,
+      "gridX": 1.0,
       "gridY": 4.0,
-      "description": "究極の力を解放し、全ステータスを大幅に強化します。"
+      "description": "最終強化",
+      "pageId": 0
+    },
+
+
+    {
+      "id": 100,
+      "name": "Base_Page1",
+      "cost": 0,
+      "parentId": -1,
+      "unlocked": true,
+      "gridX": 1.0,
+      "gridY": 0.0,
+      "description": "基本能力",
+      "pageId": 1
+    },
+    {
+      "id": 101,
+      "name": "LeftShot",
+      "cost": 1,
+      "parentId": 100,
+      "gridX": 0.0,
+      "gridY": 1.0,
+      "description": "左強化",
+      "pageId": 1
+    },
+    {
+      "id": 102,
+      "name": "CenterShot",
+      "cost": 1,
+      "parentId": 100,
+      "gridX": 1.0,
+      "gridY": 1.0,
+      "description": "中央強化",
+      "pageId": 1
+    },
+    {
+      "id": 103,
+      "name": "RightShot",
+      "cost": 1,
+      "parentId": 100,
+      "gridX": 2.0,
+      "gridY": 1.0,
+      "description": "右強化",
+      "pageId": 1
+    },
+    {
+      "id": 104,
+      "name": "Left+",
+      "cost": 2,
+      "parentId": 101,
+      "gridX": 0.0,
+      "gridY": 2.0,
+      "description": "左強化2",
+      "pageId": 1
+    },
+    {
+      "id": 105,
+      "name": "Center+",
+      "cost": 2,
+      "parentId": 102,
+      "gridX": 1.0,
+      "gridY": 2.0,
+      "description": "中央強化2",
+      "pageId": 1
+    },
+    {
+      "id": 106,
+      "name": "Right+",
+      "cost": 2,
+      "parentId": 103,
+      "gridX": 2.0,
+      "gridY": 2.0,
+      "description": "右強化2",
+      "pageId": 1
+    },
+    {
+      "id": 107,
+      "name": "Ultimate1",
+      "cost": 3,
+      "parentId": 105,
+      "gridX": 1.0,
+      "gridY": 3.0,
+      "description": "全体強化",
+      "pageId": 1
+    },
+    {
+      "id": 108,
+      "name": "GOD1",
+      "cost": 5,
+      "parentId": 107,
+      "gridX": 1.0,
+      "gridY": 4.0,
+      "description": "最終",
+      "pageId": 1
+    },
+
+
+    {
+      "id": 200,
+      "name": "Base_Page2",
+      "cost": 0,
+      "parentId": -1,
+      "unlocked": true,
+      "gridX": 1.0,
+      "gridY": 0.0,
+      "description": "基本能力",
+      "pageId": 2
+    },
+    {
+      "id": 201,
+      "name": "Guard",
+      "cost": 1,
+      "parentId": 200,
+      "gridX": 0.0,
+      "gridY": 1.0,
+      "description": "防御",
+      "pageId": 2
+    },
+    {
+      "id": 202,
+      "name": "Support",
+      "cost": 1,
+      "parentId": 200,
+      "gridX": 1.0,
+      "gridY": 1.0,
+      "description": "支援",
+      "pageId": 2
+    },
+    {
+      "id": 203,
+      "name": "Recover",
+      "cost": 1,
+      "parentId": 200,
+      "gridX": 2.0,
+      "gridY": 1.0,
+      "description": "回復",
+      "pageId": 2
+    },
+    {
+      "id": 204,
+      "name": "Guard+",
+      "cost": 2,
+      "parentId": 201,
+      "gridX": 0.0,
+      "gridY": 2.0,
+      "description": "防御強化",
+      "pageId": 2
+    },
+    {
+      "id": 205,
+      "name": "Support+",
+      "cost": 2,
+      "parentId": 202,
+      "gridX": 1.0,
+      "gridY": 2.0,
+      "description": "支援強化",
+      "pageId": 2
+    },
+    {
+      "id": 206,
+      "name": "Recover+",
+      "cost": 2,
+      "parentId": 203,
+      "gridX": 2.0,
+      "gridY": 2.0,
+      "description": "回復強化",
+      "pageId": 2
+    },
+    {
+      "id": 207,
+      "name": "Ultimate2",
+      "cost": 3,
+      "parentId": 205,
+      "gridX": 1.0,
+      "gridY": 3.0,
+      "description": "全体強化",
+      "pageId": 2
+    },
+    {
+      "id": 208,
+      "name": "GOD2",
+      "cost": 5,
+      "parentId": 207,
+      "gridX": 1.0,
+      "gridY": 4.0,
+      "description": "最終",
+      "pageId": 2
     }
+
   ]
 }

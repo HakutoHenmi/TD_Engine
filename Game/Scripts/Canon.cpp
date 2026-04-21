@@ -154,9 +154,7 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 		if (gm != entt::null) break;
 	}
 
-	float skillPowerRate = 1.0f;
-	float skillSpeedRate = 1.0f;
-	float skillRangeRate = 1.0f;
+
 
 	if (gm != entt::null) {
 		skillPowerRate = GetVar(gm, scene, "AttackPowerRate", 1.0f);
