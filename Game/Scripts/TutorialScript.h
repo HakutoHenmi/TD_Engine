@@ -30,7 +30,7 @@ private:
 	void RequestPhaseChange(PhaseSystemScript::PhaseState nextPhase);
 	void UpdatePhaseTransition(GameScene* scene);
 	void ShowStepGuide();
-	void UpdateSkillTree(GameScene* scene, bool& outKeyN);
+	void UpdateSkillTree(entt::entity entity, GameScene* scene, bool& outKeyN);
 
 	// 説明文の表示
 	void ShowGuideText();

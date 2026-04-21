@@ -141,12 +141,37 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 		powerRate = static_cast<float>(connectedTankCount) / static_cast<float>(connectedCanonCount);
 	}
 
-	float currentAttackInterval = attackInterval_;
-
-	if (powerRate > 0.0f) {
-		currentAttackInterval = attackInterval_ / powerRate;
+	entt::entity gm = entt::null;
+	auto viewScript = registry.view<ScriptComponent>();
+	for (auto e : viewScript) {
+		const auto& sc = viewScript.get<ScriptComponent>(e);
+		for (const auto& instance : sc.scripts) {
+			if (instance.scriptPath == "PhaseSystemScript" || instance.scriptPath == "TutorialScript") {
+				gm = e;
+				break;
+			}
+		}
+		if (gm != entt::null) break;
 	}
 
+	float skillPowerRate = 1.0f;
+	float skillSpeedRate = 1.0f;
+	float skillRangeRate = 1.0f;
+
+	if (gm != entt::null) {
+		skillPowerRate = GetVar(gm, scene, "AttackPowerRate", 1.0f);
+		skillSpeedRate = GetVar(gm, scene, "AttackSpeedRate", 1.0f);
+		skillRangeRate = GetVar(gm, scene, "AttackRangeRate", 1.0f);
+	}
+
+	float currentAttackInterval = attackInterval_ / skillSpeedRate;
+
+	if (powerRate > 0.0f) {
+		currentAttackInterval = currentAttackInterval / powerRate;
+	}
+
+	float currentRange = attackRange_ * skillRangeRate;
+	float currentDamage = damage_ * skillPowerRate;
 	// Debug(isConnectedToTank_); // ★削除: Update 内での ImGui 呼び出しは例外の原因となる可能性があるため
 
 	if (attackTimer_ > 0.0f) {
@@ -172,7 +197,7 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 
 	if (currentTarget_ == entt::null) {
-		float bestDistance = attackRange_;
+		float bestDistance = currentRange;
 
 		const std::vector<entt::entity>& enemies = scene->GetEntitiesByTag(TagType::Enemy);
 
@@ -256,7 +281,7 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	HitboxComponent& bulletHitbox = registry.emplace<HitboxComponent>(bullet);
 	bulletHitbox.isActive = true;
-	bulletHitbox.damage = damage_;
+	bulletHitbox.damage = currentDamage;
 	bulletHitbox.tag = TagType::Bullet;
 	bulletHitbox.size = {1.0f, 1.0f, 1.0f};
 

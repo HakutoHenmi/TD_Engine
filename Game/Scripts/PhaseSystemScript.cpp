@@ -88,8 +88,9 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 
 	// スキルツリーの初期化
 	if (auto* renderer = Engine::Renderer::GetInstance()) {
-		skillTree_.Init(renderer);
-		skillTree_.LoadFromJson("Resources/Scenes/skills.json", renderer);
+		skillTree_.SetUIContext(renderer, (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH, 0.0f, 0.0f);
+		skillTree_.Start(entity, scene);
+		skillTree_.LoadFromJson("Resources/Scenes/skills.json");
 	}
 }
 
@@ -135,10 +136,10 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		// スキルツリーが開いている間はスキルツリーの更新のみ
 		if (skillTree_.IsOpen()) {
 			float mx = 0, my = 0;
-
-#if defined(USE_IMGUI) && !defined(NDEBUG)
 			float tW = (float)Engine::WindowDX::kW;
 			float tH = (float)Engine::WindowDX::kH;
+
+#if defined(USE_IMGUI) && !defined(NDEBUG)
 			ImVec2 mousePos = ImGui::GetMousePos();
 			ImVec2 gameMin = EditorUI::GetGameImageMin();
 			ImVec2 gameMax = EditorUI::GetGameImageMax();
@@ -151,9 +152,9 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 #else
 			input->GetMousePos(mx, my);
 #endif
-			skillTree_.Update(renderer, tW, tH, mx, my);
 			// スキルツリーのUI描画用にマウス座標を変換して渡す
 			skillTree_.SetUIContext(renderer, tW, tH, mx, my);
+			skillTree_.Update(entity, scene, dt);
 			preKeyN_ = keyN;
 			return; // 設置モードの入力を抑制
 		}
@@ -630,18 +631,13 @@ void PhaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector
 	mr.shaderName = "Toon";
 }
 
-void PhaseSystemScript::Draw(entt::entity /*entity*/, GameScene* scene) {
+void PhaseSystemScript::Draw(entt::entity entity, GameScene* scene) {
 	if (skillTree_.IsOpen()) {
 		auto* renderer = scene->GetRenderer();
 		if (!renderer)
 			return;
 
-		// Editor状態で Start() が呼ばれていない場合でも描画できるように初期化を保証
-		if (!skillTree_.IsInitialized()) {
-			skillTree_.Init(renderer);
-			skillTree_.LoadFromJson("Resources/Scenes/skills.json", renderer);
-		}
-
+		// Start() 側で LoadFromJson などの初期化が行われている前提とします
 		float mx = 0, my = 0;
 		float tW = (float)Engine::WindowDX::kW;
 		float tH = (float)Engine::WindowDX::kH;
@@ -661,7 +657,8 @@ void PhaseSystemScript::Draw(entt::entity /*entity*/, GameScene* scene) {
 			input->GetMousePos(mx, my);
 		}
 #endif
-		skillTree_.Update(renderer, tW, tH, mx, my);
+		skillTree_.SetUIContext(renderer, tW, tH, mx, my);
+		skillTree_.Update(entity, scene, 0.0f);
 	}
 }
 
