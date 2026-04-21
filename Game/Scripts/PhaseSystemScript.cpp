@@ -632,34 +632,10 @@ void PhaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector
 }
 
 void PhaseSystemScript::Draw(entt::entity entity, GameScene* scene) {
-	if (skillTree_.IsOpen()) {
-		auto* renderer = scene->GetRenderer();
-		if (!renderer)
-			return;
-
-		// Start() 側で LoadFromJson などの初期化が行われている前提とします
-		float mx = 0, my = 0;
-		float tW = (float)Engine::WindowDX::kW;
-		float tH = (float)Engine::WindowDX::kH;
-
-#if defined(USE_IMGUI) && !defined(NDEBUG)
-		ImVec2 mousePos = ImGui::GetMousePos();
-		ImVec2 gameMin = EditorUI::GetGameImageMin();
-		ImVec2 gameMax = EditorUI::GetGameImageMax();
-		float viewW = gameMax.x - gameMin.x;
-		float viewH = gameMax.y - gameMin.y;
-		if (viewW > 0 && viewH > 0) {
-			mx = (mousePos.x - gameMin.x) * (tW / viewW);
-			my = (mousePos.y - gameMin.y) * (tH / viewH);
-		}
-#else
-		if (auto* input = Engine::Input::GetInstance()) {
-			input->GetMousePos(mx, my);
-		}
-#endif
-		skillTree_.SetUIContext(renderer, tW, tH, mx, my);
-		skillTree_.Update(entity, scene, 0.0f);
-	}
+	(void)entity;
+	(void)scene;
+	// 既に Update のフェーズで skillTree_.Update() が呼ばれ、描画コマンドも積まれているため
+	// ここで再度呼ぶと入力処理が 1フレームで2回走ってしまい、ページが2重にめくられる原因になる。
 }
 
 void PhaseSystemScript::OnEditorUI() {

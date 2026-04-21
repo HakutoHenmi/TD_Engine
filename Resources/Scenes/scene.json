@@ -7,10 +7,24 @@
   },
   "objects": [
     {
+      "id": 11,
+      "parentId": 4294967295,
+      "name": "Base",
+      "locked": false,
+      "translate": [69.1181, 0.0149813, -48.8427],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources\\Models\\sword.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [0.176279,0.50446,0.830116,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "BaseScript", "param": "rotationSpeed=1;attackInterval=1;damage=10;attackRange=30;"}]},
+        {"type": "Tag", "enabled": true, "tag": "Untagged"}
+      ]
+    },
+    {
       "id": 1048586,
       "parentId": 4294967295,
       "name": "Fede",
-      "locked": false,
+      "locked": true,
       "translate": [0, 0, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
