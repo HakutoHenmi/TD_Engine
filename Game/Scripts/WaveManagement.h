@@ -19,6 +19,11 @@ public:
 	static void SetWave(int waveNumber) { currentWave_ = waveNumber; }
 	static entt::entity GetManagerEntity() { return managerEntity_; }
 	static bool IsWaveEnded() { return isEnded_; }
+	static void ResetState() {
+		isEnded_ = false;
+		currentWave_ = -1;
+		managerEntity_ = static_cast<entt::entity>(entt::null);
+	}
 
 private:
 	static int currentWave_;

@@ -57,6 +57,9 @@ public:
 	// ★追加: コンテキストへのアクセス
 	GameContext& GetContext() { return ctx_; }
 
+	// ★追加: シーン名の取得
+	const std::string& GetSceneName() const { return sceneName_; }
+
 	// ★追加: 名前でオブジェクトを検索するヘルパー
 	entt::entity FindObjectByName(const std::string& name);
 	// ★追加: 指定座標のメッシュ表面の高さを取得 (startY 付近から下を探索)
@@ -85,6 +88,7 @@ private:
 
     bool isPlaying_ = false;
 	bool isPaused_ = false; // ★追加: ポーズ状態フラグ
+	std::string sceneName_; // ★追加: シーン名 ("Title", "Select", "Game", "Result")
     entt::registry pendingSpawns_;
     std::vector<entt::entity> pendingDestroys_;
     std::mutex spawnMutex_; // ★追加: マルチスレッドから安全にスポーン・破棄登録を行えるようにする
