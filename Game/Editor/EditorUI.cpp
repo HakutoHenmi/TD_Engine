@@ -2403,7 +2403,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					
 					const char* currentTagName = TagToString(tag->tag);
 					if (ImGui::BeginCombo("Tag##TagCombo", currentTagName)) {
-						for (int i = 0; i <= (int)TagType::HitDistortion_VFX; ++i) {
+						for (int i = 0; i <= (int)TagType::Core; ++i) {
 							TagType t = (TagType)i;
 							bool isSelected = (tag->tag == t);
 							if (ImGui::Selectable(TagToString(t), isSelected)) {

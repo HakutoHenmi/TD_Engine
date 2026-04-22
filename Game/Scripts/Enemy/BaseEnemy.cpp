@@ -87,7 +87,7 @@ void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 
 	// 実際の行動
-	if (inAttackRange&& attackCooltime_ == 0.0f) {
+	if (inAttackRange&& attackCooltime_ <= 0.0f) {
 		// 攻撃範囲内且つクールタイムを満たしていれば足を止めて攻撃
 		ExecuteAttack(entity, scene, dt);
 	}
@@ -173,10 +173,17 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float /*dt*/)
 			rb.velocity.x = vx;
 			rb.velocity.z = vz;
 
-			// 地面の高さに合わせて y 座標を補正（埋まり・浮き防止）
-			float h = scene->GetHeightAt(tc.translate.x, tc.translate.z, tc.translate.y + 1.0f, static_cast<uint32_t>(entity));
-			if (h > -9000.0f) {
-				tc.translate.y = h + 0.1f; // 少しだけ浮かせて接地させる
+			// ==== 物理エンジンに逆らわない地形追従 ====
+			// 自由落下で下っている(速度 <= 0.0f) かつ、地面より下に沈んだ場合のみ上に押し上げる
+			// Enemyの中心は y=1.0 と考えられるため、地面より少し上で止める
+			float h = scene->GetHeightAt(tc.translate.x, tc.translate.z, tc.translate.y, static_cast<uint32_t>(entity));
+			if (h > -5000.0f) {
+				float footY = tc.translate.y - 1.0f; // 脚元の高さ
+				// 重力で落下中、もしくはめり込んでいる場合
+				if (rb.velocity.y <= 0.01f && footY <= h + 0.05f) {
+					tc.translate.y = h + 1.0f; // 脚の長さを保証
+					rb.velocity.y = 0.0f;      // 重力を打ち消して接地面で止める
+				}
 			}
 		} 
 		//else {
@@ -294,6 +301,19 @@ void BaseEnemy::SearchTarget(entt::entity entity, GameScene* scene) {
 		if (distSq < minDistanceSq) {
 			minDistanceSq = distSq;
 			bestTarget = d;
+		}
+	}
+
+	// 最優先にすべきタグはCoreなので最後に上書き
+	// 防衛設備（Defender）を探す(プレイヤーより近ければターゲットを上書き)
+	const auto& core = scene->GetEntitiesByTag(TagType::Core);
+	for (auto c : core) {
+		auto& t = registry.get<TransformComponent>(c);
+		float distSq = (t.translate.x - myTc.translate.x) * (t.translate.x - myTc.translate.x) + 
+			(t.translate.z - myTc.translate.z) * (t.translate.z - myTc.translate.z);
+		if (distSq < minDistanceSq) {
+			minDistanceSq = distSq;
+			bestTarget = c;
 		}
 	}
 
