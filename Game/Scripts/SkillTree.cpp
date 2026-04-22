@@ -54,6 +54,15 @@ void SkillTree::LoadFromJson(const std::string& path) {
 				nodes_.push_back(node);
 			}
 		}
+		int maxPage = 0;
+
+		for (const SkillNode& node : nodes_) {
+			if (node.pageId > maxPage) {
+				maxPage = node.pageId;
+			}
+		}
+
+		pageCount_ = maxPage + 1;
 	} catch (...) {
 		// パース失敗時は何もしない
 	}
@@ -174,43 +183,55 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 		return;
 	}
 	// Canon
-	float attackPowerRate = 1.0f;
-	float attackRangeRate = 1.0f;
-	float attackSpeedRate = 1.0f;
+	float attackPowerRateCanon = 1.0f;
+	float attackRangeRateCanon = 1.0f;
+	float attackSpeedRateCanon = 1.0f;
 
+	//page1
 	if (IsSkillUnlocked(1)) {
-		attackPowerRate *= 1.10f;
+		attackPowerRateCanon *= 1.50f;
 	}
 
 	if (IsSkillUnlocked(2)) {
-		attackPowerRate *= 1.10f;
+		attackSpeedRateCanon *= 1.50f;
 	}
 
 	if (IsSkillUnlocked(3)) {
-		attackRangeRate *= 1.20f;
+		attackSpeedRateCanon *= 1.20f;
+		attackRangeRateCanon *= 1.20f;
+		attackPowerRateCanon *= 1.20f;
+	}
+	//poisonTrap
+	float attackPowerRatePoison = 1.0f;
+	float attackRangeRatePoison = 1.0f;
+
+	//page2
+	if (IsSkillUnlocked(101)) {
+		attackPowerRatePoison *= 1.50f;
 	}
 
-	if (IsSkillUnlocked(4)) {
-		attackPowerRate *= 1.20f;
+	if (IsSkillUnlocked(102)) {
+		attackRangeRatePoison *= 1.50f;
 	}
 
-	if (IsSkillUnlocked(5)) {
-		attackSpeedRate *= 1.25f;
+	if (IsSkillUnlocked(103)) {
+		attackPowerRatePoison *= 1.20f;
+		attackRangeRatePoison *= 1.20f;
 	}
 
-	if (IsSkillUnlocked(6)) {
-		attackSpeedRate *= 1.25f;
-	}
-
+	//page3
 	if (IsSkillUnlocked(7)) {
-		attackPowerRate *= 1.30f;
-		attackRangeRate *= 1.30f;
-		attackSpeedRate *= 1.30f;
+	
 	}
 
-	SetVar(entity, scene, "AttackPowerRate", attackPowerRate);
-	SetVar(entity, scene, "AttackSpeedRate", attackSpeedRate);
-	SetVar(entity, scene, "AttackRangeRate", attackRangeRate);
+	//canon
+	SetVar(entity, scene, "AttackPowerRateCanon", attackPowerRateCanon);
+	SetVar(entity, scene, "AttackSpeedRateCanon", attackSpeedRateCanon);
+	SetVar(entity, scene, "AttackRangeRateCanon", attackRangeRateCanon);
+	// poisonTrap
+	SetVar(entity, scene, "AttackPowerRatePoison", attackPowerRatePoison);
+	SetVar(entity, scene, "AttackRangeRatePoison", attackRangeRatePoison);
+	
 }
 
 void SkillTree::HandleInput(float screenW, float screenH, float mouseX, float mouseY) {
@@ -284,7 +305,6 @@ bool SkillTree::HandlePageButtonInput(float screenW, float screenH, float mouseX
 
 	return false;
 }
-
 
 bool SkillTree::TryUnlockSkill(int index) {
 	if (index < 0 || index >= (int)nodes_.size()) {

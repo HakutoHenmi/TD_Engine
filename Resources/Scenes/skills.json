@@ -13,7 +13,7 @@
     },
     {
       "id": 1,
-      "name": "Left_Page0",
+      "name": "Attack",
       "cost": 1,
       "parentId": 0,
       "unlocked": false,
@@ -24,7 +24,7 @@
     },
     {
       "id": 2,
-      "name": "Right_Page0",
+      "name": "AttackSpeed",
       "cost": 1,
       "parentId": 0,
       "unlocked": false,
@@ -35,7 +35,7 @@
     },
     {
       "id": 3,
-      "name": "Down_Page0",
+      "name": "AllUp",
       "cost": 1,
       "parentId": 0,
       "unlocked": false,
@@ -47,7 +47,7 @@
 
     {
       "id": 100,
-      "name": "Center_Page1",
+      "name": "Base2",
       "cost": 0,
       "parentId": -1,
       "unlocked": true,
@@ -58,7 +58,7 @@
     },
     {
       "id": 101,
-      "name": "Left_Page1",
+      "name": "Attack",
       "cost": 1,
       "parentId": 100,
       "unlocked": false,
@@ -69,7 +69,7 @@
     },
     {
       "id": 102,
-      "name": "Right_Page1",
+      "name": "AttackSpeed",
       "cost": 1,
       "parentId": 100,
       "unlocked": false,
@@ -80,7 +80,7 @@
     },
     {
       "id": 103,
-      "name": "Down_Page1",
+      "name": "AllUp",
       "cost": 1,
       "parentId": 100,
       "unlocked": false,
@@ -92,7 +92,7 @@
 
     {
       "id": 200,
-      "name": "Center_Page2",
+      "name": "Base3",
       "cost": 0,
       "parentId": -1,
       "unlocked": true,
@@ -103,7 +103,7 @@
     },
     {
       "id": 201,
-      "name": "Left_Page2",
+      "name": "Attack",
       "cost": 1,
       "parentId": 200,
       "unlocked": false,
@@ -114,7 +114,7 @@
     },
     {
       "id": 202,
-      "name": "Right_Page2",
+      "name": "AttackSpeed",
       "cost": 1,
       "parentId": 200,
       "unlocked": false,
@@ -125,7 +125,7 @@
     },
     {
       "id": 203,
-      "name": "Down_Page2",
+      "name": "AllUp",
       "cost": 1,
       "parentId": 200,
       "unlocked": false,
