@@ -46,7 +46,10 @@ private:
 	PhaseState preIsPhase_ = PreparationPhase; // フェーズ切り替わり検知用
 	int currentPhase_ = 0;
 
-	inline static int CoinCount = 30; // コインの数を管理する静的変数
+	inline static int CoinCount = 300; // コインの数を管理する静的変数
+
+
+
 
 	bool preKeyP_ = false; // 初期化しておく
 	bool preKeySpace_ = false;
@@ -54,16 +57,20 @@ private:
 	bool isPhaseTransitioning_ = false;
 	bool isFadeFinished_ = false;
 
+	std::string selectedObjPath_ = "Resources/Models/cube/cube.obj";
+	std::string previewModelPath = "";
+	std::string previewObjPath_ = "";
+	uint32_t previewModelHandle_ = 0;
+	uint32_t previewTextureHandle_ = 0;
+
+	// パイプ専用
 	bool isPipeSet_ = false;
 	bool hasPipeStartPoint_ = false;
 	float pipeStartX_ = 0.0f;
 	float pipeStartY_ = 0.0f;
 	float pipeStartZ_ = 0.0f;
-
-	std::string selectedObjPath_ = "Resources/Models/cube/cube.obj";
-	std::string previewObjPath_;
-	uint32_t previewModelHandle_ = 0;
-	uint32_t previewTextureHandle_ = 0;
+	
+	int selectedObjCost_ = 0; // 追加
 
 	// スキルツリー
 	SkillTree skillTree_;
