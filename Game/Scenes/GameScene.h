@@ -1,5 +1,6 @@
 #pragma once
 #include "IScene.h"
+#include "Audio.h"
 #include "Camera.h"
 #include "Renderer.h"
 #include "Model.h"
@@ -8,6 +9,7 @@
 #include "EventSystem.h" // ★追加: イベントシステム
 #include "../ObjectTypes.h"
 #include "../Systems/ISystem.h"
+#include "../Systems/UISystem.h" // ★追加: ポーズメニュー用
 #include <mutex>
 #include <unordered_map>
 #include <string>
@@ -42,6 +44,7 @@ public:
 	Engine::ParticleEditor& GetParticleEditor() { return particleEditor_; }
 	bool GetIsPlaying() const { return isPlaying_; }
 	bool IsPlaying() const { return isPlaying_; } // Alias for backward compatibility
+	bool IsPaused() const { return isPaused_; }
 	void SetIsPlaying(bool play);
 	Engine::Renderer* GetRenderer() const { return renderer_; }
 	Engine::Matrix4x4 GetWorldMatrix(int index) const; 
@@ -53,6 +56,9 @@ public:
 
 	// ★追加: コンテキストへのアクセス
 	GameContext& GetContext() { return ctx_; }
+
+	// ★追加: シーン名の取得
+	const std::string& GetSceneName() const { return sceneName_; }
 
 	// ★追加: 名前でオブジェクトを検索するヘルパー
 	entt::entity FindObjectByName(const std::string& name);
@@ -81,6 +87,8 @@ private:
     entt::entity selectedEntity_ = entt::null;
 
     bool isPlaying_ = false;
+	bool isPaused_ = false; // ★追加: ポーズ状態フラグ
+	std::string sceneName_; // ★追加: シーン名 ("Title", "Select", "Game", "Result")
     entt::registry pendingSpawns_;
     std::vector<entt::entity> pendingDestroys_;
     std::mutex spawnMutex_; // ★追加: マルチスレッドから安全にスポーン・破棄登録を行えるようにする
@@ -120,6 +128,34 @@ private:
 
 	//フローフィールド用
 	std::unique_ptr<NavigationManager> flowField_ = nullptr;
+
+	// ★追加: ポーズメニュー
+	enum class PauseMenuState { Main, Settings };
+	PauseMenuState pauseMenuState_ = PauseMenuState::Main;
+	entt::registry pauseRegistry_; // ポーズメニュー専用registry
+	std::unique_ptr<UISystem> pauseUISystem_;
+	GameContext pauseCtx_;
+
+	// ポーズメニュー用エンティティ
+	std::vector<entt::entity> pauseMainEntities_;
+	std::vector<entt::entity> pauseSettingsEntities_;
+	entt::entity pauseBtnResume_ = entt::null;
+	entt::entity pauseBtnSettings_ = entt::null;
+	entt::entity pauseBtnTitle_ = entt::null;
+	entt::entity pauseBtnFullscreen_ = entt::null;
+	entt::entity pauseBtnBGMMinus_ = entt::null;
+	entt::entity pauseBtnBGMPlus_ = entt::null;
+	entt::entity pauseBtnSEMinus_ = entt::null;
+	entt::entity pauseBtnSEPlus_ = entt::null;
+	entt::entity pauseBtnBack_ = entt::null;
+	entt::entity pauseTextFullscreen_ = entt::null;
+	entt::entity pauseTextBGM_ = entt::null;
+	entt::entity pauseTextSE_ = entt::null;
+
+	void CreatePauseMenu();
+	void CreatePauseSettingsMenu();
+	entt::entity CreatePauseButton(const std::string& text, float yPos, entt::entity parent);
+	void UpdatePauseMenu();
 };
 
 } // namespace Game

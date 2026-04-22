@@ -82,9 +82,31 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	isPhase_ = PreparationPhase;
 	NextPhase_ = PreparationPhase;
 	preIsPhase_ = PreparationPhase;
+	currentPhase_ = 0;
+	CoinCount = 0;
+
+	// 状態フラグの初期化
 	isPhaseTransitioning_ = false;
 	isFadeFinished_ = false;
+	isPlacementMode_ = false;
+	isPipeSet_ = false;
 	hasPipeStartPoint_ = false;
+
+	// キー入力の初期化
+	preKeyP_ = false;
+	preKeySpace_ = false;
+	preKeyN_ = false;
+
+	// 座標の初期化
+	pipeStartX_ = 0.0f;
+	pipeStartY_ = 0.0f;
+	pipeStartZ_ = 0.0f;
+
+	// 必要に応じてパスやハンドルの初期化
+	selectedObjPath_ = "Resources/Models/cube/cube.obj";
+	previewObjPath_ = "";
+	previewModelHandle_ = 0;
+	previewTextureHandle_ = 0;
 
 	// スキルツリーの初期化
 	if (auto* renderer = Engine::Renderer::GetInstance()) {
@@ -116,6 +138,8 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	bool key1 = input->Trigger(DIK_1) || (GetAsyncKeyState('1') & 0x8001);
 	bool key2 = input->Trigger(DIK_2) || (GetAsyncKeyState('2') & 0x8001);
 	bool key3 = input->Trigger(DIK_3) || (GetAsyncKeyState('3') & 0x8001);
+	bool key4 = input->Trigger(DIK_4) || (GetAsyncKeyState('4') & 0x8001);
+	bool key5 = input->Trigger(DIK_5) || (GetAsyncKeyState('5') & 0x8001);
 	bool keyP = input->Trigger(DIK_P) || (GetAsyncKeyState('P') & 0x8001);
 	bool keySpace = input->Trigger(DIK_SPACE) || (GetAsyncKeyState(VK_SPACE) & 0x8001);
 
@@ -181,6 +205,21 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
 		}
+
+		if (key4 || InstallationButton::IsButtonPressed(InstallationButton::Missile)) {
+			selectedObjPath_ = "Resources/Prefabs/MissileCanon.prefab";
+			isPlacementMode_ = true;
+			isPipeSet_ = false;
+			hasPipeStartPoint_ = false;
+		}
+
+		if (key5 || InstallationButton::IsButtonPressed(InstallationButton::PisonTrap)) {
+			selectedObjPath_ = "Resources/Prefabs/PoisonTrap.prefab";
+			isPlacementMode_ = true;
+			isPipeSet_ = false;
+			hasPipeStartPoint_ = false;
+		}
+
 		if (input->IsMouseTrigger(1) && isPlacementMode_) {
 			if (isPipeSet_ && hasPipeStartPoint_) {
 				hasPipeStartPoint_ = false;
@@ -241,6 +280,9 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		// 状態を同期
 		preIsPhase_ = isPhase_;
 	}
+
+	if (scene->GetRegistry().all_of<UITextComponent>(entity))
+		scene->GetRegistry().get<UITextComponent>(entity).text = std::to_string(CoinCount);
 
 	preKeyN_ = keyN;
 }
@@ -632,34 +674,10 @@ void PhaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector
 }
 
 void PhaseSystemScript::Draw(entt::entity entity, GameScene* scene) {
-	if (skillTree_.IsOpen()) {
-		auto* renderer = scene->GetRenderer();
-		if (!renderer)
-			return;
-
-		// Start() 側で LoadFromJson などの初期化が行われている前提とします
-		float mx = 0, my = 0;
-		float tW = (float)Engine::WindowDX::kW;
-		float tH = (float)Engine::WindowDX::kH;
-
-#if defined(USE_IMGUI) && !defined(NDEBUG)
-		ImVec2 mousePos = ImGui::GetMousePos();
-		ImVec2 gameMin = EditorUI::GetGameImageMin();
-		ImVec2 gameMax = EditorUI::GetGameImageMax();
-		float viewW = gameMax.x - gameMin.x;
-		float viewH = gameMax.y - gameMin.y;
-		if (viewW > 0 && viewH > 0) {
-			mx = (mousePos.x - gameMin.x) * (tW / viewW);
-			my = (mousePos.y - gameMin.y) * (tH / viewH);
-		}
-#else
-		if (auto* input = Engine::Input::GetInstance()) {
-			input->GetMousePos(mx, my);
-		}
-#endif
-		skillTree_.SetUIContext(renderer, tW, tH, mx, my);
-		skillTree_.Update(entity, scene, 0.0f);
-	}
+	(void)entity;
+	(void)scene;
+	// 既に Update のフェーズで skillTree_.Update() が呼ばれ、描画コマンドも積まれているため
+	// ここで再度呼ぶと入力処理が 1フレームで2回走ってしまい、ページが2重にめくられる原因になる。
 }
 
 void PhaseSystemScript::OnEditorUI() {

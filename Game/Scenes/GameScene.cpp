@@ -21,6 +21,9 @@
 #include "../Systems/ScriptSystem.h"
 #include "../Systems/UISystem.h"
 #include "../Scripts/WaveManagement.h"
+#include "../Scripts/TitleManagerScript.h"
+#include "../Scripts/SelectManagerScript.h"
+#include "../Scripts/ResultManagerScript.h"
 #include "imgui.h"
 #include <Windows.h> // OutputDebugStringA
 #include <algorithm>
@@ -39,6 +42,7 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	dx_ = dx;
 	renderer_ = Engine::Renderer::GetInstance();
 	eventSystem_.Clear(); // ★追加: イベントリスナーをクリア
+	WaveManagement::ResetState(); // ★追加: ゲーム状態を完全にリセット
 	playTime_ = 0.0f;
 	camera_.Initialize();
 	// ★追加: 明示的にプロジェクションを設定 (1920x1080のアスペクト比)
@@ -48,14 +52,46 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	renderer_->SetAmbientColor({0.4f, 0.4f, 0.45f});
 
 	bool loaded = false;
-	// ★ リリース構成等での自動ロード
+	// ★変更: シーン名に応じてロードするJSONパスを決定
+	std::string sceneName = params.sceneName;
+	sceneName_ = sceneName; // ★追加: メンバーに保存
+	std::string scenePath;
 	try {
-		std::string scenePath = params.stagePath.empty() ? EditorUI::GetUnifiedProjectPath("Resources/Scenes/scene.json") : params.stagePath;
-		// ★修正: UTF-8文字列をFromUTF8経由でfs::pathに変換し、日本語パスに対応
-		if (std::filesystem::exists(Engine::PathUtils::FromUTF8(scenePath))) {
+		// シーン名に応じたデフォルトJSONパスのマッピング
+		if (!params.stagePath.empty()) {
+			scenePath = EditorUI::GetUnifiedProjectPath(params.stagePath);
+		} else if (sceneName == "Title") {
+			scenePath = EditorUI::GetUnifiedProjectPath("Resources/Scenes/title.json");
+		} else if (sceneName == "Select") {
+			scenePath = EditorUI::GetUnifiedProjectPath("Resources/Scenes/select.json");
+		} else if (sceneName == "Result") {
+			scenePath = EditorUI::GetUnifiedProjectPath("Resources/Scenes/result.json");
+		} else {
+			scenePath = EditorUI::GetUnifiedProjectPath("Resources/Scenes/scene.json");
+		}
+		
+		bool useSnapshot = false;
+#ifdef USE_IMGUI
+		if (auto* sm = Engine::SceneManager::GetInstance()) {
+			isPlaying_ = sm->IsGlobalPlaying();
+			if (isPlaying_ && !sm->GetGlobalSnapshot().empty() && 
+			    (EditorUI::GetUnifiedProjectPath(scenePath) == EditorUI::GetUnifiedProjectPath(sm->GetGlobalScenePath()))) {
+				useSnapshot = true;
+			}
+		}
+#endif
+
+		if (useSnapshot) {
+			auto* sm = Engine::SceneManager::GetInstance();
+			OutputDebugStringA(("[GameScene] Restoring from global snapshot for " + scenePath + "...\n").c_str());
+			EditorUI::LoadFromMemory(this, sm->GetGlobalSnapshot());
+			EditorUI::currentScenePath = sm->GetGlobalScenePath();
+			sceneSnapshot_ = sm->GetGlobalSnapshot(); // 現在のスナップショットとして保持
+			loaded = true;
+		} else if (std::filesystem::exists(Engine::PathUtils::FromUTF8(scenePath))) {
 			OutputDebugStringA(("[GameScene] " + scenePath + " found. Loading...\n").c_str());
 			EditorUI::LoadScene(this, scenePath);
-			isPlaying_ = true; // リリース/起動時はプレイ状態から開始する
+			sceneSnapshot_ = EditorUI::SaveToMemory(this); // ★追加: 初期ロード直後の状態を保存
 			loaded = true;
 		} else {
 			OutputDebugStringA(("[GameScene] " + scenePath + " NOT found.\n").c_str());
@@ -66,35 +102,75 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 		MessageBoxA(NULL, msg.c_str(), "Scene Load Error", MB_OK | MB_ICONERROR);
 	}
 
-	// 既にオブジェクトが存在する場合（リスタート時）やロード失敗時は最低限の内容を作成
+	// ★変更: JSONが存在しない場合のフォールバック処理（シーン名に応じて分岐）
 	if (registry_.storage<entt::entity>().empty() || !loaded) {
-		auto sun = registry_.create();
-		registry_.emplace<NameComponent>(sun, "Sun");
-		registry_.emplace<TransformComponent>(
-		    sun, DirectX::XMFLOAT3{0, 10, 0}, DirectX::XMFLOAT3{DirectX::XMConvertToRadians(45.0f), DirectX::XMConvertToRadians(30.0f), 0}, DirectX::XMFLOAT3{1, 1, 1});
-		registry_.emplace<DirectionalLightComponent>(sun);
+		if (sceneName == "Title" || sceneName == "Select" || sceneName == "Result") {
+			// Title/Select/Result: マネージャースクリプトのみ生成（UIは直接作成）
+			std::string scriptName;
+			if (sceneName == "Title") {
+				scriptName = "TitleManagerScript";
+				TitleManagerScript::CreateFallbackUI(this);
+			} else if (sceneName == "Select") {
+				scriptName = "SelectManagerScript";
+				SelectManagerScript::CreateFallbackUI(this);
+			} else if (sceneName == "Result") {
+				scriptName = "ResultManagerScript";
+				ResultManagerScript::CreateFallbackUI(this, params.isWin, params.score, params.clearTime);
+			}
 
-		auto plane = registry_.create();
-		registry_.emplace<NameComponent>(plane, "Plane");
+			auto manager = registry_.create();
+			registry_.emplace<NameComponent>(manager, sceneName + "Manager");
+			auto& sc = registry_.emplace<ScriptComponent>(manager);
+			sc.scripts.push_back({scriptName});
 
-		auto& mesh = registry_.emplace<MeshRendererComponent>(plane);
-		mesh.modelHandle = renderer_->LoadObjMesh("Resources/Models/plane.obj");
-		mesh.textureHandle = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
-		mesh.modelPath = "Resources/Models/plane.obj";
-		mesh.texturePath = "Resources/Textures/white1x1.png";
+			// Resultシーンの場合、パラメータをVariableComponentで渡す
+			if (sceneName == "Result") {
+				auto& vars = registry_.emplace<VariableComponent>(manager);
+				vars.SetValue("isWin", params.isWin ? 1.0f : 0.0f);
+				vars.SetValue("score", static_cast<float>(params.score));
+				vars.SetValue("clearTime", params.clearTime);
+			}
 
-		registry_.emplace<TransformComponent>(plane, DirectX::XMFLOAT3{0, 0, 0}, DirectX::XMFLOAT3{0, 0, 0}, DirectX::XMFLOAT3{20, 1, 20});
+			// ★変更: スクリプトのインスタンス化と初期化を即座に行い、STOP中でもUIとして機能させる
+			if (auto instance = ScriptEngine::GetInstance()->CreateScript(scriptName)) {
+				sc.scripts[0].instance = instance;
+				instance->Start(manager, this);
+				sc.scripts[0].parameterData = instance->SerializeParameters();
+			}
 
-		// ★追加: 物理判定用にGpuMeshColliderを付与
-		auto& gmc = registry_.emplace<GpuMeshColliderComponent>(plane);
-		gmc.meshHandle = mesh.modelHandle;
-		gmc.enabled = true;
+			// ★追加: 保存時に誤ってscene.jsonを上書きしないよう、パスを同期
+			EditorUI::currentScenePath = scenePath;
+			sceneSnapshot_ = EditorUI::SaveToMemory(this); // フォールバック生成直後も初期状態として保存
+		} else {
+			// Game: 従来のフォールバック（Sun + Plane + PhaseSystem）
+			auto sun = registry_.create();
+			registry_.emplace<NameComponent>(sun, "Sun");
+			registry_.emplace<TransformComponent>(
+			    sun, DirectX::XMFLOAT3{0, 10, 0}, DirectX::XMFLOAT3{DirectX::XMConvertToRadians(45.0f), DirectX::XMConvertToRadians(30.0f), 0}, DirectX::XMFLOAT3{1, 1, 1});
+			registry_.emplace<DirectionalLightComponent>(sun);
 
-		// 準備フェーズシステムの作成 (フォールバック)
-		auto ps = registry_.create();
-		registry_.emplace<NameComponent>(ps, "PhaseSystem");
-		auto& sc = registry_.emplace<ScriptComponent>(ps);
-		sc.scripts.push_back({"PhaseSystemScript"});
+			auto plane = registry_.create();
+			registry_.emplace<NameComponent>(plane, "Plane");
+
+			auto& mesh = registry_.emplace<MeshRendererComponent>(plane);
+			mesh.modelHandle = renderer_->LoadObjMesh("Resources/Models/plane.obj");
+			mesh.textureHandle = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
+			mesh.modelPath = "Resources/Models/plane.obj";
+			mesh.texturePath = "Resources/Textures/white1x1.png";
+
+			registry_.emplace<TransformComponent>(plane, DirectX::XMFLOAT3{0, 0, 0}, DirectX::XMFLOAT3{0, 0, 0}, DirectX::XMFLOAT3{20, 1, 20});
+
+			// ★追加: 物理判定用にGpuMeshColliderを付与
+			auto& gmc = registry_.emplace<GpuMeshColliderComponent>(plane);
+			gmc.meshHandle = mesh.modelHandle;
+			gmc.enabled = true;
+
+			// 準備フェーズシステムの作成 (フォールバック)
+			auto ps = registry_.create();
+			registry_.emplace<NameComponent>(ps, "PhaseSystem");
+			auto& sc = registry_.emplace<ScriptComponent>(ps);
+			sc.scripts.push_back({"PhaseSystemScript"});
+		}
 	}
 
 	// エディターUIの初期化
@@ -174,6 +250,32 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 
 	//ステージロード直後に一度地形を読み込む
 	flowField_->UpdateCostMap(this);
+
+	// ★追加: ポーズメニューの初期化
+	isPaused_ = false;
+	pauseMenuState_ = PauseMenuState::Main;
+	pauseRegistry_.clear();
+	pauseMainEntities_.clear();
+	pauseSettingsEntities_.clear();
+	pauseUISystem_ = std::make_unique<UISystem>();
+	pauseCtx_.dt = 1.0f / 60.0f;
+	pauseCtx_.camera = &camera_;
+	pauseCtx_.renderer = renderer_;
+	pauseCtx_.input = Engine::Input::GetInstance();
+	pauseCtx_.isPlaying = true;
+	pauseCtx_.scene = nullptr;
+	pauseCtx_.viewportOffset = {0.0f, 0.0f};
+	pauseCtx_.viewportSize = {(float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH};
+	CreatePauseMenu();
+	CreatePauseSettingsMenu();
+	// 初期状態はメニュー非表示
+	for (auto e : pauseMainEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+	for (auto e : pauseSettingsEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+
+#ifndef _DEBUG
+	// リリースビルドではシーンファイルの有無に関わらず確実にプレイ状態から開始する
+	isPlaying_ = true;
+#endif
 }
 
 // =====================================================
@@ -222,13 +324,41 @@ void GameScene::Update() {
 
 	// コンテキストを更新
 	ctx_.dt = dt;
+
+	// ★追加: ESCキーでポーズ切り替え (プレイ中のみ)
+	if (isPlaying_ && Engine::Input::GetInstance()->Trigger(DIK_ESCAPE)) {
+		isPaused_ = !isPaused_;
+		if (isPaused_) {
+			// ポーズ開始: メインメニュー表示
+			pauseMenuState_ = PauseMenuState::Main;
+			for (auto e : pauseMainEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = true;
+			for (auto e : pauseSettingsEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+		} else {
+			// ポーズ解除: 全メニュー非表示
+			for (auto e : pauseMainEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+			for (auto e : pauseSettingsEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+		}
+	}
+
+	// ★追加: ポーズ中はゲームロジックをスキップし、メニューのみ更新
+	if (isPaused_) {
+		UpdatePauseMenu();
+		return;
+	}
+
 	if (isPlaying_)
 		playTime_ += dt;
 
-	// ★ 勝利/敗北判定 (テスト用)
-	if (isPlaying_) {
-		bool win = Engine::Input::GetInstance()->Trigger(DIK_G) || WaveManagement::IsWaveEnded();
-		bool loss = Engine::Input::GetInstance()->Trigger(DIK_J);
+	// ★ 勝利/敗北判定 (テスト用) - ★変更: Gameシーンのみ
+	if (isPlaying_ && sceneName_ == "Game") {
+		bool inputBlocked = Engine::Input::GetInstance()->IsGameInputBlocked();
+		bool win = (!inputBlocked && Engine::Input::GetInstance()->Trigger(DIK_G));
+		if (auto waveEntity = WaveManagement::GetManagerEntity(); waveEntity != entt::null && registry_.valid(waveEntity)) {
+			if (WaveManagement::IsWaveEnded()) {
+				win = true;
+			}
+		}
+		bool loss = (!inputBlocked && Engine::Input::GetInstance()->Trigger(DIK_J));
 
 		// プレイヤーの生存確認 (Viewを直接参照して同期ズレを防ぐ)
 		// プレイヤーの生存確認
@@ -258,6 +388,11 @@ void GameScene::Update() {
 	ctx_.renderer = renderer_;
 	ctx_.input = Engine::Input::GetInstance();
 	ctx_.isPlaying = isPlaying_;
+
+	// ★追加: プレイ中はゲーム入力ブロックを解除（エディタパネルが表示されていてもゲーム操作を優先）
+	if (isPlaying_ && ctx_.input) {
+		ctx_.input->SetGameInputBlocked(false);
+	}
 	ctx_.scene = this;
 	ctx_.eventSystem = &eventSystem_;
 	ctx_.pendingSpawns = &pendingSpawns_;
@@ -338,8 +473,8 @@ void GameScene::Update() {
 		system->Update(registry_, ctx_);
 	}
 
-	// ★ 追加: 手動デバッグカメラ操作はSceneビューかつ停止中のみ
-	if (!isPlaying_ && currentViewMode == 0) {
+	// ★ 追加: 手動デバッグカメラ操作はSceneビューかつ停止中かつビューポートにマウスがある時のみ
+	if (!isPlaying_ && currentViewMode == 0 && EditorUI::IsViewportHovered()) {
 		camera_.Update(*Engine::Input::GetInstance());
 	}
 	camera_.Tick(dt);
@@ -614,6 +749,8 @@ void GameScene::Draw() {
 			stressTestGridSize = 0; // Stop時にリセット
 		static bool prevH = false;
 		bool currH = (GetAsyncKeyState('H') & 0x8000) != 0;
+		// ★修正: エディタUI操作中は誤発火を防止
+		if (Engine::Input::GetInstance()->IsGameInputBlocked()) currH = false;
 		if (currH && !prevH) {
 			stressTestGridSize += 32; // add 32x32 = 1024 objects each press
 			std::string msg = "[StressTest] Triggered! Grid size: " + std::to_string(stressTestGridSize) + "x" + std::to_string(stressTestGridSize) + " (" +
@@ -768,6 +905,22 @@ void GameScene::DrawUI() {
 	}
 
 	ctx_.isPlaying = oldIsPlaying;
+
+	// ★追加: ポーズメニューの描画
+	if (isPaused_ && pauseUISystem_) {
+		// 半透明の暗い背景オーバーレイ
+		if (renderer_) {
+			Engine::Renderer::SpriteDesc overlay;
+			overlay.x = 0.0f;
+			overlay.y = 0.0f;
+			overlay.w = (float)Engine::WindowDX::kW;
+			overlay.h = (float)Engine::WindowDX::kH;
+			overlay.color = {0.0f, 0.0f, 0.0f, 0.6f};
+			overlay.layer = 100; // 最前面に描画
+			renderer_->DrawSprite(0, overlay);
+		}
+		pauseUISystem_->DrawUI(pauseRegistry_, pauseCtx_);
+	}
 }
 
 extern bool gizmoDragging;
@@ -1095,6 +1248,13 @@ void GameScene::SetIsPlaying(bool play) {
 			OutputDebugStringA(logBuf);
 		}
 
+		// ★追加: SceneManagerにも保存（シーン遷移を跨いで保持するため）
+		if (auto* sm = Engine::SceneManager::GetInstance()) {
+			sm->SetGlobalPlaying(true);
+			sm->SetGlobalSnapshot(sceneSnapshot_);
+			sm->SetGlobalScenePath(EditorUI::currentScenePath);
+		}
+
 		isPlaying_ = true;
 	} else {
 		// プレイ停止時: Play ボタンを押した直前の状態 (`sceneSnapshot_`) に戻す
@@ -1108,9 +1268,29 @@ void GameScene::SetIsPlaying(bool play) {
 		}
 
 		isPlaying_ = false;
-		if (!sceneSnapshot_.empty()) {
-			OutputDebugStringA(("[GameScene] Restoring from memory snapshot (size: " + std::to_string(sceneSnapshot_.size()) + ")...\n").c_str());
-			EditorUI::LoadFromMemory(this, sceneSnapshot_);
+
+		// ★修正: SceneManagerのグローバルスナップショットを優先（シーン遷移を跨いだ復元のため）
+		std::string restoreSnapshot = sceneSnapshot_;
+		std::string restorePath;
+		if (auto* sm = Engine::SceneManager::GetInstance()) {
+			if (!sm->GetGlobalSnapshot().empty()) {
+				restoreSnapshot = sm->GetGlobalSnapshot();
+				restorePath = sm->GetGlobalScenePath();
+			}
+			sm->ClearGlobalPlayData();
+		}
+
+		if (!restoreSnapshot.empty()) {
+			OutputDebugStringA(("[GameScene] Restoring from snapshot (size: " + std::to_string(restoreSnapshot.size()) + ")...\n").c_str());
+			EditorUI::LoadFromMemory(this, restoreSnapshot);
+			if (!restorePath.empty()) {
+				EditorUI::currentScenePath = restorePath;
+				std::string p = restorePath;
+				if (p.find("title.json") != std::string::npos) sceneName_ = "Title";
+				else if (p.find("select.json") != std::string::npos) sceneName_ = "Select";
+				else if (p.find("result.json") != std::string::npos) sceneName_ = "Result";
+				else sceneName_ = "Game";
+			}
 
 			// 保存しておいた名前を元に選択状態を復元
 			selectedEntities_.clear();
@@ -1130,13 +1310,11 @@ void GameScene::SetIsPlaying(bool play) {
 				OutputDebugStringA(("[GameScene] Restored selection for " + std::to_string(selectedEntities_.size()) + " entities.\n").c_str());
 			}
 		} else {
-			OutputDebugStringA("[GameScene] ERROR: Memory snapshot is empty on STOP! Falling back to initial state.\n");
+			OutputDebugStringA("[GameScene] ERROR: No snapshot available on STOP! Falling back to initial state.\n");
 			if (!initialSceneSnapshot_.empty()) {
 				EditorUI::LoadFromMemory(this, initialSceneSnapshot_);
 			}
 		}
-		// sceneSnapshot_ = ""; // これを消すと、再開時に残ってしまう可能性があるが、念のため残すか？
-		// 一旦、毎回保存するようにするのでクリアしても良いはず
 		sceneSnapshot_ = "";
 
 		// ★追加: 川のメッシュなど、動的メッシュの再生成
@@ -1150,6 +1328,16 @@ void GameScene::SetIsPlaying(bool play) {
 		std::lock_guard<std::mutex> lock(spawnMutex_);
 		pendingDestroys_.clear();
 		pendingSpawns_.clear();
+
+		// タグキャッシュの完全リセットと再構築（大量のエンティティ削除・追加によるフリーズ防止）
+		pendingTagSync_.clear();
+		pendingTagRemoved_.clear();
+		tagCache_.clear();
+		auto tagView = registry_.view<TagComponent>();
+		for (auto entity : tagView) {
+			const auto tag = tagView.get<TagComponent>(entity).tag;
+			tagCache_[tag].push_back(entity);
+		}
 	}
 }
 
@@ -1205,6 +1393,217 @@ const std::vector<entt::entity>& GameScene::GetEntitiesByTag(const std::string& 
 
 void GameScene::SetTag(entt::entity entity, const std::string& tagStr) {
 	SetTag(entity, StringToTag(tagStr));
+}
+
+// =====================================================
+// ★追加: ポーズメニュー
+// =====================================================
+
+entt::entity GameScene::CreatePauseButton(const std::string& text, float yPos, entt::entity parent) {
+	auto entity = pauseRegistry_.create();
+
+	auto& rect = pauseRegistry_.emplace<RectTransformComponent>(entity);
+	rect.pos = {0.0f, yPos};
+	rect.size = {300.0f, 60.0f};
+	rect.anchor = {0.0f, 0.0f};
+	rect.pivot = {0.0f, 0.5f};
+	rect.enabled = true;
+
+	if (parent != entt::null) {
+		pauseRegistry_.emplace<HierarchyComponent>(entity, parent);
+	}
+
+	auto& btn = pauseRegistry_.emplace<UIButtonComponent>(entity);
+	btn.normalColor = {0.15f, 0.15f, 0.2f, 0.9f};
+	btn.hoverColor = {0.3f, 0.3f, 0.45f, 1.0f};
+	btn.pressedColor = {0.1f, 0.1f, 0.15f, 1.0f};
+
+	auto& txt = pauseRegistry_.emplace<UITextComponent>(entity);
+	txt.text = text;
+	txt.fontSize = 32.0f;
+	txt.color = {1.0f, 1.0f, 1.0f, 1.0f};
+
+	pauseRegistry_.emplace<UIImageComponent>(entity).color = {1.0f, 1.0f, 1.0f, 1.0f};
+
+	return entity;
+}
+
+void GameScene::CreatePauseMenu() {
+	auto parent = pauseRegistry_.create();
+	auto& pRect = pauseRegistry_.emplace<RectTransformComponent>(parent);
+	// 画面中央に配置
+	pRect.pos = {(float)Engine::WindowDX::kW / 2.0f - 150.0f, (float)Engine::WindowDX::kH / 2.0f - 100.0f};
+	pRect.size = {0, 0};
+	pRect.anchor = {0.0f, 0.0f};
+	pauseMainEntities_.push_back(parent);
+
+	// タイトルテキスト
+	auto titleText = pauseRegistry_.create();
+	auto& titleRect = pauseRegistry_.emplace<RectTransformComponent>(titleText);
+	titleRect.pos = {30.0f, -80.0f};
+	pauseRegistry_.emplace<HierarchyComponent>(titleText, parent);
+	auto& txt = pauseRegistry_.emplace<UITextComponent>(titleText);
+	txt.text = "PAUSE";
+	txt.fontSize = 64.0f;
+	txt.color = {1.0f, 0.9f, 0.3f, 1.0f};
+	pauseMainEntities_.push_back(titleText);
+
+	pauseBtnResume_ = CreatePauseButton(reinterpret_cast<const char*>(u8"\u30B2\u30FC\u30E0\u306B\u623B\u308B"), 0.0f, parent);
+	pauseBtnSettings_ = CreatePauseButton(reinterpret_cast<const char*>(u8"\u8A2D\u5B9A"), 80.0f, parent);
+	pauseBtnTitle_ = CreatePauseButton(reinterpret_cast<const char*>(u8"\u30BF\u30A4\u30C8\u30EB\u306B\u623B\u308B"), 160.0f, parent);
+
+	pauseMainEntities_.push_back(pauseBtnResume_);
+	pauseMainEntities_.push_back(pauseBtnSettings_);
+	pauseMainEntities_.push_back(pauseBtnTitle_);
+}
+
+void GameScene::CreatePauseSettingsMenu() {
+	auto parent = pauseRegistry_.create();
+	auto& pRect = pauseRegistry_.emplace<RectTransformComponent>(parent);
+	pRect.pos = {(float)Engine::WindowDX::kW / 2.0f - 150.0f, (float)Engine::WindowDX::kH / 2.0f - 100.0f};
+	pRect.size = {0, 0};
+	pRect.anchor = {0.0f, 0.0f};
+	pRect.enabled = false;
+	pauseSettingsEntities_.push_back(parent);
+
+	// タイトルテキスト
+	auto titleText = pauseRegistry_.create();
+	auto& titleRect = pauseRegistry_.emplace<RectTransformComponent>(titleText);
+	titleRect.pos = {30.0f, -80.0f};
+	titleRect.enabled = false;
+	pauseRegistry_.emplace<HierarchyComponent>(titleText, parent);
+	auto& txt = pauseRegistry_.emplace<UITextComponent>(titleText);
+	txt.text = "Settings";
+	txt.fontSize = 64.0f;
+	txt.color = {1.0f, 0.9f, 0.3f, 1.0f};
+	pauseSettingsEntities_.push_back(titleText);
+
+	// フルスクリーン
+	pauseBtnFullscreen_ = CreatePauseButton("Fullscreen: OFF", 0.0f, parent);
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnFullscreen_).enabled = false;
+	pauseTextFullscreen_ = pauseBtnFullscreen_;
+
+	// BGM 音量
+	auto bgmLabel = pauseRegistry_.create();
+	auto& bgmRect = pauseRegistry_.emplace<RectTransformComponent>(bgmLabel);
+	bgmRect.pos = {0.0f, 80.0f};
+	bgmRect.enabled = false;
+	pauseRegistry_.emplace<HierarchyComponent>(bgmLabel, parent);
+	auto& bgmTxt = pauseRegistry_.emplace<UITextComponent>(bgmLabel);
+	bgmTxt.text = "BGM Volume";
+	bgmTxt.fontSize = 32.0f;
+	pauseTextBGM_ = bgmLabel;
+
+	pauseBtnBGMMinus_ = CreatePauseButton("-", 80.0f, parent);
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMMinus_).size = {60.0f, 60.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMMinus_).pos = {310.0f, 80.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMMinus_).enabled = false;
+
+	pauseBtnBGMPlus_ = CreatePauseButton("+", 80.0f, parent);
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMPlus_).size = {60.0f, 60.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMPlus_).pos = {380.0f, 80.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMPlus_).enabled = false;
+
+	// SE 音量
+	auto seLabel = pauseRegistry_.create();
+	auto& seRect = pauseRegistry_.emplace<RectTransformComponent>(seLabel);
+	seRect.pos = {0.0f, 160.0f};
+	seRect.enabled = false;
+	pauseRegistry_.emplace<HierarchyComponent>(seLabel, parent);
+	auto& seTxt = pauseRegistry_.emplace<UITextComponent>(seLabel);
+	seTxt.text = "SE Volume";
+	seTxt.fontSize = 32.0f;
+	pauseTextSE_ = seLabel;
+
+	pauseBtnSEMinus_ = CreatePauseButton("-", 160.0f, parent);
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEMinus_).size = {60.0f, 60.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEMinus_).pos = {310.0f, 160.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEMinus_).enabled = false;
+
+	pauseBtnSEPlus_ = CreatePauseButton("+", 160.0f, parent);
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEPlus_).size = {60.0f, 60.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEPlus_).pos = {380.0f, 160.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEPlus_).enabled = false;
+
+	pauseBtnBack_ = CreatePauseButton(reinterpret_cast<const char*>(u8"\u623B\u308B"), 260.0f, parent);
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBack_).enabled = false;
+
+	pauseSettingsEntities_.push_back(bgmLabel);
+	pauseSettingsEntities_.push_back(pauseBtnFullscreen_);
+	pauseSettingsEntities_.push_back(pauseBtnBGMMinus_);
+	pauseSettingsEntities_.push_back(pauseBtnBGMPlus_);
+	pauseSettingsEntities_.push_back(seLabel);
+	pauseSettingsEntities_.push_back(pauseBtnSEMinus_);
+	pauseSettingsEntities_.push_back(pauseBtnSEPlus_);
+	pauseSettingsEntities_.push_back(pauseBtnBack_);
+}
+
+void GameScene::UpdatePauseMenu() {
+	// ポーズメニューのUIシステム更新（ボタンhover状態等）
+	pauseCtx_.dt = 1.0f / 60.0f;
+	pauseCtx_.input = Engine::Input::GetInstance();
+	pauseCtx_.viewportOffset = ctx_.viewportOffset;
+	pauseCtx_.viewportSize = ctx_.viewportSize;
+	pauseUISystem_->Draw(pauseRegistry_, pauseCtx_);
+
+	auto* input = Engine::Input::GetInstance();
+	bool isClicked = input->IsMouseTrigger(0);
+
+	if (pauseMenuState_ == PauseMenuState::Main) {
+		if (isClicked) {
+			if (pauseRegistry_.get<UIButtonComponent>(pauseBtnResume_).isHovered) {
+				// ゲームに戻る
+				isPaused_ = false;
+				for (auto e : pauseMainEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+				for (auto e : pauseSettingsEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnSettings_).isHovered) {
+				// 設定画面へ
+				pauseMenuState_ = PauseMenuState::Settings;
+				for (auto e : pauseMainEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+				for (auto e : pauseSettingsEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = true;
+			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnTitle_).isHovered) {
+				// タイトルに戻る
+				isPaused_ = false;
+				isPlaying_ = false;
+				Engine::SceneManager::GetInstance()->RequestChange("Title");
+			}
+		}
+	} else if (pauseMenuState_ == PauseMenuState::Settings) {
+		auto* audio = Engine::Audio::GetInstance();
+
+		// フルスクリーンテキスト更新
+		if (dx_) {
+			std::string fsText = dx_->IsFullscreen() ? "Fullscreen: ON" : "Fullscreen: OFF";
+			pauseRegistry_.get<UITextComponent>(pauseTextFullscreen_).text = fsText;
+		}
+
+		// 音量テキスト更新
+		if (audio) {
+			int bgmVol = static_cast<int>(audio->GetMasterBGMVolume() * 100);
+			pauseRegistry_.get<UITextComponent>(pauseTextBGM_).text = "BGM Volume: " + std::to_string(bgmVol) + "%";
+			int seVol = static_cast<int>(audio->GetMasterSEVolume() * 100);
+			pauseRegistry_.get<UITextComponent>(pauseTextSE_).text = "SE Volume: " + std::to_string(seVol) + "%";
+		}
+
+		if (isClicked) {
+			if (pauseRegistry_.get<UIButtonComponent>(pauseBtnBack_).isHovered) {
+				// メインメニューに戻る
+				pauseMenuState_ = PauseMenuState::Main;
+				for (auto e : pauseMainEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = true;
+				for (auto e : pauseSettingsEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnFullscreen_).isHovered) {
+				if (dx_) dx_->ToggleFullscreen();
+			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnBGMMinus_).isHovered) {
+				if (audio) audio->SetMasterBGMVolume(audio->GetMasterBGMVolume() - 0.1f);
+			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnBGMPlus_).isHovered) {
+				if (audio) audio->SetMasterBGMVolume(audio->GetMasterBGMVolume() + 0.1f);
+			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnSEMinus_).isHovered) {
+				if (audio) audio->SetMasterSEVolume(audio->GetMasterSEVolume() - 0.1f);
+			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnSEPlus_).isHovered) {
+				if (audio) audio->SetMasterSEVolume(audio->GetMasterSEVolume() + 0.1f);
+			}
+		}
+	}
 }
 
 } // namespace Game

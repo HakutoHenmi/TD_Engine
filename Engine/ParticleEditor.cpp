@@ -4,12 +4,19 @@
 
 namespace Engine {
 
+static Renderer::CustomRenderTarget g_SharedPreviewTarget{};
+static bool g_TargetInitialized = false;
+
 void ParticleEditor::Initialize() {
 	previewEmitter_.Initialize(*Renderer::GetInstance(), "PreviewEmitter");
 	targetEmitter = &previewEmitter_;
 
-	// ★追加: プレビュー用レンダーターゲットとカメラの初期化
-	previewTarget_ = Renderer::GetInstance()->CreateRenderTarget(512, 512);
+	// ★修正: レンダーターゲットはアプリケーション全体で1つだけ確保し、ディスクリプタリークを防ぐ
+	if (!g_TargetInitialized) {
+		g_SharedPreviewTarget = Renderer::GetInstance()->CreateRenderTarget(512, 512);
+		g_TargetInitialized = true;
+	}
+	previewTarget_ = g_SharedPreviewTarget;
 
 	previewCamera_.Initialize();
 	// ★修正: 透視投影行列を設定（これがないと何も描画されない）

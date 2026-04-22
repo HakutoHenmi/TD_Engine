@@ -12,12 +12,24 @@ namespace Game {
 class TutorialScript : public IScript {
 public:
 	enum class TutorialStep {
-		Preparation,
-		InstallCannonGuide,
-		InstallTankGuide,
-		InstallPipeGuide,
-		FirstBattle,
-		SkillTreeGuide,
+		Preparation1,
+		Preparation2,
+		Preparation3,
+		InstallCannonGuide1,
+		InstallCannonGuide2,
+		InstallCannonGuide3,
+		InstallTankGuide1,
+		InstallTankGuide2,
+		InstallTankGuide3,
+		InstallPipeGuide1,
+		InstallPipeGuide2,
+		InstallPipeGuide3,
+		FirstBattle1,
+		FirstBattle2,
+		FirstBattle3,
+		SkillTreeGuide1,
+		SkillTreeGuide2,
+		SkillTreeGuide3,
 		Finish, // 終了
 	};
 
@@ -33,7 +45,7 @@ private:
 	void UpdateSkillTree(entt::entity entity, GameScene* scene, bool& outKeyN);
 
 	// 説明文の表示
-	void ShowGuideText();
+	void ShowGuideText(entt::entity entity, GameScene* scene);
 
 	void Installation(GameScene* scene, const std::string& objPath);
 	bool TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3& outHitPoint) const;
@@ -45,8 +57,10 @@ private:
 
 
 
-	TutorialStep tutorialStep_ = TutorialStep::Preparation;
+	TutorialStep tutorialStep_ = TutorialStep::Preparation1;
 	bool stepGuideShown_ = false;
+
+	float autoProceedTimer_ = 0.0f;
 
 	PhaseSystemScript::PhaseState phaseState_ = PhaseSystemScript::PreparationPhase;
 	PhaseSystemScript::PhaseState nextPhaseState_ = PhaseSystemScript::PreparationPhase;

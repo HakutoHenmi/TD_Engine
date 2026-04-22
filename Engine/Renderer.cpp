@@ -219,7 +219,7 @@ bool Renderer::Initialize(WindowDX* window) {
 
 	// テキストシステム初期化
 	// ※"msgothic.ttc" はWindows環境依存ですがテスト用に使用
-	InitTextSystem("C:\\Windows\\Fonts\\msgothic.ttc", 64.0f);
+	InitTextSystem("Resources\\Fonts\\ZenAntique-Regular.ttf", 64.0f);
 
 	return true;
 }
@@ -2682,7 +2682,48 @@ void Renderer::DrawString(const std::string& text, float x, float y, float scale
 
 	auto& vertices = textVerticesMap_[fontPath];
 
-	for (uint32_t cp : codepoints) {
+	Vector4 currentColor = color;
+	std::vector<Vector4> colorStack;
+
+	for (size_t i = 0; i < codepoints.size(); ++i) {
+		uint32_t cp = codepoints[i];
+
+		// Inline color tag parsing
+		if (cp == '<') {
+			std::string tag = "";
+			size_t peek = i;
+			while (peek < codepoints.size() && peek < i + 16) {
+				if (codepoints[peek] < 128) tag += (char)codepoints[peek];
+				if (codepoints[peek] == '>') break;
+				peek++;
+			}
+			if (tag.size() >= 15 && tag.substr(0, 8) == "<color=#" && tag.back() == '>') {
+				std::string hex = tag.substr(8, 6);
+				try {
+					uint32_t rgb = std::stoul(hex, nullptr, 16);
+					Vector4 newColor;
+					float tagR = ((rgb >> 16) & 0xFF) / 255.0f;
+					float tagG = ((rgb >> 8) & 0xFF) / 255.0f;
+					float tagB = ((rgb >> 0) & 0xFF) / 255.0f;
+					newColor.x = tagR * color.x; 
+					newColor.y = tagG * color.y;
+					newColor.z = tagB * color.z;
+					newColor.w = currentColor.w;
+					colorStack.push_back(currentColor);
+					currentColor = newColor;
+					i = peek;
+					continue;
+				} catch(...) {}
+			} else if (tag == "</color>") {
+				if (!colorStack.empty()) {
+					currentColor = colorStack.back();
+					colorStack.pop_back();
+				}
+				i = peek;
+				continue;
+			}
+		}
+
 		// 改行処理
 		if (cp == '\n') {
 			cursorX = x;
@@ -2718,12 +2759,12 @@ void Renderer::DrawString(const std::string& text, float x, float y, float scale
 			float ny1 = toNdcY(yPos + h);
 
 			// 6頂点 (2三角形)
-			TextVertex v0 = { nx0, ny0, glyph->u0, glyph->v0, color.x, color.y, color.z, color.w };
-			TextVertex v1 = { nx1, ny0, glyph->u1, glyph->v0, color.x, color.y, color.z, color.w };
-			TextVertex v2 = { nx0, ny1, glyph->u0, glyph->v1, color.x, color.y, color.z, color.w };
-			TextVertex v3 = { nx0, ny1, glyph->u0, glyph->v1, color.x, color.y, color.z, color.w };
-			TextVertex v4 = { nx1, ny0, glyph->u1, glyph->v0, color.x, color.y, color.z, color.w };
-			TextVertex v5 = { nx1, ny1, glyph->u1, glyph->v1, color.x, color.y, color.z, color.w };
+			TextVertex v0 = { nx0, ny0, glyph->u0, glyph->v0, currentColor.x, currentColor.y, currentColor.z, currentColor.w };
+			TextVertex v1 = { nx1, ny0, glyph->u1, glyph->v0, currentColor.x, currentColor.y, currentColor.z, currentColor.w };
+			TextVertex v2 = { nx0, ny1, glyph->u0, glyph->v1, currentColor.x, currentColor.y, currentColor.z, currentColor.w };
+			TextVertex v3 = { nx0, ny1, glyph->u0, glyph->v1, currentColor.x, currentColor.y, currentColor.z, currentColor.w };
+			TextVertex v4 = { nx1, ny0, glyph->u1, glyph->v0, currentColor.x, currentColor.y, currentColor.z, currentColor.w };
+			TextVertex v5 = { nx1, ny1, glyph->u1, glyph->v1, currentColor.x, currentColor.y, currentColor.z, currentColor.w };
 
 			vertices.push_back(v0);
 			vertices.push_back(v1);
@@ -2817,21 +2858,44 @@ float Renderer::MeasureTextWidth(const std::string& text, float scale, const std
 	auto& cache = it->second;
 
 	auto codepoints = Utf8ToCodepoints(text);
-	float width = 0.0f;
+	float maxWidth = 0.0f;
+	float currentWidth = 0.0f;
 
-	for (uint32_t cp : codepoints) {
-		if (cp == '\n') break;
+	for (size_t i = 0; i < codepoints.size(); ++i) {
+		uint32_t cp = codepoints[i];
+
+		if (cp == '<') {
+			std::string tag = "";
+			size_t peek = i;
+			while (peek < codepoints.size() && peek < i + 16) {
+				if (codepoints[peek] < 128) tag += (char)codepoints[peek];
+				if (codepoints[peek] == '>') break;
+				peek++;
+			}
+			if ((tag.size() >= 15 && tag.substr(0, 8) == "<color=#" && tag.back() == '>') || tag == "</color>") {
+				i = peek;
+				continue;
+			}
+		}
+
+		if (cp == '\n') {
+			if (currentWidth > maxWidth) maxWidth = currentWidth;
+			currentWidth = 0.0f;
+			continue;
+		}
 		if (cp == '\t') {
 			const CachedGlyph* spaceGlyph = cache->GetGlyph(' ');
-			if (spaceGlyph) width += spaceGlyph->metrics.advance * scale * 4.0f;
+			if (spaceGlyph) currentWidth += spaceGlyph->metrics.advance * scale * 4.0f;
 			continue;
 		}
 		const CachedGlyph* glyph = cache->GetGlyph(cp);
 		if (glyph) {
-			width += glyph->metrics.advance * scale;
+			currentWidth += glyph->metrics.advance * scale;
 		}
 	}
-	return width;
+	if (currentWidth > maxWidth) maxWidth = currentWidth;
+
+	return maxWidth;
 }
 
 float Renderer::GetTextLineHeight(float scale, const std::string& fontPath) const {

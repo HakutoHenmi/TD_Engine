@@ -314,8 +314,11 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 					c.enabled = en; 
 					c.text = comp.value("text", ""); 
 					c.fontSize = comp.value("fontSize", 24.0f);
-					c.fontPath = comp.value("fontPath", "C:\\Windows\\Fonts\\msgothic.ttc");
+					c.fontPath = comp.value("fontPath", "Resources\\Fonts\\ZenAntique-Regular.ttf");
 					if (comp.contains("color")) c.color = {comp["color"][0], comp["color"][1], comp["color"][2], comp["color"][3]};
+					c.outlineEnabled = comp.value("outlineEnabled", false);
+					if (comp.contains("outlineColor")) c.outlineColor = {comp["outlineColor"][0], comp["outlineColor"][1], comp["outlineColor"][2], comp["outlineColor"][3]};
+					c.outlineThickness = comp.value("outlineThickness", 2.0f);
 				} else if (type == "UIButton") {
 					auto& c = reg.get_or_emplace<UIButtonComponent>(entity);
 					c.enabled = en;
@@ -458,6 +461,8 @@ static std::string GenerateCopyName(const std::string& baseName, entt::registry&
 }
 
 ViewMode EditorUI::GetViewMode() { return currentViewMode; }
+static bool s_viewportHovered = false;
+bool EditorUI::IsViewportHovered() { return s_viewportHovered; }
 
 // ====== Undo/Redo ======
 void EditorUI::PushUndo(const UndoCommand& cmd) {
@@ -528,7 +533,7 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 	uint32_t id = static_cast<uint32_t>(entity);
 	ss << "      \"id\": " << id << ",\n";
 	
-	uint32_t parentId = 0;
+	uint32_t parentId = static_cast<uint32_t>(entt::null);
 	if (auto* hc = registry.try_get<HierarchyComponent>(entity)) {
 		parentId = static_cast<uint32_t>(hc->parentId);
 	}
@@ -699,7 +704,7 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 	}
 	if (auto* cp = registry.try_get<UITextComponent>(entity)) {
 		addComma();
-		ss << "        {\"type\": \"UIText\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"text\": \"" << EscapeJson(cp->text) << "\", \"fontSize\": " << cp->fontSize << ", \"fontPath\": \"" << EscapeJson(cp->fontPath) << "\", \"color\": [" << cp->color.x << "," << cp->color.y << "," << cp->color.z << "," << cp->color.w << "]}";
+		ss << "        {\"type\": \"UIText\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"text\": \"" << EscapeJson(cp->text) << "\", \"fontSize\": " << cp->fontSize << ", \"fontPath\": \"" << EscapeJson(cp->fontPath) << "\", \"color\": [" << cp->color.x << "," << cp->color.y << "," << cp->color.z << "," << cp->color.w << "], \"outlineEnabled\": " << (cp->outlineEnabled ? "true" : "false") << ", \"outlineThickness\": " << cp->outlineThickness << ", \"outlineColor\": [" << cp->outlineColor.x << "," << cp->outlineColor.y << "," << cp->outlineColor.z << "," << cp->outlineColor.w << "]}";
 	}
 	if (auto* cp = registry.try_get<UIButtonComponent>(entity)) {
 		addComma();
@@ -889,11 +894,20 @@ static void ExecuteDuplicateSelected(GameScene* scene) {
 	ExecutePasteSelected(scene);
 }
 
+static std::string SaveFileDialog(const char* filter, const char* defExt);
+
 void EditorUI::SaveScene(GameScene* scene, const std::string& path) {
 	if (!scene) return;
 	std::string targetPath = path;
 	if (targetPath.empty()) targetPath = currentScenePath;
-	else currentScenePath = targetPath;
+	
+	if (targetPath.empty()) {
+		std::string userPath = SaveFileDialog("JSON Files (*.json)|*.json|All Files (*.*)|*.*|", "json");
+		if (userPath.empty()) return;
+		targetPath = userPath;
+	}
+
+	currentScenePath = targetPath;
 
 	std::string absPath = GetUnifiedProjectPath(targetPath);
 	OutputDebugStringA(("[EditorUI] Saving scene to: " + absPath + "\n").c_str());
@@ -953,8 +967,8 @@ static std::string SaveFileDialog(const char* filter, const char* defExt) {
 	return "";
 }
 
-static void LoadSceneInternal(GameScene* scene, const std::string& path, bool append) {
-	if (!scene) return;
+static bool LoadSceneInternal(GameScene* scene, const std::string& path, bool append) {
+	if (!scene) return false;
 	std::string absPath = EditorUI::GetUnifiedProjectPath(path);
 	OutputDebugStringA(("[EditorUI] LoadSceneInternal: " + absPath + "\n").c_str());
 
@@ -964,24 +978,36 @@ static void LoadSceneInternal(GameScene* scene, const std::string& path, bool ap
 		if (!f.is_open()) {
 			EditorUI::LogError("Load failed: " + absPath);
 			MessageBoxA(NULL, ("Failed to open scene file:\n" + absPath).c_str(), "Load Error", MB_OK | MB_ICONERROR);
-			return;
+			return false;
 		}
 	}
 	json j;
 	try {
 		f >> j;
+		
+		// データ用JSON等をシーン扱いで読み込まないようにチェック
+		if (!j.contains("objects") && !j.contains("settings")) {
+			std::string msg = "This JSON file is not a valid scene format:\n" + absPath;
+			EditorUI::LogError(msg);
+			MessageBoxA(NULL, msg.c_str(), "Format Error", MB_OK | MB_ICONWARNING);
+			return false;
+		}
+
 		RestoreSceneFromJson(scene, j, append);
 		EditorUI::Log((append ? "Scene appended: " : "Scene loaded: ") + absPath);
+		return true;
 	} catch (const std::exception& e) {
 		std::string msg = "JSON Parse Error in " + absPath + ": " + std::string(e.what());
 		EditorUI::LogError(msg);
 		MessageBoxA(NULL, msg.c_str(), "JSON Error", MB_OK | MB_ICONERROR);
+		return false;
 	}
 }
 
 void EditorUI::LoadScene(GameScene* scene, const std::string& path) {
-	currentScenePath = path;
-	(void)LoadSceneInternal(scene, path, false);
+	if (LoadSceneInternal(scene, path, false)) {
+		currentScenePath = path;
+	}
 }
 void EditorUI::AddScene(GameScene* scene, const std::string& path) { (void)LoadSceneInternal(scene, path, true); }
 
@@ -1078,10 +1104,52 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 		ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
 	}
 
+	static bool s_showStartupSceneSelect = true;
+	if (s_showStartupSceneSelect) {
+		ImGui::OpenPopup("Select Startup Scene");
+		s_showStartupSceneSelect = false;
+	}
+
+	if (ImGui::BeginPopupModal("Select Startup Scene", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+		ImGui::Text((const char*)u8"開くシーンを選択してください:");
+		ImGui::Separator();
+		std::string sceneDir = "Resources/Scenes";
+		std::string absSceneDir = GetUnifiedProjectPath(sceneDir);
+		if (std::filesystem::exists(Engine::PathUtils::FromUTF8(absSceneDir))) {
+			for (const auto& entry : std::filesystem::directory_iterator(Engine::PathUtils::FromUTF8(absSceneDir))) {
+				if (entry.path().extension() == ".json") {
+					std::string fileName = entry.path().filename().string();
+					if (fileName == "skills.json" || fileName == "level_data.json" || fileName == "settings.json" || fileName == ".temp_play.json") continue;
+					if (ImGui::Button(fileName.c_str(), ImVec2(250, 0))) {
+						LoadScene(gameScene, sceneDir + "/" + fileName);
+						ImGui::CloseCurrentPopup();
+					}
+				}
+			}
+		}
+		ImGui::Separator();
+		if (ImGui::Button((const char*)u8"新規シーン作成", ImVec2(250, 0))) {
+			gameScene->GetRegistry().clear();
+			gameScene->GetSelectedEntities().clear();
+			gameScene->SetSelectedEntity(entt::null);
+			currentScenePath = ""; // 初回保存時にダイアログを出す
+			ImGui::CloseCurrentPopup();
+		}
+		if (ImGui::Button((const char*)u8"キャンセル", ImVec2(250, 0))) {
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+
 	// Global Shortcuts
+	// ★ Ctrl+S は常に有効（テキスト入力中でも保存可能にする）
+	if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
+		SaveScene(gameScene, currentScenePath);
+	}
+
+	// テキスト入力中は他のショートカットを無効化（誤操作防止）
 	if (!io.WantTextInput) {
 		if (io.KeyCtrl) {
-			if (ImGui::IsKeyPressed(ImGuiKey_S)) SaveScene(gameScene, currentScenePath);
 			if (ImGui::IsKeyPressed(ImGuiKey_Z)) Undo();
 			if (ImGui::IsKeyPressed(ImGuiKey_Y)) Redo();
 			if (ImGui::IsKeyPressed(ImGuiKey_N)) {
@@ -1125,7 +1193,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				gameScene->GetRegistry().clear();
 				gameScene->GetSelectedEntities().clear();
 				gameScene->SetSelectedEntity(entt::null);
-				currentScenePath = "Resources/Scenes/scene.json";
+				currentScenePath = "";
 			}
 			ImGui::Separator();
 			if (ImGui::MenuItem("Open Scene", "Ctrl+O")) {
@@ -1189,12 +1257,30 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Scenes")) {
+			if (ImGui::MenuItem("Generate Default Title UI")) {
+				Engine::SceneParameters p; p.sceneName = "Title";
+				Engine::SceneManager::GetInstance()->RequestChange("Game", p);
+			}
+			if (ImGui::MenuItem("Generate Default Select UI")) {
+				Engine::SceneParameters p; p.sceneName = "Select";
+				Engine::SceneManager::GetInstance()->RequestChange("Game", p);
+			}
+			if (ImGui::MenuItem("Generate Default Result UI")) {
+				Engine::SceneParameters p; p.sceneName = "Result";
+				Engine::SceneManager::GetInstance()->RequestChange("Game", p);
+			}
+			ImGui::Separator();
+
 			std::string sceneDir = "Resources/Scenes";
 			std::string absSceneDir = GetUnifiedProjectPath(sceneDir);
 			if (fs::exists(Engine::PathUtils::FromUTF8(absSceneDir))) {
 				for (const auto& entry : fs::directory_iterator(Engine::PathUtils::FromUTF8(absSceneDir))) {
 					if (entry.path().extension() == ".json") {
 						std::string fileName = entry.path().filename().string();
+						// データ用JSONをシーンリストから除外する
+						if (fileName == "skills.json" || fileName == "level_data.json" || fileName == "settings.json") {
+							continue;
+						}
 						std::string fullPath = sceneDir + "/" + fileName;
 						bool selected = (currentScenePath == fullPath);
 						if (ImGui::MenuItem(fileName.c_str(), nullptr, selected)) {
@@ -1375,6 +1461,8 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	// ★修正: 実際に画像が描画された正確なスクリーン座標を取得
 	gameImageMin = ImGui::GetItemRectMin();
 	gameImageMax = ImGui::GetItemRectMax();
+	// ★追加: ビューポートのホバー状態を更新（Unityライクなカメラ操作用）
+	s_viewportHovered = ImGui::IsItemHovered();
 	
 	// ★追加: UISystemなどの座標変換用にコンテキストへ設定
 	auto& gctx = gameScene->GetContext();
@@ -1397,6 +1485,21 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROJECT_ASSET")) {
 			std::string sPath = (const char*)payload->Data;
 			std::replace(sPath.begin(), sPath.end(), '\\', '/'); // 正規化
+			// Calculate Drop Position via Raycast
+			float pickSx = ImGui::GetMousePos().x - gameImageMin.x;
+			float pickSy = ImGui::GetMousePos().y - gameImageMin.y;
+			DirectX::XMVECTOR rayOrig, rayDir;
+			ScreenToWorldRay(pickSx, pickSy, (float)renderW, (float)renderH, gameScene->GetCamera().View(), gameScene->GetCamera().Proj(), rayOrig, rayDir);
+			float dirY = DirectX::XMVectorGetY(rayDir);
+			Engine::Vector3 dropPos(0, 0, 0);
+			if (std::abs(dirY) > 0.001f) {
+				float t = -DirectX::XMVectorGetY(rayOrig) / dirY;
+				if (t > 0.0f) {
+					DirectX::XMVECTOR hit = DirectX::XMVectorAdd(rayOrig, DirectX::XMVectorScale(rayDir, t));
+					dropPos = { DirectX::XMVectorGetX(hit), DirectX::XMVectorGetY(hit), DirectX::XMVectorGetZ(hit) };
+				}
+			}
+
 			if (sPath.find(".obj") != std::string::npos || sPath.find(".fbx") != std::string::npos) {
 				auto e = gameScene->CreateEntity(fs::path(sPath).stem().string());
 				auto& mr = gameScene->GetRegistry().emplace<MeshRendererComponent>(e);
@@ -1404,7 +1507,32 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				mr.modelHandle = renderer->LoadObjMesh(sPath);
 				mr.texturePath = "Resources/Textures/white1x1.png";
 				mr.textureHandle = renderer->LoadTexture2D(mr.texturePath);
+				
+				auto& tc = gameScene->GetRegistry().get<TransformComponent>(e);
+				tc.translate = { dropPos.x, dropPos.y, dropPos.z };
+
 				gameScene->SetSelectedEntity(e);
+			} else if (sPath.find(".prefab") != std::string::npos) {
+				auto entities = LoadPrefab(gameScene, sPath);
+				if (!entities.empty()) {
+					for (auto e : entities) {
+						bool isRoot = true;
+						if (auto* hc = gameScene->GetRegistry().try_get<HierarchyComponent>(e)) {
+							if (hc->parentId != entt::null) {
+								isRoot = false;
+							}
+						}
+						if (isRoot) {
+							if (auto* tc = gameScene->GetRegistry().try_get<TransformComponent>(e)) {
+								// Move only root entities to preserve relative child positions
+								tc->translate.x += dropPos.x;
+								tc->translate.y += dropPos.y;
+								tc->translate.z += dropPos.z;
+							}
+						}
+					}
+					gameScene->SetSelectedEntity(entities.back());
+				}
 			}
 		}
 		ImGui::EndDragDropTarget();
@@ -1416,8 +1544,8 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 
 	if (!isPlaying && selectedEnt != entt::null && gameScene->GetRegistry().valid(selectedEnt)) {
 		auto& reg = gameScene->GetRegistry();
-		auto* mc = reg.try_get<MotionComponent>(selectedEnt);
-		auto& tc = reg.get<TransformComponent>(selectedEnt);
+		if (auto* tc = reg.try_get<TransformComponent>(selectedEnt)) {
+			auto* mc = reg.try_get<MotionComponent>(selectedEnt);
 		
 		DirectX::XMFLOAT3 currentPos;
 		if (mc && mc->selectedKeyframe >= 0 && mc->clips.count(mc->activeClip)) {
@@ -1425,10 +1553,10 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 			if (mc->selectedKeyframe < (int)kfs.size()) {
 				currentPos = kfs[mc->selectedKeyframe].translate;
 			} else {
-				currentPos = tc.translate;
+				currentPos = tc->translate;
 			}
 		} else {
-			currentPos = tc.translate;
+			currentPos = tc->translate;
 		}
 
 		DirectX::XMVECTOR objPos3D = DirectX::XMLoadFloat3(&currentPos);
@@ -1496,9 +1624,9 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 			if (gizmoDragging) {
 				if (ImGui::IsMouseReleased(0)) {
 					// Undo support
-					DirectX::XMFLOAT3 endT = tc.translate;
-					DirectX::XMFLOAT3 endR = tc.rotate;
-					DirectX::XMFLOAT3 endS = tc.scale;
+					DirectX::XMFLOAT3 endT = tc->translate;
+					DirectX::XMFLOAT3 endR = tc->rotate;
+					DirectX::XMFLOAT3 endS = tc->scale;
 					DirectX::XMFLOAT3 startT = gizmoStartTranslate;
 					DirectX::XMFLOAT3 startR = gizmoStartRotate;
 					DirectX::XMFLOAT3 startS = gizmoStartScale;
@@ -1507,13 +1635,13 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 					PushUndo({
 						"Transform",
 						[=, &reg = gameScene->GetRegistry()]() {
-							if (reg.valid(e)) {
+							if (reg.valid(e) && reg.all_of<TransformComponent>(e)) {
 								auto& t = reg.get<TransformComponent>(e);
 								t.translate = startT; t.rotate = startR; t.scale = startS;
 							}
 						},
 						[=, &reg = gameScene->GetRegistry()]() {
-							if (reg.valid(e)) {
+							if (reg.valid(e) && reg.all_of<TransformComponent>(e)) {
 								auto& t = reg.get<TransformComponent>(e);
 								t.translate = endT; t.rotate = endR; t.scale = endS;
 							}
@@ -1604,12 +1732,13 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 									gizmoHovered = true; // Prevent object picking
 									break;
 								}
+								}
 							}
 						}
 					}
 				}
 			}
-		}
+		} // end if (tc)
 
 		// ★追加: UI Gizmo Logic
 		if (auto* rt = reg.try_get<RectTransformComponent>(selectedEnt)) {
@@ -1706,33 +1835,48 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 
 				if (uiDragging) {
 					gizmoHovered = true;
-					ImVec2 delta = ImGui::GetMouseDragDelta(0);
-					float dx = delta.x / scaleX;
-					float dy = delta.y / scaleY;
+					ImVec2 mDelta = ImGui::GetIO().MouseDelta;
+					float dx = mDelta.x / scaleX;
+					float dy = mDelta.y / scaleY;
 
 					if (uiDragHandle == 0) { // UI Pos
-						rt->pos.x = uiDragStartPos.x + dx;
-						rt->pos.y = uiDragStartPos.y + dy;
+						rt->pos.x += dx;
+						rt->pos.y += dy;
 					} else if (uiDragHandle == 1) { // UI Size
-						rt->size.x = (std::max)(1.0f, uiDragStartSize.x + dx);
-						rt->size.y = (std::max)(1.0f, uiDragStartSize.y + dy);
+						float oldW = rt->size.x;
+						float oldH = rt->size.y;
+						rt->size.x = (std::max)(1.0f, oldW + dx);
+						rt->size.y = (std::max)(1.0f, oldH + dy);
+
+						// ピボットによるズレを補正 (pMinを固定)
+						float addedW = rt->size.x - oldW;
+						float addedH = rt->size.y - oldH;
+						rt->pos.x += rt->pivot.x * addedW;
+						rt->pos.y += rt->pivot.y * addedH;
+
+						// UITextが含まれていればフォントサイズも同期してスケーリングする
+						if (auto* text = reg.try_get<UITextComponent>(selectedEnt)) {
+							if (oldH > 1.0f) {
+								text->fontSize = (std::max)(1.0f, text->fontSize * (rt->size.y / oldH));
+							}
+						}
 					} else if (uiDragHandle == 10) { // Hitbox Offset
 						if (auto* btn = reg.try_get<UIButtonComponent>(selectedEnt)) {
-							btn->hitboxOffset.x = uiDragStartHitOffset.x + dx;
-							btn->hitboxOffset.y = uiDragStartHitOffset.y + dy;
+							btn->hitboxOffset.x += dx;
+							btn->hitboxOffset.y += dy;
 						}
 					} else if (uiDragHandle == 11) { // Hitbox Scale
 						if (auto* btn = reg.try_get<UIButtonComponent>(selectedEnt)) {
-							btn->hitboxScale.x = (std::max)(0.01f, uiDragStartHitScale.x + dx / wr.w);
-							btn->hitboxScale.y = (std::max)(0.01f, uiDragStartHitScale.y + dy / wr.h);
+							btn->hitboxScale.x = (std::max)(0.01f, btn->hitboxScale.x + dx / wr.w);
+							btn->hitboxScale.y = (std::max)(0.01f, btn->hitboxScale.y + dy / wr.h);
 						}
 					}
 
 					if (ImGui::IsMouseReleased(0)) {
 						uiDragging = false;
 						uiDragHandle = -1;
+					}
 				}
-			}
 		}
 	}
 
@@ -1773,6 +1917,7 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 				// 1. UI Picking Pass
 				int maxLayer = -10000;
 				gameScene->GetRegistry().view<RectTransformComponent>().each([&](entt::entity e, const RectTransformComponent&) {
+					if (auto* esc = gameScene->GetRegistry().try_get<EditorStateComponent>(e)) { if (esc->locked) return; }
 					UISystem::WorldRect wr = UISystem::CalculateWorldRect(e, gameScene->GetRegistry(), (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH);
 					if (internalMouseX >= wr.x && internalMouseX <= wr.x + wr.w &&
 						internalMouseY >= wr.y && internalMouseY <= wr.y + wr.h) {
@@ -2623,13 +2768,26 @@ void EditorUI::ShowInspector(GameScene* scene) {
 			if (auto* txt = registry.try_get<UITextComponent>(entity)) {
 				if (ImGui::CollapsingHeader("UIText", ImGuiTreeNodeFlags_DefaultOpen)) {
 					ImGui::Checkbox("Enabled##TXT", &txt->enabled);
-					char tbuf[256]; strcpy_s(tbuf, txt->text.c_str());
-					if (ImGui::InputText("Text", tbuf, sizeof(tbuf))) txt->text = tbuf;
+					char tbuf[2048] = {0}; 
+					strcpy_s(tbuf, sizeof(tbuf), txt->text.c_str());
+					if (ImGui::InputTextMultiline("Text", tbuf, sizeof(tbuf), ImVec2(0, 60), ImGuiInputTextFlags_AllowTabInput)) {
+						txt->text = tbuf;
+					}
+					ImGui::TextDisabled("Help: Use <color=#RRGGBB>Text</color> for colored inline text.");
 					ImGui::DragFloat("Font Size", &txt->fontSize, 1.0f, 1, 100);
 					ImGui::ColorEdit4("Color##TXT", &txt->color.x);
 
+					// ★追加: アウトライン設定
+					ImGui::Checkbox("Outline", &txt->outlineEnabled);
+					if (txt->outlineEnabled) {
+						ImGui::Indent();
+						ImGui::ColorEdit4("Outline Color", &txt->outlineColor.x);
+						ImGui::DragFloat("Thickness", &txt->outlineThickness, 0.1f, 0.1f, 10.0f);
+						ImGui::Unindent();
+					}
+
 					// フォント選択ドロップダウン
-					std::vector<std::string> fonts = { "C:\\Windows\\Fonts\\msgothic.ttc" };
+					std::vector<std::string> fonts = { "Resources\\Fonts\\ZenAntique-Regular.ttf" };
 					std::string fontDir = GetUnifiedProjectPath("Resources/Fonts");
 					if (std::filesystem::exists(Engine::PathUtils::FromUTF8(fontDir))) {
 						for (auto& p : std::filesystem::directory_iterator(Engine::PathUtils::FromUTF8(fontDir))) {
@@ -2918,7 +3076,9 @@ void EditorUI::ShowSceneSettings(Engine::Renderer* renderer) {
 void EditorUI::ShowConsole() {
 	ImGui::Begin("Console");
 	if (ImGui::Button("Clear")) consoleLog.clear();
-	for (const auto& log : consoleLog) ImGui::TextUnformatted(log.message.c_str());
+	for (auto it = consoleLog.rbegin(); it != consoleLog.rend(); ++it) {
+		ImGui::TextUnformatted(it->message.c_str());
+	}
 	ImGui::End();
 }
 

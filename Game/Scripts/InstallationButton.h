@@ -11,6 +11,8 @@ public:
 		Cannon = 0,
 		Pipe,
 		Tank,
+		Missile,
+		PisonTrap,
 		ButtonTypesNum,
 	};
 

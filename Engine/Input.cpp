@@ -1,5 +1,6 @@
 #include "Input.h"
 #include "WindowDX.h"
+#include "imgui.h"
 #include <cassert>
 #include <algorithm>
 #pragma comment(lib, "dinput8.lib")
@@ -64,6 +65,19 @@ void Input::Update() {
 	if (FAILED(mouse_->GetDeviceState(sizeof(DIMOUSESTATE2), &mouseState_))) {
 		mouse_->Acquire();
 		mouse_->GetDeviceState(sizeof(DIMOUSESTATE2), &mouseState_);
+	}
+
+	// エディタUIが入力をキャプチャしている場合、ゲームスクリプト側の入力をブロック
+	// ★注意: プレイ中はゲーム入力を常に有効にする（ビューポートもImGui Image内なのでWantCaptureMouse=trueになるため）
+	// カメラ操作は Camera::Update 側で別途制御するためここではブロックしない
+	gameInputBlocked_ = false;
+	if (ImGui::GetCurrentContext()) {
+		auto& io = ImGui::GetIO();
+		// エディタUIがフォーカスを持っている場合のみフラグを立てる
+		// ※プレイ中かどうかはゲーム側で判断してこのフラグを上書きする
+		if (io.WantCaptureKeyboard || io.WantCaptureMouse) {
+			gameInputBlocked_ = true;
+		}
 	}
 
 	// マウスの移動差分
