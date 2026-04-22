@@ -1,0 +1,97 @@
+{
+  "settings": {
+    "postProcessEnabled": false,
+    "ambientColor": [0.4, 0.4, 0.45],
+    "vignette": 0,
+    "noiseStrength": 0
+  },
+  "objects": [
+    {
+      "id": 1048581,
+      "parentId": 4294967295,
+      "name": "TitleText",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "RectTransform", "enabled": true, "pos": [0,-400], "size": [800,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIText", "enabled": true, "text": "SELECT STAGE", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]}
+      ]
+    },
+    {
+      "id": 1048580,
+      "parentId": 4294967295,
+      "name": "StageButton_0",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Tag", "enabled": true, "tag": "Default"},
+        {"type": "Variable", "enabled": true, "values": {}, "strings": {"Path": "Resources/Scenes/PhaseSystem.json"}},
+        {"type": "RectTransform", "enabled": true, "pos": [0,-82.9258], "size": [500,60], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIText", "enabled": true, "text": "チュートリアルステージ", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
+        {"type": "UIButton", "enabled": true, "normalColor": [0.25,0.25,0.35,1], "hoverColor": [0.4,0.4,0.6,1], "pressedColor": [0.15,0.15,0.25,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+      ]
+    },
+    {
+      "id": 1048579,
+      "parentId": 4294967295,
+      "name": "StageButton_1",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Tag", "enabled": true, "tag": "Default"},
+        {"type": "Variable", "enabled": true, "values": {}, "strings": {"Path": "Resources/Scenes/PhaseSystem.json"}},
+        {"type": "RectTransform", "enabled": true, "pos": [0,158.646], "size": [500,60], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIText", "enabled": true, "text": "ステージ 1", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
+        {"type": "UIButton", "enabled": true, "normalColor": [0.25,0.25,0.35,1], "hoverColor": [0.4,0.4,0.6,1], "pressedColor": [0.15,0.15,0.25,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+      ]
+    },
+    {
+      "id": 1048582,
+      "parentId": 4294967295,
+      "name": "Background",
+      "locked": true,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "RectTransform", "enabled": true, "pos": [0,0], "size": [1920,1080], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [0.1,0.1,0.15,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10}
+      ]
+    },
+    {
+      "id": 1048577,
+      "parentId": 4294967295,
+      "name": "BackButton",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "RectTransform", "enabled": true, "pos": [-800,450], "size": [200,60], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIText", "enabled": true, "text": "BACK", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
+        {"type": "UIButton", "enabled": true, "normalColor": [0.4,0.15,0.15,1], "hoverColor": [0.6,0.2,0.2,1], "pressedColor": [0.3,0.1,0.1,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+      ]
+    },
+    {
+      "id": 1048576,
+      "parentId": 4294967295,
+      "name": "SelectManager",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Script", "enabled": true, "scripts": [{"path": "SelectManagerScript", "param": ""}]}
+      ]
+    }
+  ]
+}
