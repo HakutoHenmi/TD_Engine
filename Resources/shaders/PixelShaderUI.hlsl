@@ -16,6 +16,8 @@ cbuffer CBUI : register(b0)
     float   uRound;        // 角丸半径(px)（四角用）
     float   uInner;        // 三日月の内側半径（円との差分用）
     float   uRotateRad;    // 回転（ラジアン） 2D図形を回転したい時
+    float   uProgress;     // プログレスバーの割合(0.0 - 1.0) ※未使用時は -1.0 などを設定してください
+    float3  _pad;          // アライメント調整用
 }
 
 // 受け取り：頂点で出したUV（0-1）。全画面クアッドならそのまま使える
@@ -105,6 +107,13 @@ float4 mainPS(PSIn i) : SV_TARGET
     } else { // 2: Crescent
         d = sdCrescent(p, uSizePx.x, uInner);
         innerMask = innerMaskByInnerCircle(p, uInner);
+    }
+
+    // 左から右へのプログレス(クリッピング)処理
+    if (uProgress >= 0.0 && uProgress <= 1.0) {
+        float width = (uShape == 0) ? uSizePx.x : uSizePx.x * 2.0;
+        float t = (p.x + width * 0.5) / width;
+        innerMask *= step(t, uProgress);
     }
 
     return drawLineGlow(d, uLineWidth, uGlow, uColor, innerMask);

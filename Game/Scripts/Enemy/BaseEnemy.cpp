@@ -101,8 +101,10 @@ void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 }
 
-void BaseEnemy::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
+void BaseEnemy::OnDestroy(entt::entity /*entity*/, GameScene* scene) {
 	// エンティティがHealthComponentを持っているか確認
+
+	scene->GetEventSystem().Emit("GainExp", expDrop_);
 
 	PhaseSystemScript::PlusCoinCount(10);
 
@@ -117,6 +119,7 @@ void BaseEnemy::OnEditorUI() {
 	if (ImGui::Combo("Enemy Type", &typeNum, types, IM_ARRAYSIZE(types))) {
 		type_ = static_cast<MoveType>(typeNum);
 	}
+	ImGui::DragFloat("Drop EXP", &expDrop_, 1.0f, 0.0f, 10000.0f);
 #endif
 }
 
@@ -201,6 +204,7 @@ std::string BaseEnemy::SerializeParameters() {
 	nlohmann::json j;
 	j["moveType"] = (int)type_;
 	j["speed"] = speed_;
+	j["expDrop"] = expDrop_;
 	return j.dump();
 }
 
@@ -213,6 +217,8 @@ void BaseEnemy::DeserializeParameters(const std::string& data) {
 			type_ = (MoveType)j["moveType"].get<int>();
 		if (j.contains("speed"))
 			speed_ = j["speed"].get<float>();
+		if (j.contains("expDrop"))
+			expDrop_ = j["expDrop"].get<float>();
 	} catch (...) {
 	}
 }

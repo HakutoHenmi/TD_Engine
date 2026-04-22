@@ -8,6 +8,7 @@
 #include "ScriptEngine.h"
 #include <cmath>
 #include <iostream>
+#include <algorithm>
 
 namespace Game {
 
@@ -182,8 +183,14 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 
 	if (!isSubscribed_) {
-		scene->GetEventSystem().Subscribe("GainGold", [this](float amount) {
+		scene->GetEventSystem().Subscribe("GainExp", [this, scene](float amount) {
 			experience_ += amount;
+			if (experience_ >= nextExperience_) {
+				experience_ -= nextExperience_;
+				level_++;
+				nextExperience_ *= 1.5f;
+				scene->GetEventSystem().Emit("GainSkillPoint", 1.0f);
+			}
 			debugReceiveCount_ += 1;
 			debugLastValue_ = amount;
 		});
@@ -380,10 +387,45 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 void PlayerScript::OnEditorUI() {
 #if defined(USE_IMGUI) && !defined(NDEBUG)
 	ImGui::SeparatorText("Player Debug");
-	ImGui::Text("Experience: %.1f", experience_);
+	ImGui::Text("Level: %d", level_);
+	ImGui::Text("Experience: %.1f / %.1f", experience_, nextExperience_);
 	ImGui::Text("Subscribe Count: %d", debugSubscribeCount_);
 	ImGui::Text("Receive Count: %d", debugReceiveCount_);
 	ImGui::Text("Last Value: %.2f", debugLastValue_);
+#endif
+}
+
+void PlayerScript::DrawUI(entt::entity /*entity*/, GameScene* /*scene*/) {
+#if defined(USE_IMGUI)
+	ImDrawList* drawList = ImGui::GetForegroundDrawList();
+	if (!drawList) return;
+
+	// 画面左上に経験値バーを描画
+	float barX = 20.0f;
+	float barY = 20.0f;
+	float barW = 300.0f;
+	float barH = 24.0f;
+
+	float progress = nextExperience_ > 0.0f ? (experience_ / nextExperience_) : 0.0f;
+	progress = std::clamp(progress, 0.0f, 1.0f);
+
+	// 背景 (黒半透明)
+	drawList->AddRectFilled(ImVec2(barX, barY), ImVec2(barX + barW, barY + barH), IM_COL32(30, 30, 30, 200));
+	
+	// 経験値バー本体 (青系)
+	drawList->AddRectFilled(ImVec2(barX, barY), ImVec2(barX + barW * progress, barY + barH), IM_COL32(50, 150, 255, 255));
+	
+	// 外枠 (白)
+	drawList->AddRect(ImVec2(barX, barY), ImVec2(barX + barW, barY + barH), IM_COL32(255, 255, 255, 255));
+
+	// テキスト (Lvと経験値)
+	char textBuf[64];
+	snprintf(textBuf, sizeof(textBuf), "Lv.%d   EXP: %.1f / %.1f", level_, experience_, nextExperience_);
+	
+	// 文字の影
+	drawList->AddText(ImVec2(barX + 11, barY + 4), IM_COL32(0, 0, 0, 255), textBuf);
+	// メインテキスト
+	drawList->AddText(ImVec2(barX + 10, barY + 3), IM_COL32(255, 255, 255, 255), textBuf);
 #endif
 }
 

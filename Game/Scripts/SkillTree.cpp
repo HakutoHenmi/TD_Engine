@@ -90,6 +90,10 @@ void SkillTree::Start(entt::entity entity, GameScene* scene) {
 		texNodeUnlocked_ = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
 		texLine_ = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
 
+		scene->GetEventSystem().Subscribe("GainSkillPoint", [this](float pts) {
+			skillPoints_ += static_cast<int>(pts);
+		});
+
 		initialized_ = true;
 	}
 
