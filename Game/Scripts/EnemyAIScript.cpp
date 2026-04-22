@@ -65,11 +65,18 @@ void EnemyAIScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			float distSq = dx * dx + dy * dy + dz * dz;
 
 			// 視界範囲内なら移動
-			if (distSq <= sightRange_ * sightRange_ && distSq > 0.001f) {
+			if (distSq <= sightRange_ * sightRange_) {
 				float dist = std::sqrt(distSq);
-				myTc.translate.x -= (dx / dist) * speed_ * dt;
-				myTc.translate.y -= (dy / dist) * speed_ * dt;
-				myTc.translate.z -= (dz / dist) * speed_ * dt;
+				float minDistance = 2.2f; // ★ プレイヤーと敵のオブジェクトがめり込まないための最小停止距離
+				if (dist > minDistance) {
+					myTc.translate.x -= (dx / dist) * speed_ * dt;
+					myTc.translate.z -= (dz / dist) * speed_ * dt;
+					// y（高さ）は地形追従や重力に任せるため追従させない（もしくは緩やかに）
+					float dyTarget = (dy / dist) * speed_ * dt;
+					if (std::abs(dy) > 0.5f) {
+						myTc.translate.y -= dyTarget * 0.5f; // 高さ合わせは少し弱める
+					}
+				}
 			}
 		}
 	}
