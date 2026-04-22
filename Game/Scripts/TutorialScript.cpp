@@ -125,6 +125,7 @@ void TutorialScript::EnterStep(TutorialStep step) {
     isPlacementMode_ = false;
     isPipeSet_ = false;
     hasPipeStartPoint_ = false;
+    autoProceedTimer_ = 0.0f;
 
     if (step == TutorialStep::InstallCannonGuide1 || step == TutorialStep::InstallCannonGuide2 || step == TutorialStep::InstallCannonGuide3) {
         hasPlacedTank_ = false;
@@ -231,7 +232,7 @@ void TutorialScript::UpdateSkillTree(entt::entity entity, GameScene* scene, bool
 }
 
 // 毎フレーム呼ばれる更新処理。入力の監視、チュートリアルステップの進行チェック、オブジェクトの設置モード制御などを行う
-void TutorialScript::Update(entt::entity entity, GameScene* scene, float /*dt*/) {
+void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
     auto* input = Engine::Input::GetInstance();
     if (!scene || !input)
         return;
@@ -366,10 +367,12 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float /*dt*/)
         break;
 
     case TutorialStep::FirstBattle1:
-        if (keySpace) EnterStep(TutorialStep::FirstBattle2);
+        autoProceedTimer_ += dt;
+        if (autoProceedTimer_ >= 2.0f) EnterStep(TutorialStep::FirstBattle2);
         break;
     case TutorialStep::FirstBattle2:
-        if (keySpace) EnterStep(TutorialStep::FirstBattle3);
+        autoProceedTimer_ += dt;
+        if (autoProceedTimer_ >= 2.0f) EnterStep(TutorialStep::FirstBattle3);
         break;
     case TutorialStep::FirstBattle3:
         if (keyP) {
@@ -532,11 +535,11 @@ void TutorialScript::ShowGuideText(entt::entity entity, GameScene* scene) {
 
 	case TutorialStep::FirstBattle1:
 		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "いよいよ敵がやってきます。\nSPACE:次へ";
+			scene->GetRegistry().get<UITextComponent>(entity).text = "いよいよ敵がやってきます。";
 		break;
 	case TutorialStep::FirstBattle2:
 		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "後ろの青いタワーを敵から守ろう。\nSPACE:次へ";
+			scene->GetRegistry().get<UITextComponent>(entity).text = "後ろの青いタワーを敵から守ろう。";
 		break;
 	case TutorialStep::FirstBattle3:
 		if (scene->GetRegistry().all_of<UITextComponent>(entity))
@@ -552,7 +555,7 @@ void TutorialScript::ShowGuideText(entt::entity entity, GameScene* scene) {
 		break;
     case TutorialStep::SkillTreeGuide3:
 		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "Nキーでスキルツリーを開いて確認後、SPACEを押して次へ進もう。";
+			scene->GetRegistry().get<UITextComponent>(entity).text = "Nキーでスキルツリーを開いてね！\nSPACEを押したらチュートリアル終了。";
 		break;
 	}
 }

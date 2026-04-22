@@ -53,7 +53,7 @@
       ]
     },
     {
-      "id": 11,
+      "id": 1048587,
       "parentId": 4294967295,
       "name": "Player",
       "locked": true,
@@ -74,7 +74,7 @@
       ]
     },
     {
-      "id": 2097162,
+      "id": 1048586,
       "parentId": 4294967295,
       "name": "Floor",
       "locked": true,
@@ -88,7 +88,7 @@
       ]
     },
     {
-      "id": 2097161,
+      "id": 1048585,
       "parentId": 4294967295,
       "name": "Fede",
       "locked": false,
@@ -102,7 +102,7 @@
       ]
     },
     {
-      "id": 2097160,
+      "id": 1048584,
       "parentId": 4294967295,
       "name": "CannonButton",
       "locked": false,
@@ -117,7 +117,7 @@
       ]
     },
     {
-      "id": 2097159,
+      "id": 1048583,
       "parentId": 4294967295,
       "name": "PipeButton",
       "locked": false,
@@ -125,14 +125,14 @@
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":0}"}]},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":1}"}]},
         {"type": "RectTransform", "enabled": true, "pos": [0,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/PipeButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
-      "id": 2097158,
+      "id": 1048582,
       "parentId": 4294967295,
       "name": "TankButton",
       "locked": false,
@@ -140,27 +140,29 @@
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":0}"}]},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":2}"}]},
         {"type": "RectTransform", "enabled": true, "pos": [-400,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/TankButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
-      "id": 2097157,
+      "id": 1048581,
       "parentId": 4294967295,
       "name": "PhysicsSystem",
       "locked": true,
-      "translate": [0, 0, 0],
+      "translate": [-500, -350, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "TutorialScript", "param": ""}, {"path": "WaveManagement", "param": "{\"spawners\":[[\"Spawner_W1_1\",\"Spawner_W1_2\",\"Spawner_W1_3\"]]}"}]}
+        {"type": "Script", "enabled": true, "scripts": [{"path": "TutorialScript", "param": ""}, {"path": "WaveManagement", "param": "{\"spawners\":[[\"Spawner_W1_1\",\"Spawner_W1_2\",\"Spawner_W1_3\"],[]]}"}]},
+        {"type": "RectTransform", "enabled": true, "pos": [-500,-350], "size": [100,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIText", "enabled": true, "text": "New Text", "fontSize": 50, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]}
       ]
     },
     {
-      "id": 2097156,
-      "parentId": 2097155,
+      "id": 1048580,
+      "parentId": 1048579,
       "name": "PreparationCamera",
       "locked": false,
       "translate": [0, 10, 0],
@@ -176,7 +178,7 @@
       ]
     },
     {
-      "id": 2097155,
+      "id": 1048579,
       "parentId": 4294967295,
       "name": "Core",
       "locked": false,
@@ -191,7 +193,7 @@
       ]
     },
     {
-      "id": 2097154,
+      "id": 1048578,
       "parentId": 4294967295,
       "name": "Spawner_W1_1",
       "locked": false,
@@ -203,7 +205,7 @@
       ]
     },
     {
-      "id": 2097153,
+      "id": 1048577,
       "parentId": 4294967295,
       "name": "Spawner_W1_2",
       "locked": false,
@@ -215,7 +217,7 @@
       ]
     },
     {
-      "id": 2097152,
+      "id": 1048576,
       "parentId": 4294967295,
       "name": "Spawner_W1_3",
       "locked": false,

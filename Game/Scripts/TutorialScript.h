@@ -60,6 +60,8 @@ private:
 	TutorialStep tutorialStep_ = TutorialStep::Preparation1;
 	bool stepGuideShown_ = false;
 
+	float autoProceedTimer_ = 0.0f;
+
 	PhaseSystemScript::PhaseState phaseState_ = PhaseSystemScript::PreparationPhase;
 	PhaseSystemScript::PhaseState nextPhaseState_ = PhaseSystemScript::PreparationPhase;
 	bool isPhaseTransitioning_ = false;
