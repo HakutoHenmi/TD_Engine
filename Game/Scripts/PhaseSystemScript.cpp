@@ -83,7 +83,7 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	NextPhase_ = PreparationPhase;
 	preIsPhase_ = PreparationPhase;
 	currentPhase_ = 0;
-	CoinCount = 0;
+	CoinCount = 30;
 
 	// 状態フラグの初期化
 	isPhaseTransitioning_ = false;

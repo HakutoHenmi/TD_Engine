@@ -3,16 +3,17 @@
 #ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
 #endif
+#include "../ScriptEngine.h"
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
-#include "../ScriptEngine.h"
 
 #include "../PhaseSystemScript.h"
 
 namespace Game {
 
 static bool HasTag(entt::registry& registry, entt::entity entity, TagType tagName) {
-	if (!registry.valid(entity) || !registry.all_of<TagComponent>(entity)) return false;
+	if (!registry.valid(entity) || !registry.all_of<TagComponent>(entity))
+		return false;
 	return registry.get<TagComponent>(entity).tag == tagName;
 }
 
@@ -87,11 +88,10 @@ void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 
 	// 実際の行動
-	if (inAttackRange&& attackCooltime_ == 0.0f) {
+	if (inAttackRange && attackCooltime_ == 0.0f) {
 		// 攻撃範囲内且つクールタイムを満たしていれば足を止めて攻撃
 		ExecuteAttack(entity, scene, dt);
-	}
-	else {
+	} else {
 		// 攻撃関数を呼んでない時は攻撃判定を消す
 		if (registry.all_of<HitboxComponent>(entity)) {
 			registry.get<HitboxComponent>(entity).isActive = false;
@@ -99,23 +99,12 @@ void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
 
 		DefaultMove(entity, scene, dt);
 	}
-
-	
-
 }
 
-void BaseEnemy::OnDestroy(entt::entity entity, GameScene* scene) {
+void BaseEnemy::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
 	// エンティティがHealthComponentを持っているか確認
 
-
-	if (scene->GetRegistry().all_of<HealthComponent>(entity)) {
-		float hp = scene->GetRegistry().get<HealthComponent>(entity).hp;
-
-		// ちゃんとHPが0以下になって倒された場合のみコインを増やす
-		if (hp <= 0.0f) {
-			PhaseSystemScript::PlusCoinCount(10);///////ますやごう
-		}
-	}
+	PhaseSystemScript::PlusCoinCount(10);
 
 	// その他、終了時のクリーンアップなどを記述
 }
@@ -178,8 +167,8 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float /*dt*/)
 			if (h > -9000.0f) {
 				tc.translate.y = h + 0.1f; // 少しだけ浮かせて接地させる
 			}
-		} 
-		//else {
+		}
+		// else {
 		//	// 飛行タイプ（y軸はふわふわさせる）
 		//	rb.velocity.x = vx;
 		//	rb.velocity.z = vz;
@@ -193,55 +182,55 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float /*dt*/)
 		if (std::abs(vx) > 0.1f || std::abs(vz) > 0.1f) {
 			float targetAngle = std::atan2(vx, vz);
 			// 角度の線形補間
-			tc.rotate.y = targetAngle; 
+			tc.rotate.y = targetAngle;
 		}
 	}
 }
 
 void BaseEnemy::Debug() {
-/*
-#ifndef NDEBUG
-#ifdef USE_IMGUI
-	ImGui::Begin("Enemy Debug");
-	ImGui::Text("State: %d", (int)state_);
-	ImGui::Text("GroundHeight : %f", groundHeight_);
-	ImGui::Text("Move Type : %s", (type_ == Fly ? "Fly" : "Walk"));
+	/*
+	#ifndef NDEBUG
+	#ifdef USE_IMGUI
+	    ImGui::Begin("Enemy Debug");
+	    ImGui::Text("State: %d", (int)state_);
+	    ImGui::Text("GroundHeight : %f", groundHeight_);
+	    ImGui::Text("Move Type : %s", (type_ == Fly ? "Fly" : "Walk"));
 
-	if (showDebugGrid_) {
-		ImGui::Text("Local Grid Debug");
-		// 文字列を一括で構築して表示速度を稼ぐ
-		std::string gridStr;
-		gridStr.reserve(GRID_SIZE * (GRID_SIZE * 3 + 1));
+	    if (showDebugGrid_) {
+	        ImGui::Text("Local Grid Debug");
+	        // 文字列を一括で構築して表示速度を稼ぐ
+	        std::string gridStr;
+	        gridStr.reserve(GRID_SIZE * (GRID_SIZE * 3 + 1));
 
-		for (int z = GRID_SIZE - 1; z >= 0; --z) {
-			for (int x = 0; x < GRID_SIZE; ++x) {
-				// そのマスが path_ に含まれているかチェック
-				bool isPath = false;
-				for (const auto& p : path_) {
-					int px = static_cast<int>((p.x - myPos_.x) / cellLength_) + (GRID_SIZE / 2);
-					int pz = static_cast<int>((p.z - myPos_.z) / cellLength_) + (GRID_SIZE / 2);
-					if (px == x && pz == z) {
-						isPath = true;
-						break;
-					}
-				}
+	        for (int z = GRID_SIZE - 1; z >= 0; --z) {
+	            for (int x = 0; x < GRID_SIZE; ++x) {
+	                // そのマスが path_ に含まれているかチェック
+	                bool isPath = false;
+	                for (const auto& p : path_) {
+	                    int px = static_cast<int>((p.x - myPos_.x) / cellLength_) + (GRID_SIZE / 2);
+	                    int pz = static_cast<int>((p.z - myPos_.z) / cellLength_) + (GRID_SIZE / 2);
+	                    if (px == x && pz == z) {
+	                        isPath = true;
+	                        break;
+	                    }
+	                }
 
-				if (x == GRID_SIZE / 2 && z == GRID_SIZE / 2)
-					gridStr += "|S|";
-				else if (isPath)
-					gridStr += " * ";
-				else if (localGrid_[z][x].isWall)
-					gridStr += " # ";
-				else
-					gridStr += " . ";
-			}
-			gridStr += "\n";
-		}
-		ImGui::TextUnformatted(gridStr.c_str());
-	}
-	ImGui::End();
-#endif
-*/
+	                if (x == GRID_SIZE / 2 && z == GRID_SIZE / 2)
+	                    gridStr += "|S|";
+	                else if (isPath)
+	                    gridStr += " * ";
+	                else if (localGrid_[z][x].isWall)
+	                    gridStr += " # ";
+	                else
+	                    gridStr += " . ";
+	            }
+	            gridStr += "\n";
+	        }
+	        ImGui::TextUnformatted(gridStr.c_str());
+	    }
+	    ImGui::End();
+	#endif
+	*/
 }
 
 std::string BaseEnemy::SerializeParameters() {
@@ -271,14 +260,12 @@ void BaseEnemy::SearchTarget(entt::entity entity, GameScene* scene) {
 	entt::entity bestTarget = entt::null;
 	float minDistanceSq = searchRange_ * searchRange_;
 
-
 	// プレイヤーとDefenderの中から一番近いものを探す
 	// プレイヤーを探す
 	const auto& players = scene->GetEntitiesByTag(TagType::Player);
 	for (auto p : players) {
 		auto& t = registry.get<TransformComponent>(p);
-		float distSq = (t.translate.x - myTc.translate.x) * (t.translate.x - myTc.translate.x) + 
-			(t.translate.z - myTc.translate.z) * (t.translate.z - myTc.translate.z);
+		float distSq = (t.translate.x - myTc.translate.x) * (t.translate.x - myTc.translate.x) + (t.translate.z - myTc.translate.z) * (t.translate.z - myTc.translate.z);
 		if (distSq < minDistanceSq) {
 			minDistanceSq = distSq;
 			bestTarget = p;
@@ -289,8 +276,7 @@ void BaseEnemy::SearchTarget(entt::entity entity, GameScene* scene) {
 	const auto& defenders = scene->GetEntitiesByTag(TagType::Defender);
 	for (auto d : defenders) {
 		auto& t = registry.get<TransformComponent>(d);
-		float distSq = (t.translate.x - myTc.translate.x) * (t.translate.x - myTc.translate.x) + 
-			(t.translate.z - myTc.translate.z) * (t.translate.z - myTc.translate.z);
+		float distSq = (t.translate.x - myTc.translate.x) * (t.translate.x - myTc.translate.x) + (t.translate.z - myTc.translate.z) * (t.translate.z - myTc.translate.z);
 		if (distSq < minDistanceSq) {
 			minDistanceSq = distSq;
 			bestTarget = d;
