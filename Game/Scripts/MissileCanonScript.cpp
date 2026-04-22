@@ -137,9 +137,9 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 		attackTimer_ -= dt;
 	}
 
-	if (!isConnectedToTank_) {
-		return;
-	}
+	//if (!isConnectedToTank_) {
+	//	return;
+	//}
 
 	if (!registry.all_of<TransformComponent>(entity)) {
 		return;
