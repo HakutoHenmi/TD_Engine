@@ -188,7 +188,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 				experience_ -= nextExperience_;
 				level_++;
 				nextExperience_ *= 1.5f;
-				scene->GetEventSystem().Dispatch("GainSkillPoint", 1.0f);
+				scene->GetEventSystem().Emit("GainSkillPoint", 1.0f);
 			}
 			debugReceiveCount_ += 1;
 			debugLastValue_ = amount;
