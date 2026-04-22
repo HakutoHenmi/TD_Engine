@@ -106,6 +106,8 @@ void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
 
 void BaseEnemy::OnDestroy(entt::entity entity, GameScene* scene) {
 	// エンティティがHealthComponentを持っているか確認
+
+
 	if (scene->GetRegistry().all_of<HealthComponent>(entity)) {
 		float hp = scene->GetRegistry().get<HealthComponent>(entity).hp;
 
