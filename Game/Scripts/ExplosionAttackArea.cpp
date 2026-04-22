@@ -21,8 +21,8 @@ void ExplosionAttackArea::Start(entt::entity entity, GameScene* scene) {
 		return;
 	}
 
-	damage_ = 10.0f; // GetVar(entity, scene, "Damage", 0.0f);
-	radius_ = GetVar(entity, scene, "ExplosionRadius", 10.0f);
+	damage_ =  GetVar(entity, scene, "Damage", 1.0f);
+	radius_ = GetVar(entity, scene, "ExplosionRadius", 1.0f);
 
 	lifeTime_ = 0.0f;
 

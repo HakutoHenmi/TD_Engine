@@ -137,9 +137,10 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 		attackTimer_ -= dt;
 	}
 
-	//if (!isConnectedToTank_) {
-	//	return;
-	//}
+	// 接続チェックを無効化したいときはこのままコメントアウトでOK
+	// if (!isConnectedToTank_) {
+	// 	return;
+	// }
 
 	if (!registry.all_of<TransformComponent>(entity)) {
 		return;
@@ -147,6 +148,41 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 
 	TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
 
+	// -------------------------------
+	// スキルツリー側の倍率を取得
+	// -------------------------------
+	entt::entity gameManagerEntity = entt::null;
+
+	auto scriptView = registry.view<ScriptComponent>();
+	for (entt::entity checkEntity : scriptView) {
+		const ScriptComponent& scriptComponent = scriptView.get<ScriptComponent>(checkEntity);
+
+		for (const auto& scriptInstance : scriptComponent.scripts) {
+			if (scriptInstance.scriptPath == "PhaseSystemScript" || scriptInstance.scriptPath == "TutorialScript") {
+				gameManagerEntity = checkEntity;
+				break;
+			}
+		}
+
+		if (gameManagerEntity != entt::null) {
+			break;
+		}
+	}
+
+	float attackPowerRateMisile = 1.0f;
+	float attackAreaRateMisile = 1.0f;
+
+	if (gameManagerEntity != entt::null) {
+		attackPowerRateMisile = GetVar(gameManagerEntity, scene, "AttackPowerRateMisile", 1.0f);
+		attackAreaRateMisile = GetVar(gameManagerEntity, scene, "AttackAreaRateMisile", 1.0f);
+	}
+
+	float finalDamage = damage_ * attackPowerRateMisile;
+	float finalExplosionRadius = explosionRadius_ * attackAreaRateMisile;
+
+	// -------------------------------
+	// ターゲット探索
+	// -------------------------------
 	currentTarget_ = entt::null;
 	float bestDistance = attackRange_;
 
@@ -198,6 +234,9 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 		return;
 	}
 
+	// -------------------------------
+	// 弾生成
+	// -------------------------------
 	entt::entity bullet = registry.create();
 
 	TagComponent& bulletTag = registry.emplace<TagComponent>(bullet);
@@ -217,30 +256,25 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 	bulletTransform.rotate.x = -0.8f;
 	bulletTransform.scale = {0.5f, 0.5f, 1.2f};
 
-	auto* renderer = scene->GetRenderer();
+	Engine::Renderer* renderer = scene->GetRenderer();
 	if (renderer) {
 		MeshRendererComponent& bulletMeshRenderer = registry.emplace<MeshRendererComponent>(bullet);
 		bulletMeshRenderer.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
 		bulletMeshRenderer.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 	}
 
-	//HitboxComponent& bulletHitbox = registry.emplace<HitboxComponent>(bullet);
-	//bulletHitbox.isActive = false;
-	//bulletHitbox.damage = 0;
-	//bulletHitbox.tag = TagType::Bullet;
-	//bulletHitbox.size = {1.0f, 1.0f, 1.0f};
-
 	ScriptComponent& bulletScriptComponent = registry.emplace<ScriptComponent>(bullet);
 	bulletScriptComponent.scripts.push_back({"MissileBulletScript", "", nullptr});
 
 	SetVar(bullet, scene, "HasTarget", 1.0f);
 	SetVar(bullet, scene, "TargetEntity", static_cast<float>(static_cast<uint32_t>(currentTarget_)));
-	SetVar(bullet, scene, "Damage", damage_);
-	SetVar(bullet, scene, "ExplosionRadius", explosionRadius_);
+
+	// ここでスキル反映後の完成値を渡す
+	SetVar(bullet, scene, "Damage", finalDamage);
+	SetVar(bullet, scene, "ExplosionRadius", finalExplosionRadius);
 
 	attackTimer_ = currentAttackInterval;
 }
-
 void MissileCanonScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 void MissileCanonScript::OnEditorUI() {

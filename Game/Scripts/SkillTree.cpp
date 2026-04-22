@@ -219,11 +219,15 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 		attackRangeRatePoison *= 1.20f;
 	}
 
+	float attackPowerRateMisile = 1.0f;
+	float attackAreaRateMisile = 1.0f;
+
 	//page3
 	if (IsSkillUnlocked(201)) {
-	
+		attackPowerRateMisile *= 1.50f;
 	}
 	if (IsSkillUnlocked(202)) {
+		attackAreaRateMisile *= 1.50f;
 	}
 
 	if (IsSkillUnlocked(203)) {
@@ -236,6 +240,9 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 	SetVar(entity, scene, "AttackPowerRatePoison", attackPowerRatePoison);
 	SetVar(entity, scene, "AttackRangeRatePoison", attackRangeRatePoison);
 	
+	// misile
+	SetVar(entity, scene, "AttackPowerRateMisile", attackPowerRateMisile);
+	SetVar(entity, scene, "AttackAreaRateMisile", attackAreaRateMisile);
 }
 
 void SkillTree::HandleInput(float screenW, float screenH, float mouseX, float mouseY) {

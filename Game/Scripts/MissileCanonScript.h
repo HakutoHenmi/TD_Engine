@@ -15,8 +15,8 @@ public:
 private:
 	float attackRange_ = 50.0f;
 	float attackInterval_ = 3.0f;
-	float damage_ = 50.0f;
-	float explosionRadius_ = 10.0f;
+	float damage_ = 30.0f;
+	float explosionRadius_ = 2.0f;
 	float attackTimer_ = 0.0f;
 	float rotationSpeed_ = 1.0f;
 

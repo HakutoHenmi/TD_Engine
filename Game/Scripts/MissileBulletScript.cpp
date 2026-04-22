@@ -20,7 +20,6 @@ void MissileBulletScript::Start(entt::entity entity, GameScene* scene) {
 	}
 
 	float hasTargetValue = GetVar(entity, scene, "HasTarget", 0.0f);
-
 	if (hasTargetValue > 0.5f) {
 		float targetEntityValue = GetVar(entity, scene, "TargetEntity", -1.0f);
 
@@ -31,8 +30,8 @@ void MissileBulletScript::Start(entt::entity entity, GameScene* scene) {
 		}
 	}
 
-	damage_ = GetVar(entity, scene, "Damage", 10.0f);
-	explosionRadius_ = GetVar(entity, scene, "ExplosionRadius", 10.0f);
+	damage_ = GetVar(entity, scene, "Damage", 1.0f);
+	explosionRadius_ = GetVar(entity, scene, "ExplosionRadius", 1.0f);
 
 	entt::registry& registry = scene->GetRegistry();
 
@@ -120,7 +119,6 @@ void MissileBulletScript::Update(entt::entity entity, GameScene* scene, float dt
 	missileTransform.translate.z = baseZ;
 
 	float nextT = t + 0.02f;
-
 	if (nextT > 1.0f) {
 		nextT = 1.0f;
 	}
@@ -155,7 +153,6 @@ void MissileBulletScript::Update(entt::entity entity, GameScene* scene, float dt
 		scene->DestroyObject(static_cast<uint32_t>(entity));
 		return;
 	}
-
 }
 
 void MissileBulletScript::CreateExplosionAttackArea(entt::entity entity, GameScene* scene) {
@@ -177,10 +174,11 @@ void MissileBulletScript::CreateExplosionAttackArea(entt::entity entity, GameSce
 
 	entt::entity explosionAttackArea = registry.create();
 
-	if (scene->GetRenderer()) {
+	Engine::Renderer* renderer = scene->GetRenderer();
+	if (renderer) {
 		MeshRendererComponent& explosionMeshRenderer = registry.emplace<MeshRendererComponent>(explosionAttackArea);
-		explosionMeshRenderer.modelHandle = scene->GetRenderer()->LoadObjMesh("Resources/Models/cube/cube.obj");
-		explosionMeshRenderer.textureHandle = scene->GetRenderer()->LoadTexture2D("Resources/Textures/white1x1.png");
+		explosionMeshRenderer.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+		explosionMeshRenderer.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 	}
 
 	TagComponent& explosionTag = registry.emplace<TagComponent>(explosionAttackArea);
