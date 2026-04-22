@@ -82,9 +82,31 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	isPhase_ = PreparationPhase;
 	NextPhase_ = PreparationPhase;
 	preIsPhase_ = PreparationPhase;
+	currentPhase_ = 0;
+	CoinCount = 0;
+
+	// 状態フラグの初期化
 	isPhaseTransitioning_ = false;
 	isFadeFinished_ = false;
+	isPlacementMode_ = false;
+	isPipeSet_ = false;
 	hasPipeStartPoint_ = false;
+
+	// キー入力の初期化
+	preKeyP_ = false;
+	preKeySpace_ = false;
+	preKeyN_ = false;
+
+	// 座標の初期化
+	pipeStartX_ = 0.0f;
+	pipeStartY_ = 0.0f;
+	pipeStartZ_ = 0.0f;
+
+	// 必要に応じてパスやハンドルの初期化
+	selectedObjPath_ = "Resources/Models/cube/cube.obj";
+	previewObjPath_ = "";
+	previewModelHandle_ = 0;
+	previewTextureHandle_ = 0;
 
 	// スキルツリーの初期化
 	if (auto* renderer = Engine::Renderer::GetInstance()) {
@@ -241,6 +263,9 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		// 状態を同期
 		preIsPhase_ = isPhase_;
 	}
+
+	if (scene->GetRegistry().all_of<UITextComponent>(entity))
+		scene->GetRegistry().get<UITextComponent>(entity).text = std::to_string(CoinCount);
 
 	preKeyN_ = keyN;
 }
