@@ -157,9 +157,9 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 
 
 	if (gm != entt::null) {
-		skillPowerRate = GetVar(gm, scene, "AttackPowerRate", 1.0f);
-		skillSpeedRate = GetVar(gm, scene, "AttackSpeedRate", 1.0f);
-		skillRangeRate = GetVar(gm, scene, "AttackRangeRate", 1.0f);
+		skillPowerRate = GetVar(gm, scene, "AttackPowerRateCanon", 1.0f);
+		skillSpeedRate = GetVar(gm, scene, "AttackSpeedRateCanon", 1.0f);
+		skillRangeRate = GetVar(gm, scene, "AttackRangeRateCanon", 1.0f);
 	}
 
 	float currentAttackInterval = attackInterval_ / skillSpeedRate;

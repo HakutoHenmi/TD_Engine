@@ -6,7 +6,8 @@
 #include <cmath>
 #include <unordered_set>
 #include <vector>
-
+#include "ScriptEngine.h"
+#include "ScriptUtils.h"
 #ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
 #endif
@@ -59,13 +60,8 @@ static bool IsConnectedSphere(entt::registry& registry, entt::entity a, entt::en
 }
 
 static void CollectConnectedBulletTanks(
-	entt::registry& registry,
-	entt::entity currentPipe,
-	std::unordered_set<entt::entity>& visitedPipes,
-	std::unordered_set<entt::entity>& foundTanks,
-	const std::vector<entt::entity>& allPipes,
-	const std::vector<entt::entity>& allTanks,
-	float connectRange) {
+    entt::registry& registry, entt::entity currentPipe, std::unordered_set<entt::entity>& visitedPipes, std::unordered_set<entt::entity>& foundTanks, const std::vector<entt::entity>& allPipes,
+    const std::vector<entt::entity>& allTanks, float connectRange) {
 	visitedPipes.insert(currentPipe);
 
 	for (entt::entity tank : allTanks) {
@@ -91,9 +87,7 @@ static void CollectConnectedBulletTanks(
 	}
 }
 
-void PoisonTrap::Start(entt::entity /*entity*/, GameScene* /*scene*/) {
-	poisonTimer_ = 0.0f;
-}
+void PoisonTrap::Start(entt::entity /*entity*/, GameScene* /*scene*/) { poisonTimer_ = 0.0f; }
 
 void PoisonTrap::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (!scene) {
@@ -114,6 +108,8 @@ void PoisonTrap::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	// Debug(isConnectedToTank_); // ★削除: Update 内での ImGui 呼び出しは例外の原因となる可能性があるため
 
+	//タンクと接続確認するためのやつ
+
 	if (!isConnectedToTank_) {
 		return;
 	}
@@ -122,14 +118,34 @@ void PoisonTrap::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	}
 
+	entt::entity gm = entt::null;
+	auto viewScript = registry.view<ScriptComponent>();
+	for (auto e : viewScript) {
+		const auto& sc = viewScript.get<ScriptComponent>(e);
+		for (const auto& instance : sc.scripts) {
+			if (instance.scriptPath == "PhaseSystemScript" || instance.scriptPath == "TutorialScript") {
+				gm = e;
+				break;
+			}
+		}
+		if (gm != entt::null)
+			break;
+	}
 
+	if (gm != entt::null) {
+		skillPowerRate = GetVar(gm, scene, "AttackPowerRatePoison", 1.0f);
+		skillSpeedRate = GetVar(gm, scene, "AttackRangeRatePoison", 1.0f);
+		
+	}
+	poisonDamage_ *= skillPowerRate;
+	poisonRange_ *= skillRangeRate;
+	
 
 	CreatePoisonAttackArea(entity, scene);
 	poisonTimer_ = poisonInterval_;
 }
 
-void PoisonTrap::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
-}
+void PoisonTrap::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 void PoisonTrap::OnEditorUI() {
 #if defined(USE_IMGUI) && !defined(NDEBUG)
@@ -152,7 +168,7 @@ void PoisonTrap::UpdateConnection(entt::entity entity, GameScene* scene) {
 	}
 
 	entt::registry& registry = scene->GetRegistry();
-	float connectRange = 2.5f;
+	float connectRange = 3.0f;
 
 	const std::vector<entt::entity>& allPipes = scene->GetEntitiesByTag(TagType::Pipe);
 	const std::vector<entt::entity>& allTanks = scene->GetEntitiesByTag(TagType::BulletTank);
@@ -176,7 +192,7 @@ void PoisonTrap::UpdateConnection(entt::entity entity, GameScene* scene) {
 		isConnectedToTank_ = false;
 	}
 }
-
+#pragma region HelperFunctions
 bool PoisonTrap::IsEnemyInRange(entt::entity entity, GameScene* scene, float range) {
 	if (!scene) {
 		return false;
@@ -220,6 +236,8 @@ bool PoisonTrap::IsEnemyInRange(entt::entity entity, GameScene* scene, float ran
 	return false;
 }
 
+#pragma endregion
+
 void PoisonTrap::CreatePoisonAttackArea(entt::entity entity, GameScene* scene) {
 	if (!scene) {
 		return;
@@ -250,7 +268,7 @@ void PoisonTrap::CreatePoisonAttackArea(entt::entity entity, GameScene* scene) {
 	TransformComponent& poisonTransform = registry.emplace<TransformComponent>(poisonAttackArea);
 	poisonTransform.translate = trapTransform.translate;
 	poisonTransform.rotate = trapTransform.rotate;
-	poisonTransform.scale = {poisonRange_/2.0f, poisonRange_/2.0f, poisonRange_/2.0f};
+	poisonTransform.scale = {poisonRange_ / 2.0f, poisonRange_ / 2.0f, poisonRange_ / 2.0f};
 
 	HitboxComponent& poisonHitbox = registry.emplace<HitboxComponent>(poisonAttackArea);
 	poisonHitbox.isActive = true;
@@ -260,8 +278,6 @@ void PoisonTrap::CreatePoisonAttackArea(entt::entity entity, GameScene* scene) {
 
 	ScriptComponent& poisonScript = registry.emplace<ScriptComponent>(poisonAttackArea);
 	poisonScript.scripts.push_back({"PoisonAttackArea", "", nullptr});
-
-
 }
 
 void PoisonTrap::Debug(bool /*connected*/) {

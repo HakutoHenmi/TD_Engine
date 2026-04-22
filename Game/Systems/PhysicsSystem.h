@@ -170,10 +170,7 @@ public:
 						float overlap = rA + rB - std::abs(DirectX::XMVectorGetX(DirectX::XMVector3Dot(relPos, L)));
 						if (overlap <= 0.0f) { collision = false; break; }
 						
-						float weight = 1.0f;
-						if (isC1 && isC2 && std::abs(DirectX::XMVectorGetY(L)) > 0.5f) weight = 10.0f;
-
-						if (overlap / weight < minOverlap) {
+						if (overlap < minOverlap) {
 							minOverlap = overlap;
 							DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&mtv), L);
 							if (DirectX::XMVectorGetX(DirectX::XMVector3Dot(relPos, L)) < 0) {
@@ -188,11 +185,7 @@ public:
 						float move1 = rb1.isKinematic ? 0.0f : (rb2.isKinematic ? 1.0f : 0.5f);
 						float move2 = rb2.isKinematic ? 0.0f : (rb1.isKinematic ? 1.0f : 0.5f);
 
-						if (isC1 && isC2) {
-							mtv.y = 0;
-							float xzLen = std::sqrt(mtv.x * mtv.x + mtv.z * mtv.z);
-							if (xzLen > 0.001f) { mtv.x /= xzLen; mtv.z /= xzLen; }
-						}
+						// 純粋なOBBの分離軸定理に基づく押し出しを適用する
 
 						if (move1 > 0) {
 							auto& tc1 = registry.get<TransformComponent>(d1.entity);
@@ -227,6 +220,19 @@ public:
 			ctx.renderer->BeginCollisionCheck(1024);
 
 			for (auto& d : m_dynamics) {
+				auto* tagComp = registry.try_get<TagComponent>(d.entity);
+				if (tagComp && (tagComp->tag == TagType::Enemy || tagComp->tag == TagType::Bullet)) {
+					if (tagComp->tag == TagType::Enemy) {
+						auto& tcEnemy = registry.get<TransformComponent>(d.entity);
+						if (tcEnemy.translate.y < 0.5f) {
+							tcEnemy.translate.y = 0.5f;
+							auto& rbEnemy = registry.get<RigidbodyComponent>(d.entity);
+							rbEnemy.velocity.y = 0.0f;
+						}
+					}
+					continue; // 敵と弾は重いGPU地形判定から除外
+				}
+
 				auto& tc = registry.get<TransformComponent>(d.entity);
 				auto& bc = registry.get<BoxColliderComponent>(d.entity);
 				
