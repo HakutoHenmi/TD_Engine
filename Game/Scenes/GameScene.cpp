@@ -51,11 +51,31 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	// ★ リリース構成等での自動ロード
 	try {
 		std::string scenePath = params.stagePath.empty() ? EditorUI::GetUnifiedProjectPath("Resources/Scenes/scene.json") : params.stagePath;
-		// ★修正: UTF-8文字列をFromUTF8経由でfs::pathに変換し、日本語パスに対応
-		if (std::filesystem::exists(Engine::PathUtils::FromUTF8(scenePath))) {
+		
+		bool useSnapshot = false;
+#ifdef USE_IMGUI
+		if (auto* sm = Engine::SceneManager::GetInstance()) {
+			isPlaying_ = sm->IsGlobalPlaying();
+			if (isPlaying_ && !sm->GetGlobalSnapshot().empty() && 
+			    (EditorUI::GetUnifiedProjectPath(scenePath) == EditorUI::GetUnifiedProjectPath(sm->GetGlobalScenePath()))) {
+				useSnapshot = true;
+			}
+		}
+#endif
+
+		if (useSnapshot) {
+			auto* sm = Engine::SceneManager::GetInstance();
+			OutputDebugStringA(("[GameScene] Restoring from global snapshot for " + scenePath + "...\n").c_str());
+			EditorUI::LoadFromMemory(this, sm->GetGlobalSnapshot());
+			EditorUI::currentScenePath = sm->GetGlobalScenePath();
+			sceneSnapshot_ = sm->GetGlobalSnapshot(); // 現在のスナップショットとして保持
+			loaded = true;
+		} else if (std::filesystem::exists(Engine::PathUtils::FromUTF8(scenePath))) {
 			OutputDebugStringA(("[GameScene] " + scenePath + " found. Loading...\n").c_str());
 			EditorUI::LoadScene(this, scenePath);
+#ifndef USE_IMGUI
 			isPlaying_ = true; // リリース/起動時はプレイ状態から開始する
+#endif
 			sceneSnapshot_ = EditorUI::SaveToMemory(this); // ★追加: 初期ロード直後の状態を保存
 			loaded = true;
 		} else {
@@ -1163,6 +1183,13 @@ void GameScene::SetIsPlaying(bool play) {
 			OutputDebugStringA(logBuf);
 		}
 
+		// ★追加: SceneManagerにも保存（シーン遷移を跨いで保持するため）
+		if (auto* sm = Engine::SceneManager::GetInstance()) {
+			sm->SetGlobalPlaying(true);
+			sm->SetGlobalSnapshot(sceneSnapshot_);
+			sm->SetGlobalScenePath(EditorUI::currentScenePath);
+		}
+
 		isPlaying_ = true;
 	} else {
 		// プレイ停止時: Play ボタンを押した直前の状態 (`sceneSnapshot_`) に戻す
@@ -1176,9 +1203,24 @@ void GameScene::SetIsPlaying(bool play) {
 		}
 
 		isPlaying_ = false;
-		if (!sceneSnapshot_.empty()) {
-			OutputDebugStringA(("[GameScene] Restoring from memory snapshot (size: " + std::to_string(sceneSnapshot_.size()) + ")...\n").c_str());
-			EditorUI::LoadFromMemory(this, sceneSnapshot_);
+
+		// ★修正: SceneManagerのグローバルスナップショットを優先（シーン遷移を跨いだ復元のため）
+		std::string restoreSnapshot = sceneSnapshot_;
+		std::string restorePath;
+		if (auto* sm = Engine::SceneManager::GetInstance()) {
+			if (!sm->GetGlobalSnapshot().empty()) {
+				restoreSnapshot = sm->GetGlobalSnapshot();
+				restorePath = sm->GetGlobalScenePath();
+			}
+			sm->ClearGlobalPlayData();
+		}
+
+		if (!restoreSnapshot.empty()) {
+			OutputDebugStringA(("[GameScene] Restoring from snapshot (size: " + std::to_string(restoreSnapshot.size()) + ")...\n").c_str());
+			EditorUI::LoadFromMemory(this, restoreSnapshot);
+			if (!restorePath.empty()) {
+				EditorUI::currentScenePath = restorePath;
+			}
 
 			// 保存しておいた名前を元に選択状態を復元
 			selectedEntities_.clear();
@@ -1198,13 +1240,11 @@ void GameScene::SetIsPlaying(bool play) {
 				OutputDebugStringA(("[GameScene] Restored selection for " + std::to_string(selectedEntities_.size()) + " entities.\n").c_str());
 			}
 		} else {
-			OutputDebugStringA("[GameScene] ERROR: Memory snapshot is empty on STOP! Falling back to initial state.\n");
+			OutputDebugStringA("[GameScene] ERROR: No snapshot available on STOP! Falling back to initial state.\n");
 			if (!initialSceneSnapshot_.empty()) {
 				EditorUI::LoadFromMemory(this, initialSceneSnapshot_);
 			}
 		}
-		// sceneSnapshot_ = ""; // これを消すと、再開時に残ってしまう可能性があるが、念のため残すか？
-		// 一旦、毎回保存するようにするのでクリアしても良いはず
 		sceneSnapshot_ = "";
 
 		// ★追加: 川のメッシュなど、動的メッシュの再生成

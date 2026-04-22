@@ -42,6 +42,15 @@ public:
 
 	void Clear();
 
+	// ★追加: グローバルPlay状態管理（シーン遷移を跨いでPlay状態とスナップショットを保持）
+	bool IsGlobalPlaying() const { return isGlobalPlaying_; }
+	void SetGlobalPlaying(bool playing) { isGlobalPlaying_ = playing; }
+	void SetGlobalSnapshot(const std::string& snapshot) { globalSnapshot_ = snapshot; }
+	const std::string& GetGlobalSnapshot() const { return globalSnapshot_; }
+	void SetGlobalScenePath(const std::string& path) { globalScenePath_ = path; }
+	const std::string& GetGlobalScenePath() const { return globalScenePath_; }
+	void ClearGlobalPlayData() { isGlobalPlaying_ = false; globalSnapshot_.clear(); globalScenePath_.clear(); }
+
 	// ---- 追加：原因調査＆自動起動用 ----
 	bool Has(const std::string& name) const;
 	std::string FirstRegisteredName() const; // 登録済みの先頭（無ければ空）
@@ -54,6 +63,11 @@ private:
 	std::string pendingNext_;
 	SceneParameters pendingParams_;
 	WindowDX* dx_ = nullptr;
+
+	// ★追加: グローバルPlay状態
+	bool isGlobalPlaying_ = false;
+	std::string globalSnapshot_;    // Play開始時のシーンスナップショット
+	std::string globalScenePath_;   // Play開始時のシーンファイルパス
 
 	static SceneManager* instance_;
 };

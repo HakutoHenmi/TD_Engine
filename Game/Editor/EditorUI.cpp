@@ -314,7 +314,7 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 					c.enabled = en; 
 					c.text = comp.value("text", ""); 
 					c.fontSize = comp.value("fontSize", 24.0f);
-					c.fontPath = comp.value("fontPath", "C:\\Windows\\Fonts\\msgothic.ttc");
+					c.fontPath = comp.value("fontPath", "Resources\\Fonts\\ZenAntique-Regular.ttf");
 					if (comp.contains("color")) c.color = {comp["color"][0], comp["color"][1], comp["color"][2], comp["color"][3]};
 					c.outlineEnabled = comp.value("outlineEnabled", false);
 					if (comp.contains("outlineColor")) c.outlineColor = {comp["outlineColor"][0], comp["outlineColor"][1], comp["outlineColor"][2], comp["outlineColor"][3]};
@@ -2726,7 +2726,7 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					}
 
 					// フォント選択ドロップダウン
-					std::vector<std::string> fonts = { "C:\\Windows\\Fonts\\msgothic.ttc" };
+					std::vector<std::string> fonts = { "Resources\\Fonts\\ZenAntique-Regular.ttf" };
 					std::string fontDir = GetUnifiedProjectPath("Resources/Fonts");
 					if (std::filesystem::exists(Engine::PathUtils::FromUTF8(fontDir))) {
 						for (auto& p : std::filesystem::directory_iterator(Engine::PathUtils::FromUTF8(fontDir))) {

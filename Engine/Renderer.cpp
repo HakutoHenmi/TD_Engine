@@ -219,7 +219,7 @@ bool Renderer::Initialize(WindowDX* window) {
 
 	// テキストシステム初期化
 	// ※"msgothic.ttc" はWindows環境依存ですがテスト用に使用
-	InitTextSystem("C:\\Windows\\Fonts\\msgothic.ttc", 64.0f);
+	InitTextSystem("Resources\\Fonts\\ZenAntique-Regular.ttf", 64.0f);
 
 	return true;
 }
