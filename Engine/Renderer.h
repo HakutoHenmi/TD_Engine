@@ -231,6 +231,13 @@ public:
 	TextureHandle LoadTexture2D(const std::string& filePath, bool sRGB = true);
 	MeshHandle LoadObjMesh(const std::string& objFilePath);
 
+	// ★追加: キューブマップ読み込み (DDS) と Skybox 設定
+	TextureHandle LoadCubeMap(const std::string& ddsPath);
+	void SetSkyboxTexture(TextureHandle cubeMap);
+	TextureHandle GetSkyboxTexture() const { return skyboxCubeMapHandle_; }
+	void SetUseCubemapBackground(bool use) { cbFrame_.useCubemapBackground = use ? 1 : 0; }
+	bool GetUseCubemapBackground() const { return cbFrame_.useCubemapBackground != 0; }
+
 	// ★追加: 動的メッシュの作成と更新
 	MeshHandle CreateDynamicMesh(const std::vector<VertexData>& vertices, const std::vector<uint32_t>& indices);
 	void UpdateDynamicMesh(MeshHandle handle, const std::vector<VertexData>& vertices);
@@ -242,8 +249,8 @@ public:
 	}
 
 	// 通常メッシュ描画
-	void DrawMesh(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, const std::string& shaderName = "Default");
-	void DrawMesh(MeshHandle mesh, TextureHandle texture, const Matrix4x4& worldMatrix, const Vector4& mulColor, const std::string& shaderName = "Default");
+	void DrawMesh(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, const std::string& shaderName = "Default", float reflectivity = 0.0f, bool useCubemap = false);
+	void DrawMesh(MeshHandle mesh, TextureHandle texture, const Matrix4x4& worldMatrix, const Vector4& mulColor, const std::string& shaderName = "Default", float reflectivity = 0.0f, bool useCubemap = false);
 
 	// インスタンス描画の予約
 	void DrawMeshInstanced(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, 
@@ -378,6 +385,8 @@ private:
 		std::vector<Matrix4x4> bones;
 		bool isParticle = false;
 		Vector4 uvScaleOffset;
+		float reflectivity = 0.0f; // ★追加: 環境マップ反射率
+		bool useCubemap = false;   // ★追加: キューブマップ使用フラグ
 	};
 
 	struct InstanceData {
@@ -422,6 +431,11 @@ private:
 	bool InitPostProcess_();
 	bool CreatePSO(const std::string& name, ID3DBlob* vsBlob, ID3DBlob* psBlob);
 	bool CreatePSO(const std::string& name, ID3DBlob* vsBlob, ID3DBlob* psBlob, const D3D12_INPUT_ELEMENT_DESC* layout, UINT numElements);
+
+	// ★追加: Skybox描画
+	void DrawSkybox();
+	void InitSkyboxMesh();
+	bool InitSkyboxPipeline();
 
 	void WaitGPU();
 
@@ -534,6 +548,17 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> shadowSkinPso_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> shadowInstancedPso_;
 
+	// ★追加: Skybox / 環境マップ
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSigSkybox_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoSkybox_;
+	Microsoft::WRL::ComPtr<ID3D12Resource> skyboxVB_;
+	Microsoft::WRL::ComPtr<ID3D12Resource> skyboxIB_;
+	D3D12_VERTEX_BUFFER_VIEW skyboxVBV_{};
+	D3D12_INDEX_BUFFER_VIEW skyboxIBV_{};
+	uint32_t skyboxIndexCount_ = 0;
+	TextureHandle skyboxCubeMapHandle_ = 0;
+	D3D12_GPU_DESCRIPTOR_HANDLE envMapSrvGpu_{}; // 環境マップSRV (3D描画時バインド用)
+
 #ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable : 4324)
@@ -546,7 +571,7 @@ private:
 		float time = 0.0f;
 		Vector4 windParams = {1.0f, 0.0f, 0.5f, 0.2f}; // x,y:方向, z:速度, w:強さ
 		Vector3 playerPos = {0.0f, 0.0f, 0.0f};
-		float pad;
+		uint32_t useCubemapBackground = 0; // ★追加: 背景も環境マップを使うか
 	} cbFrame_{};
 #ifdef _MSC_VER
 #pragma warning(pop)
