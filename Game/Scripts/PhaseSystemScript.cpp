@@ -222,8 +222,8 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			hasPipeStartPoint_ = false;
 		}
 
-		if (key5 || InstallationButton::IsButtonPressed(InstallationButton::PisonTrap)) {
-			selectedObjPath_ = "Resources/Prefabs/PoisonTrap.prefab";
+		if (key5 || InstallationButton::IsButtonPressed(InstallationButton::PoisonTrap)) {
+			selectedObjPath_ = "Resources/Prefabs/Poison.prefab";
 			selectedObjCost_ = poisonCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;

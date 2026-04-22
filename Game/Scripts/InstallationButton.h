@@ -12,7 +12,7 @@ public:
 		Pipe,
 		Tank,
 		Missile,
-		PisonTrap,
+		PoisonTrap,
 		ButtonTypesNum,
 	};
 

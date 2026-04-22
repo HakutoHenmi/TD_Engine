@@ -55,7 +55,7 @@ void InstallationButton::OnEditorUI() {
 #if defined(USE_IMGUI) && !defined(NDEBUG)
 	ImGui::SeparatorText("Installation Button");
 
-	const char* buttonTypeNames[] = {"Cannon", "Pipe", "Tank", "Missile", "PisonTrap"};
+	const char* buttonTypeNames[] = {"Cannon", "Pipe", "Tank", "Missile", "PoisonTrap"};
 	int currentType = static_cast<int>(buttonTypes_);
 	if (ImGui::Combo("Button Type", &currentType, buttonTypeNames, IM_ARRAYSIZE(buttonTypeNames))) {
 		buttonTypes_ = static_cast<ButtonTypes>(currentType);
