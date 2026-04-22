@@ -2,6 +2,7 @@
 #include <Windows.h>
 #include "JobSystem.h"
 #include "Time/TimeManager.h" // ★追加
+#include "Logger.h"
 
 
 namespace Engine {
@@ -13,6 +14,10 @@ bool App::Initialize(HINSTANCE hInst, int cmdShow) {
 
 	// Job Systemの初期化
 	JobSystem::Initialize();
+
+	// ログシステムの初期化
+	Logger::Initialize();
+	Logger::Log("App initialized.");
 
 
 	if (!renderer_.Initialize(&dx_))
@@ -101,6 +106,8 @@ void App::Run() {
 }
 
 void App::Shutdown() {
+	Logger::Log("App shutdown.");
+	Logger::Shutdown();
 	JobSystem::Shutdown();
 #ifdef USE_IMGUI
 	imgui_.Shutdown();
