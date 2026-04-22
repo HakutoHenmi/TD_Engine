@@ -250,7 +250,7 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 
 	// NavigationManagerの初期化
 	flowField_ = std::make_unique<NavigationManager>();
-	flowField_->Initialize(300, 300, 2.0f, -300, -300);
+	flowField_->Initialize(350, 350, 2.0f, -350, -350);
 
 	//ステージロード直後に一度地形を読み込む
 	flowField_->UpdateCostMap(this);

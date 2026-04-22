@@ -41,7 +41,7 @@
       "components": [
         {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Scenes/Map/Ground.obj", "texturePath": "", "shaderName": "Default", "color": [0.644788,0.363471,0.363471,1], "uvTiling": [1,1], "uvOffset": [0,0]},
         {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,1,1], "isTrigger": false},
-        {"type": "Tag", "enabled": true, "tag": "Wall"}
+        {"type": "Tag", "enabled": true, "tag": "Default"}
       ]
     },
     {
