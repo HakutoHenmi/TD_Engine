@@ -193,7 +193,19 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	} else {
 		currentTarget_ = entt::null;
 	}
+	if (currentTarget_ != entt::null) {
+		TransformComponent& currentTargetTransform = registry.get<TransformComponent>(currentTarget_);
 
+		float diffX = currentTargetTransform.translate.x - canonTransform.translate.x;
+		float diffY = currentTargetTransform.translate.y - canonTransform.translate.y;
+		float diffZ = currentTargetTransform.translate.z - canonTransform.translate.z;
+
+		float distanceToCurrentTarget = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
+
+		if (distanceToCurrentTarget > currentRange) {
+			currentTarget_ = entt::null;
+		}
+	}
 	if (currentTarget_ == entt::null) {
 		float bestDistance = currentRange;
 
