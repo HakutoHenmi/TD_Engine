@@ -37,9 +37,15 @@ bool SceneManager::Change(const std::string& name, const SceneParameters& params
 	current_ = it->second();
 	currentName_ = name;
 
+	// ★追加: sceneNameが空の場合、シーンキー名を自動設定
+	SceneParameters adjustedParams = params;
+	if (adjustedParams.sceneName.empty()) {
+		adjustedParams.sceneName = name;
+	}
+
 	if (current_) {
 		OutputDebugStringA("[SceneManager] Initialize scene\n");
-		current_->Initialize(dx_, params);
+		current_->Initialize(dx_, adjustedParams);
 	}
 
 	pendingNext_.clear();

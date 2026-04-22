@@ -28,10 +28,16 @@ UISystem::WorldRect UISystem::CalculateWorldRect(entt::entity entity, entt::regi
         
         if (registry.all_of<HierarchyComponent>(current)) {
             entt::entity parentId = registry.get<HierarchyComponent>(current).parentId;
-            if (parentId != entt::null) {
+            if (parentId != entt::null && registry.valid(parentId)) {
                 parent = parentId;
             }
         }
+        
+        // ★循環参照による無限ループ防止
+        if (std::find(path.begin(), path.end(), parent) != path.end()) {
+            break;
+        }
+        
         current = parent;
     }
     std::reverse(path.begin(), path.end());

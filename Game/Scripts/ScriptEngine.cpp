@@ -75,7 +75,13 @@ void ScriptEngine::Shutdown() {
 void ScriptEngine::RegisterScript(const std::string& className, ScriptCreator creator) { scriptFactory_[className] = creator; }
 
 std::shared_ptr<IScript> ScriptEngine::CreateScript(const std::string& className) {
-	auto it = scriptFactory_.find(className);
+	// ★追加: 古いJSON等で "EnemyBehavior" が指定されていた場合の互換性フォールバック対策
+	std::string targetName = className;
+	if (targetName == "EnemyBehavior" || targetName == "EnemyAIScript") {
+		targetName = "Warrior";
+	}
+
+	auto it = scriptFactory_.find(targetName);
 	if (it != scriptFactory_.end()) {
 		return it->second();
 	}

@@ -21,6 +21,9 @@
 #include "../Systems/ScriptSystem.h"
 #include "../Systems/UISystem.h"
 #include "../Scripts/WaveManagement.h"
+#include "../Scripts/TitleManagerScript.h"
+#include "../Scripts/SelectManagerScript.h"
+#include "../Scripts/ResultManagerScript.h"
 #include "imgui.h"
 #include <Windows.h> // OutputDebugStringA
 #include <algorithm>
@@ -39,6 +42,7 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	dx_ = dx;
 	renderer_ = Engine::Renderer::GetInstance();
 	eventSystem_.Clear(); // ★追加: イベントリスナーをクリア
+	WaveManagement::ResetState(); // ★追加: ゲーム状態を完全にリセット
 	playTime_ = 0.0f;
 	camera_.Initialize();
 	// ★追加: 明示的にプロジェクションを設定 (1920x1080のアスペクト比)
@@ -48,9 +52,23 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	renderer_->SetAmbientColor({0.4f, 0.4f, 0.45f});
 
 	bool loaded = false;
-	// ★ リリース構成等での自動ロード
+	// ★変更: シーン名に応じてロードするJSONパスを決定
+	std::string sceneName = params.sceneName;
+	sceneName_ = sceneName; // ★追加: メンバーに保存
+	std::string scenePath;
 	try {
-		std::string scenePath = params.stagePath.empty() ? EditorUI::GetUnifiedProjectPath("Resources/Scenes/scene.json") : params.stagePath;
+		// シーン名に応じたデフォルトJSONパスのマッピング
+		if (!params.stagePath.empty()) {
+			scenePath = EditorUI::GetUnifiedProjectPath(params.stagePath);
+		} else if (sceneName == "Title") {
+			scenePath = EditorUI::GetUnifiedProjectPath("Resources/Scenes/title.json");
+		} else if (sceneName == "Select") {
+			scenePath = EditorUI::GetUnifiedProjectPath("Resources/Scenes/select.json");
+		} else if (sceneName == "Result") {
+			scenePath = EditorUI::GetUnifiedProjectPath("Resources/Scenes/result.json");
+		} else {
+			scenePath = EditorUI::GetUnifiedProjectPath("Resources/Scenes/scene.json");
+		}
 		
 		bool useSnapshot = false;
 #ifdef USE_IMGUI
@@ -73,9 +91,6 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 		} else if (std::filesystem::exists(Engine::PathUtils::FromUTF8(scenePath))) {
 			OutputDebugStringA(("[GameScene] " + scenePath + " found. Loading...\n").c_str());
 			EditorUI::LoadScene(this, scenePath);
-#ifndef USE_IMGUI
-			isPlaying_ = true; // リリース/起動時はプレイ状態から開始する
-#endif
 			sceneSnapshot_ = EditorUI::SaveToMemory(this); // ★追加: 初期ロード直後の状態を保存
 			loaded = true;
 		} else {
@@ -87,35 +102,75 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 		MessageBoxA(NULL, msg.c_str(), "Scene Load Error", MB_OK | MB_ICONERROR);
 	}
 
-	// 既にオブジェクトが存在する場合（リスタート時）やロード失敗時は最低限の内容を作成
+	// ★変更: JSONが存在しない場合のフォールバック処理（シーン名に応じて分岐）
 	if (registry_.storage<entt::entity>().empty() || !loaded) {
-		auto sun = registry_.create();
-		registry_.emplace<NameComponent>(sun, "Sun");
-		registry_.emplace<TransformComponent>(
-		    sun, DirectX::XMFLOAT3{0, 10, 0}, DirectX::XMFLOAT3{DirectX::XMConvertToRadians(45.0f), DirectX::XMConvertToRadians(30.0f), 0}, DirectX::XMFLOAT3{1, 1, 1});
-		registry_.emplace<DirectionalLightComponent>(sun);
+		if (sceneName == "Title" || sceneName == "Select" || sceneName == "Result") {
+			// Title/Select/Result: マネージャースクリプトのみ生成（UIは直接作成）
+			std::string scriptName;
+			if (sceneName == "Title") {
+				scriptName = "TitleManagerScript";
+				TitleManagerScript::CreateFallbackUI(this);
+			} else if (sceneName == "Select") {
+				scriptName = "SelectManagerScript";
+				SelectManagerScript::CreateFallbackUI(this);
+			} else if (sceneName == "Result") {
+				scriptName = "ResultManagerScript";
+				ResultManagerScript::CreateFallbackUI(this, params.isWin, params.score, params.clearTime);
+			}
 
-		auto plane = registry_.create();
-		registry_.emplace<NameComponent>(plane, "Plane");
+			auto manager = registry_.create();
+			registry_.emplace<NameComponent>(manager, sceneName + "Manager");
+			auto& sc = registry_.emplace<ScriptComponent>(manager);
+			sc.scripts.push_back({scriptName});
 
-		auto& mesh = registry_.emplace<MeshRendererComponent>(plane);
-		mesh.modelHandle = renderer_->LoadObjMesh("Resources/Models/plane.obj");
-		mesh.textureHandle = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
-		mesh.modelPath = "Resources/Models/plane.obj";
-		mesh.texturePath = "Resources/Textures/white1x1.png";
+			// Resultシーンの場合、パラメータをVariableComponentで渡す
+			if (sceneName == "Result") {
+				auto& vars = registry_.emplace<VariableComponent>(manager);
+				vars.SetValue("isWin", params.isWin ? 1.0f : 0.0f);
+				vars.SetValue("score", static_cast<float>(params.score));
+				vars.SetValue("clearTime", params.clearTime);
+			}
 
-		registry_.emplace<TransformComponent>(plane, DirectX::XMFLOAT3{0, 0, 0}, DirectX::XMFLOAT3{0, 0, 0}, DirectX::XMFLOAT3{20, 1, 20});
+			// ★変更: スクリプトのインスタンス化と初期化を即座に行い、STOP中でもUIとして機能させる
+			if (auto instance = ScriptEngine::GetInstance()->CreateScript(scriptName)) {
+				sc.scripts[0].instance = instance;
+				instance->Start(manager, this);
+				sc.scripts[0].parameterData = instance->SerializeParameters();
+			}
 
-		// ★追加: 物理判定用にGpuMeshColliderを付与
-		auto& gmc = registry_.emplace<GpuMeshColliderComponent>(plane);
-		gmc.meshHandle = mesh.modelHandle;
-		gmc.enabled = true;
+			// ★追加: 保存時に誤ってscene.jsonを上書きしないよう、パスを同期
+			EditorUI::currentScenePath = scenePath;
+			sceneSnapshot_ = EditorUI::SaveToMemory(this); // フォールバック生成直後も初期状態として保存
+		} else {
+			// Game: 従来のフォールバック（Sun + Plane + PhaseSystem）
+			auto sun = registry_.create();
+			registry_.emplace<NameComponent>(sun, "Sun");
+			registry_.emplace<TransformComponent>(
+			    sun, DirectX::XMFLOAT3{0, 10, 0}, DirectX::XMFLOAT3{DirectX::XMConvertToRadians(45.0f), DirectX::XMConvertToRadians(30.0f), 0}, DirectX::XMFLOAT3{1, 1, 1});
+			registry_.emplace<DirectionalLightComponent>(sun);
 
-		// 準備フェーズシステムの作成 (フォールバック)
-		auto ps = registry_.create();
-		registry_.emplace<NameComponent>(ps, "PhaseSystem");
-		auto& sc = registry_.emplace<ScriptComponent>(ps);
-		sc.scripts.push_back({"PhaseSystemScript"});
+			auto plane = registry_.create();
+			registry_.emplace<NameComponent>(plane, "Plane");
+
+			auto& mesh = registry_.emplace<MeshRendererComponent>(plane);
+			mesh.modelHandle = renderer_->LoadObjMesh("Resources/Models/plane.obj");
+			mesh.textureHandle = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
+			mesh.modelPath = "Resources/Models/plane.obj";
+			mesh.texturePath = "Resources/Textures/white1x1.png";
+
+			registry_.emplace<TransformComponent>(plane, DirectX::XMFLOAT3{0, 0, 0}, DirectX::XMFLOAT3{0, 0, 0}, DirectX::XMFLOAT3{20, 1, 20});
+
+			// ★追加: 物理判定用にGpuMeshColliderを付与
+			auto& gmc = registry_.emplace<GpuMeshColliderComponent>(plane);
+			gmc.meshHandle = mesh.modelHandle;
+			gmc.enabled = true;
+
+			// 準備フェーズシステムの作成 (フォールバック)
+			auto ps = registry_.create();
+			registry_.emplace<NameComponent>(ps, "PhaseSystem");
+			auto& sc = registry_.emplace<ScriptComponent>(ps);
+			sc.scripts.push_back({"PhaseSystemScript"});
+		}
 	}
 
 	// エディターUIの初期化
@@ -216,6 +271,11 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	// 初期状態はメニュー非表示
 	for (auto e : pauseMainEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
 	for (auto e : pauseSettingsEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+
+#ifndef _DEBUG
+	// リリースビルドではシーンファイルの有無に関わらず確実にプレイ状態から開始する
+	isPlaying_ = true;
+#endif
 }
 
 // =====================================================
@@ -289,10 +349,15 @@ void GameScene::Update() {
 	if (isPlaying_)
 		playTime_ += dt;
 
-	// ★ 勝利/敗北判定 (テスト用)
-	if (isPlaying_) {
+	// ★ 勝利/敗北判定 (テスト用) - ★変更: Gameシーンのみ
+	if (isPlaying_ && sceneName_ == "Game") {
 		bool inputBlocked = Engine::Input::GetInstance()->IsGameInputBlocked();
-		bool win = (!inputBlocked && Engine::Input::GetInstance()->Trigger(DIK_G)) || WaveManagement::IsWaveEnded();
+		bool win = (!inputBlocked && Engine::Input::GetInstance()->Trigger(DIK_G));
+		if (auto waveEntity = WaveManagement::GetManagerEntity(); waveEntity != entt::null && registry_.valid(waveEntity)) {
+			if (WaveManagement::IsWaveEnded()) {
+				win = true;
+			}
+		}
 		bool loss = (!inputBlocked && Engine::Input::GetInstance()->Trigger(DIK_J));
 
 		// プレイヤーの生存確認 (Viewを直接参照して同期ズレを防ぐ)
@@ -1220,6 +1285,11 @@ void GameScene::SetIsPlaying(bool play) {
 			EditorUI::LoadFromMemory(this, restoreSnapshot);
 			if (!restorePath.empty()) {
 				EditorUI::currentScenePath = restorePath;
+				std::string p = restorePath;
+				if (p.find("title.json") != std::string::npos) sceneName_ = "Title";
+				else if (p.find("select.json") != std::string::npos) sceneName_ = "Select";
+				else if (p.find("result.json") != std::string::npos) sceneName_ = "Result";
+				else sceneName_ = "Game";
 			}
 
 			// 保存しておいた名前を元に選択状態を復元

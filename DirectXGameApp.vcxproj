@@ -186,9 +186,9 @@ exit /b 0
     <ClCompile Include="Game\Editor\EnemySpawnerEditor.cpp" />
     <ClCompile Include="Game\main.cpp" />
     <ClCompile Include="Game\Scenes\GameScene.cpp" />
-    <ClCompile Include="Game\Scenes\TitleScene.cpp" />
-    <ClCompile Include="Game\Scenes\SelectScene.cpp" />
-    <ClCompile Include="Game\Scenes\ResultScene.cpp" />
+    <ClCompile Include="Game\Scripts\TitleManagerScript.cpp" />
+    <ClCompile Include="Game\Scripts\SelectManagerScript.cpp" />
+    <ClCompile Include="Game\Scripts\ResultManagerScript.cpp" />
     <ClCompile Include="Game\Scripts\BaseScript.cpp" />
     <ClCompile Include="Game\Scripts\BulletScript.cpp" />
     <ClCompile Include="Game\Scripts\BulletTank.cpp" />
@@ -233,9 +233,9 @@ exit /b 0
     <ClInclude Include="Game\Editor\PipeEditor.h" />
     <ClInclude Include="Game\Editor\EnemySpawnerEditor.h" />
     <ClInclude Include="Game\Scenes\GameScene.h" />
-    <ClInclude Include="Game\Scenes\TitleScene.h" />
-    <ClInclude Include="Game\Scenes\SelectScene.h" />
-    <ClInclude Include="Game\Scenes\ResultScene.h" />
+    <ClInclude Include="Game\Scripts\TitleManagerScript.h" />
+    <ClInclude Include="Game\Scripts\SelectManagerScript.h" />
+    <ClInclude Include="Game\Scripts\ResultManagerScript.h" />
     <ClInclude Include="Game\ObjectTypes.h" />
     <ClInclude Include="Game\Scripts\BaseScript.h" />
     <ClInclude Include="Game\Scripts\BulletScript.h" />
