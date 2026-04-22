@@ -220,6 +220,19 @@ public:
 			ctx.renderer->BeginCollisionCheck(1024);
 
 			for (auto& d : m_dynamics) {
+				auto* tagComp = registry.try_get<TagComponent>(d.entity);
+				if (tagComp && (tagComp->tag == TagType::Enemy || tagComp->tag == TagType::Bullet)) {
+					if (tagComp->tag == TagType::Enemy) {
+						auto& tcEnemy = registry.get<TransformComponent>(d.entity);
+						if (tcEnemy.translate.y < 0.5f) {
+							tcEnemy.translate.y = 0.5f;
+							auto& rbEnemy = registry.get<RigidbodyComponent>(d.entity);
+							rbEnemy.velocity.y = 0.0f;
+						}
+					}
+					continue; // 敵と弾は重いGPU地形判定から除外
+				}
+
 				auto& tc = registry.get<TransformComponent>(d.entity);
 				auto& bc = registry.get<BoxColliderComponent>(d.entity);
 				

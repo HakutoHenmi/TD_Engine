@@ -15,6 +15,7 @@
 #include <cmath>
 #include <fstream>
 #include <vector>
+#include <unordered_map>
 #if defined(USE_IMGUI) && !defined(NDEBUG)
 #include <imgui.h>
 #endif
@@ -809,6 +810,13 @@ bool TutorialScript::IsPrefabPath(const std::string& path) const {
 
 // プレハブファイルからモデルとテクスチャのパスを抽出する
 bool TutorialScript::ExtractPrefabRenderPaths(const std::string& prefabPath, std::string& outModelPath, std::string& outTexturePath) const {
+    static std::unordered_map<std::string, std::pair<std::string, std::string>> cache;
+    if (cache.find(prefabPath) != cache.end()) {
+        outModelPath = cache[prefabPath].first;
+        outTexturePath = cache[prefabPath].second;
+        return true;
+    }
+
     std::string absPath = EditorUI::GetUnifiedProjectPath(prefabPath);
     std::ifstream f(Engine::PathUtils::FromUTF8(absPath));
     if (!f.is_open()) {
@@ -839,7 +847,11 @@ bool TutorialScript::ExtractPrefabRenderPaths(const std::string& prefabPath, std
     extractValue("\"modelPath\"", outModelPath);
     extractValue("\"texturePath\"", outTexturePath);
 
-    return !outModelPath.empty();
+    if (!outModelPath.empty()) {
+        cache[prefabPath] = {outModelPath, outTexturePath};
+        return true;
+    }
+    return false;
 }
 
 // 指定した位置に既に他のオブジェクトが存在し、設置がブロックされるかどうかを判定する

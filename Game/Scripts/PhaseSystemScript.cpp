@@ -16,6 +16,7 @@
 #include "../../Engine/Input.h"
 #include "../../Engine/WindowDX.h"
 #include <iostream>
+#include <unordered_map>
 
 // Button UI
 #include "InstallationButton.h"
@@ -555,6 +556,13 @@ bool PhaseSystemScript::IsPrefabPath(const std::string& path) const {
 }
 
 bool PhaseSystemScript::ExtractPrefabRenderPaths(const std::string& prefabPath, std::string& outModelPath, std::string& outTexturePath) const {
+	static std::unordered_map<std::string, std::pair<std::string, std::string>> cache;
+	if (cache.find(prefabPath) != cache.end()) {
+		outModelPath = cache[prefabPath].first;
+		outTexturePath = cache[prefabPath].second;
+		return true;
+	}
+
 	std::string absPath = EditorUI::GetUnifiedProjectPath(prefabPath);
 	// ★修正: UTF-8パスをFromUTF8経由でワイドパスに変換してオープン
 	std::ifstream f(Engine::PathUtils::FromUTF8(absPath));
@@ -586,7 +594,11 @@ bool PhaseSystemScript::ExtractPrefabRenderPaths(const std::string& prefabPath, 
 	extractValue("\"modelPath\"", outModelPath);
 	extractValue("\"texturePath\"", outTexturePath);
 
-	return !outModelPath.empty();
+	if (!outModelPath.empty()) {
+		cache[prefabPath] = {outModelPath, outTexturePath};
+		return true;
+	}
+	return false;
 }
 
 bool PhaseSystemScript::IsPlacementBlocked(GameScene* scene, const Engine::Vector3& hitPoint) const {
