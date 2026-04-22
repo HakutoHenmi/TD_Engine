@@ -93,7 +93,7 @@ entt::entity GetFacilityInRange(GameScene* scene, float x, float z, float range 
 
 // チュートリアルスクリプトの初期化処理。フェーズや変数の初期化、スキルツリーの読み込みなどを行う
 void TutorialScript::Start(entt::entity entity, GameScene* scene) {
-    tutorialStep_ = TutorialStep::Preparation;
+    tutorialStep_ = TutorialStep::Preparation1;
     phaseState_ = PhaseSystemScript::PreparationPhase;
     nextPhaseState_ = PhaseSystemScript::PreparationPhase;
     isPhaseTransitioning_ = false;
@@ -126,18 +126,22 @@ void TutorialScript::EnterStep(TutorialStep step) {
     isPipeSet_ = false;
     hasPipeStartPoint_ = false;
 
-    if (step == TutorialStep::InstallCannonGuide) {
+    if (step == TutorialStep::InstallCannonGuide1 || step == TutorialStep::InstallCannonGuide2 || step == TutorialStep::InstallCannonGuide3) {
         hasPlacedTank_ = false;
         hasPlacedPipe_ = false;
         hasPlacedCannon_ = false;
     }
 
-    if (step == TutorialStep::SkillTreeGuide) {
+    if (step == TutorialStep::SkillTreeGuide1 || step == TutorialStep::SkillTreeGuide2 || step == TutorialStep::SkillTreeGuide3) {
         hasOpenedSkillTreeInGuide_ = false;
         skillTree_.Close();
     }
 
-    if (step == TutorialStep::Preparation || step == TutorialStep::InstallCannonGuide || step == TutorialStep::InstallTankGuide || step == TutorialStep::InstallPipeGuide || step == TutorialStep::SkillTreeGuide) {
+    if (step == TutorialStep::Preparation1 || step == TutorialStep::Preparation2 || step == TutorialStep::Preparation3 || 
+        step == TutorialStep::InstallCannonGuide1 || step == TutorialStep::InstallCannonGuide2 || step == TutorialStep::InstallCannonGuide3 || 
+        step == TutorialStep::InstallTankGuide1 || step == TutorialStep::InstallTankGuide2 || step == TutorialStep::InstallTankGuide3 || 
+        step == TutorialStep::InstallPipeGuide1 || step == TutorialStep::InstallPipeGuide2 || step == TutorialStep::InstallPipeGuide3 || 
+        step == TutorialStep::SkillTreeGuide1 || step == TutorialStep::SkillTreeGuide2 || step == TutorialStep::SkillTreeGuide3) {
         RequestPhaseChange(PhaseSystemScript::PreparationPhase);
     } else {
         RequestPhaseChange(PhaseSystemScript::BattlePhase);
@@ -150,22 +154,34 @@ void TutorialScript::ShowStepGuide() {
         return;
 
     switch (tutorialStep_) {
-    case TutorialStep::Preparation:
+    case TutorialStep::Preparation1:
+    case TutorialStep::Preparation2:
+    case TutorialStep::Preparation3:
         EditorUI::Log("Tutorial: 準備フェーズです。Spaceで次の説明へ進みます。");
         break;
-    case TutorialStep::InstallCannonGuide:
+    case TutorialStep::InstallCannonGuide1:
+    case TutorialStep::InstallCannonGuide2:
+    case TutorialStep::InstallCannonGuide3:
         EditorUI::Log("Tutorial: 大砲の設置説明。大砲を1つ設置してください。(3キー)");
         break;
-    case TutorialStep::InstallTankGuide:
+    case TutorialStep::InstallTankGuide1:
+    case TutorialStep::InstallTankGuide2:
+    case TutorialStep::InstallTankGuide3:
         EditorUI::Log("Tutorial: タンクの設置説明。弾丸タンクを1つ設置してください。(1キー)");
         break;
-    case TutorialStep::InstallPipeGuide:
+    case TutorialStep::InstallPipeGuide1:
+    case TutorialStep::InstallPipeGuide2:
+    case TutorialStep::InstallPipeGuide3:
         EditorUI::Log("Tutorial: パイプの設置説明。タンクの緑の位置から大砲へパイプを繋いでください。(2キー)");
         break;
-    case TutorialStep::FirstBattle:
+    case TutorialStep::FirstBattle1:
+    case TutorialStep::FirstBattle2:
+    case TutorialStep::FirstBattle3:
         EditorUI::Log("Tutorial: 戦闘フェーズです。ウェーブ終了後にスキルツリー説明へ進みます。(Pキーでも進行可)");
         break;
-    case TutorialStep::SkillTreeGuide:
+    case TutorialStep::SkillTreeGuide1:
+    case TutorialStep::SkillTreeGuide2:
+    case TutorialStep::SkillTreeGuide3:
         EditorUI::Log("Tutorial: スキルツリー説明。Nで開いて確認後、Spaceで最終戦闘へ進みます。");
         break;
 	case TutorialStep::Finish:
@@ -227,21 +243,34 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float /*dt*/)
     const bool key2 = input->Trigger(DIK_2) || (GetAsyncKeyState('2') & 0x8001);
     const bool key3 = input->Trigger(DIK_3) || (GetAsyncKeyState('3') & 0x8001);
     const bool keyP = input->Trigger(DIK_P) || (GetAsyncKeyState('P') & 0x8001);
-    const bool keySpace = input->Trigger(DIK_SPACE) || (GetAsyncKeyState(VK_SPACE) & 0x8001);
+    static bool prevKeySpace = false;
+    const bool currentRawSpace = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
+    const bool keySpace = input->Trigger(DIK_SPACE) || (currentRawSpace && !prevKeySpace);
+    prevKeySpace = currentRawSpace;
 
-    if (tutorialStep_ == TutorialStep::FirstBattle && phaseState_ == PhaseSystemScript::BattlePhase &&
-        PhaseSystemScript::GetRequestedPhase() == PhaseSystemScript::PreparationPhase) {
-        EnterStep(TutorialStep::SkillTreeGuide);
+    if ((tutorialStep_ == TutorialStep::FirstBattle1 || tutorialStep_ == TutorialStep::FirstBattle2 || tutorialStep_ == TutorialStep::FirstBattle3) && 
+        phaseState_ == PhaseSystemScript::BattlePhase && PhaseSystemScript::GetRequestedPhase() == PhaseSystemScript::PreparationPhase) {
+        EnterStep(TutorialStep::SkillTreeGuide1);
     }
 
     switch (tutorialStep_) {
-    case TutorialStep::Preparation:
-        if (keySpace) {
-            EnterStep(TutorialStep::InstallCannonGuide);
-        }
+    case TutorialStep::Preparation1:
+        if (keySpace) EnterStep(TutorialStep::Preparation2);
+        break;
+    case TutorialStep::Preparation2:
+        if (keySpace) EnterStep(TutorialStep::Preparation3);
+        break;
+    case TutorialStep::Preparation3:
+        if (keySpace) EnterStep(TutorialStep::InstallCannonGuide1);
         break;
 
-    case TutorialStep::InstallCannonGuide:
+    case TutorialStep::InstallCannonGuide1:
+        if (keySpace) EnterStep(TutorialStep::InstallCannonGuide2);
+        break;
+    case TutorialStep::InstallCannonGuide2:
+        if (keySpace) EnterStep(TutorialStep::InstallCannonGuide3);
+        break;
+    case TutorialStep::InstallCannonGuide3:
         if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
             break;
 
@@ -264,11 +293,17 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 
         Installation(scene, selectedObjPath_);
         if (hasPlacedCannon_) {
-            EnterStep(TutorialStep::InstallTankGuide);
+            EnterStep(TutorialStep::InstallTankGuide1);
         }
         break;
 
-    case TutorialStep::InstallTankGuide:
+    case TutorialStep::InstallTankGuide1:
+        if (keySpace) EnterStep(TutorialStep::InstallTankGuide2);
+        break;
+    case TutorialStep::InstallTankGuide2:
+        if (keySpace) EnterStep(TutorialStep::InstallTankGuide3);
+        break;
+    case TutorialStep::InstallTankGuide3:
         if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
             break;
 
@@ -291,11 +326,17 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 
         Installation(scene, selectedObjPath_);
         if (hasPlacedTank_) {
-            EnterStep(TutorialStep::InstallPipeGuide);
+            EnterStep(TutorialStep::InstallPipeGuide1);
         }
         break;
 
-    case TutorialStep::InstallPipeGuide:
+    case TutorialStep::InstallPipeGuide1:
+        if (keySpace) EnterStep(TutorialStep::InstallPipeGuide2);
+        break;
+    case TutorialStep::InstallPipeGuide2:
+        if (keySpace) EnterStep(TutorialStep::InstallPipeGuide3);
+        break;
+    case TutorialStep::InstallPipeGuide3:
         if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
             break;
 
@@ -319,18 +360,32 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float /*dt*/)
         Installation(scene, selectedObjPath_);
         if (hasPlacedPipe_) {
             if (keySpace) {
-                EnterStep(TutorialStep::FirstBattle);
+                EnterStep(TutorialStep::FirstBattle1);
             }
         }
         break;
 
-    case TutorialStep::FirstBattle:
+    case TutorialStep::FirstBattle1:
+        if (keySpace) EnterStep(TutorialStep::FirstBattle2);
+        break;
+    case TutorialStep::FirstBattle2:
+        if (keySpace) EnterStep(TutorialStep::FirstBattle3);
+        break;
+    case TutorialStep::FirstBattle3:
         if (keyP) {
-            EnterStep(TutorialStep::SkillTreeGuide);
+            EnterStep(TutorialStep::SkillTreeGuide1);
         }
         break;
 
-    case TutorialStep::SkillTreeGuide: {
+    case TutorialStep::SkillTreeGuide1: {
+        if (keySpace) EnterStep(TutorialStep::SkillTreeGuide2);
+        break;
+    }
+    case TutorialStep::SkillTreeGuide2: {
+        if (keySpace) EnterStep(TutorialStep::SkillTreeGuide3);
+        break;
+    }
+    case TutorialStep::SkillTreeGuide3: {
         if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
             break;
 
@@ -358,7 +413,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float /*dt*/)
         break;
     }
 
-    if (tutorialStep_ != TutorialStep::SkillTreeGuide) {
+    if (tutorialStep_ != TutorialStep::SkillTreeGuide1 && tutorialStep_ != TutorialStep::SkillTreeGuide2 && tutorialStep_ != TutorialStep::SkillTreeGuide3) {
         preKeyN_ = false;
     }
 
@@ -410,7 +465,7 @@ void TutorialScript::UpdatePhaseTransition(GameScene* scene) {
                 nav.GenerateFlowField(tc.translate.x, tc.translate.z);
             }
 
-            if (tutorialStep_ == TutorialStep::FirstBattle) {
+            if (tutorialStep_ == TutorialStep::FirstBattle1 || tutorialStep_ == TutorialStep::FirstBattle2 || tutorialStep_ == TutorialStep::FirstBattle3) {
                 WaveManagement::SetWave(0);
 			} else if (tutorialStep_ == TutorialStep::Finish) {
             }
@@ -423,32 +478,81 @@ void TutorialScript::UpdatePhaseTransition(GameScene* scene) {
 void TutorialScript::ShowGuideText(entt::entity entity, GameScene* scene) {
 
 	switch (tutorialStep_) {
-	case TutorialStep::Preparation:
+	case TutorialStep::Preparation1:
 		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "チュートリアルです。ゲームは準備フェーズと戦闘フェーズで構成されています。:SPACE";
+			scene->GetRegistry().get<UITextComponent>(entity).text = "チュートリアルです。\nSPACE:次へ";
 		break;
-	case TutorialStep::InstallCannonGuide:
+	case TutorialStep::Preparation2:
 		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "設置について！大砲を設置しましょう。アイコンをタップして設置したい場所に置こう";
+			scene->GetRegistry().get<UITextComponent>(entity).text = "ゲームは準備フェーズと戦闘フェーズで構成されています。\nSPACE:次へ";
 		break;
-	case TutorialStep::InstallTankGuide:
+	case TutorialStep::Preparation3:
 		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "大砲には動力源が必要！動力を設置しよう！";
+			scene->GetRegistry().get<UITextComponent>(entity).text = "準備ができたら、防衛の準備を始めましょう。\nSPACE:次へ";
 		break;
-	case TutorialStep::InstallPipeGuide:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "動力を送る溜めにパイプを設置しよう！";
-		break;
-	case TutorialStep::FirstBattle:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "後ろの青いタワーを敵から守ろう、敵を倒すと経験値とお金が落ちます。";
-		break;
-	case TutorialStep::SkillTreeGuide:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "Nを押したらスキルツリーが開きます。レベルに応じてスキルを取得できます。チュートリアルはここで終了です:SPACE";
-		break;
-	case TutorialStep::Finish:
 
+	case TutorialStep::InstallCannonGuide1:
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "設置について！\nSPACE:次へ";
+		break;
+	case TutorialStep::InstallCannonGuide2:
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "大砲を設置しましょう。\nSPACE:次へ";
+		break;
+	case TutorialStep::InstallCannonGuide3:
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "アイコンをタップして設置したい場所に置こう\n";
+		break;
+
+	case TutorialStep::InstallTankGuide1:
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "大砲には動力源が必要！\nSPACE:次へ";
+		break;
+	case TutorialStep::InstallTankGuide2:
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "弾丸タンクを設置してエネルギーを供給します。\nSPACE:次へ";
+		break;
+	case TutorialStep::InstallTankGuide3:
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "動力を設置しよう！\n";
+		break;
+
+	case TutorialStep::InstallPipeGuide1:
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "タンクと大砲を繋ぐ必要があります。\nSPACE:次へ";
+		break;
+	case TutorialStep::InstallPipeGuide2:
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "動力を送るために\nSPACE:次へ";
+		break;
+	case TutorialStep::InstallPipeGuide3:
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "パイプを設置しよう！\n（タンクの緑の位置から大砲へ）";
+		break;
+
+	case TutorialStep::FirstBattle1:
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "いよいよ敵がやってきます。\nSPACE:次へ";
+		break;
+	case TutorialStep::FirstBattle2:
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "後ろの青いタワーを敵から守ろう。\nSPACE:次へ";
+		break;
+	case TutorialStep::FirstBattle3:
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "敵を倒すと経験値とお金が落ちます。";
+		break;
+    case TutorialStep::SkillTreeGuide1:
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "戦闘で得た経験値を使って強くなろう。\nSPACE:次へ";
+		break;
+    case TutorialStep::SkillTreeGuide2:
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "スキルツリーを開いて強化を行います。\nSPACE:次へ";
+		break;
+    case TutorialStep::SkillTreeGuide3:
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "Nキーでスキルツリーを開いて確認後、SPACEを押して次へ進もう。";
 		break;
 	}
 }

@@ -12,12 +12,24 @@ namespace Game {
 class TutorialScript : public IScript {
 public:
 	enum class TutorialStep {
-		Preparation,
-		InstallCannonGuide,
-		InstallTankGuide,
-		InstallPipeGuide,
-		FirstBattle,
-		SkillTreeGuide,
+		Preparation1,
+		Preparation2,
+		Preparation3,
+		InstallCannonGuide1,
+		InstallCannonGuide2,
+		InstallCannonGuide3,
+		InstallTankGuide1,
+		InstallTankGuide2,
+		InstallTankGuide3,
+		InstallPipeGuide1,
+		InstallPipeGuide2,
+		InstallPipeGuide3,
+		FirstBattle1,
+		FirstBattle2,
+		FirstBattle3,
+		SkillTreeGuide1,
+		SkillTreeGuide2,
+		SkillTreeGuide3,
 		Finish, // 終了
 	};
 
@@ -45,7 +57,7 @@ private:
 
 
 
-	TutorialStep tutorialStep_ = TutorialStep::Preparation;
+	TutorialStep tutorialStep_ = TutorialStep::Preparation1;
 	bool stepGuideShown_ = false;
 
 	PhaseSystemScript::PhaseState phaseState_ = PhaseSystemScript::PreparationPhase;
