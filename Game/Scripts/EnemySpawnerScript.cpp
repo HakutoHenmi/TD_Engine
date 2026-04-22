@@ -41,15 +41,19 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 
 	// Kを押して今いる敵を消す処理
 	// Kを押して今いる敵を消す処理
+#if defined(USE_IMGUI) && !defined(NDEBUG)
 	if (GetAsyncKeyState('K') & 0x8000) {
 		const auto& enemies = scene->GetEntitiesByTag(TagType::Enemy);
 		std::vector<entt::entity> toDestroy(enemies.begin(), enemies.end());
 		for (auto e : toDestroy) {
-            if (scene->GetRegistry().valid(e)) {
+			if (scene->GetRegistry().valid(e)) {
 				scene->DestroyObject(static_cast<uint32_t>(e));
 			}
 		}
 	}
+#endif // (USE_IMGUI) && !defined(NDEBUG)
+
+	
 
 	if (currentWave_ >= waveCount) {
       bool hasEnemy = false;
