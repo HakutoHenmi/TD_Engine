@@ -49,14 +49,15 @@ $buildArgs = @(
     "/p:Configuration=$Configuration",
     "/v:m",
     "/fl",
-    "/flp:logfile=""$buildLogFile"";Verbosity=normal"
+    "/flp:logfile=""$buildLogFile"";Encoding=UTF-8;Verbosity=normal"
 )
 
-$process = Start-Process -FilePath $vsPath -ArgumentList $buildArgs -NoNewWindow -Wait -PassThru
+& $vsPath @buildArgs
+$buildExitCode = $LASTEXITCODE
 
-if ($process.ExitCode -ne 0) {
+if ($buildExitCode -ne 0) {
     Write-Host "Build failed! Check $buildLogFile for details." -ForegroundColor Red
-    exit $process.ExitCode
+    exit $buildExitCode
 }
 
 Write-Host "Build succeeded!" -ForegroundColor Green
