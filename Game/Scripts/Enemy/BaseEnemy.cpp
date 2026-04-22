@@ -199,49 +199,6 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float /*dt*/)
 }
 
 void BaseEnemy::Debug() {
-/*
-#ifndef NDEBUG
-#ifdef USE_IMGUI
-	ImGui::Begin("Enemy Debug");
-	ImGui::Text("State: %d", (int)state_);
-	ImGui::Text("GroundHeight : %f", groundHeight_);
-	ImGui::Text("Move Type : %s", (type_ == Fly ? "Fly" : "Walk"));
-
-	if (showDebugGrid_) {
-		ImGui::Text("Local Grid Debug");
-		// 文字列を一括で構築して表示速度を稼ぐ
-		std::string gridStr;
-		gridStr.reserve(GRID_SIZE * (GRID_SIZE * 3 + 1));
-
-		for (int z = GRID_SIZE - 1; z >= 0; --z) {
-			for (int x = 0; x < GRID_SIZE; ++x) {
-				// そのマスが path_ に含まれているかチェック
-				bool isPath = false;
-				for (const auto& p : path_) {
-					int px = static_cast<int>((p.x - myPos_.x) / cellLength_) + (GRID_SIZE / 2);
-					int pz = static_cast<int>((p.z - myPos_.z) / cellLength_) + (GRID_SIZE / 2);
-					if (px == x && pz == z) {
-						isPath = true;
-						break;
-					}
-				}
-
-				if (x == GRID_SIZE / 2 && z == GRID_SIZE / 2)
-					gridStr += "|S|";
-				else if (isPath)
-					gridStr += " * ";
-				else if (localGrid_[z][x].isWall)
-					gridStr += " # ";
-				else
-					gridStr += " . ";
-			}
-			gridStr += "\n";
-		}
-		ImGui::TextUnformatted(gridStr.c_str());
-	}
-	ImGui::End();
-#endif
-*/
 }
 
 std::string BaseEnemy::SerializeParameters() {
