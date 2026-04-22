@@ -84,7 +84,7 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	NextPhase_ = PreparationPhase;
 	preIsPhase_ = PreparationPhase;
 	currentPhase_ = 0;
-	CoinCount = 0;
+	CoinCount = 300;
 
 	// 状態フラグの初期化
 	isPhaseTransitioning_ = false;
@@ -177,7 +177,6 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 #else
 			input->GetMousePos(mx, my);
 #endif
-			// スキルツリーのUI描画用にマウス座標を変換して渡す
 			skillTree_.SetUIContext(renderer, tW, tH, mx, my);
 			skillTree_.Update(entity, scene, dt);
 			preKeyN_ = keyN;
@@ -188,6 +187,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		if (key1 || InstallationButton::IsButtonPressed(InstallationButton::Tank)) {
 			selectedObjPath_ = "Resources/Prefabs/BulletTank.prefab";
+			selectedObjCost_ = tankCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
@@ -195,6 +195,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		if (key2 || InstallationButton::IsButtonPressed(InstallationButton::Pipe)) {
 			selectedObjPath_ = "Resources/Prefabs/Pipe.prefab";
+			selectedObjCost_ = pipeCost_;
 			isPipeSet_ = true;
 			isPlacementMode_ = true;
 			hasPipeStartPoint_ = false;
@@ -202,6 +203,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		if (key3 || InstallationButton::IsButtonPressed(InstallationButton::Cannon)) {
 			selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
+			selectedObjCost_ = canonCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
@@ -209,6 +211,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		if (key4 || InstallationButton::IsButtonPressed(InstallationButton::Missile)) {
 			selectedObjPath_ = "Resources/Prefabs/MissileCanon.prefab";
+			selectedObjCost_ = missileCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
@@ -216,6 +219,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		if (key5 || InstallationButton::IsButtonPressed(InstallationButton::PisonTrap)) {
 			selectedObjPath_ = "Resources/Prefabs/PoisonTrap.prefab";
+			selectedObjCost_ = poisonCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
@@ -283,7 +287,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	}
 
 	if (scene->GetRegistry().all_of<UITextComponent>(entity))
-		scene->GetRegistry().get<UITextComponent>(entity).text = std::to_string(CoinCount);
+		scene->GetRegistry().get<UITextComponent>(entity).text = "$"+ std::to_string(CoinCount);
 
 	preKeyN_ = keyN;
 }
@@ -341,7 +345,7 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 		snappedHitPoint.z = SnapTo2x2Grid(snappedHitPoint.z);
 
 		if (!hasPipeStartPoint_) {
-			const bool canPlaceStart = !IsPlacementBlocked(scene, snappedHitPoint);
+			const bool canPlaceStart = (!IsPlacementBlocked(scene, snappedHitPoint) && (CoinCount >= selectedObjCost_));
 			DrawPlacementPreview(scene, snappedHitPoint, objPath, canPlaceStart);
 
 			if (input->IsMouseTrigger(0) && canPlaceStart) {
@@ -356,33 +360,44 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 		Engine::Vector3 startPoint{pipeStartX_, pipeStartY_, pipeStartZ_};
 		auto pathPoints = BuildPipePathPoints(startPoint, snappedHitPoint);
 		bool canPlaceAll = !pathPoints.empty();
+		if (CoinCount < pathPoints.size() * selectedObjCost_) {
+			canPlaceAll = false;
+		}
+
 		for (const auto& p : pathPoints) {
-			const bool canPlacePoint = !IsPlacementBlocked(scene, p);
+			bool canPlacePoint = !IsPlacementBlocked(scene, p);
+			if (CoinCount < pathPoints.size() * selectedObjCost_) {
+				canPlacePoint = false; // お金が足りない場合は赤く（配置不可として）描画
+			}
 			DrawPlacementPreview(scene, p, objPath, canPlacePoint);
-			if (!canPlacePoint) {
+			if (!canPlacePoint && CoinCount >= pathPoints.size() * selectedObjCost_) {
 				canPlaceAll = false;
 			}
 		}
 
 		if (input->IsMouseTrigger(0)) {
 			if (canPlaceAll) {
-				for (const auto& p : pathPoints) {
-					SpawnPlacedObject(scene, p, objPath);
+				if (CoinCount >= pathPoints.size() * selectedObjCost_) {
+					CoinCount -= static_cast<int>(pathPoints.size()) * selectedObjCost_;
+					for (const auto& p : pathPoints) {
+						SpawnPlacedObject(scene, p, objPath);
+					}
+					isPlacementMode_ = false;
+					isPipeSet_ = false;
 				}
-				isPlacementMode_ = false;
-				isPipeSet_ = false;
 			}
 			hasPipeStartPoint_ = false;
 		}
 		return;
 	}
 
-	const bool canPlace = !IsPlacementBlocked(scene, snappedHitPoint);
+	const bool canPlace = (!IsPlacementBlocked(scene, snappedHitPoint) && (CoinCount >= selectedObjCost_));
 
 	DrawPlacementPreview(scene, snappedHitPoint, objPath, canPlace);
 
 	if (input->IsMouseTrigger(0) && canPlace) {
 		SpawnPlacedObject(scene, snappedHitPoint, objPath);
+		CoinCount -= selectedObjCost_;
 		isPlacementMode_ = false;
 	}
 }
@@ -486,15 +501,15 @@ void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vec
 	if (!renderer)
 		return;
 
-	std::string previewModelPath = objPath;
+	std::string previewModelP = objPath; // Changed name to avoid shadowing class member
 	std::string previewTexturePath = "Resources/Textures/white1x1.png";
 	if (IsPrefabPath(objPath)) {
-		ExtractPrefabRenderPaths(objPath, previewModelPath, previewTexturePath);
+		ExtractPrefabRenderPaths(objPath, previewModelP, previewTexturePath);
 	}
 
-	if (previewModelHandle_ == 0 || previewObjPath_ != previewModelPath) {
-		previewModelHandle_ = renderer->LoadObjMesh(previewModelPath);
-		previewObjPath_ = previewModelPath;
+	if (previewModelHandle_ == 0 || previewObjPath_ != previewModelP) {
+		previewModelHandle_ = renderer->LoadObjMesh(previewModelP);
+		previewObjPath_ = previewModelP;
 		previewTextureHandle_ = 0;
 	}
 	if (previewTextureHandle_ == 0) {

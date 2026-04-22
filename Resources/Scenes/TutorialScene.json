@@ -7,7 +7,7 @@
   },
   "objects": [
     {
-      "id": 13,
+      "id": 8388613,
       "parentId": 4294967295,
       "name": "PlayerSword",
       "locked": false,
@@ -41,7 +41,7 @@
       ]
     },
     {
-      "id": 12,
+      "id": 5242894,
       "parentId": 4294967295,
       "name": "Sun",
       "locked": true,
@@ -53,7 +53,7 @@
       ]
     },
     {
-      "id": 1048587,
+      "id": 6291469,
       "parentId": 4294967295,
       "name": "Player",
       "locked": true,
@@ -74,7 +74,7 @@
       ]
     },
     {
-      "id": 1048586,
+      "id": 6291468,
       "parentId": 4294967295,
       "name": "Floor",
       "locked": true,
@@ -88,10 +88,10 @@
       ]
     },
     {
-      "id": 1048585,
+      "id": 7340043,
       "parentId": 4294967295,
       "name": "Fede",
-      "locked": false,
+      "locked": true,
       "translate": [2000, 1.1, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
@@ -102,37 +102,37 @@
       ]
     },
     {
-      "id": 1048584,
+      "id": 7340042,
       "parentId": 4294967295,
-      "name": "CannonButton",
+      "name": "PisonTrapButton",
       "locked": false,
-      "translate": [400, 400.5, -0.5],
+      "translate": [400, 401.5, -1.5],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":0}"}]},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":4}"}]},
         {"type": "RectTransform", "enabled": true, "pos": [400,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/CannonButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/PisonTrapButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
-      "id": 1048583,
+      "id": 7340041,
       "parentId": 4294967295,
       "name": "PipeButton",
       "locked": false,
-      "translate": [0, 400.5, -0.5],
+      "translate": [-200, 400.5, -0.5],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
         {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":1}"}]},
-        {"type": "RectTransform", "enabled": true, "pos": [0,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "RectTransform", "enabled": true, "pos": [-200,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/PipeButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
-      "id": 1048582,
+      "id": 7340040,
       "parentId": 4294967295,
       "name": "TankButton",
       "locked": false,
@@ -147,7 +147,37 @@
       ]
     },
     {
-      "id": 1048581,
+      "id": 7340033,
+      "parentId": 4294967295,
+      "name": "MissikeButton",
+      "locked": false,
+      "translate": [200, 401, -1],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":3}"}]},
+        {"type": "RectTransform", "enabled": true, "pos": [200,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/MissileButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+      ]
+    },
+    {
+      "id": 7340032,
+      "parentId": 4294967295,
+      "name": "CannonButton",
+      "locked": false,
+      "translate": [0, 400.5, -0.5],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":0}"}]},
+        {"type": "RectTransform", "enabled": true, "pos": [0,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/CannonButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+      ]
+    },
+    {
+      "id": 7340039,
       "parentId": 4294967295,
       "name": "PhysicsSystem",
       "locked": true,
@@ -161,8 +191,8 @@
       ]
     },
     {
-      "id": 1048580,
-      "parentId": 1048579,
+      "id": 7340038,
+      "parentId": 5242895,
       "name": "PreparationCamera",
       "locked": false,
       "translate": [0, 10, 0],
@@ -178,7 +208,7 @@
       ]
     },
     {
-      "id": 1048579,
+      "id": 5242895,
       "parentId": 4294967295,
       "name": "Core",
       "locked": false,
@@ -193,7 +223,7 @@
       ]
     },
     {
-      "id": 1048578,
+      "id": 7340036,
       "parentId": 4294967295,
       "name": "Spawner_W1_1",
       "locked": false,
@@ -205,7 +235,7 @@
       ]
     },
     {
-      "id": 1048577,
+      "id": 7340035,
       "parentId": 4294967295,
       "name": "Spawner_W1_2",
       "locked": false,
@@ -217,7 +247,7 @@
       ]
     },
     {
-      "id": 1048576,
+      "id": 7340034,
       "parentId": 4294967295,
       "name": "Spawner_W1_3",
       "locked": false,
@@ -228,5 +258,6 @@
         {"type": "Script", "enabled": true, "scripts": [{"path": "EnemySpawnerScript", "param": "{\"enemyScriptParams\":\"{\\\"moveType\\\":0,\\\"speed\\\":2.0}\",\"enemyScriptPath\":\"Warrior\",\"enemyType\":0,\"maxCount\":2,\"pattern\":0,\"patternRadius\":3.0,\"spawnDuration\":10.0,\"startWave\":0,\"waveCount\":1,\"waveDelay\":0.0}"}]}
       ]
     }
+    
   ]
 }
