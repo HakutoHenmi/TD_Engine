@@ -618,13 +618,13 @@ void TutorialScript::Installation(GameScene* scene, const std::string& objPath) 
         }
 
         // パイプ間の接続ラインを描画
-        auto* renderer = scene->GetRenderer();
-        if (renderer && pathPoints.size() >= 2) {
+        auto* pipeRenderer = scene->GetRenderer();
+        if (pipeRenderer && pathPoints.size() >= 2) {
             for (size_t i = 0; i + 1 < pathPoints.size(); ++i) {
                 Engine::Vector3 p1 = {pathPoints[i].x, pathPoints[i].y + 0.5f, pathPoints[i].z};
                 Engine::Vector3 p2 = {pathPoints[i+1].x, pathPoints[i+1].y + 0.5f, pathPoints[i+1].z};
                 Engine::Vector4 lineColor = canPlaceAll ? Engine::Vector4{0.6f, 1.0f, 0.6f, 1.0f} : Engine::Vector4{1.0f, 0.3f, 0.3f, 1.0f};
-                renderer->DrawLine3D(p1, p2, lineColor, true);
+                pipeRenderer->DrawLine3D(p1, p2, lineColor, true);
             }
         }
 
