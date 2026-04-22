@@ -2,7 +2,7 @@
   "skills": [
     {
       "id": 0,
-      "name": "Center_Page0",
+      "name": "Base",
       "cost": 0,
       "parentId": -1,
       "unlocked": true,
