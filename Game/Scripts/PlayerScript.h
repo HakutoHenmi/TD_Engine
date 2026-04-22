@@ -16,6 +16,7 @@ public:
 	void Start(entt::entity entity, GameScene* scene) override;
 	void Update(entt::entity entity, GameScene* scene, float dt) override;
 	void OnEditorUI() override;
+	void DrawUI(entt::entity entity, GameScene* scene) override;
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
 
 private:
@@ -45,8 +46,8 @@ private:
 	void UpdateSword(entt::entity entity, GameScene* scene, float dt);
 
 	float experience_ = 0.0f;
-	float nextExperience_ = 100.0f;
 	int level_ = 1;
+	float nextExperience_ = 100.0f;
 	bool isSubscribed_ = false;
 	int debugSubscribeCount_ = 0;
 	int debugReceiveCount_ = 0;

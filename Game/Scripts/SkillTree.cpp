@@ -96,6 +96,10 @@ void SkillTree::Start(entt::entity entity, GameScene* scene) {
 		texNodeUnlocked_ = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
 		texLine_ = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
 
+		scene->GetEventSystem().Subscribe("GainSkillPoint", [this](float pts) {
+			skillPoints_ += static_cast<int>(pts);
+		});
+
 		initialized_ = true;
 	}
 
@@ -704,6 +708,8 @@ void SkillTree::DrawDescriptionPanel(Engine::Renderer* renderer, float screenW, 
 	// ImGui での描画処理は削除されました。
 #endif
 }
+
+
 
 void SkillTree::DrawConfirmationDialog(Engine::Renderer* renderer, float screenW, float screenH) {
 	if (pendingUnlockId_ < 0 || pendingUnlockId_ >= (int)nodes_.size()) {

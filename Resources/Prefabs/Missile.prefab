@@ -1,0 +1,18 @@
+{
+  "prefab":
+    {
+      "id": 13,
+      "parentId": 4294967295,
+      "name": "Missile",
+      "locked": false,
+      "translate": [17.5564, 19.7526, -14.739],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/cube/cube.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Rigidbody", "enabled": true, "velocity": [0,0,0], "useGravity": true, "isKinematic": false},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "MissileCanonScript", "param": ""}]},
+        {"type": "Tag", "enabled": false, "tag": "Untagged"}
+      ]
+    }
+}
