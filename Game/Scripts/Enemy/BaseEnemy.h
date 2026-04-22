@@ -64,6 +64,7 @@ protected: // メンバ変数
 
 	float hp_ = 0.0f;
 	float maxHp_ = 0.0f;
+	float expDrop_ = 10.0f;
 	float speed_ = 2.0f;
 	float searchRange_ = 15.0f;
 	float loseTargetRange_ = 25.0f;
