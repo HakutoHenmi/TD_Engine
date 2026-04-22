@@ -227,6 +227,8 @@ void TutorialScript::UpdateSkillTree(entt::entity entity, GameScene* scene, bool
             mx = (mousePos.x - gameMin.x) * (tW / viewW);
             my = (mousePos.y - gameMin.y) * (tH / viewH);
         }
+#else
+        input->GetMousePos(mx, my);
 #endif
 
         skillTree_.SetUIContext(renderer, tW, tH, mx, my);
