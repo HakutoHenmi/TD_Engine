@@ -77,7 +77,13 @@ void SkillTree::SetUIContext(Engine::Renderer* renderer, float screenW, float sc
 
 void SkillTree::Start(entt::entity entity, GameScene* scene) {
 	(void)entity;
-	(void)scene;
+	
+	if (!eventSubscribed_ && scene) {
+		scene->GetEventSystem().Subscribe("GainSkillPoint", [this](float pts) {
+			AddSkillPoints(static_cast<int>(pts));
+		});
+		eventSubscribed_ = true;
+	}
 
 	if (!renderer_) {
 		return;
@@ -227,10 +233,6 @@ void SkillTree::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (pendingUnlockId_ != -1) {
 		DrawConfirmationDialog(renderer_, screenW_, screenH_);
 	}
-
-	ImGui::Begin("SkillTree Debug");
-	ImGui::Text("currentPageId = %d", currentPageId_);
-	ImGui::End();
 }
 
 void SkillTree::ClearText(GameScene* scene) {

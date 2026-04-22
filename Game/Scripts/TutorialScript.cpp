@@ -246,7 +246,10 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
     const bool key1 = input->Trigger(DIK_1) || (GetAsyncKeyState('1') & 0x8001);
     const bool key2 = input->Trigger(DIK_2) || (GetAsyncKeyState('2') & 0x8001);
     const bool key3 = input->Trigger(DIK_3) || (GetAsyncKeyState('3') & 0x8001);
-    const bool keyP = input->Trigger(DIK_P) || (GetAsyncKeyState('P') & 0x8001);
+    bool keyP = false;
+#ifndef NDEBUG
+    keyP = input->Trigger(DIK_P) || (GetAsyncKeyState('P') & 0x8001);
+#endif
     static bool prevKeySpace = false;
     const bool currentRawSpace = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
     const bool keySpace = input->Trigger(DIK_SPACE) || (currentRawSpace && !prevKeySpace);

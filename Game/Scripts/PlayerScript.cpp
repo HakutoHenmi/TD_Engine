@@ -182,8 +182,14 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 
 	if (!isSubscribed_) {
-		scene->GetEventSystem().Subscribe("GainGold", [this](float amount) {
+		scene->GetEventSystem().Subscribe("GainGold", [this, scene](float amount) {
 			experience_ += amount;
+			while (experience_ >= nextExperience_) {
+				experience_ -= nextExperience_;
+				level_++;
+				nextExperience_ *= 1.5f;
+				scene->GetEventSystem().Dispatch("GainSkillPoint", 1.0f);
+			}
 			debugReceiveCount_ += 1;
 			debugLastValue_ = amount;
 		});
@@ -380,7 +386,8 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 void PlayerScript::OnEditorUI() {
 #if defined(USE_IMGUI) && !defined(NDEBUG)
 	ImGui::SeparatorText("Player Debug");
-	ImGui::Text("Experience: %.1f", experience_);
+	ImGui::Text("Level: %d", level_);
+	ImGui::Text("Experience: %.1f / %.1f", experience_, nextExperience_);
 	ImGui::Text("Subscribe Count: %d", debugSubscribeCount_);
 	ImGui::Text("Receive Count: %d", debugReceiveCount_);
 	ImGui::Text("Last Value: %.2f", debugLastValue_);

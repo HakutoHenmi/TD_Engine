@@ -128,11 +128,13 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	// スクリプト動作確認用の白い線 (常に表示)
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
+#ifndef NDEBUG
 		renderer->DrawLine3D({0, 20, 0}, {5, 20, 0}, {1, 1, 1, 1}, true);
 		if (isPhase_ == PreparationPhase)
 			renderer->DrawLine3D({0, 21, 0}, {5, 21, 0}, {0, 1, 0, 1}, true);
 		if (isPlacementMode_)
 			renderer->DrawLine3D({0, 22, 0}, {5, 22, 0}, {0, 0, 1, 1}, true);
+#endif
 	}
 
 	// ★入力処理: キーボードとUI両方からの入力を受け付ける
@@ -141,7 +143,10 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	bool key3 = input->Trigger(DIK_3) || (GetAsyncKeyState('3') & 0x8001);
 	bool key4 = input->Trigger(DIK_4) || (GetAsyncKeyState('4') & 0x8001);
 	bool key5 = input->Trigger(DIK_5) || (GetAsyncKeyState('5') & 0x8001);
-	bool keyP = input->Trigger(DIK_P) || (GetAsyncKeyState('P') & 0x8001);
+	bool keyP = false;
+#ifndef NDEBUG
+	keyP = input->Trigger(DIK_P) || (GetAsyncKeyState('P') & 0x8001);
+#endif
 	bool keySpace = input->Trigger(DIK_SPACE) || (GetAsyncKeyState(VK_SPACE) & 0x8001);
 
 	// ★ スキルツリーの入力処理 (準備フェーズ中のみ)
