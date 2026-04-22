@@ -1,4 +1,4 @@
-﻿{
+{
   "prefab":
     {
       "id": 2097172,
@@ -7,9 +7,9 @@
       "locked": false,
       "translate": [7.08015, 8.24044, 1.41189],
       "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
+      "scale": [0.7, 0.7, 0.7],
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/cube/cube.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/player_ball/ball.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Toon", "color": [0.75,0.75,0.75,1], "uvTiling": [1,1], "uvOffset": [0,0]},
         {"type": "Script", "enabled": true, "scripts": [{"path": "PipeScript", "param": ""}]},
         {"type": "Tag", "enabled": true, "tag": "Pipe"}
       ]

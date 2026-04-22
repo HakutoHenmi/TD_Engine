@@ -2,6 +2,8 @@
 #include "IScript.h"
 #include "Scenes/GameScene.h"
 #include "../../externals/entt/entt.hpp"
+#include "../../Engine/Matrix4x4.h"
+#include <unordered_map>
 
 namespace Game {
 
@@ -13,6 +15,7 @@ public:
 
 private:
 	float rotationSpeed_ = 1.0f; // パイプの回転速度（ラジアン/秒）
+	std::unordered_map<entt::entity, entt::entity> connectionCylinders_;
 };
 
 }// namespace Game
