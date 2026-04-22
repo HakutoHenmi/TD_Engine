@@ -703,6 +703,8 @@ void SkillTree::DrawDescriptionPanel(Engine::Renderer* renderer, float screenW, 
 #endif
 }
 
+
+
 void SkillTree::DrawConfirmationDialog(Engine::Renderer* renderer, float screenW, float screenH) {
 	if (pendingUnlockId_ < 0 || pendingUnlockId_ >= (int)nodes_.size()) {
 		return;
