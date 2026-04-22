@@ -23,10 +23,14 @@ int WaveManagement::currentWave_ = -1;
 void WaveManagement::Start(entt::entity entity, GameScene* scene) {
 	if (!scene) return;
 
+	// ↓これを追加してシーンの参照を正しく持たせる
+	cachedScene_ = scene;
+
 	managerEntity_ = entity;
 	currentWave_ = -1;
 	previousWave_ = -2;
 	isEnded_ = false;
+
 
 	// 名前に基づいてエンティティを解決
 	enemySpawners_.clear();
@@ -43,6 +47,9 @@ void WaveManagement::Start(entt::entity entity, GameScene* scene) {
 		}
 		enemySpawners_.push_back(waveSpawners);
 	}
+
+	currentWave_ = 0;
+	previousWave_ = -1;
 }
 
 void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/) {
@@ -124,7 +131,10 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 	previousWave_ = currentWave_;
 }
 
-void WaveManagement::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
+void WaveManagement::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
+
+	
+}
 
 void WaveManagement::SpawnSpanner(int currentWave, GameScene* scene) {
 	if (!scene) return;
