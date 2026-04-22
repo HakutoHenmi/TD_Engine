@@ -181,7 +181,8 @@ enum class TagType : uint32_t {
 	ExperienceMiner,
 	Default,
 	VFX,
-	HitDistortion_VFX
+	HitDistortion_VFX,
+	Core,
 };
 
 inline const char* TagToString(TagType tag) {
@@ -210,6 +211,7 @@ inline const char* TagToString(TagType tag) {
 	case TagType::VFX: return "VFX";
 	case TagType::HitDistortion_VFX: return "HitDistortion_VFX";
 	case TagType::Default: return "Default";
+	case TagType::Core: return "Core";
 	default: return "Untagged";
 	}
 }
@@ -239,6 +241,7 @@ inline TagType StringToTag(const std::string& s) {
 	if (s == "VFX") return TagType::VFX;
 	if (s == "HitDistortion_VFX") return TagType::HitDistortion_VFX;
 	if (s == "Default") return TagType::Default;
+	if (s == "Core") return TagType::Core;
 	return TagType::Untagged;
 }
 

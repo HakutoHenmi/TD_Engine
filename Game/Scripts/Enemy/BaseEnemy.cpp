@@ -87,7 +87,7 @@ void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 
 	// 実際の行動
-	if (inAttackRange&& attackCooltime_ == 0.0f) {
+	if (inAttackRange&& attackCooltime_ <= 0.0f) {
 		// 攻撃範囲内且つクールタイムを満たしていれば足を止めて攻撃
 		ExecuteAttack(entity, scene, dt);
 	}
@@ -294,6 +294,19 @@ void BaseEnemy::SearchTarget(entt::entity entity, GameScene* scene) {
 		if (distSq < minDistanceSq) {
 			minDistanceSq = distSq;
 			bestTarget = d;
+		}
+	}
+
+	// 最優先にすべきタグはCoreなので最後に上書き
+	// 防衛設備（Defender）を探す(プレイヤーより近ければターゲットを上書き)
+	const auto& core = scene->GetEntitiesByTag(TagType::Core);
+	for (auto c : core) {
+		auto& t = registry.get<TransformComponent>(c);
+		float distSq = (t.translate.x - myTc.translate.x) * (t.translate.x - myTc.translate.x) + 
+			(t.translate.z - myTc.translate.z) * (t.translate.z - myTc.translate.z);
+		if (distSq < minDistanceSq) {
+			minDistanceSq = distSq;
+			bestTarget = c;
 		}
 	}
 
