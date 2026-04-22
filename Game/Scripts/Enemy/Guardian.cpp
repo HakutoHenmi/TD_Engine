@@ -9,6 +9,8 @@ namespace Game {
 		// 継承元のStartを呼んで大まかな部分の初期化
 		BaseEnemy::Start(entity, scene);
 
+		hp_ = 150.0f;
+		maxHp_ = 150.0f;
 		attackCooltime_ = kCooltime;	
 	}
 
@@ -23,7 +25,7 @@ namespace Game {
 		// HitBoxコンポーネントの設定
 		auto& hb = registry.get<HitboxComponent>(entity);
 		hb.isActive = true;
-		hb.damage = 50.0f;
+		hb.damage = 20.0f;
 		hb.size = { 3.0f, 2.0f, 3.0f };
 
 		// クールタイムリセット
