@@ -220,10 +220,14 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 	}
 
 	//page3
-	if (IsSkillUnlocked(7)) {
+	if (IsSkillUnlocked(201)) {
 	
 	}
+	if (IsSkillUnlocked(202)) {
+	}
 
+	if (IsSkillUnlocked(203)) {
+	}
 	//canon
 	SetVar(entity, scene, "AttackPowerRateCanon", attackPowerRateCanon);
 	SetVar(entity, scene, "AttackSpeedRateCanon", attackSpeedRateCanon);

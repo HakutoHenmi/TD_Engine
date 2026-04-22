@@ -108,6 +108,8 @@ void PoisonTrap::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	// Debug(isConnectedToTank_); // ★削除: Update 内での ImGui 呼び出しは例外の原因となる可能性があるため
 
+	//タンクと接続確認するためのやつ
+
 	if (!isConnectedToTank_) {
 		return;
 	}
