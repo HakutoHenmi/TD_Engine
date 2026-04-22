@@ -150,12 +150,13 @@ public:
 							hc.hitFlashTimer = 0.2f;
 							::Engine::TimeManager::GetInstance().SetHitstop(0.1f);
 							ApplyKnockback(registry, attackerEntity, defenderEntity);
-
-							if ((aTag == TagType::Bullet || aTag == TagType::EnemyBullet) && ctx.scene) {
-								ctx.scene->DestroyObject(static_cast<uint32_t>(attackerEntity));
-								break; // 弾は消えるのでループ抜ける
-							}
 						}
+					}
+
+					// 弾はヒット判定が行われたら（無敵状態でも）消去する
+					if ((aTag == TagType::Bullet || aTag == TagType::EnemyBullet) && ctx.scene) {
+						ctx.scene->DestroyObject(static_cast<uint32_t>(attackerEntity));
+						break; // 弾は消えるのでループ抜ける
 					}
 				}
 			}

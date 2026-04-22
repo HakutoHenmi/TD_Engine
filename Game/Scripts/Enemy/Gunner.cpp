@@ -11,6 +11,9 @@ void Gunner::Start(entt::entity entity, GameScene* scene) {
 
 	hp_ = 50.0f;
 	maxHp_ = 50.0f;
+	searchRange_ = 25.0f;
+	attackRange_ = 20.0f;
+
 	attackCooltime_ = kCooltime;
 }
 
@@ -32,7 +35,7 @@ void Game::Gunner::ExecuteAttack(entt::entity entity, GameScene* scene, float /*
 	bulletTransform.translate = myTransform.translate;
 	bulletTransform.translate.y += 1.0f; // 少し上から発射
 	bulletTransform.rotate = myTransform.rotate;
-	bulletTransform.scale = {0.5f, 0.5f, 0.5f}; // サイズ
+	bulletTransform.scale = {0.3f, 0.3f, 0.3f}; // サイズ
 
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
