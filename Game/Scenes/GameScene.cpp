@@ -35,6 +35,7 @@ GameScene::~GameScene() {
 	// ★追加: 破棄時にシグナルを解除し、安全にレジストリをクリアする
 	registry_.on_construct<TagComponent>().disconnect<&GameScene::OnTagAdded>(this);
 	registry_.on_destroy<TagComponent>().disconnect<&GameScene::OnTagRemoved>(this);
+	registry_.on_destroy<ScriptComponent>().disconnect<&GameScene::OnScriptDestroyed>(this); // ★追加
 	registry_.clear();
 }
 
@@ -243,6 +244,9 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	registry_.on_construct<TagComponent>().connect<&GameScene::OnTagAdded>(this);
 	registry_.on_destroy<TagComponent>().disconnect<&GameScene::OnTagRemoved>(this);
 	registry_.on_destroy<TagComponent>().connect<&GameScene::OnTagRemoved>(this);
+	
+	registry_.on_destroy<ScriptComponent>().disconnect<&GameScene::OnScriptDestroyed>(this); // ★追加
+	registry_.on_destroy<ScriptComponent>().connect<&GameScene::OnScriptDestroyed>(this); // ★追加
 
 	// NavigationManagerの初期化
 	flowField_ = std::make_unique<NavigationManager>();
@@ -1604,6 +1608,10 @@ void GameScene::UpdatePauseMenu() {
 			}
 		}
 	}
+}
+
+void GameScene::OnScriptDestroyed(entt::registry& /*reg*/, entt::entity entity) {
+	ScriptEngine::GetInstance()->ExecuteDestroy(entity, this);
 }
 
 } // namespace Game

@@ -99,6 +99,7 @@ private:
 	std::vector<entt::entity> pendingTagRemoved_; // ★追加: 破棄時のキャッシュ削除待ち
 	void OnTagAdded(entt::registry& reg, entt::entity entity);
 	void OnTagRemoved(entt::registry& reg, entt::entity entity);
+	void OnScriptDestroyed(entt::registry& reg, entt::entity entity); // ★追加
 
 	// 行列計算キャッシュ (FPS向上用)
 	mutable std::unordered_map<entt::entity, Engine::Matrix4x4> matrixCache_;

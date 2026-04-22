@@ -160,4 +160,20 @@ void ScriptEngine::ExecuteDrawUI(entt::entity entity, GameScene* scene) {
 	}
 }
 
+void ScriptEngine::ExecuteDestroy(entt::entity entity, GameScene* scene) {
+	if (!scene) return;
+	auto& registry = scene->GetRegistry();
+
+	// on_destroyフック内ではコンポーネントはまだget可能
+	if (!registry.valid(entity) || !registry.all_of<ScriptComponent>(entity)) return;
+
+	auto& comp = registry.get<ScriptComponent>(entity);
+	
+	for (auto& entry : comp.scripts) {
+		if (entry.instance) {
+			entry.instance->OnDestroy(entity, scene);
+		}
+	}
+}
+
 } // namespace Game
