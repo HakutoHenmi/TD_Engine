@@ -115,6 +115,10 @@ public:
 							hc.invincibleTime = 0.5f;
 
 							if (ctx.scene) {
+								if (aTag == TagType::PlayerSword || aTag == TagType::Sword) {
+									ctx.scene->GetEventSystem().Emit("PlayerSwordHit", 1.0f);
+								}
+
 								auto hitDistortion = ctx.scene->CreateEntity("HitDistortion_VFX");
 								if (registry.all_of<BoxColliderComponent>(hitDistortion)) registry.remove<BoxColliderComponent>(hitDistortion);
 								if (registry.all_of<HurtboxComponent>(hitDistortion)) registry.remove<HurtboxComponent>(hitDistortion);
@@ -195,22 +199,9 @@ private:
 		return true;
 	}
 
-	static void ApplyKnockback(entt::registry& registry, entt::entity attacker, entt::entity defender) {
-		if (!registry.all_of<RigidbodyComponent>(defender) || !registry.all_of<TransformComponent>(attacker) || !registry.all_of<TransformComponent>(defender)) return;
-		auto& dRb = registry.get<RigidbodyComponent>(defender);
-		if (dRb.isKinematic) return;
-
-		auto& aTc = registry.get<TransformComponent>(attacker);
-		auto& dTc = registry.get<TransformComponent>(defender);
-		float dx = dTc.translate.x - aTc.translate.x;
-		float dz = dTc.translate.z - aTc.translate.z;
-		float dist = std::sqrt(dx * dx + dz * dz);
-		if (dist > 0.001f) {
-			float knockbackPower = 35.0f;
-			dRb.velocity.x += (dx / dist) * knockbackPower;
-			dRb.velocity.z += (dz / dist) * knockbackPower;
-			dRb.velocity.y += 10.0f;
-		}
+	static void ApplyKnockback(entt::registry& /*registry*/, entt::entity /*attacker*/, entt::entity /*defender*/) {
+		// プレイヤーや敵がダメージを受けた際のノックバック機能を無効化
+		return;
 	}
 };
 

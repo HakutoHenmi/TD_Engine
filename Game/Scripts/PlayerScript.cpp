@@ -17,7 +17,9 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		scene->GetRegistry().get<RigidbodyComponent>(entity).isKinematic = true;
 	}
 	if (scene->GetRegistry().all_of<CharacterMovementComponent>(entity)) {
-		scene->GetRegistry().get<CharacterMovementComponent>(entity).heightOffset = 1.0f; // 2m立方体キャラの中心がy=1.0になるように
+		auto& cm = scene->GetRegistry().get<CharacterMovementComponent>(entity);
+		cm.heightOffset = 1.0f; // 2m立方体キャラの中心がy=1.0になるように
+		cm.jumpPower = jumpPower_; // ★追加: ヘッダで定義されているジャンプ力(8.0f)を反映し、ジャンプを弱くする
 	}
 
 	// プレイヤー自身のコライダーサイズを「見た目（2m立方体）」に合わせる
@@ -58,7 +60,7 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		// ★追加: モーションコンポーネントの追加
 		auto& motion = scene->GetRegistry().emplace<MotionComponent>(sword);
 		motion.isPlaying = false;
-		motion.isPlaying = false;
+		motion.activeClip = ""; // ★追加: デフォルトクリップによるTransform上書きを防ぐ
 
 		auto* renderer = scene->GetRenderer();
 		if (renderer) {
@@ -85,12 +87,15 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		if (!scene->GetRegistry().all_of<HierarchyComponent>(sword)) {
 			auto& hc = scene->GetRegistry().emplace<HierarchyComponent>(sword);
 			hc.parentId = entity;
+		} else {
+			auto& hc = scene->GetRegistry().get<HierarchyComponent>(sword);
+			hc.parentId = entity; // デシリアライズ後などはIDが変わっている可能性があるため強制上書き
 		}
 		// ★追加: モーションコンポーネントの確認・設定
 		if (!scene->GetRegistry().all_of<MotionComponent>(sword)) {
 			auto& motion = scene->GetRegistry().emplace<MotionComponent>(sword);
 			motion.isPlaying = false;
-			motion.isPlaying = false;
+			motion.activeClip = ""; // ★追加: デフォルトクリップによるTransform上書きを防ぐ
 		}
 
 		// 既にある場合は基本的なプロパティを維持
@@ -134,17 +139,17 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 					clip.loop = false;
 					
 					if (index == 1) { // 横薙ぎ（より広く、伸縮追加）
-						clip.keyframes.push_back({0.00f, { 2.5f, 0.8f, -1.0f }, { 0.0f, 1.57f, 0.0f }, { 0.15f, 0.15f, 1.8f }});
-						clip.keyframes.push_back({0.20f, { 0.0f, 0.8f, 4.0f }, { 0.0f, 0.0f, 0.0f }, { 0.15f, 0.15f, 3.5f }});
-						clip.keyframes.push_back({0.40f, {-2.5f, 0.8f, -1.0f }, { 0.0f, -1.57f, 0.0f }, { 0.15f, 0.15f, 1.8f }});
+						clip.keyframes.push_back({0.00f, { 1.2f, 0.8f, -0.3f }, { 0.0f, 1.57f, 0.0f }, { 0.15f, 0.15f, 1.8f }});
+						clip.keyframes.push_back({0.20f, { 0.0f, 0.8f, 1.8f }, { 0.0f, 0.0f, 0.0f }, { 0.15f, 0.15f, 2.5f }});
+						clip.keyframes.push_back({0.40f, {-1.2f, 0.8f, -0.3f }, { 0.0f, -1.57f, 0.0f }, { 0.15f, 0.15f, 1.8f }});
 					} else if (index == 2) { // 斜め斬り（右上から左下）
-						clip.keyframes.push_back({0.00f, { 2.2f, 4.0f, -0.8f }, { -0.7f, 0.0f, 0.7f }, { 0.15f, 0.15f, 2.0f }});
-						clip.keyframes.push_back({0.20f, { 0.0f, 1.2f, 4.5f }, { 0.0f, 0.0f, 0.0f }, { 0.15f, 0.15f, 3.5f }});
-						clip.keyframes.push_back({0.40f, { -2.2f, -1.0f, 0.2f }, { 0.7f, 0.0f, -0.7f }, { 0.15f, 0.15f, 1.8f }});
+						clip.keyframes.push_back({0.00f, { 1.2f, 2.0f, -0.5f }, { -0.7f, 0.0f, 0.7f }, { 0.15f, 0.15f, 1.8f }});
+						clip.keyframes.push_back({0.20f, { 0.0f, 1.0f, 2.0f }, { 0.0f, 0.0f, 0.0f }, { 0.15f, 0.15f, 2.5f }});
+						clip.keyframes.push_back({0.40f, { -1.2f, -0.5f, 0.2f }, { 0.7f, 0.0f, -0.7f }, { 0.15f, 0.15f, 1.8f }});
 					} else { // 突き/回転（超推力・多回転）
 						clip.keyframes.push_back({0.00f, { 0.0f, 0.8f, 0.5f }, { 0.0f, 0.0f, 0.0f }, { 0.15f, 0.15f, 1.8f }});
-						clip.keyframes.push_back({0.15f, { 0.0f, 0.8f, 6.5f }, { 0.0f, 0.0f, 6.28f }, { 0.15f, 0.15f, 5.0f }});
-						clip.keyframes.push_back({0.40f, { 0.0f, 0.8f, 1.5f }, { 0.0f, 0.0f, 12.56f }, { 0.15f, 0.15f, 1.8f }});
+						clip.keyframes.push_back({0.15f, { 0.0f, 0.8f, 2.5f }, { 0.0f, 0.0f, 6.28f }, { 0.15f, 0.15f, 3.0f }});
+						clip.keyframes.push_back({0.40f, { 0.0f, 0.8f, 1.0f }, { 0.0f, 0.0f, 12.56f }, { 0.15f, 0.15f, 1.8f }});
 					}
 					motion->clips[name] = clip;
 				}
@@ -166,6 +171,17 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			experience_ += amount;
 			debugReceiveCount_ += 1;
 			debugLastValue_ = amount;
+		});
+		scene->GetEventSystem().Subscribe("PlayerSwordHit", [this, scene](float) {
+			if (!scene || !scene->GetContext().camera) return;
+			auto* cam = scene->GetContext().camera;
+			if (comboCount_ <= 1) {
+				cam->StartShake(0.1f, 0.15f); // 弱
+			} else if (comboCount_ == 2) {
+				cam->StartShake(0.15f, 0.35f); // 中
+			} else {
+				cam->StartShake(0.2f, 0.6f);  // 強
+			}
 		});
 		debugSubscribeCount_ += 1;
 		isSubscribed_ = true;
@@ -189,6 +205,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase) {
 		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) scene->GetRegistry().get<CameraTargetComponent>(entity).enabled = false;
 		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))  scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = false;
+		UpdateSword(entity, scene, dt); // ★準備フェーズ中でも剣の状態と位置を更新する
 	} else {
 		UpdateMovement(entity, scene, dt);
 		UpdateAttack(entity, scene, dt);
@@ -264,8 +281,15 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 	
 	if (!isAttacking_) {
 		// 非攻撃時は常に背中に背負う配置にする
-		swordTc.translate = { -0.55f, 1.3f, -0.5f };
+		swordTc.translate = { -0.3f, 1.0f, -0.4f };
 		swordTc.rotate = { DirectX::XMConvertToRadians(35.0f), 0.0f, DirectX::XMConvertToRadians(25.0f) };
+		swordTc.scale = { 0.15f, 0.15f, 1.8f }; // ★待機中の細長さ（スケール）を維持する
+
+		// ★MotionSystemによる待機中のスケール＆座標リセットを防ぐため、再生クリップを空にする
+		if (auto* motion = scene->GetRegistry().try_get<MotionComponent>(sword)) {
+			motion->activeClip = "";
+		}
+
 		isSheathed_ = true;
 		sheatheTimer_ = AUTO_SHEATHE_TIME;
 	}
