@@ -138,6 +138,8 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	bool key1 = input->Trigger(DIK_1) || (GetAsyncKeyState('1') & 0x8001);
 	bool key2 = input->Trigger(DIK_2) || (GetAsyncKeyState('2') & 0x8001);
 	bool key3 = input->Trigger(DIK_3) || (GetAsyncKeyState('3') & 0x8001);
+	bool key4 = input->Trigger(DIK_4) || (GetAsyncKeyState('4') & 0x8001);
+	bool key5 = input->Trigger(DIK_5) || (GetAsyncKeyState('5') & 0x8001);
 	bool keyP = input->Trigger(DIK_P) || (GetAsyncKeyState('P') & 0x8001);
 	bool keySpace = input->Trigger(DIK_SPACE) || (GetAsyncKeyState(VK_SPACE) & 0x8001);
 
@@ -203,6 +205,21 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
 		}
+
+		if (key4 || InstallationButton::IsButtonPressed(InstallationButton::Missile)) {
+			selectedObjPath_ = "Resources/Prefabs/MissileCanon.prefab";
+			isPlacementMode_ = true;
+			isPipeSet_ = false;
+			hasPipeStartPoint_ = false;
+		}
+
+		if (key5 || InstallationButton::IsButtonPressed(InstallationButton::PisonTrap)) {
+			selectedObjPath_ = "Resources/Prefabs/PoisonTrap.prefab";
+			isPlacementMode_ = true;
+			isPipeSet_ = false;
+			hasPipeStartPoint_ = false;
+		}
+
 		if (input->IsMouseTrigger(1) && isPlacementMode_) {
 			if (isPipeSet_ && hasPipeStartPoint_) {
 				hasPipeStartPoint_ = false;
