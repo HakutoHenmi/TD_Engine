@@ -36,18 +36,20 @@ public:
 	void SetUIContext(Engine::Renderer* renderer, float screenW, float screenH, float mouseX, float mouseY);
 	void ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene);
 
-	void Toggle() {
+	void Toggle(GameScene* scene) {
 		isOpen_ = !isOpen_;
 		if (!isOpen_) {
 			pendingUnlockId_ = -1;
+			ClearText(scene);
 		}
 	}
 
 	bool IsOpen() const { return isOpen_; }
 
-	void Close() {
+	void Close(GameScene* scene) {
 		isOpen_ = false;
 		pendingUnlockId_ = -1;
+		ClearText(scene);
 	}
 
 	int GetSkillPoints() const { return skillPoints_; }
@@ -56,6 +58,7 @@ public:
 
 	bool IsSkillUnlocked(int skillId) const;
 	void LoadFromJson(const std::string& path);
+	void ClearText(GameScene* scene);
 
 private:
 	void DrawBackground(Engine::Renderer* renderer, float screenW, float screenH);
@@ -114,6 +117,11 @@ private:
 	float nextButtonTop_ = 520.0f;
 	float nextButtonRight_ = 1080.0f;
 	float nextButtonBottom_ = 570.0f;
+
+	entt::entity titleTextEntity_ = entt::null;
+	entt::entity costTextEntity_ = entt::null;
+	entt::entity descTextEntity_ = entt::null;
+	entt::entity statusTextEntity_ = entt::null;
 };
 
 } // namespace Game
