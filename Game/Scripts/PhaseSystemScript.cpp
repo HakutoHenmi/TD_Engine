@@ -186,7 +186,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		if (key1 || InstallationButton::IsButtonPressed(InstallationButton::Tank)) {
 			selectedObjPath_ = "Resources/Prefabs/BulletTank.prefab";
-			selectedObjCost_ = 100;
+			selectedObjCost_ = tankCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
@@ -194,7 +194,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		if (key2 || InstallationButton::IsButtonPressed(InstallationButton::Pipe)) {
 			selectedObjPath_ = "Resources/Prefabs/Pipe.prefab";
-			selectedObjCost_ = 10;
+			selectedObjCost_ = pipeCost_;
 			isPipeSet_ = true;
 			isPlacementMode_ = true;
 			hasPipeStartPoint_ = false;
@@ -202,7 +202,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		if (key3 || InstallationButton::IsButtonPressed(InstallationButton::Cannon)) {
 			selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
-			selectedObjCost_ = 150;
+			selectedObjCost_ = canonCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
@@ -210,7 +210,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		if (key4 || InstallationButton::IsButtonPressed(InstallationButton::Missile)) {
 			selectedObjPath_ = "Resources/Prefabs/MissileCanon.prefab";
-			selectedObjCost_ = 200;
+			selectedObjCost_ = missileCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
@@ -218,7 +218,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		if (key5 || InstallationButton::IsButtonPressed(InstallationButton::PisonTrap)) {
 			selectedObjPath_ = "Resources/Prefabs/PoisonTrap.prefab";
-			selectedObjCost_ = 50;
+			selectedObjCost_ = poisonCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;

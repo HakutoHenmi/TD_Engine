@@ -48,9 +48,6 @@ private:
 
 	inline static int CoinCount = 300; // コインの数を管理する静的変数
 
-
-
-
 	bool preKeyP_ = false; // 初期化しておく
 	bool preKeySpace_ = false;
 	bool isPlacementMode_ = false;
@@ -63,13 +60,20 @@ private:
 	uint32_t previewModelHandle_ = 0;
 	uint32_t previewTextureHandle_ = 0;
 
+	// 施設の値段
+	int tankCost_ = 100;
+	int pipeCost_ = 5;
+	int canonCost_ = 150;
+	int missileCost_ = 200;
+	int poisonCost_ = 120;
+
 	// パイプ専用
 	bool isPipeSet_ = false;
 	bool hasPipeStartPoint_ = false;
 	float pipeStartX_ = 0.0f;
 	float pipeStartY_ = 0.0f;
 	float pipeStartZ_ = 0.0f;
-	
+
 	int selectedObjCost_ = 0; // 追加
 
 	// スキルツリー

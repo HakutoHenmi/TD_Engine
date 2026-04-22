@@ -67,38 +67,38 @@
         {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/white1x1.png", "color": [0,0,0,0], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10}
       ]
     },
-    {
-      "id": 4194311,
+     {
+      "id": 7340042,
       "parentId": 4294967295,
-      "name": "CannonButton",
+      "name": "PisonTrapButton",
       "locked": false,
-      "translate": [400, 400.5, -0.5],
+      "translate": [400, 401.5, -1.5],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":0}"}]},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":4}"}]},
         {"type": "RectTransform", "enabled": true, "pos": [400,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/CannonButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/PisonTrapButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
-      "id": 4194310,
+      "id": 7340041,
       "parentId": 4294967295,
       "name": "PipeButton",
       "locked": false,
-      "translate": [0, 400.5, -0.5],
+      "translate": [-200, 400.5, -0.5],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":0}"}]},
-        {"type": "RectTransform", "enabled": true, "pos": [0,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":1}"}]},
+        {"type": "RectTransform", "enabled": true, "pos": [-200,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/PipeButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
-      "id": 4194309,
+      "id": 7340040,
       "parentId": 4294967295,
       "name": "TankButton",
       "locked": false,
@@ -106,9 +106,39 @@
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":0}"}]},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":2}"}]},
         {"type": "RectTransform", "enabled": true, "pos": [-400,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/TankButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+      ]
+    },
+    {
+      "id": 7340033,
+      "parentId": 4294967295,
+      "name": "MissikeButton",
+      "locked": false,
+      "translate": [200, 401, -1],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":3}"}]},
+        {"type": "RectTransform", "enabled": true, "pos": [200,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/MissileButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+      ]
+    },
+    {
+      "id": 7340032,
+      "parentId": 4294967295,
+      "name": "CannonButton",
+      "locked": false,
+      "translate": [0, 400.5, -0.5],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":0}"}]},
+        {"type": "RectTransform", "enabled": true, "pos": [0,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/CannonButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
