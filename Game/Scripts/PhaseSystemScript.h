@@ -46,7 +46,9 @@ private:
 	PhaseState preIsPhase_ = PreparationPhase; // フェーズ切り替わり検知用
 	int currentPhase_ = 0;
 
-	inline static int CoinCount = 300; // コインの数を管理する静的変数
+	int StartCoinCount_ = 600; // 初期コイン数
+
+	inline static int CoinCount; // コインの数を管理する静的変数
 
 	bool preKeyP_ = false; // 初期化しておく
 	bool preKeySpace_ = false;

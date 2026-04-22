@@ -84,7 +84,7 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	NextPhase_ = PreparationPhase;
 	preIsPhase_ = PreparationPhase;
 	currentPhase_ = 0;
-	CoinCount = 300;
+	CoinCount = StartCoinCount_;
 
 	// 状態フラグの初期化
 	isPhaseTransitioning_ = false;
@@ -215,7 +215,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		}
 
 		if (key4 || InstallationButton::IsButtonPressed(InstallationButton::Missile)) {
-			selectedObjPath_ = "Resources/Prefabs/MissileCanon.prefab";
+			selectedObjPath_ = "Resources/Prefabs/Missile.prefab";
 			selectedObjCost_ = missileCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
