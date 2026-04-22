@@ -155,7 +155,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	if (isPhase_ == PreparationPhase) {
 		// Nキーでスキルツリーの開閉
 		if (keyN && !preKeyN_) {
-			skillTree_.Toggle();
+			skillTree_.Toggle(scene);
 		}
 
 		// スキルツリーが開いている間はスキルツリーの更新のみ
@@ -241,7 +241,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			RequestPhaseChange(BattlePhase);
 			isPlacementMode_ = false;
 			hasPipeStartPoint_ = false;
-			skillTree_.Close(); // フェーズ移行時にスキルツリーを閉じる
+			skillTree_.Close(scene); // フェーズ移行時にスキルツリーを閉じる
 		}
 
 	} else if (isPhase_ == BattlePhase) {
@@ -721,7 +721,8 @@ void PhaseSystemScript::Draw(entt::entity entity, GameScene* scene) {
 void PhaseSystemScript::OnEditorUI() {
 #ifdef USE_IMGUI
 	if (ImGui::Button(skillTree_.IsOpen() ? "Close SkillTree Preview" : "Open SkillTree Preview")) {
-		skillTree_.Toggle();
+		// EditorUIからの呼び出しはsceneが不明なためnullを渡す
+		skillTree_.Toggle(nullptr);
 	}
 #endif
 }

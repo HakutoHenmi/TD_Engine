@@ -95,7 +95,7 @@ void SkillTree::Start(entt::entity entity, GameScene* scene) {
 
 	// JSON読み込み（1回だけ）
 	if (!dataLoaded_) {
-		LoadFromJson("Resources/Data/skills.json");
+		LoadFromJson("Resources/Scenes/skills.json");
 		dataLoaded_ = true;
 	}
 }
@@ -156,6 +156,74 @@ void SkillTree::Update(entt::entity entity, GameScene* scene, float dt) {
 		DrawDescriptionPanel(renderer_, screenW_, screenH_, hoveredIndex);
 	}
 
+	// テキストコンポーネントの更新
+	auto& registry = scene->GetRegistry();
+
+	auto getOrCreateTextEntity = [&](entt::entity& e) {
+		if (!registry.valid(e)) {
+			e = registry.create();
+			registry.emplace<NameComponent>(e, "SkillTreeText");
+			auto& rect = registry.emplace<RectTransformComponent>(e);
+			rect.size = {0.0f, 0.0f};
+			rect.anchor = {0.0f, 0.0f}; // 左上基準にする
+			rect.pivot = {0.0f, 0.0f};  // 左上基準にする
+			registry.emplace<UITextComponent>(e);
+		}
+		return e;
+	};
+
+	bool showText = (hoveredIndex >= 0 && pendingUnlockId_ == -1);
+
+	entt::entity titleE = getOrCreateTextEntity(titleTextEntity_);
+	entt::entity costE = getOrCreateTextEntity(costTextEntity_);
+	entt::entity descE = getOrCreateTextEntity(descTextEntity_);
+	entt::entity statusE = getOrCreateTextEntity(statusTextEntity_);
+
+	auto& titleComp = registry.get<UITextComponent>(titleE);
+	auto& titleRect = registry.get<RectTransformComponent>(titleE);
+	auto& costComp = registry.get<UITextComponent>(costE);
+	auto& costRect = registry.get<RectTransformComponent>(costE);
+	auto& descComp = registry.get<UITextComponent>(descE);
+	auto& descRect = registry.get<RectTransformComponent>(descE);
+	auto& statusComp = registry.get<UITextComponent>(statusE);
+	auto& statusRect = registry.get<RectTransformComponent>(statusE);
+
+	if (showText) {
+		const SkillNode& node = nodes_[hoveredIndex];
+		float panelWidth = 400.0f;
+		float panelX = screenW_ - kPanelMargin - panelWidth;
+		float panelY = kPanelMargin;
+
+		titleComp.text = node.name;
+		titleComp.fontSize = 28.0f;
+		titleComp.color = {1, 1, 1, 1};
+		titleRect.pos = {panelX + 20.0f, panelY + 30.0f};
+
+		costComp.text = "Cost: " + std::to_string(node.cost) + " SP";
+		costComp.fontSize = 20.0f;
+		costComp.color = {0.8f, 0.8f, 0.8f, 1};
+		costRect.pos = {panelX + 20.0f, panelY + 75.0f};
+
+		descComp.text = node.description;
+		descComp.fontSize = 18.0f;
+		descComp.color = {0.9f, 0.9f, 0.9f, 1};
+		descRect.pos = {panelX + 20.0f, panelY + 140.0f};
+
+		if (node.unlocked) {
+			statusComp.text = "[Unlocked]";
+			statusComp.fontSize = 22.0f;
+			statusComp.color = {0.2f, 1.0f, 0.4f, 1};
+			statusRect.pos = {panelX + 20.0f, panelY + 200.0f};
+		} else {
+			statusComp.text = "";
+		}
+	} else {
+		titleComp.text = "";
+		costComp.text = "";
+		descComp.text = "";
+		statusComp.text = "";
+	}
+
 	if (pendingUnlockId_ != -1) {
 		DrawConfirmationDialog(renderer_, screenW_, screenH_);
 	}
@@ -165,9 +233,31 @@ void SkillTree::Update(entt::entity entity, GameScene* scene, float dt) {
 	ImGui::End();
 }
 
+void SkillTree::ClearText(GameScene* scene) {
+	if (!scene) return;
+	auto& registry = scene->GetRegistry();
+
+	if (registry.valid(titleTextEntity_)) registry.get<UITextComponent>(titleTextEntity_).text = "";
+	if (registry.valid(costTextEntity_)) registry.get<UITextComponent>(costTextEntity_).text = "";
+	if (registry.valid(descTextEntity_)) registry.get<UITextComponent>(descTextEntity_).text = "";
+	if (registry.valid(statusTextEntity_)) registry.get<UITextComponent>(statusTextEntity_).text = "";
+}
+
 void SkillTree::OnDestroy(entt::entity entity, GameScene* scene) {
 	(void)entity;
-	(void)scene;
+
+	if (scene) {
+		auto& registry = scene->GetRegistry();
+		if (registry.valid(titleTextEntity_)) registry.destroy(titleTextEntity_);
+		if (registry.valid(costTextEntity_)) registry.destroy(costTextEntity_);
+		if (registry.valid(descTextEntity_)) registry.destroy(descTextEntity_);
+		if (registry.valid(statusTextEntity_)) registry.destroy(statusTextEntity_);
+	}
+
+	titleTextEntity_ = entt::null;
+	costTextEntity_ = entt::null;
+	descTextEntity_ = entt::null;
+	statusTextEntity_ = entt::null;
 
 	renderer_ = nullptr;
 	screenW_ = 0.0f;
@@ -596,27 +686,8 @@ void SkillTree::DrawDescriptionPanel(Engine::Renderer* renderer, float screenW, 
 	}
 
 #ifdef USE_IMGUI
-	ImDrawList* drawList = ImGui::GetBackgroundDrawList();
-	if (drawList) {
-		ImVec2 pos(panelX + 20.0f, panelY + 30.0f);
-
-		drawList->AddText(ImGui::GetFont(), 28.0f, pos, IM_COL32(255, 255, 255, 255), node.name.c_str());
-
-		pos.y += 45.0f;
-		std::string costString = "Cost: " + std::to_string(node.cost) + " SP";
-		drawList->AddText(ImGui::GetFont(), 20.0f, pos, IM_COL32(200, 200, 200, 255), costString.c_str());
-
-		pos.y += 35.0f;
-		drawList->AddLine(pos, ImVec2(pos.x + panelWidth - 40.0f, pos.y), IM_COL32(100, 100, 100, 255), 1.0f);
-
-		pos.y += 30.0f;
-		drawList->AddText(ImGui::GetFont(), 18.0f, pos, IM_COL32(220, 220, 220, 255), node.description.c_str());
-
-		if (node.unlocked) {
-			pos.y += 60.0f;
-			drawList->AddText(ImGui::GetFont(), 22.0f, pos, IM_COL32(50, 255, 100, 255), "[Unlocked]");
-		}
-	}
+	// テキストは UITextComponent で描画するため、ここでは描画しません。
+	// ImGui での描画処理は削除されました。
 #endif
 }
 

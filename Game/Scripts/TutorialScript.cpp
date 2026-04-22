@@ -136,7 +136,9 @@ void TutorialScript::EnterStep(TutorialStep step) {
 
     if (step == TutorialStep::SkillTreeGuide1 || step == TutorialStep::SkillTreeGuide2 || step == TutorialStep::SkillTreeGuide3) {
         hasOpenedSkillTreeInGuide_ = false;
-        skillTree_.Close();
+        // 注意: scene が EnterStep に渡されていないため、null を渡すか、
+        // もしくはここではテキストクリアが不要なためそのまま。
+        skillTree_.Close(nullptr);
     }
 
     if (step == TutorialStep::Preparation1 || step == TutorialStep::Preparation2 || step == TutorialStep::Preparation3 || 
@@ -206,7 +208,7 @@ void TutorialScript::UpdateSkillTree(entt::entity entity, GameScene* scene, bool
 
     outKeyN = input->Trigger(DIK_N) || (GetAsyncKeyState('N') & 0x8001);
     if (outKeyN && !preKeyN_) {
-        skillTree_.Toggle();
+        skillTree_.Toggle(scene);
     }
 
     if (skillTree_.IsOpen()) {
@@ -396,7 +398,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
         bool keyN = false;
         UpdateSkillTree(entity, scene, keyN);
         if (hasOpenedSkillTreeInGuide_ && keySpace) {
-            skillTree_.Close();
+            skillTree_.Close(scene);
 			EnterStep(TutorialStep::Finish);
         }
         preKeyN_ = keyN;
@@ -404,7 +406,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
     }
 
     case TutorialStep::Finish:
-        skillTree_.Close();
+        skillTree_.Close(scene);
         if (scene) {
 			// 次のシーン（リザルト画面）に引き継ぐためのパラメータを作成します
             Engine::SceneParameters res;
@@ -952,8 +954,8 @@ void TutorialScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector3& 
 }
 
 // スクリプト破棄時の処理。スキルツリーを閉じ、フェーズを初期状態にリセットする
-void TutorialScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
-    skillTree_.Close();
+void TutorialScript::OnDestroy(entt::entity /*entity*/, GameScene* scene) {
+    skillTree_.Close(scene);
     PhaseSystemScript::ForcePhaseState(PhaseSystemScript::PreparationPhase);
 }
 
