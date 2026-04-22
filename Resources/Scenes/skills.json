@@ -64,7 +64,7 @@
       "unlocked": false,
       "gridX": 0.0,
       "gridY": 0.0,
-      "description": "毒トラップの攻撃力が1.5倍になります。",
+      "description": "毒トラップの攻撃力が\n1.5倍になります。",
       "pageId": 1
     },
     {
@@ -75,7 +75,7 @@
       "unlocked": false,
       "gridX": 2.0,
       "gridY": 0.0,
-      "description": "毒トラップの攻撃範囲が1.5倍になります。",
+      "description": "毒トラップの攻撃範囲が\n1.5倍になります。",
       "pageId": 1
     },
     {

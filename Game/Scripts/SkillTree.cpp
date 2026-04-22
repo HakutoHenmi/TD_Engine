@@ -195,17 +195,17 @@ void SkillTree::Update(entt::entity entity, GameScene* scene, float dt) {
 		float panelY = kPanelMargin;
 
 		titleComp.text = node.name;
-		titleComp.fontSize = 28.0f;
+		titleComp.fontSize = 50.0f;
 		titleComp.color = {1, 1, 1, 1};
 		titleRect.pos = {panelX + 20.0f, panelY + 30.0f};
 
 		costComp.text = "Cost: " + std::to_string(node.cost) + " SP";
-		costComp.fontSize = 20.0f;
+		costComp.fontSize = 40.0f;
 		costComp.color = {0.8f, 0.8f, 0.8f, 1};
 		costRect.pos = {panelX + 20.0f, panelY + 75.0f};
 
 		descComp.text = node.description;
-		descComp.fontSize = 18.0f;
+		descComp.fontSize = 30.0f;
 		descComp.color = {0.9f, 0.9f, 0.9f, 1};
 		descRect.pos = {panelX + 20.0f, panelY + 140.0f};
 
@@ -234,13 +234,18 @@ void SkillTree::Update(entt::entity entity, GameScene* scene, float dt) {
 }
 
 void SkillTree::ClearText(GameScene* scene) {
-	if (!scene) return;
+	if (!scene)
+		return;
 	auto& registry = scene->GetRegistry();
 
-	if (registry.valid(titleTextEntity_)) registry.get<UITextComponent>(titleTextEntity_).text = "";
-	if (registry.valid(costTextEntity_)) registry.get<UITextComponent>(costTextEntity_).text = "";
-	if (registry.valid(descTextEntity_)) registry.get<UITextComponent>(descTextEntity_).text = "";
-	if (registry.valid(statusTextEntity_)) registry.get<UITextComponent>(statusTextEntity_).text = "";
+	if (registry.valid(titleTextEntity_))
+		registry.get<UITextComponent>(titleTextEntity_).text = "";
+	if (registry.valid(costTextEntity_))
+		registry.get<UITextComponent>(costTextEntity_).text = "";
+	if (registry.valid(descTextEntity_))
+		registry.get<UITextComponent>(descTextEntity_).text = "";
+	if (registry.valid(statusTextEntity_))
+		registry.get<UITextComponent>(statusTextEntity_).text = "";
 }
 
 void SkillTree::OnDestroy(entt::entity entity, GameScene* scene) {
@@ -248,10 +253,14 @@ void SkillTree::OnDestroy(entt::entity entity, GameScene* scene) {
 
 	if (scene) {
 		auto& registry = scene->GetRegistry();
-		if (registry.valid(titleTextEntity_)) registry.destroy(titleTextEntity_);
-		if (registry.valid(costTextEntity_)) registry.destroy(costTextEntity_);
-		if (registry.valid(descTextEntity_)) registry.destroy(descTextEntity_);
-		if (registry.valid(statusTextEntity_)) registry.destroy(statusTextEntity_);
+		if (registry.valid(titleTextEntity_))
+			registry.destroy(titleTextEntity_);
+		if (registry.valid(costTextEntity_))
+			registry.destroy(costTextEntity_);
+		if (registry.valid(descTextEntity_))
+			registry.destroy(descTextEntity_);
+		if (registry.valid(statusTextEntity_))
+			registry.destroy(statusTextEntity_);
 	}
 
 	titleTextEntity_ = entt::null;
@@ -277,7 +286,7 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 	float attackRangeRateCanon = 1.0f;
 	float attackSpeedRateCanon = 1.0f;
 
-	//page1
+	// page1
 	if (IsSkillUnlocked(1)) {
 		attackPowerRateCanon *= 1.50f;
 	}
@@ -291,11 +300,11 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 		attackRangeRateCanon *= 1.20f;
 		attackPowerRateCanon *= 1.20f;
 	}
-	//poisonTrap
+	// poisonTrap
 	float attackPowerRatePoison = 1.0f;
 	float attackRangeRatePoison = 1.0f;
 
-	//page2
+	// page2
 	if (IsSkillUnlocked(101)) {
 		attackPowerRatePoison *= 1.50f;
 	}
@@ -312,7 +321,7 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 	float attackPowerRateMisile = 1.0f;
 	float attackAreaRateMisile = 1.0f;
 
-	//page3
+	// page3
 	if (IsSkillUnlocked(201)) {
 		attackPowerRateMisile *= 1.50f;
 	}
@@ -322,14 +331,14 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 
 	if (IsSkillUnlocked(203)) {
 	}
-	//canon
+	// canon
 	SetVar(entity, scene, "AttackPowerRateCanon", attackPowerRateCanon);
 	SetVar(entity, scene, "AttackSpeedRateCanon", attackSpeedRateCanon);
 	SetVar(entity, scene, "AttackRangeRateCanon", attackRangeRateCanon);
 	// poisonTrap
 	SetVar(entity, scene, "AttackPowerRatePoison", attackPowerRatePoison);
 	SetVar(entity, scene, "AttackRangeRatePoison", attackRangeRatePoison);
-	
+
 	// misile
 	SetVar(entity, scene, "AttackPowerRateMisile", attackPowerRateMisile);
 	SetVar(entity, scene, "AttackAreaRateMisile", attackAreaRateMisile);
@@ -625,6 +634,7 @@ void SkillTree::DrawNodes(Engine::Renderer* renderer, float screenW, float scree
 	}
 }
 
+#pragma region PageButtons
 void SkillTree::DrawSkillPointsText(Engine::Renderer* renderer, float screenW, float screenH) {
 	(void)screenW;
 
@@ -644,6 +654,8 @@ void SkillTree::DrawSkillPointsText(Engine::Renderer* renderer, float screenW, f
 		renderer->DrawSprite(texBg_, dot);
 	}
 }
+
+#pragma endregion
 
 void SkillTree::DrawDescriptionPanel(Engine::Renderer* renderer, float screenW, float screenH, int hoveredNodeIndex) {
 	(void)screenH;
