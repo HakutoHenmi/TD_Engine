@@ -62,6 +62,8 @@ protected: // メンバ変数
 	MoveType type_ = Walk;	// 初期値はWalk
 	entt::entity currentTarget_ = entt::null;
 
+	float hp_ = 0.0f;
+	float maxHp_ = 0.0f;
 	float speed_ = 2.0f;
 	float searchRange_ = 15.0f;
 	float loseTargetRange_ = 25.0f;

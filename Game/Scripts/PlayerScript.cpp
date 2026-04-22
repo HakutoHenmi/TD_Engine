@@ -26,8 +26,23 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 	if (scene->GetRegistry().all_of<BoxColliderComponent>(entity)) {
 		scene->GetRegistry().get<BoxColliderComponent>(entity).size = { 2.0f, 2.0f, 2.0f };
 	}
-	if (scene->GetRegistry().all_of<HurtboxComponent>(entity)) {
-		scene->GetRegistry().get<HurtboxComponent>(entity).size = { 2.0f, 2.0f, 2.0f };
+	
+	// 食らい判定（Hurtbox）がなければ追加し、サイズとタグを設定する
+	if (!scene->GetRegistry().all_of<HurtboxComponent>(entity)) {
+		auto& hb = scene->GetRegistry().emplace<HurtboxComponent>(entity);
+		hb.size = { 2.0f, 2.0f, 2.0f };
+		hb.tag = TagType::Player;
+	} else {
+		auto& hb = scene->GetRegistry().get<HurtboxComponent>(entity);
+		hb.size = { 2.0f, 2.0f, 2.0f };
+		hb.tag = TagType::Player;
+	}
+
+	// 体力（Health）がなければ追加する
+	if (!scene->GetRegistry().all_of<HealthComponent>(entity)) {
+		auto& hc = scene->GetRegistry().emplace<HealthComponent>(entity);
+		hc.hp = 100.0f;
+		hc.maxHp = 100.0f;
 	}
 
 	// 剣がシーンに既にあるか確認
