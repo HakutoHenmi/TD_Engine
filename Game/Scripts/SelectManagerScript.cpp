@@ -13,8 +13,8 @@ void SelectManagerScript::Start(entt::entity entity, GameScene* scene) {
 
 	// ステージリスト
 	stages_.clear();
-	stages_.push_back({"Stage 1: Main City", "Resources/Scenes/PhaseSystem.json", "Standard TD map"});
-	stages_.push_back({"Stage 2: TPS Arena", "Resources/Scenes/PhaseSystem.json", "Action oriented map"});
+	stages_.push_back({"チュートリアル", "Resources/Scenes/PhaseSystem.json", "Standard TD map"});
+	stages_.push_back({"1ステージ", "Resources/Scenes/PhaseSystem.json", "Action oriented map"});
 	stages_.push_back({"Stage 3: Tower Defense", "Resources/Scenes/PhaseSystem.json", "Defend the core"});
 
 	// UIが存在するかチェック
@@ -24,6 +24,16 @@ void SelectManagerScript::Start(entt::entity entity, GameScene* scene) {
 		uiInitialized_ = true;
 	} else {
 		uiInitialized_ = true;
+	}
+
+	// 既存UIがロードされた場合も考慮して、ボタンのテキストを更新する
+	auto btn0 = scene->FindObjectByName("StageButton_0");
+	if (btn0 != entt::null && scene->GetRegistry().all_of<UITextComponent>(btn0)) {
+		scene->GetRegistry().get<UITextComponent>(btn0).text = "チュートリアル";
+	}
+	auto btn1 = scene->FindObjectByName("StageButton_1");
+	if (btn1 != entt::null && scene->GetRegistry().all_of<UITextComponent>(btn1)) {
+		scene->GetRegistry().get<UITextComponent>(btn1).text = "1ステージ";
 	}
 }
 
@@ -102,8 +112,8 @@ void SelectManagerScript::CreateFallbackUI(GameScene* scene) {
 		std::string path;
 	};
 	std::vector<StageInfo> defaultStages = {
-		{"Stage 1: Main City", "Resources/Scenes/PhaseSystem.json"},
-		{"Stage 2: TPS Arena", "Resources/Scenes/PhaseSystem.json"},
+		{"チュートリアル", "Resources/Scenes/PhaseSystem.json"},
+		{"1ステージ", "Resources/Scenes/PhaseSystem.json"},
 		{"Stage 3: Tower Defense", "Resources/Scenes/PhaseSystem.json"}
 	};
 
