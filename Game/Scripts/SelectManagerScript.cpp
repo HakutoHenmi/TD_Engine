@@ -13,8 +13,8 @@ void SelectManagerScript::Start(entt::entity entity, GameScene* scene) {
 
 	// ステージリスト
 	stages_.clear();
-	stages_.push_back({"チュートリアル", "Resources/Scenes/PhaseSystem.json", "Standard TD map"});
-	stages_.push_back({"1ステージ", "Resources/Scenes/PhaseSystem.json", "Action oriented map"});
+	stages_.push_back({"チュートリアル", "Resources/Scenes/TutorialScene.json", "Standard TD map"});
+	stages_.push_back({"1ステージ", "Resources/Scenes/tesuto.json", "Action oriented map"});
 	stages_.push_back({"Stage 3: Tower Defense", "Resources/Scenes/PhaseSystem.json", "Defend the core"});
 
 	// UIが存在するかチェック
@@ -30,10 +30,16 @@ void SelectManagerScript::Start(entt::entity entity, GameScene* scene) {
 	auto btn0 = scene->FindObjectByName("StageButton_0");
 	if (btn0 != entt::null && scene->GetRegistry().all_of<UITextComponent>(btn0)) {
 		scene->GetRegistry().get<UITextComponent>(btn0).text = "チュートリアル";
+		if (scene->GetRegistry().all_of<VariableComponent>(btn0)) {
+			scene->GetRegistry().get<VariableComponent>(btn0).SetString("Path", "Resources/Scenes/TutorialScene.json");
+		}
 	}
 	auto btn1 = scene->FindObjectByName("StageButton_1");
 	if (btn1 != entt::null && scene->GetRegistry().all_of<UITextComponent>(btn1)) {
 		scene->GetRegistry().get<UITextComponent>(btn1).text = "1ステージ";
+		if (scene->GetRegistry().all_of<VariableComponent>(btn1)) {
+			scene->GetRegistry().get<VariableComponent>(btn1).SetString("Path", "Resources/Scenes/tesuto.json");
+		}
 	}
 }
 
@@ -54,8 +60,12 @@ void SelectManagerScript::Update(entt::entity entity, GameScene* scene, float dt
 				if (name.find("StageButton_") != std::string::npos) {
 					if (reg.all_of<VariableComponent>(e)) {
 						std::string path = reg.get<VariableComponent>(e).GetString("Path");
-						// ★一時対応: どのボタンを押しても確実に機能するPhaseSystem.jsonへ飛ばす
-						path = "Resources/Scenes/PhaseSystem.json";
+						
+						// もし空だった場合のためのフォールバック
+						if (path.empty()) {
+							path = "Resources/Scenes/PhaseSystem.json";
+						}
+						
 						Engine::SceneParameters p;
 						p.stagePath = path;
 						p.sceneName = "Game";
@@ -107,13 +117,13 @@ void SelectManagerScript::CreateFallbackUI(GameScene* scene) {
 	textTitle.color = {1, 1, 1, 1};
 
 	// デフォルトのステージリスト（Fallback用）
-	struct StageInfo {
+	struct LocalStageInfo {
 		std::string name;
 		std::string path;
 	};
-	std::vector<StageInfo> defaultStages = {
-		{"チュートリアル", "Resources/Scenes/PhaseSystem.json"},
-		{"1ステージ", "Resources/Scenes/PhaseSystem.json"},
+	std::vector<LocalStageInfo> defaultStages = {
+		{"チュートリアル", "Resources/Scenes/TutorialScene.json"},
+		{"1ステージ", "Resources/Scenes/tesuto.json"},
 		{"Stage 3: Tower Defense", "Resources/Scenes/PhaseSystem.json"}
 	};
 
