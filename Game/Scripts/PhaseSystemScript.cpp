@@ -28,6 +28,34 @@ namespace Game {
 namespace {
 float SnapTo2x2Grid(float value) { return std::floor(value / 2.0f) * 2.0f; }
 
+bool IsPointerOverInstallationButton(GameScene* scene) {
+	if (!scene)
+		return false;
+
+	auto& registry = scene->GetRegistry();
+	auto view = registry.view<UIButtonComponent, ScriptComponent>();
+	for (auto entity : view) {
+		const auto& btn = view.get<UIButtonComponent>(entity);
+		if (!btn.enabled || !btn.isHovered)
+			continue;
+
+		if (registry.all_of<RectTransformComponent>(entity) && !registry.get<RectTransformComponent>(entity).enabled)
+			continue;
+
+		const auto& sc = view.get<ScriptComponent>(entity);
+		if (!sc.enabled)
+			continue;
+
+		for (const auto& entry : sc.scripts) {
+			if (entry.scriptPath == "InstallationButton") {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
 std::vector<Engine::Vector3> BuildPipePathPoints(const Engine::Vector3& start, const Engine::Vector3& end) {
 	std::vector<Engine::Vector3> points;
 
@@ -158,6 +186,9 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	}
 
 	if (isPhase_ == PreparationPhase) {
+        bool placementSelectionChangedThisFrame = false;
+		const bool clickedInstallationButtonThisFrame = input->IsMouseTrigger(0) && IsPointerOverInstallationButton(scene);
+
 		// Nキーでスキルツリーの開閉
 		if (keyN && !preKeyN_) {
 			skillTree_.Toggle(scene);
@@ -196,6 +227,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
+           placementSelectionChangedThisFrame = true;
 		}
 
 		if (key2 || InstallationButton::IsButtonPressed(InstallationButton::Pipe)) {
@@ -204,6 +236,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			isPipeSet_ = true;
 			isPlacementMode_ = true;
 			hasPipeStartPoint_ = false;
+           placementSelectionChangedThisFrame = true;
 		}
 
 		if (key3 || InstallationButton::IsButtonPressed(InstallationButton::Cannon)) {
@@ -212,6 +245,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
+           placementSelectionChangedThisFrame = true;
 		}
 
 		if (key4 || InstallationButton::IsButtonPressed(InstallationButton::Missile)) {
@@ -220,6 +254,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
+           placementSelectionChangedThisFrame = true;
 		}
 
 		if (key5 || InstallationButton::IsButtonPressed(InstallationButton::PoisonTrap)) {
@@ -228,6 +263,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
+           placementSelectionChangedThisFrame = true;
 		}
 
 		if (input->IsMouseTrigger(1) && isPlacementMode_) {
@@ -240,7 +276,9 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			}
 		}
 
-		Installation(scene, selectedObjPath_);
+        if (!placementSelectionChangedThisFrame && !clickedInstallationButtonThisFrame) {
+			Installation(scene, selectedObjPath_);
+		}
 
 		if (keySpace) {
 			RequestPhaseChange(BattlePhase);
