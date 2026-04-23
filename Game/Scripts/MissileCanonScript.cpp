@@ -138,9 +138,9 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 	}
 
 	// 接続チェックを無効化したいときはこのままコメントアウトでOK
-	// if (!isConnectedToTank_) {
-	// 	return;
-	// }
+	 if (!isConnectedToTank_) {
+	 	return;
+	 }
 
 	if (!registry.all_of<TransformComponent>(entity)) {
 		return;
