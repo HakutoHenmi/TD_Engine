@@ -576,7 +576,7 @@ void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vec
 	const Engine::Vector4 previewColor = canPlace ? Engine::Vector4{0.6f, 1.0f, 0.6f, 0.6f} : Engine::Vector4{1.0f, 0.3f, 0.3f, 0.6f};
 	renderer->DrawMesh(previewModelHandle_, previewTextureHandle_, tr, previewColor, "Toon");
 
-	// パイプ設置時のみ、既存のタンク・大砲の接続エリア（緑の平面十字）を描画する
+	// パイプ設置時のみ、既存のタンク・大砲・ミサイル・ポイズンの接続エリア（緑の平面十字）を描画する
 	if (objPath.find("Pipe") != std::string::npos) {
 		static uint32_t crossPlaneHandle = 0;
 		if (crossPlaneHandle == 0) {
@@ -584,7 +584,7 @@ void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vec
 		}
 		auto& registry = scene->GetRegistry();
 		registry.view<NameComponent, TransformComponent>().each([&](entt::entity, const NameComponent& nc, const TransformComponent& tc) {
-			if (nc.name.find("Canon") != std::string::npos || nc.name.find("Cannon") != std::string::npos || nc.name.find("Tank") != std::string::npos) {
+			if (nc.name.find("Canon") != std::string::npos || nc.name.find("Cannon") != std::string::npos || nc.name.find("Tank") != std::string::npos || nc.name.find("Missile") != std::string::npos || nc.name.find("Poison") != std::string::npos) {
 				Engine::Transform planeTr;
 				planeTr.scale = {1.0f, 0.05f, 1.0f};
 				Engine::Vector4 colorPlane = {0.0f, 1.0f, 0.0f, 0.4f};
