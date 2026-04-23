@@ -508,7 +508,7 @@ void TutorialScript::ShowGuideText(entt::entity entity, GameScene* scene) {
 		break;
 	case TutorialStep::InstallCannonGuide2:
 		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "まず大砲を設置しましょう。\nSPACE:次へ";
+			scene->GetRegistry().get<UITextComponent>(entity).text = "まずキャノンを設置しましょう。\nSPACE:次へ";
 		break;
 	case TutorialStep::InstallCannonGuide3:
 		if (scene->GetRegistry().all_of<UITextComponent>(entity))
@@ -517,11 +517,11 @@ void TutorialScript::ShowGuideText(entt::entity entity, GameScene* scene) {
 
 	case TutorialStep::InstallTankGuide1:
 		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "大砲には動力源が必要です。\nSPACE:次へ";
+			scene->GetRegistry().get<UITextComponent>(entity).text = "キャノンには動力源が必要です。\nSPACE:次へ";
 		break;
 	case TutorialStep::InstallTankGuide2:
 		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "弾丸タンクを設置してエネルギーを供給しましょう\nSPACE:次へ";
+			scene->GetRegistry().get<UITextComponent>(entity).text = "タンクを設置してエネルギーを供給しましょう\nSPACE:次へ";
 		break;
 	case TutorialStep::InstallTankGuide3:
 		if (scene->GetRegistry().all_of<UITextComponent>(entity))
@@ -530,7 +530,7 @@ void TutorialScript::ShowGuideText(entt::entity entity, GameScene* scene) {
 
 	case TutorialStep::InstallPipeGuide1:
 		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "タンクと大砲を繋ぐ必要があります。\nSPACE:次へ";
+			scene->GetRegistry().get<UITextComponent>(entity).text = "タンクとキャノンを繋ぐ必要があります。\nSPACE:次へ";
 		break;
 	case TutorialStep::InstallPipeGuide2:
 		if (scene->GetRegistry().all_of<UITextComponent>(entity))
