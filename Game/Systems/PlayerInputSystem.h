@@ -41,14 +41,15 @@ public:
 			// 攻撃入力
 			pi.attackRequested = (GetAsyncKeyState('J') & 0x8000) != 0;
 
-			// カメラ操作
+			// ★追加: Shiftダッシュ入力
+			pi.sprintRequested = (GetAsyncKeyState(VK_LSHIFT) & 0x8000) != 0;
+
+			// ★変更: カメラ操作 - 常にマウスの動きに追従（右クリック不要）
 			pi.cameraYaw = 0.0f;
 			pi.cameraPitch = 0.0f;
-			if (GetAsyncKeyState(VK_RBUTTON) & 0x8000) {
-				if (ctx.input) {
-					pi.cameraYaw = ctx.input->GetMouseDeltaX() * 0.005f;
-					pi.cameraPitch = ctx.input->GetMouseDeltaY() * 0.005f;
-				}
+			if (ctx.input) {
+				pi.cameraYaw = ctx.input->GetMouseDeltaX() * 0.003f;
+				pi.cameraPitch = ctx.input->GetMouseDeltaY() * 0.003f;
 			}
 		}
 	}

@@ -7,6 +7,10 @@ namespace Game {
 class CharacterMovementSystem : public ISystem {
 public:
 	void Update(entt::registry& registry, GameContext& ctx) override {
+		// ★バウンダリ: 初回のみGroundメッシュからマップ境界を算出してキャッシュ
+		if (!boundsCached_) {
+			CacheBounds(registry, ctx);
+		}
 		if (!ctx.isPlaying) return;
 
 		auto view = registry.view<CharacterMovementComponent, RigidbodyComponent, TransformComponent>();
@@ -46,19 +50,43 @@ public:
 			}
 			
 			// 1. 壁判定と水平移動
-			float desiredX = moveX * cm.speed * ctx.dt;
-			float desiredZ = moveZ * cm.speed * ctx.dt;
+			// ★追加: ダッシュ判定 (PlayerInputComponentのsprintRequestedを反映)
+			cm.isSprinting = false;
+			if (registry.all_of<PlayerInputComponent>(entity)) {
+				auto& pi = registry.get<PlayerInputComponent>(entity);
+				if (pi.sprintRequested && (std::abs(moveX) > 0.001f || std::abs(moveZ) > 0.001f)) {
+					cm.isSprinting = true;
+				}
+			}
+			float currentSpeed = cm.speed * (cm.isSprinting ? cm.sprintMultiplier : 1.0f);
+			float desiredX = moveX * currentSpeed * ctx.dt;
+			float desiredZ = moveZ * currentSpeed * ctx.dt;
 
 			if (ctx.scene && (std::abs(moveX) > 0.001f || std::abs(moveZ) > 0.001f)) {
 				// --- 強力な段差制限による壁判定 ---
 				float futureX = tc.translate.x + desiredX;
 				float futureZ = tc.translate.z + desiredZ;
+
+				// ★バウンダリ: キャッシュされた境界外への移動を即ブロック
+				if (boundsCached_) {
+					float margin = 1.0f; // 端から1mの余裕
+					if (futureX < boundsMinX_ + margin || futureX > boundsMaxX_ - margin ||
+					    futureZ < boundsMinZ_ + margin || futureZ > boundsMaxZ_ - margin) {
+						desiredX = 0;
+						desiredZ = 0;
+					}
+				}
+
 				float currentFeetY = tc.translate.y - cm.heightOffset;
 				// 移動先の地面高さを先読み (startY は現在地 y。自己判定回避のため中心から発射)
 				float futureGround = ctx.scene->GetHeightAt(futureX, futureZ, tc.translate.y, static_cast<uint32_t>(entity));
 
-				// 移動先が 0.4m 以上高いなら壁とみなして移動をブロック
-				if (futureGround > currentFeetY + 0.4f) {
+				// ★変更: 地面が見つからない場合(-10000.0f以下)も移動をブロック (マップ外防止)
+				if (futureGround <= -5000.0f) {
+					desiredX = 0;
+					desiredZ = 0;
+				} else if (futureGround > currentFeetY + 0.4f) {
+					// 移動先が 0.4m 以上高いなら壁とみなして移動をブロック
 					desiredX = 0;
 					desiredZ = 0;
 				} else {
@@ -140,6 +168,59 @@ public:
 			auto& cm = registry.get<CharacterMovementComponent>(entity);
 			cm.isGrounded = false;
 		}
+		boundsCached_ = false; // ★リセット時にキャッシュを無効化
+	}
+
+private:
+	// ★バウンダリ: マップ境界キャッシュ
+	bool boundsCached_ = false;
+	float boundsMinX_ = -350.0f;
+	float boundsMaxX_ =  350.0f;
+	float boundsMinZ_ = -350.0f;
+	float boundsMaxZ_ =  350.0f;
+
+	// ★Groundオブジェクトのメッシュ頂点からAABBを算出してキャッシュ
+	void CacheBounds(entt::registry& registry, GameContext& ctx) {
+		auto view = registry.view<NameComponent, TransformComponent>();
+		for (auto entity : view) {
+			auto& nc = registry.get<NameComponent>(entity);
+			if (nc.name != "Ground") continue;
+
+			auto& tc = registry.get<TransformComponent>(entity);
+
+			// メッシュからAABBを取得
+			uint32_t modelHandle = 0;
+			if (registry.all_of<MeshRendererComponent>(entity)) {
+				modelHandle = registry.get<MeshRendererComponent>(entity).modelHandle;
+			}
+			if (modelHandle != 0 && ctx.renderer) {
+				auto* model = ctx.renderer->GetModel(modelHandle);
+				if (model) {
+					const auto& data = model->GetData();
+					if (!data.vertices.empty()) {
+						float minX = 1e9f, maxX = -1e9f;
+						float minZ = 1e9f, maxZ = -1e9f;
+						for (const auto& v : data.vertices) {
+							// ワールド座標 = ローカル頂点 * スケール + 位置
+							float wx = v.position.x * tc.scale.x + tc.translate.x;
+							float wz = v.position.z * tc.scale.z + tc.translate.z;
+							minX = std::min(minX, wx);
+							maxX = std::max(maxX, wx);
+							minZ = std::min(minZ, wz);
+							maxZ = std::max(maxZ, wz);
+						}
+						boundsMinX_ = minX;
+						boundsMaxX_ = maxX;
+						boundsMinZ_ = minZ;
+						boundsMaxZ_ = maxZ;
+					}
+				}
+			}
+			boundsCached_ = true;
+			return;
+		}
+		// Groundが見つからない場合はデフォルト値のまま
+		boundsCached_ = true;
 	}
 };
 
