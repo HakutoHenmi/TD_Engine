@@ -263,6 +263,7 @@ struct PlayerInputComponent : public Component {
 	DirectX::XMFLOAT2 moveDir = {0, 0};
 	bool jumpRequested = false;
 	bool attackRequested = false;
+	bool sprintRequested = false; // ★追加: Shiftダッシュ
 
 	// ★追加: マウス操作によるカメラの旋回量（intent）
 	float cameraYaw = 0.0f;
@@ -273,11 +274,13 @@ struct PlayerInputComponent : public Component {
 // ★追加: キャラクター移動 (能力)
 struct CharacterMovementComponent : public Component {
 	float speed = 5.0f;
+	float sprintMultiplier = 1.8f; // ★追加: ダッシュ時の速度倍率
 	float jumpPower = 12.0f;
 	float gravity = 9.8f;
 	float velocityY = 0.0f;
 	float heightOffset = 1.0f; // ★追加: 地面からの高度オフセット
 	bool isGrounded = false;
+	bool isSprinting = false; // ★追加: ダッシュ中フラグ
 	bool enabled = true;
 	CharacterMovementComponent() { type = ComponentType::CharacterMovement; }
 };
