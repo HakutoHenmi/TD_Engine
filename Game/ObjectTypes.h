@@ -175,6 +175,7 @@ enum class TagType : uint32_t {
 	Head,
 	Explosion,
 	Poison,
+	Missile,
 	Trap,
 	Experience,
 	ExperienceOrb,

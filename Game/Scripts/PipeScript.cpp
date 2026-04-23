@@ -89,7 +89,9 @@ static bool IsConnectableTag(GameScene* scene, entt::entity entity) {
 	       HasTag(scene, entity, TagType::BulletTank) ||
 	       HasTag(scene, entity, TagType::Cannon) ||
 	       HasTag(scene, entity, TagType::Canon) ||
-	       HasTag(scene, entity, TagType::PipeCannon);
+		HasTag(scene, entity, TagType::PipeCannon) ||
+		   HasTag(scene, entity, TagType::Poison) ||
+		   HasTag(scene, entity, TagType::Missile);
 }
 
 void PipeScript::Start(entt::entity obj, GameScene* scene) {
