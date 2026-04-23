@@ -53,6 +53,7 @@ enum class ComponentType {
 	Variable, // ★追加: 汎用変数
 	WorldSpaceUI, // ★追加: ワールド空間UI
 	Motion // ★追加: モーションエディタ用
+
 };
 struct Component { 
 	ComponentType type = ComponentType::MeshRenderer; 
@@ -215,6 +216,7 @@ inline const char* TagToString(TagType tag) {
 	case TagType::Default: return "Default";
 	case TagType::Core: return "Core";
 	case TagType::EnemyBullet: return "EnemyBullet";
+    case TagType::Missile: return "Missile";
 	default: return "Untagged";
 	}
 }
@@ -246,6 +248,7 @@ inline TagType StringToTag(const std::string& s) {
 	if (s == "Default") return TagType::Default;
 	if (s == "Core") return TagType::Core;
 	if (s == "EnemyBullet") return TagType::EnemyBullet;
+	if (s=="Missile")return TagType::Missile;
 	return TagType::Untagged;
 }
 
