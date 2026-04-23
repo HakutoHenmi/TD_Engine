@@ -4,7 +4,7 @@
 // 画面空間(px)で処理 / グロー付 / 加算ブレンド推奨
 // ================================================
 
-cbuffer CBUI : register(b0)
+cbuffer CBUI : register(b1)
 {
     float2  uCenterPx;     // 画面上の中心位置(px)
     float2  uSizePx;       // 図形サイズ(px) … 四角は幅高、円は半径を uSizePx.x に入れる
@@ -17,7 +17,8 @@ cbuffer CBUI : register(b0)
     float   uInner;        // 三日月の内側半径（円との差分用）
     float   uRotateRad;    // 回転（ラジアン） 2D図形を回転したい時
     float   uProgress;     // プログレスバーの割合(0.0 - 1.0) ※未使用時は -1.0 などを設定してください
-    float3  _pad;          // アライメント調整用
+    float   uFill;         // 1.0: 塗りつぶし, 0.0: アウトラインのみ
+    float2  _pad;          // アライメント調整用
 }
 
 // 受け取り：頂点で出したUV（0-1）。全画面クアッドならそのまま使える
@@ -57,16 +58,24 @@ float sdCrescent(float2 p, float rOuter, float rInner) {
 //  width : 線の半分厚み（px）に近いイメージ → uLineWidthをそのまま使用
 //  glow  : グロー厚（px）
 //  col   : ベース色
-float4 drawLineGlow(float d, float width, float glow, float4 col, float innerMask)
+//  fill  : 1.0=塗りつぶし, 0.0=アウトライン
+float4 drawLineGlow(float d, float width, float glow, float4 col, float innerMask, float fill)
 {
+    // 塗りつぶしの場合は内側 (d < 0) を全て不透明にし、外側は輪郭でフェードする
+    float lineDist = lerp(abs(d), max(d, 0.0), fill);
+    
     // 線のα（-width..+width を1→0へ）
-    float lineAlpha = 1.0 - smoothstep(width-1.0, width+1.0, abs(d)); // 線の内側を強めに
+    float lineAlpha = 1.0 - smoothstep(width-1.0, width+1.0, lineDist); 
     // グロー（線の外側からglow範囲で0→1→0のフェード）
-    float glowAlpha = 1.0 - smoothstep(width, width + glow, abs(d));
+    float glowAlpha = 1.0 - smoothstep(width, width + max(glow, 0.001), lineDist);
 
     // ちょい内側を強調（発光コア）
-    float core = 1.0 - smoothstep(0.0, width*0.6, abs(d));
+    float core = 1.0 - smoothstep(0.0, width*0.6 + 0.001, lineDist);
     float4 glowCol = col * (0.55 * glowAlpha + 0.45 * core);
+    
+    if (fill > 0.5) {
+        glowCol = col * lineAlpha; // 塗りつぶしの場合はそのままの色
+    }
 
     // 内側マスク（三日月など内側を切るため）
     glowCol.a *= innerMask;
@@ -116,5 +125,5 @@ float4 mainPS(PSIn i) : SV_TARGET
         innerMask *= step(t, uProgress);
     }
 
-    return drawLineGlow(d, uLineWidth, uGlow, uColor, innerMask);
+    return drawLineGlow(d, uLineWidth, uGlow, uColor, innerMask, uFill);
 }

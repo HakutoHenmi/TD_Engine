@@ -328,6 +328,7 @@ void Renderer::BeginFrame(const float clearColorRGBA[4]) {
 	lastIDCIndex_ = -1;
 	srvDynamicCursor_ = kSrvStaticMax; // 動的SRVカーソルをリセット
 	spriteDrawCalls_.clear(); // ★スプライトもクリア
+	sdfUIDrawCalls_.clear(); // ★SDF UIもクリア
 
 	cbFrameAddr_ = 0;
 	backBufferBarrierState_ = false;
@@ -948,6 +949,7 @@ void Renderer::EndFrame() {
 	list_->DrawInstanced(3, 1, 0, 0);
 
 	FlushSprites();
+	FlushSDFUI(); // ★追加: SDF UIの描画を実行
 	FlushText(); // ★追加: メインUI描画後にテキスト描画を実行
 
 	if (finalSceneState_ != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
@@ -1881,6 +1883,52 @@ float4 main(VSIn v, uint instanceID : SV_InstanceID) : SV_POSITION {
 			return false;
 	}
 
+	// ★追加: SDF UI (PixelShaderUI) 用パイプライン
+	{
+		static const char* kVSUI = R"(
+struct VSOut { float4 svpos : SV_POSITION; float2 uv : TEXCOORD0; };
+VSOut main(uint vid : SV_VertexID) {
+    float2 p = (vid == 0) ? float2(-1, -1) : ((vid == 1) ? float2(-1,  3) : float2( 3, -1));
+    VSOut o; o.svpos = float4(p, 0, 1); o.uv = float2((p.x + 1) * 0.5, 1.0 - (p.y + 1) * 0.5); return o;
+})";
+		auto vsUI = CompileShader(kVSUI, "main", "vs_5_0");
+		auto psUI = CompileShaderFromFile(L"Resources/shaders/PixelShaderUI.hlsl", "mainPS", "ps_5_0");
+		if (vsUI && psUI) {
+			CD3DX12_ROOT_PARAMETER params[1]{};
+			params[0].InitAsConstantBufferView(1); // b1 for CBUI
+			CD3DX12_ROOT_SIGNATURE_DESC rsDesc;
+			rsDesc.Init(_countof(params), params, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_NONE);
+			ComPtr<ID3DBlob> sig, err;
+			D3D12SerializeRootSignature(&rsDesc, D3D_ROOT_SIGNATURE_VERSION_1, &sig, &err);
+			dev_->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(), IID_PPV_ARGS(&rootSigUI_));
+
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC pso{};
+			pso.pRootSignature = rootSigUI_.Get();
+			pso.VS = {vsUI->GetBufferPointer(), vsUI->GetBufferSize()};
+			pso.PS = {psUI->GetBufferPointer(), psUI->GetBufferSize()};
+			pso.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			pso.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+			pso.NumRenderTargets = 1;
+			pso.SampleDesc.Count = 1;
+			pso.SampleMask = UINT_MAX;
+			pso.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+			pso.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+			auto blend = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+			blend.RenderTarget[0].BlendEnable = TRUE;
+			blend.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+			blend.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+			blend.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+			blend.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+			blend.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
+			blend.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+			blend.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+			pso.BlendState = blend;
+			pso.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+			pso.DepthStencilState.DepthEnable = FALSE;
+			dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoUI_));
+		}
+	}
+
 	// ---------------------------------------------------------
 	// ★追加: 3Dライン描画用パイプライン (Position + Color)
 	// ---------------------------------------------------------
@@ -2537,7 +2585,7 @@ void Renderer::FlushSprites() {
 
 	for (const auto& dc : spriteDrawCalls_) {
 		const auto& s = dc.desc;
-		auto texH = dc.tex;
+		//auto texH = dc.tex;
 
 #ifdef _MSC_VER
 #pragma warning(push)
@@ -2612,9 +2660,53 @@ void Renderer::FlushSprites() {
 		vbv.StrideInBytes = sizeof(V);
 
 		list_->IASetVertexBuffers(0, 1, &vbv);
-		list_->SetGraphicsRootDescriptorTable(1, textures_[texH].srvGpu);
+		list_->SetGraphicsRootDescriptorTable(1, textures_[dc.tex].srvGpu); // ★修正: dc.texを使用
 		list_->DrawInstanced(6, 1, 0, 0);
 	}
+}
+
+void Renderer::FlushSDFUI() {
+	if (sdfUIDrawCalls_.empty() || !psoUI_) return;
+
+	const float W = (float)Engine::WindowDX::kW;
+	const float H = (float)Engine::WindowDX::kH;
+	const uint32_t fi = window_->FrameIndex();
+
+	ID3D12DescriptorHeap* heaps[] = { srvHeap_ };
+	list_->SetDescriptorHeaps(1, heaps);
+	list_->SetPipelineState(psoUI_.Get());
+	list_->SetGraphicsRootSignature(rootSigUI_.Get());
+	list_->RSSetViewports(1, &viewport_);
+	list_->RSSetScissorRects(1, &scissor_);
+	list_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	for (const auto& dc : sdfUIDrawCalls_) {
+		CBUI cb{};
+		cb.uCenterPx = dc.desc.centerPx;
+		cb.uSizePx = dc.desc.sizePx;
+		cb.uViewportPx = Vector2(W, H);
+		cb.uLineWidth = dc.desc.lineWidth;
+		cb.uGlow = dc.desc.glow;
+		cb.uColor = dc.desc.color;
+		cb.uShape = dc.desc.shape;
+		cb.uRound = dc.desc.round;
+		cb.uInner = dc.desc.inner;
+		cb.uRotateRad = dc.desc.rotateRad;
+		cb.uProgress = dc.desc.progress;
+		cb.uFill = dc.desc.fill;
+
+		const uint32_t cbOff = upload_[fi].Allocate(sizeof(CBUI), 256);
+		if (cbOff != UINT32_MAX) {
+			std::memcpy(upload_[fi].mapped + cbOff, &cb, sizeof(CBUI));
+			list_->SetGraphicsRootConstantBufferView(0, upload_[fi].buffer->GetGPUVirtualAddress() + cbOff);
+			// Fullscreen triangle (3 vertices)
+			list_->DrawInstanced(3, 1, 0, 0);
+		}
+	}
+}
+
+void Renderer::DrawSDFUI(const SdfUIDesc& desc) {
+	sdfUIDrawCalls_.push_back({desc});
 }
 
 // ★追加: テキスト描画システム
