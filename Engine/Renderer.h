@@ -286,9 +286,26 @@ public:
 		float rotationRad = 0;
 		int layer = 0; // ★追加: 描画レイヤー
 	};
+
+	struct SdfUIDesc {
+		Vector2 centerPx;
+		Vector2 sizePx;
+		float lineWidth = 1.0f;
+		float glow = 0.0f;
+		Vector4 color = {1, 1, 1, 1};
+		int shape = 0; // 0:Square, 1:Circle, 2:Crescent
+		float round = 0.0f;
+		float inner = 0.0f;
+		float rotateRad = 0.0f;
+		float progress = 1.0f;
+		float fill = 1.0f; // ★追加: 1.0=塗りつぶし, 0.0=アウトライン
+	};
+
 	void DrawSprite(TextureHandle texH, const SpriteDesc& s);
 	void DrawSprite9Slice(TextureHandle texH, const Sprite9SliceDesc& s); // ★追加
+	void DrawSDFUI(const SdfUIDesc& desc);
 	void FlushSprites(); // スプライトの描画実行
+	void FlushSDFUI();   // SDF UI の描画実行
 
 	// ★追加: テキスト描画
 	// text: UTF-8 文字列
@@ -403,6 +420,27 @@ private:
 		std::vector<InstanceData> instances;
 	};
 
+	struct CBUI {
+		Vector2 uCenterPx;
+		Vector2 uSizePx;
+		Vector2 uViewportPx;
+		float uLineWidth;
+		float uGlow;
+		Vector4 uColor;
+		int uShape;
+		float uRound;
+		float uInner;
+		float uRotateRad;
+		float uProgress;
+		float uFill; // ★追加
+		float pad[2];
+	};
+
+	struct SDFUIDrawCall {
+		SdfUIDesc desc;
+	};
+	std::vector<SDFUIDrawCall> sdfUIDrawCalls_;
+
 private:
 	struct Texture {
 		Microsoft::WRL::ComPtr<ID3D12Resource> res;
@@ -483,6 +521,9 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSig2D_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> pso2D_;
+
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSigUI_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoUI_;
 
 	// ★追加: テキスト描画用 (複数フォント対応)
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoText_;

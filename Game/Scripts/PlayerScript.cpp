@@ -396,37 +396,58 @@ void PlayerScript::OnEditorUI() {
 }
 
 void PlayerScript::DrawUI(entt::entity /*entity*/, GameScene* /*scene*/) {
-#if defined(USE_IMGUI)
-	ImDrawList* drawList = ImGui::GetForegroundDrawList();
-	if (!drawList) return;
-
-	// 画面左上に経験値バーを描画
-	float barX = 20.0f;
-	float barY = 20.0f;
-	float barW = 300.0f;
-	float barH = 24.0f;
-
 	float progress = nextExperience_ > 0.0f ? (experience_ / nextExperience_) : 0.0f;
 	progress = std::clamp(progress, 0.0f, 1.0f);
 
 	// 背景 (黒半透明)
-	drawList->AddRectFilled(ImVec2(barX, barY), ImVec2(barX + barW, barY + barH), IM_COL32(30, 30, 30, 200));
-	
+	Engine::Renderer::SdfUIDesc bgDesc{};
+	bgDesc.centerPx = {170.0f, 32.0f}; // X=20+150, Y=20+12
+	bgDesc.sizePx = {300.0f, 24.0f};
+	bgDesc.lineWidth = 0.0f;
+	bgDesc.glow = 0.0f;
+	bgDesc.color = {0.1f, 0.1f, 0.1f, 0.8f};
+	bgDesc.shape = 0; // Square
+	bgDesc.round = 4.0f;
+	bgDesc.progress = 1.0f;
+	bgDesc.fill = 1.0f;
+	Engine::Renderer::GetInstance()->DrawSDFUI(bgDesc);
+
 	// 経験値バー本体 (青系)
-	drawList->AddRectFilled(ImVec2(barX, barY), ImVec2(barX + barW * progress, barY + barH), IM_COL32(50, 150, 255, 255));
-	
+	Engine::Renderer::SdfUIDesc barDesc{};
+	barDesc.centerPx = {170.0f, 32.0f};
+	barDesc.sizePx = {300.0f, 24.0f};
+	barDesc.lineWidth = 0.0f;
+	barDesc.glow = 2.0f;
+	barDesc.color = {0.2f, 0.6f, 1.0f, 1.0f};
+	barDesc.shape = 0;
+	barDesc.round = 4.0f;
+	barDesc.progress = progress;
+	barDesc.fill = 1.0f;
+	if (progress > 0.0f) {
+		Engine::Renderer::GetInstance()->DrawSDFUI(barDesc);
+	}
+
 	// 外枠 (白)
-	drawList->AddRect(ImVec2(barX, barY), ImVec2(barX + barW, barY + barH), IM_COL32(255, 255, 255, 255));
+	Engine::Renderer::SdfUIDesc outlineDesc{};
+	outlineDesc.centerPx = {170.0f, 32.0f};
+	outlineDesc.sizePx = {300.0f, 24.0f};
+	outlineDesc.lineWidth = 2.0f;
+	outlineDesc.glow = 0.0f;
+	outlineDesc.color = {1.0f, 1.0f, 1.0f, 1.0f};
+	outlineDesc.shape = 0;
+	outlineDesc.round = 4.0f;
+	outlineDesc.progress = 1.0f;
+	outlineDesc.fill = 0.0f;
+	Engine::Renderer::GetInstance()->DrawSDFUI(outlineDesc);
 
 	// テキスト (Lvと経験値)
 	char textBuf[64];
 	snprintf(textBuf, sizeof(textBuf), "Lv.%d   EXP: %.1f / %.1f", level_, experience_, nextExperience_);
 	
 	// 文字の影
-	drawList->AddText(ImVec2(barX + 11, barY + 4), IM_COL32(0, 0, 0, 255), textBuf);
+	Engine::Renderer::GetInstance()->DrawString(textBuf, 32.0f, 26.0f, 0.5f, {0,0,0,1});
 	// メインテキスト
-	drawList->AddText(ImVec2(barX + 10, barY + 3), IM_COL32(255, 255, 255, 255), textBuf);
-#endif
+	Engine::Renderer::GetInstance()->DrawString(textBuf, 30.0f, 24.0f, 0.5f, {1,1,1,1});
 }
 
 void PlayerScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
