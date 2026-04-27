@@ -19,14 +19,51 @@ static float DistanceBetween(GameScene* scene, entt::entity a, entt::entity b) {
 	auto& bTc = scene->GetRegistry().get<TransformComponent>(b);
 
 	float dx = bTc.translate.x - aTc.translate.x;
-	float dy = bTc.translate.y - aTc.translate.y;
+   float dy = bTc.translate.y - aTc.translate.y;
 	float dz = bTc.translate.z - aTc.translate.z;
 
-	return std::sqrt(dx * dx + dy * dy + dz * dz);
+  return std::sqrt(dx * dx + dy * dy + dz * dz);
 }
 
 static bool IsConnectedSphere(GameScene* scene, entt::entity a, entt::entity b, float connectRange) {
-	return DistanceBetween(scene, a, b) <= connectRange;
+  if (!scene->GetRegistry().all_of<TransformComponent>(a) || !scene->GetRegistry().all_of<TransformComponent>(b)) return false;
+
+	auto& aTc = scene->GetRegistry().get<TransformComponent>(a);
+	auto& bTc = scene->GetRegistry().get<TransformComponent>(b);
+
+	float dx = bTc.translate.x - aTc.translate.x;
+	float dy = bTc.translate.y - aTc.translate.y;
+	float dz = bTc.translate.z - aTc.translate.z;
+	float dist3D = std::sqrt(dx * dx + dy * dy + dz * dz);
+
+    // まず従来の3D距離で接続できるならそのまま接続
+	if (dist3D <= connectRange) {
+		return true;
+	}
+
+ // 平地では従来挙動のまま（補填しない）
+	if (std::abs(dy) < 0.1f) {
+		return false;
+	}
+
+	// 高低差がある場合のみ、斜め方向の補填接続を許可
+	const float absDx = std::abs(dx);
+	const float absDz = std::abs(dz);
+
+	// 2x2グリッドの「1マス隣接」のみ補填対象にする（余計な接続を防ぐ）
+	const bool isStraightNeighbor =
+		((absDx >= 1.6f && absDx <= 2.4f) && absDz <= 0.4f) ||
+		((absDz >= 1.6f && absDz <= 2.4f) && absDx <= 0.4f);
+	const bool isDiagonalNeighbor =
+		(absDx >= 1.6f && absDx <= 2.4f) &&
+		(absDz >= 1.6f && absDz <= 2.4f);
+
+	if (!isStraightNeighbor && !isDiagonalNeighbor) {
+		return false;
+	}
+
+	float distXZ = std::sqrt(dx * dx + dz * dz);
+	return distXZ <= 3.0f;
 }
 
 static bool IsAlreadyVisited(const std::vector<entt::entity>& visitedObjects, entt::entity obj) {
@@ -76,7 +113,7 @@ static bool IsConnectedToBulletTankRecursive(GameScene* scene, entt::entity curr
 }
 
 static bool IsConnectedToBulletTank(GameScene* scene, entt::entity selfObj) {
-	const float connectRange = 2.5f;
+    const float connectRange = 2.5f;
 
 	std::vector<entt::entity> visitedObjects;
 
@@ -110,7 +147,7 @@ void PipeScript::Update(entt::entity obj, GameScene* scene, float dt) {
 	if (!renderer) return;
 
 	// 接続判定と円柱の生成・更新
-	const float connectRange = 2.5f;
+    const float connectRange = 2.5f;
 	std::vector<entt::entity> currentConnections;
 
 	auto view = scene->GetRegistry().view<TransformComponent>();

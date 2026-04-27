@@ -65,7 +65,7 @@ std::vector<Engine::Vector3> BuildPipePathPoints(const Engine::Vector3& start, c
 	const int z1 = static_cast<int>(SnapTo2x2Grid(end.z));
 	constexpr int kStep = 2;
 
-	const float y = end.y;
+  const float y = 0.0f;
 	points.push_back({static_cast<float>(x0), y, static_cast<float>(z0)});
 
 	int x = x0;
@@ -102,6 +102,62 @@ std::vector<Engine::Vector3> BuildPipePathPoints(const Engine::Vector3& start, c
 	}
 
 	return points;
+}
+
+bool TryGetPlacementSurfaceYAt(GameScene* scene, float x, float z, float& outY) {
+	if (!scene)
+		return false;
+
+	auto* renderer = scene->GetRenderer();
+	if (!renderer)
+		return false;
+
+	auto& registry = scene->GetRegistry();
+	DirectX::XMVECTOR rayOrig = DirectX::XMVectorSet(x, 1000.0f, z, 1.0f);
+	DirectX::XMVECTOR rayDir = DirectX::XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f);
+
+	float bestDist = FLT_MAX;
+	bool hit = false;
+
+	registry.view<NameComponent, TransformComponent>().each([&](entt::entity entity, const NameComponent& nc, const TransformComponent& tc) {
+		const bool isWallTag = registry.all_of<TagComponent>(entity) && registry.get<TagComponent>(entity).tag == TagType::Wall;
+		const bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || (nc.name.find("Floor") != std::string::npos) || (nc.name.find("Ground") != std::string::npos) ||
+							   (nc.name.find("Stage") != std::string::npos) || (nc.name.find("Plane") != std::string::npos);
+		if (!isTerrain && !isWallTag)
+			return;
+
+		Engine::Model* model = nullptr;
+		if (registry.all_of<GpuMeshColliderComponent>(entity)) {
+			auto& gmc = registry.get<GpuMeshColliderComponent>(entity);
+			if (gmc.meshHandle != 0) {
+				model = renderer->GetModel(gmc.meshHandle);
+			}
+		}
+
+		if (!model && registry.all_of<MeshRendererComponent>(entity)) {
+			auto& mr = registry.get<MeshRendererComponent>(entity);
+			if (mr.modelHandle != 0) {
+				model = renderer->GetModel(mr.modelHandle);
+			}
+		}
+
+		if (!model)
+			return;
+
+		float d;
+		Engine::Vector3 hp;
+		if (model->RayCast(rayOrig, rayDir, tc.ToMatrix(), d, hp) && d < bestDist) {
+			bestDist = d;
+			outY = hp.y;
+			hit = true;
+		}
+	});
+
+	if (!hit) {
+		outY = 0.0f;
+	}
+
+	return hit;
 }
 } // namespace
 
@@ -402,6 +458,12 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 
 		Engine::Vector3 startPoint{pipeStartX_, pipeStartY_, pipeStartZ_};
 		auto pathPoints = BuildPipePathPoints(startPoint, snappedHitPoint);
+     for (auto& p : pathPoints) {
+			float surfaceY = p.y;
+			if (TryGetPlacementSurfaceYAt(scene, p.x, p.z, surfaceY)) {
+				p.y = surfaceY;
+			}
+		}
 		bool canPlaceAll = !pathPoints.empty();
 		if (CoinCount < pathPoints.size() * selectedObjCost_) {
 			canPlaceAll = false;
@@ -499,9 +561,10 @@ bool PhaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3&
 
 	auto& registry = scene->GetRegistry();
 	registry.view<NameComponent, TransformComponent>().each([&](entt::entity entity, const NameComponent& nc, const TransformComponent& tc) {
+     const bool isWallTag = registry.all_of<TagComponent>(entity) && registry.get<TagComponent>(entity).tag == TagType::Wall;
 		bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || (nc.name.find("Floor") != std::string::npos) || (nc.name.find("Ground") != std::string::npos) ||
 		                 (nc.name.find("Stage") != std::string::npos) || (nc.name.find("Plane") != std::string::npos);
-		if (!isTerrain)
+     if (!isTerrain && !isWallTag)
 			return;
 
 		Engine::Model* model = nullptr;
@@ -685,8 +748,12 @@ bool PhaseSystemScript::IsPlacementBlocked(GameScene* scene, const Engine::Vecto
 			const auto& nc = registry.get<NameComponent>(entity);
 			const bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || (nc.name.find("Floor") != std::string::npos) || (nc.name.find("Ground") != std::string::npos) ||
 			                       (nc.name.find("Stage") != std::string::npos) || (nc.name.find("Plane") != std::string::npos);
-			if (isTerrain)
+          if (isTerrain)
 				continue;
+		}
+
+		if (registry.all_of<TagComponent>(entity) && registry.get<TagComponent>(entity).tag == TagType::Wall) {
+			continue;
 		}
 
 		const auto& tc = view.get<TransformComponent>(entity);
