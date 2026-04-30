@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="Game\Scenes\TitleScene.cpp">
-      <Filter>Scenes</Filter>
-    </ClCompile>
     <ClCompile Include="Game\Scenes\GameScene.cpp">
       <Filter>Scenes</Filter>
     </ClCompile>
@@ -69,8 +66,6 @@
     <ClCompile Include="Game\Scripts\CommunicationTestScript.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
-    <ClCompile Include="Game\Scenes\SelectScene.cpp" />
-    <ClCompile Include="Game\Scenes\ResultScene.cpp" />
     <ClCompile Include="Game\Scripts\BulletTank.cpp" />
     <ClCompile Include="Game\Scripts\SkillTree.cpp" />
     <ClCompile Include="Game\Scripts\InstallationButton.cpp" />
@@ -87,11 +82,13 @@
     <ClCompile Include="Game\Scripts\PhaseTransition.cpp" />
     <ClCompile Include="Game\Scripts\WaveManagement.cpp" />
     <ClCompile Include="Game\Scripts\TutorialScript.cpp" />
+    <ClCompile Include="Game\Scripts\TitleManagerScript.cpp" />
+    <ClCompile Include="Game\Scripts\SelectManagerScript.cpp" />
+    <ClCompile Include="Game\Scripts\ResultManagerScript.cpp" />
+    <ClCompile Include="Game\Scripts\IceBulletScript.cpp" />
+    <ClCompile Include="Game\Scripts\IceCanon.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Game\Scenes\TitleScene.h">
-      <Filter>Scenes</Filter>
-    </ClInclude>
     <ClInclude Include="Game\Scenes\GameScene.h">
       <Filter>Scenes</Filter>
     </ClInclude>
@@ -187,8 +184,6 @@
     <ClInclude Include="Game\Scripts\ScriptUtils.h">
       <Filter>Scripts</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Scenes\SelectScene.h" />
-    <ClInclude Include="Game\Scenes\ResultScene.h" />
     <ClInclude Include="Game\Scripts\BulletTank.h" />
     <ClInclude Include="Game\Scripts\SkillTree.h" />
     <ClInclude Include="Game\Scripts\InstallationButton.h" />
@@ -206,6 +201,12 @@
     <ClInclude Include="Game\Scripts\PhaseTransition.h" />
     <ClInclude Include="Game\Scripts\WaveManagement.h" />
     <ClInclude Include="Game\Scripts\TutorialScript.h" />
+    <ClInclude Include="Game\Scripts\Canon.h" />
+    <ClInclude Include="Game\Scripts\TitleManagerScript.h" />
+    <ClInclude Include="Game\Scripts\SelectManagerScript.h" />
+    <ClInclude Include="Game\Scripts\ResultManagerScript.h" />
+    <ClInclude Include="Game\Scripts\IceBulletScript.h" />
+    <ClInclude Include="Game\Scripts\IceCanon.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">

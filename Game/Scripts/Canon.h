@@ -32,6 +32,9 @@ private:
 	float skillPowerRate = 1.0f;
 	float skillSpeedRate = 1.0f;
 	float skillRangeRate = 1.0f;
+	entt::entity coolTimeGaugeEntity_ = entt::null;
+
+
 };
 
 } // namespace Game
