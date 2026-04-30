@@ -20,19 +20,89 @@ public:
 			if (inputIns) {
 				float wheel = inputIns->GetMouseWheelDelta();
 				if (std::abs(wheel) > 0.001f) {
-					ct.distance -= wheel * 0.005f; // 感度調整
-					ct.distance = std::clamp(ct.distance, 3.0f, 20.0f); // 範囲制限
+					ct.distance -= wheel * 2.0f; // 感度調整（1クリックで2m移動）
+					ct.distance = std::clamp(ct.distance, 2.0f, 30.0f); // 範囲制限
 				}
 			}
 
 			auto& tc = view.get<TransformComponent>(entity);
 			DirectX::XMFLOAT3 targetPos = tc.translate;
 
+			// ★追加: ホイール押し込みによるターゲットロック
+			bool currentMButton = (GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
+			static bool prevMButton = false;
+			if (currentMButton && !prevMButton) {
+				if (ct.lockedTarget != entt::null) {
+					ct.lockedTarget = entt::null; // ロック解除
+				} else {
+					// 最も近い敵を探す
+					float minDist = 50.0f;
+					auto enemies = registry.view<TagComponent, TransformComponent>();
+					for (auto e : enemies) {
+						if (enemies.get<TagComponent>(e).tag == TagType::Enemy) {
+							if (registry.all_of<HealthComponent>(e) && registry.get<HealthComponent>(e).isDead) continue;
+							auto& eTc = enemies.get<TransformComponent>(e);
+							float dx = eTc.translate.x - targetPos.x;
+							float dz = eTc.translate.z - targetPos.z;
+							float dist = std::sqrt(dx*dx + dz*dz);
+							if (dist < minDist) {
+								minDist = dist;
+								ct.lockedTarget = e;
+							}
+						}
+					}
+				}
+			}
+			prevMButton = currentMButton;
+
+			// ロック対象が死んだり無効になったら、次の敵へ自動ロックオン（チェインロック）
+			if (ct.lockedTarget != entt::null) {
+				if (!registry.valid(ct.lockedTarget) || 
+					(registry.all_of<HealthComponent>(ct.lockedTarget) && registry.get<HealthComponent>(ct.lockedTarget).isDead)) {
+					
+					ct.lockedTarget = entt::null; // 一旦解除
+
+					// 次の敵を探す
+					float minDist = 50.0f;
+					auto enemies = registry.view<TagComponent, TransformComponent>();
+					for (auto e : enemies) {
+						if (enemies.get<TagComponent>(e).tag == TagType::Enemy) {
+							if (registry.all_of<HealthComponent>(e) && registry.get<HealthComponent>(e).isDead) continue;
+							auto& eTc = enemies.get<TransformComponent>(e);
+							float dx = eTc.translate.x - targetPos.x;
+							float dz = eTc.translate.z - targetPos.z;
+							float dist = std::sqrt(dx*dx + dz*dz);
+							if (dist < minDist) {
+								minDist = dist;
+								ct.lockedTarget = e;
+							}
+						}
+					}
+				}
+			}
+
 			if (registry.all_of<PlayerInputComponent>(entity)) {
 				auto& pi = registry.get<PlayerInputComponent>(entity);
 				if (pi.enabled) {
 					auto rot = ctx.camera->Rotation();
-					rot.y += pi.cameraYaw;
+					
+					if (ct.lockedTarget != entt::null && registry.valid(ct.lockedTarget)) {
+						// ターゲットの方向を向く
+						auto& eTc = registry.get<TransformComponent>(ct.lockedTarget);
+						float dx = eTc.translate.x - targetPos.x;
+						float dz = eTc.translate.z - targetPos.z;
+						float targetYaw = std::atan2(dx, dz);
+						
+						// スムーズにターゲットへ向かせる
+						float diff = targetYaw - rot.y;
+						while (diff >  DirectX::XM_PI) diff -= DirectX::XM_2PI;
+						while (diff < -DirectX::XM_PI) diff += DirectX::XM_2PI;
+						
+						rot.y += diff * std::min(1.0f, 15.0f * ctx.dt);
+					} else {
+						rot.y += pi.cameraYaw;
+					}
+
 					rot.x += pi.cameraPitch;
 
 					const float PITCH_LIMIT = 1.5f;
@@ -61,17 +131,8 @@ public:
 				targetPos.z + offset.z
 			};
 
-			DirectX::XMFLOAT3 currentPos = ctx.camera->Position();
-			float t = ct.smoothSpeed * ctx.dt;
-			if (t > 1.0f) t = 1.0f;
-
-			DirectX::XMFLOAT3 newPos = {
-				currentPos.x + (desiredPos.x - currentPos.x) * t,
-				currentPos.y + (desiredPos.y - currentPos.y) * t,
-				currentPos.z + (desiredPos.z - currentPos.z) * t
-			};
-
-			ctx.camera->SetPosition(newPos);
+			// ★変更: カメラの回転と同期させるため、位置の遅延を無くし即座に追従させる
+			ctx.camera->SetPosition(desiredPos);
 			break;
 		}
 	}

@@ -16,7 +16,7 @@ private:
 
 	float lifeTime_ = 0.0f;
 	float maxLifeTime_ = 5.0f;
-	float speed_ = 20.0f;
+	float speed_ = 80.0f; // ★変更: 弾速を大幅にアップ
 };
 
 } // namespace Game

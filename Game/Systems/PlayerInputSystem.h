@@ -2,6 +2,7 @@
 #include "ISystem.h"
 #include <Windows.h>
 #include <cmath>
+#include "../Scripts/PhaseSystemScript.h"
 
 namespace Game {
 
@@ -44,12 +45,20 @@ public:
 			// ★追加: Shiftダッシュ入力
 			pi.sprintRequested = (GetAsyncKeyState(VK_LSHIFT) & 0x8000) != 0;
 
-			// ★変更: カメラ操作 - 常にマウスの動きに追従（右クリック不要）
+			// ★変更: カメラ操作
+			// 準備フェーズの場合は右クリック押下時のみ視点移動可能にする
 			pi.cameraYaw = 0.0f;
 			pi.cameraPitch = 0.0f;
 			if (ctx.input) {
-				pi.cameraYaw = ctx.input->GetMouseDeltaX() * 0.003f;
-				pi.cameraPitch = ctx.input->GetMouseDeltaY() * 0.003f;
+				bool canMoveCamera = true;
+				if (PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase) {
+					canMoveCamera = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+				}
+				
+				if (canMoveCamera) {
+					pi.cameraYaw = ctx.input->GetMouseDeltaX() * 0.003f;
+					pi.cameraPitch = ctx.input->GetMouseDeltaY() * 0.003f;
+				}
 			}
 		}
 	}
