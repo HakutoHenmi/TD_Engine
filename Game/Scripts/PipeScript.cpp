@@ -26,7 +26,13 @@ static float DistanceBetween(GameScene* scene, entt::entity a, entt::entity b) {
 }
 
 static bool IsConnectedSphere(GameScene* scene, entt::entity a, entt::entity b, float connectRange) {
-  if (!scene->GetRegistry().all_of<TransformComponent>(a) || !scene->GetRegistry().all_of<TransformComponent>(b)) return false;
+	if (!scene->GetRegistry().all_of<TransformComponent>(a)) {
+		return false;
+	}
+
+	if (!scene->GetRegistry().all_of<TransformComponent>(b)) {
+		return false;
+	}
 
 	auto& aTc = scene->GetRegistry().get<TransformComponent>(a);
 	auto& bTc = scene->GetRegistry().get<TransformComponent>(b);
@@ -34,36 +40,24 @@ static bool IsConnectedSphere(GameScene* scene, entt::entity a, entt::entity b, 
 	float dx = bTc.translate.x - aTc.translate.x;
 	float dy = bTc.translate.y - aTc.translate.y;
 	float dz = bTc.translate.z - aTc.translate.z;
-	float dist3D = std::sqrt(dx * dx + dy * dy + dz * dz);
 
-    // まず従来の3D距離で接続できるならそのまま接続
-	if (dist3D <= connectRange) {
+	float distance3D = std::sqrt(dx * dx + dy * dy + dz * dz);
+
+	if (distance3D <= connectRange) {
 		return true;
 	}
 
- // 平地では従来挙動のまま（補填しない）
-	if (std::abs(dy) < 0.1f) {
-		return false;
+	float distanceXZ = std::sqrt(dx * dx + dz * dz);
+	float heightDifference = std::abs(dy);
+
+	// 高低差があるときだけ、横方向の距離で接続を許可する
+	if (heightDifference >= 0.1f) {
+		if (distanceXZ <= connectRange) {
+			return true;
+		}
 	}
 
-	// 高低差がある場合のみ、斜め方向の補填接続を許可
-	const float absDx = std::abs(dx);
-	const float absDz = std::abs(dz);
-
-	// 2x2グリッドの「1マス隣接」のみ補填対象にする（余計な接続を防ぐ）
-	const bool isStraightNeighbor =
-		((absDx >= 1.6f && absDx <= 2.4f) && absDz <= 0.4f) ||
-		((absDz >= 1.6f && absDz <= 2.4f) && absDx <= 0.4f);
-	const bool isDiagonalNeighbor =
-		(absDx >= 1.6f && absDx <= 2.4f) &&
-		(absDz >= 1.6f && absDz <= 2.4f);
-
-	if (!isStraightNeighbor && !isDiagonalNeighbor) {
-		return false;
-	}
-
-	float distXZ = std::sqrt(dx * dx + dz * dz);
-	return distXZ <= 3.0f;
+	return false;
 }
 
 static bool IsAlreadyVisited(const std::vector<entt::entity>& visitedObjects, entt::entity obj) {
