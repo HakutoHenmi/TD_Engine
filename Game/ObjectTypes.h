@@ -290,6 +290,7 @@ struct CameraTargetComponent : public Component {
 	float distance = 10.0f;
 	float height = 3.0f;
 	float smoothSpeed = 5.0f;
+	entt::entity lockedTarget = entt::null; // ★追加: ターゲットロック用
 	CameraTargetComponent() { type = ComponentType::CameraTarget; }
 };
 

@@ -8,6 +8,10 @@
 
 #pragma once
 
+#if defined(_MSC_VER)
+#pragma warning(disable: 26819)
+#endif
+
 #include <array> // array
 #include <clocale> // localeconv
 #include <cstddef> // size_t

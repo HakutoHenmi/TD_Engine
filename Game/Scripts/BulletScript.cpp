@@ -15,6 +15,9 @@ void BulletScript::Start(entt::entity entity, GameScene* scene) {
 		return;
 	}
 
+	speed_ = GetVar(entity, scene, "Speed", 80.0f); 
+	maxLifeTime_ = GetVar(entity, scene, "MaxLifeTime", 5.0f); // ★追加: 寿命を個別設定可能に
+
 	float hasTargetValue = GetVar(entity, scene, "HasTarget", 0.0f);
 
 	if (hasTargetValue > 0.5f) {

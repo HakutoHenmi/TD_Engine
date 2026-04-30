@@ -103,7 +103,7 @@ public:
 					TagType dTag = registry.all_of<TagComponent>(defenderEntity) ? registry.get<TagComponent>(defenderEntity).tag : TagType::Untagged;
 					
 					bool skipDamage = false;
-					if (aTag == TagType::PlayerSword || aTag == TagType::Sword) { if (dTag != TagType::Enemy) skipDamage = true; }
+					if (aTag == TagType::Bullet || aTag == TagType::PlayerSword || aTag == TagType::Sword) { if (dTag != TagType::Enemy) skipDamage = true; }
 					if (aTag != TagType::Untagged && aTag == dTag) skipDamage = true;
 					if (aTag == TagType::EnemyBullet && dTag == TagType::Enemy) skipDamage = true;
 					if (skipDamage) continue;
