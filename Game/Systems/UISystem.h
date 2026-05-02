@@ -2,7 +2,7 @@
 #include "ISystem.h"
 #include <vector>
 #include "../../externals/entt/entt.hpp"
-
+#include "imgui.h"
 namespace Game {
 
 class UISystem : public ISystem {
@@ -24,6 +24,11 @@ private:
     void RenderNodeWithRect(entt::entity entity, entt::registry& registry, const WorldRect& wr, GameContext& ctx);
     void DrawTextW(entt::entity entity, entt::registry& registry, const UITextComponent& text, float worldX, float worldY, float worldW, float worldH, Engine::Renderer* renderer);
     void ProcessButton(entt::entity entity, entt::registry& registry, UIButtonComponent& btn, float worldX, float worldY, float worldW, float worldH, GameContext& ctx);
+
+private:
+	// ★追加: キャノンのクールタイムUI描画用
+	void DrawCanonCoolTimeUI(entt::registry& registry, GameContext& ctx, ImDrawList* drawList);
+	float debugCoolTimeRate_ = 0.0f;
 };
 
 } // namespace Game

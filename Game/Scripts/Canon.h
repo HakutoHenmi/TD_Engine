@@ -12,6 +12,7 @@ public:
 	void Update(entt::entity entity, GameScene* scene, float dt) override;
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
 	void OnEditorUI() override;
+	void DrawUI(entt::entity entity, GameScene* scene);
 
 private:
 	float attackRange_ = 50.0f;
@@ -19,12 +20,13 @@ private:
 	float damage_ = 10.0f;
 	float attackTimer_ = 0.0f;
 	float rotationSpeed_ = 1.0f;
-
+	float currentAttackInterval_ = 1.0f;
 	int connectedTankCount = 0;
 	int connectedCanonCount = 0;
 	float connectionCheckTimer_ = 0.0f;
 	bool isConnectedToTank_ = false;
 	entt::entity currentTarget_ = entt::null;
+	uint32_t coolTimeTextureHandle_ = 0;
 
 private:
 	void Debug(bool connected);
@@ -33,6 +35,7 @@ private:
 	float skillSpeedRate = 1.0f;
 	float skillRangeRate = 1.0f;
 	entt::entity coolTimeGaugeEntity_ = entt::null;
+
 
 
 };

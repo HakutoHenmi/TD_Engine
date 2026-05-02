@@ -167,7 +167,7 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (powerRate > 0.0f) {
 		currentAttackInterval = currentAttackInterval / powerRate;
 	}
-
+	currentAttackInterval_ = currentAttackInterval;
 	float currentRange = attackRange_ * skillRangeRate;
 	float currentDamage = damage_ * skillPowerRate;
 	// Debug(isConnectedToTank_); // ★削除: Update 内での ImGui 呼び出しは例外の原因となる可能性があるため
@@ -300,8 +300,25 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	SetVar(bullet, scene, "HasTarget", 1.0f);
 	SetVar(bullet, scene, "TargetEntity", static_cast<float>(static_cast<uint32_t>(currentTarget_)));
+	//クールタイムをUIスクリプトに教える
+	if (currentAttackInterval_ > 0.0f) {
 
+		float rate = 1.0f - (attackTimer_ / currentAttackInterval_);
+
+		if (rate < 0.0f) {
+			rate = 0.0f;
+		}
+
+		if (rate > 1.0f) {
+			rate = 1.0f;
+		}
+
+		SetVar(entity, scene, "CoolTimeRate", rate);
+	}
 	attackTimer_ = currentAttackInterval;
+	//float currentAttackInterval = attackInterval_ / skillSpeedRate;
+
+
 }
 
 void Canon::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
@@ -365,13 +382,86 @@ void Canon::UpdateConnection(entt::entity entity, GameScene* scene) {
 
 	foundCanons.insert(entity);
 	connectedCanonCount = static_cast<int>(foundCanons.size());
+
 }
 
 void Canon::Debug(bool /*connected*/) {
 	// 以前はここで ImGui::Begin を呼んでいたが、Update からの呼び出しは危険なため廃止。
 	// 代わりに OnEditorUI を使用する。
 }
+void Canon::DrawUI(entt::entity entity, GameScene* scene) {
+	if (!scene) {
+		return;
+	}
 
+	if (!scene->GetRenderer()) {
+		return;
+	}
+
+	entt::registry& registry = scene->GetRegistry();
+
+	if (!registry.valid(entity)) {
+		return;
+	}
+
+	if (!registry.all_of<TransformComponent>(entity)) {
+		return;
+	}
+
+	TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
+
+	DirectX::XMFLOAT3 uiWorldPosition;
+	uiWorldPosition.x = canonTransform.translate.x;
+	uiWorldPosition.y = canonTransform.translate.y + 2.0f;
+	uiWorldPosition.z = canonTransform.translate.z;
+
+	float screenX = 0.0f;
+	float screenY = 0.0f;
+
+	bool isVisible = UISystem::WorldToScreen(uiWorldPosition, scene->GetCamera(), screenX, screenY);
+
+	if (!isVisible) {
+		return;
+	}
+
+	float coolTimeRate = 1.0f;
+
+	if (currentAttackInterval_ > 0.0f) {
+		coolTimeRate = 1.0f - (attackTimer_ / currentAttackInterval_);
+	}
+
+	if (coolTimeRate < 0.0f) {
+		coolTimeRate = 0.0f;
+	}
+
+	if (coolTimeRate > 1.0f) {
+		coolTimeRate = 1.0f;
+	}
+
+	Engine::Renderer::SdfUIDesc backDesc;
+	backDesc.shape = 1;
+	backDesc.centerPx = {screenX, screenY};
+	backDesc.sizePx = {44.0f, 44.0f};
+	backDesc.color = {0.05f, 0.05f, 0.05f, 0.75f};
+	backDesc.progress = 1.0f;
+	backDesc.fill = 1.0f;
+	backDesc.round = 22.0f;
+	backDesc.glow = 0.0f;
+
+	scene->GetRenderer()->DrawSDFUI(backDesc);
+
+	Engine::Renderer::SdfUIDesc gaugeDesc;
+	gaugeDesc.shape = 1;
+	gaugeDesc.centerPx = {screenX, screenY};
+	gaugeDesc.sizePx = {36.0f, 36.0f};
+	gaugeDesc.color = {0.2f, 0.8f, 1.0f, 1.0f};
+	gaugeDesc.progress = coolTimeRate;
+	gaugeDesc.fill = 0.0f;
+	gaugeDesc.round = 18.0f;
+	gaugeDesc.glow = 1.0f;
+
+	scene->GetRenderer()->DrawSDFUI(gaugeDesc);
+}
 REGISTER_SCRIPT(Canon);
 
 } // namespace Game
