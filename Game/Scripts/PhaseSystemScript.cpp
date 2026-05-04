@@ -174,6 +174,7 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	isPhaseTransitioning_ = false;
 	isFadeFinished_ = false;
 	isPlacementMode_ = false;
+	isSellMode_ = false;
 	isPipeSet_ = false;
 	hasPipeStartPoint_ = false;
 
@@ -218,6 +219,8 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			renderer->DrawLine3D({0, 21, 0}, {5, 21, 0}, {0, 1, 0, 1}, true);
 		if (isPlacementMode_)
 			renderer->DrawLine3D({0, 22, 0}, {5, 22, 0}, {0, 0, 1, 1}, true);
+		if (isSellMode_)
+			renderer->DrawLine3D({0, 23, 0}, {5, 23, 0}, {1, 0, 0, 1}, true); // 赤線でSellモード表示
 #endif
 	}
 
@@ -227,6 +230,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	bool key3 = input->Trigger(DIK_3) || (GetAsyncKeyState('3') & 0x8001);
 	bool key4 = input->Trigger(DIK_4) || (GetAsyncKeyState('4') & 0x8001);
 	bool key5 = input->Trigger(DIK_5) || (GetAsyncKeyState('5') & 0x8001);
+	bool keyX = input->Trigger(DIK_X) || (GetAsyncKeyState('X') & 0x8001); // 削除モード用
 	bool keyP = false;
 #ifndef NDEBUG
 	keyP = input->Trigger(DIK_P) || (GetAsyncKeyState('P') & 0x8001);
@@ -318,8 +322,19 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			selectedObjCost_ = poisonCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
+			isSellMode_ = false;
 			hasPipeStartPoint_ = false;
-           placementSelectionChangedThisFrame = true;
+		   placementSelectionChangedThisFrame = true;
+		}
+
+		// Xキーで削除(売却)モードへの切り替え
+		if (keyX) {
+			isSellMode_ = true;
+			isPlacementMode_ = false;
+			isPipeSet_ = false;
+			hasPipeStartPoint_ = false;
+			placementSelectionChangedThisFrame = true;
+			EditorUI::Log("Sell Mode Activated");
 		}
 
 		if (input->IsMouseTrigger(1) && isPlacementMode_) {
@@ -332,8 +347,148 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			}
 		}
 
-        if (!placementSelectionChangedThisFrame && !clickedInstallationButtonThisFrame) {
+		if (input->IsMouseTrigger(1) && isSellMode_) {
+			isSellMode_ = false;
+			EditorUI::Log("Sell Mode Deactivated");
+		}
+
+		if (!placementSelectionChangedThisFrame && !clickedInstallationButtonThisFrame && !isSellMode_) {
 			Installation(scene, selectedObjPath_);
+		}
+
+		if (isSellMode_ && !clickedInstallationButtonThisFrame) {
+			// マウス位置からレイキャストしてヒットしたハイライトを描画する
+			float localX = 0, localY = 0;
+			float tW = 0, tH = 0;
+#if defined(USE_IMGUI) && !defined(NDEBUG)
+			ImVec2 mousePos = ImGui::GetMousePos();
+			ImVec2 gameMin = EditorUI::GetGameImageMin();
+			ImVec2 gameMax = EditorUI::GetGameImageMax();
+			tW = gameMax.x - gameMin.x;
+			tH = gameMax.y - gameMin.y;
+			if (tW > 0.0f && tH > 0.0f) {
+				localX = mousePos.x - gameMin.x;
+				localY = mousePos.y - gameMin.y;
+			}
+#else
+			input->GetMousePos(localX, localY);
+			tW = (float)Engine::WindowDX::kW;
+			tH = (float)Engine::WindowDX::kH;
+#endif
+			auto& camera = scene->GetCamera();
+			DirectX::XMVECTOR rayOrig, rayDir;
+			EditorUI::ScreenToWorldRay(localX, localY, tW, tH, camera.View(), camera.Proj(), rayOrig, rayDir);
+
+			float bestDist = FLT_MAX;
+			entt::entity hoverEntity = entt::null;
+			auto& registry = scene->GetRegistry();
+
+			registry.view<TransformComponent>().each([&](entt::entity e, const TransformComponent& tc) {
+				if (registry.all_of<NameComponent>(e)) {
+					const auto& name = registry.get<NameComponent>(e).name;
+					// 地形などは削除できないようにする
+					if (name.find("Terrain") != std::string::npos || name.find("Plane") != std::string::npos || name.find("Core") != std::string::npos || name.find("Floor") != std::string::npos) return;
+				}
+
+				Engine::Model* model = nullptr;
+				if (registry.all_of<GpuMeshColliderComponent>(e)) {
+					model = scene->GetRenderer()->GetModel(registry.get<GpuMeshColliderComponent>(e).meshHandle);
+				} else if (registry.all_of<MeshRendererComponent>(e)) {
+					model = scene->GetRenderer()->GetModel(registry.get<MeshRendererComponent>(e).modelHandle);
+				}
+
+				if (model) {
+					float d; Engine::Vector3 hp;
+					if (model->RayCast(rayOrig, rayDir, tc.ToMatrix(), d, hp) && d < bestDist) {
+						bestDist = d;
+						hoverEntity = e;
+					}
+				}
+			});
+
+			if (hoverEntity != entt::null) {
+				if (registry.all_of<TransformComponent>(hoverEntity)) {
+					auto tc = registry.get<TransformComponent>(hoverEntity);
+					// ルートの取得
+					if (registry.all_of<HierarchyComponent>(hoverEntity)) {
+						auto root = hoverEntity;
+						while (registry.get<HierarchyComponent>(root).parentId != entt::null) {
+							root = registry.get<HierarchyComponent>(root).parentId;
+						}
+						tc = registry.get<TransformComponent>(root);
+					}
+
+					Engine::Matrix4x4 mat = tc.ToMatrix();
+					// Matrix4x4をXMMATRIXに変換
+					DirectX::XMMATRIX xmat = DirectX::XMMatrixSet(
+						mat.m[0][0], mat.m[0][1], mat.m[0][2], mat.m[0][3],
+						mat.m[1][0], mat.m[1][1], mat.m[1][2], mat.m[1][3],
+						mat.m[2][0], mat.m[2][1], mat.m[2][2], mat.m[2][3],
+						mat.m[3][0], mat.m[3][1], mat.m[3][2], mat.m[3][3]
+					);
+
+					float hs = 1.0f; // 大体の大きさ
+					// 少し外側に枠を描画（赤色で）
+					Engine::Vector3 cv[8] = {
+						{-hs, -hs, -hs}, {hs,  -hs, -hs}, {hs,  hs,  -hs}, {-hs, hs,  -hs},
+						{-hs, -hs, hs }, {hs,  -hs, hs }, {hs,  hs,  hs }, {-hs, hs,  hs }
+					};
+					int edges[12][2] = {
+						{0,1},{1,2},{2,3},{3,0},
+						{4,5},{5,6},{6,7},{7,4},
+						{0,4},{1,5},{2,6},{3,7}
+					};
+					for (int i = 0; i < 8; ++i) {
+						DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(cv[i].x, cv[i].y, cv[i].z, 1.0f), xmat);
+						DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&cv[i]), p);
+					}
+					for (int i = 0; i < 12; ++i) {
+						scene->GetRenderer()->DrawLine3D(cv[edges[i][0]], cv[edges[i][1]], {1.0f, 0.0f, 0.0f, 1.0f}, true);
+					}
+				}
+			}
+
+
+			// 右クリックでキャンセルは上部で処理済み
+			if (input->IsMouseTrigger(0)) {
+				Engine::Vector3 hitPoint;
+				if (TryGetTerrainHitPoint(scene, hitPoint)) { // TerrainHitPoint関数ですが実際レイキャストで地形を探す
+
+					if (hoverEntity != entt::null) {
+						// コストの推測 (prefabの復元情報がないため名前等から推測)
+						int refundCost = 0;
+						if (registry.all_of<NameComponent>(hoverEntity)) {
+							const auto& name = registry.get<NameComponent>(hoverEntity).name;
+							if (name.find("Tank") != std::string::npos) { refundCost = tankCost_; }
+							else if (name.find("Pipe") != std::string::npos) { refundCost = pipeCost_; }
+							else if (name.find("Canon") != std::string::npos || name.find("Cannon") != std::string::npos) { refundCost = canonCost_; }
+							else if (name.find("Missile") != std::string::npos) { refundCost = missileCost_; }
+							else if (name.find("Poison") != std::string::npos) { refundCost = poisonCost_; }
+							else { refundCost = 0; } // 未知のオブジェクト
+						}
+
+
+						if (refundCost > 0) {
+							int getRefundAmount = CalculateRefund(refundCost);
+							CoinCount += getRefundAmount;
+
+							// 親オブジェクト等があれば再帰的に削除するか、単純にエンティティをデストロイする
+							// GameObjectの削除
+							if (registry.all_of<HierarchyComponent>(hoverEntity)) {
+								auto root = hoverEntity;
+								while(registry.get<HierarchyComponent>(root).parentId != entt::null) {
+									root = registry.get<HierarchyComponent>(root).parentId;
+								}
+								scene->DestroyObject(static_cast<uint32_t>(root));
+							} else {
+								scene->DestroyObject(static_cast<uint32_t>(hoverEntity));
+							}
+
+							EditorUI::Log("Object sold for " + std::to_string(getRefundAmount));
+						}
+					}
+				}
+			}
 		}
 
 		if (keySpace) {
@@ -348,9 +503,11 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			RequestPhaseChange(PreparationPhase);
 		}
 		isPlacementMode_ = false;
+		isSellMode_ = false;
 		hasPipeStartPoint_ = false;
 	} else {
 		isPlacementMode_ = false;
+		isSellMode_ = false;
 		hasPipeStartPoint_ = false;
 	}
 

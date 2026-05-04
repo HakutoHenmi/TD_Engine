@@ -40,6 +40,11 @@ public:
 
 	static void PlusCoinCount(int PlusCoin) { CoinCount += PlusCoin; } // 追加: コイン数を増減させる関数
 
+	// 返金時の計算関数
+	static int CalculateRefund(int cost) {
+		return static_cast<int>(cost * 0.8f);
+	}
+
 private:
 	inline static PhaseState isPhase_ = PreparationPhase;
 	inline static PhaseState NextPhase_ = PreparationPhase;
@@ -61,6 +66,8 @@ private:
 	std::string previewObjPath_ = "";
 	uint32_t previewModelHandle_ = 0;
 	uint32_t previewTextureHandle_ = 0;
+
+	bool isSellMode_ = false;       // 追加: 売却（削除）モード
 
 	// 施設の値段
 	int tankCost_ = 100;
