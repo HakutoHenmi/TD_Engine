@@ -37,10 +37,19 @@ static bool IsConnectedSphere(entt::registry& registry, entt::entity entityA, en
 	float diffY = transformB.translate.y - transformA.translate.y;
 	float diffZ = transformB.translate.z - transformA.translate.z;
 
-	float distance = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
+	float distance3D = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
 
-	if (distance <= connectRange) {
+	if (distance3D <= connectRange) {
 		return true;
+	}
+
+	float distanceXZ = std::sqrt(diffX * diffX + diffZ * diffZ);
+	float heightDifference = std::abs(diffY);
+
+	if (heightDifference >= 0.1f) {
+		if (distanceXZ <= connectRange) {
+			return true;
+		}
 	}
 
 	return false;

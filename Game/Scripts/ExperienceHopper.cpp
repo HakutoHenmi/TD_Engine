@@ -27,7 +27,13 @@ static bool IsConnectedSphere(entt::registry& registry, entt::entity a, entt::en
 	auto& posA = registry.get<TransformComponent>(a).translate;
 	auto& posB = registry.get<TransformComponent>(b).translate;
 	float dx = posB.x - posA.x, dy = posB.y - posA.y, dz = posB.z - posA.z;
-	return std::sqrt(dx*dx + dy*dy + dz*dz) <= connectRange;
+	float dist3D = std::sqrt(dx*dx + dy*dy + dz*dz);
+	if (dist3D <= connectRange) return true;
+
+	float distXZ = std::sqrt(dx*dx + dz*dz);
+	float heightDiff = std::abs(dy);
+	if (heightDiff >= 0.1f && distXZ <= connectRange) return true;
+	return false;
 }
 
 static bool IsAlreadyVisited(const std::vector<entt::entity>& visited, entt::entity e) {
