@@ -444,12 +444,26 @@ void UISystem::DrawCoolTimeUI(entt::registry& registry, GameContext& ctx, ImDraw
 		if (!isVisible) {
 			continue;
 		}
+		float coolTimeRate = ctx.scene->GetVar(entity, "CoolTimeRate", 0.0f);
+
+		if (coolTimeRate < 0.0f) {
+			coolTimeRate = 0.0f;
+		}
+
+		if (coolTimeRate > 1.0f) {
+			coolTimeRate = 1.0f;
+		}
 
 		ImVec2 center(screenX, screenY - 30.0f);
 		float radius = 18.0f;
 
 		drawList->AddCircleFilled(center, radius, IM_COL32(40, 40, 40, 180));
-		drawList->AddCircle(center, radius, IM_COL32(80, 180, 255, 255), 32, 4.0f);
+
+		float startAngle = -3.141592f * 0.5f;
+		float endAngle = startAngle + 3.141592f * 2.0f * coolTimeRate;
+
+		drawList->PathArcTo(center, radius, startAngle, endAngle, 32);
+		drawList->PathStroke(IM_COL32(80, 180, 255, 255), false, 4.0f);
 	}
 }
 
