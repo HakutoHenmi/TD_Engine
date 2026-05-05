@@ -452,7 +452,10 @@ void UISystem::DrawCoolTimeUI(entt::registry& registry, GameContext& ctx, ImDraw
 		drawList->AddCircle(center, radius, IM_COL32(80, 180, 255, 255), 32, 4.0f);
 	}
 }
+
 void UISystem::DrawCanonCoolTimeUI(entt::registry& registry, GameContext& ctx, ImDrawList* drawList) {
+
+
 	if (!ctx.camera) {
 		return;
 	}

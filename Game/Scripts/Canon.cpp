@@ -265,7 +265,23 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	canonTransform.rotate.y = desiredYaw;
 	canonTransform.rotate.x = -desiredPitch;
 
-	if (attackTimer_ > 0.0f) {
+if (attackTimer_ > 0.0f) {
+
+		if (currentAttackInterval_ > 0.0f) {
+
+			float rate = 1.0f - (attackTimer_ / currentAttackInterval_);
+
+			if (rate < 0.0f) {
+				rate = 0.0f;
+			}
+
+			if (rate > 1.0f) {
+				rate = 1.0f;
+			}
+
+			SetVar(entity, scene, "CoolTimeRate", rate);
+		}
+
 		return;
 	}
 
@@ -309,23 +325,8 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	SetVar(bullet, scene, "HasTarget", 1.0f);
 	SetVar(bullet, scene, "TargetEntity", static_cast<float>(static_cast<uint32_t>(currentTarget_)));
-	//クールタイムをUIスクリプトに教える
-	if (currentAttackInterval_ > 0.0f) {
-
-		float rate = 1.0f - (attackTimer_ / currentAttackInterval_);
-
-		if (rate < 0.0f) {
-			rate = 0.0f;
-		}
-
-		if (rate > 1.0f) {
-			rate = 1.0f;
-		}
-
-		SetVar(entity, scene, "CoolTimeRate", rate);
-	}
-	attackTimer_ = currentAttackInterval;
-	//float currentAttackInterval = attackInterval_ / skillSpeedRate;
+	attackTimer_ = currentAttackInterval_;
+	SetVar(entity, scene, "CoolTimeRate", 0.0f);
 
 
 }
