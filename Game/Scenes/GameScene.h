@@ -57,6 +57,12 @@ public:
 	// ★追加: コンテキストへのアクセス
 	GameContext& GetContext() { return ctx_; }
 
+	// ★追加: 共有変数へのアクセス (VariableComponent連携)
+	float GetVar(entt::entity entity, const std::string& key, float defaultVal = 0.0f);
+	void SetVar(entt::entity entity, const std::string& key, float value);
+	std::string GetVarString(entt::entity entity, const std::string& key, const std::string& defaultVal = "");
+	void SetVarString(entt::entity entity, const std::string& key, const std::string& value);
+
 	// ★追加: シーン名の取得
 	const std::string& GetSceneName() const { return sceneName_; }
 
