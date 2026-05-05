@@ -44,6 +44,39 @@
       "description": "大砲の攻撃力、攻撃速度、\n射程が1.2倍になります。",
       "pageId": 0
     },
+    {
+      "id": 4,
+      "name": "None",
+      "cost": 1,
+      "parentId": 1,
+      "unlocked": false,
+      "gridX": 0.0,
+      "gridY": 1.0,
+      "description": "設定中",
+      "pageId": 0
+    },
+    {
+      "id": 5,
+      "name": "None",
+      "cost": 1,
+      "parentId": 2,
+      "unlocked": false,
+      "gridX": 2.0,
+      "gridY": 1.0,
+      "description": "設定中",
+      "pageId": 0
+    },
+    {
+      "id": 6,
+      "name": "None",
+      "cost": 1,
+      "parentId": 3,
+      "unlocked": false,
+      "gridX": 1.0,
+      "gridY": 3.0,
+      "description": "設定中",
+      "pageId": 0
+    },
 
     {
       "id": 100,
@@ -89,6 +122,39 @@
       "description": "毒トラップの攻撃力と攻撃範囲が\n1.2倍になります。",
       "pageId": 1
     },
+    {
+      "id": 104,
+      "name": "None",
+      "cost": 1,
+      "parentId": 101,
+      "unlocked": false,
+      "gridX": 0.0,
+      "gridY": 1.0,
+      "description": "設定中",
+      "pageId": 1
+    },
+    {
+      "id": 105,
+      "name": "None",
+      "cost": 1,
+      "parentId": 102,
+      "unlocked": false,
+      "gridX": 2.0,
+      "gridY": 1.0,
+      "description": "設定中",
+      "pageId": 1
+    },
+    {
+      "id": 106,
+      "name": "None",
+      "cost": 1,
+      "parentId": 103,
+      "unlocked": false,
+      "gridX": 1.0,
+      "gridY": 3.0,
+      "description": "設定中",
+      "pageId": 1
+    },
 
     {
       "id": 200,
@@ -132,6 +198,39 @@
       "gridX": 1.0,
       "gridY": 1.0,
       "description": "ミサイルの全性能がアップします。",
+      "pageId": 2
+    },
+    {
+      "id": 204,
+      "name": "None",
+      "cost": 1,
+      "parentId": 201,
+      "unlocked": false,
+      "gridX": 0.0,
+      "gridY": 1.0,
+      "description": "設定中",
+      "pageId": 2
+    },
+    {
+      "id": 205,
+      "name": "None",
+      "cost": 1,
+      "parentId": 202,
+      "unlocked": false,
+      "gridX": 2.0,
+      "gridY": 1.0,
+      "description": "設定中",
+      "pageId": 2
+    },
+    {
+      "id": 206,
+      "name": "None",
+      "cost": 1,
+      "parentId": 203,
+      "unlocked": false,
+      "gridX": 1.0,
+      "gridY": 3.0,
+      "description": "設定中",
       "pageId": 2
     }
   ]

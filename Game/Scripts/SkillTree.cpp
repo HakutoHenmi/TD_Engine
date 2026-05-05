@@ -306,6 +306,14 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 		attackRangeRateCanon *= 1.20f;
 		attackPowerRateCanon *= 1.20f;
 	}
+	if (IsSkillUnlocked(4)) {
+	}
+	if (IsSkillUnlocked(5)) {
+	}
+	if (IsSkillUnlocked(6)) {
+		attackPowerRateCanon *= 1.20f;
+	}
+
 	// poisonTrap
 	float attackPowerRatePoison = 1.0f;
 	float attackRangeRatePoison = 1.0f;
