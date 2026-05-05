@@ -146,10 +146,28 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 		attackTimer_ -= dt;
 	}
 
-	// 接続チェックを無効化したいときはこのままコメントアウトでOK
-	 if (!isConnectedToTank_) {
-	 	return;
-	 }
+	float missileGaugeRate = 1.0f - (attackTimer_ / currentAttackInterval);
+
+	if (missileGaugeRate < 0.0f) {
+		missileGaugeRate = 0.0f;
+	}
+
+	if (missileGaugeRate > 1.0f) {
+		missileGaugeRate = 1.0f;
+	}
+
+	float missileGaugeState = 2.0f;
+
+	if (attackTimer_ <= 0.0f) {
+		missileGaugeState = 1.0f;
+	}
+
+	SetVar(entity, scene, "MissileGaugeRate", missileGaugeRate);
+	SetVar(entity, scene, "MissileGaugeState", missileGaugeState);
+
+	if (!isConnectedToTank_) {
+		return;
+	}
 
 	if (!registry.all_of<TransformComponent>(entity)) {
 		return;
@@ -157,9 +175,6 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 
 	TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
 
-	// -------------------------------
-	// スキルツリー側の倍率を取得
-	// -------------------------------
 	entt::entity gameManagerEntity = entt::null;
 
 	auto scriptView = registry.view<ScriptComponent>();
@@ -189,9 +204,6 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 	float finalDamage = damage_ * attackPowerRateMisile;
 	float finalExplosionRadius = explosionRadius_ * attackAreaRateMisile;
 
-	// -------------------------------
-	// ターゲット探索
-	// -------------------------------
 	currentTarget_ = entt::null;
 	float bestDistance = attackRange_;
 
@@ -243,9 +255,6 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 		return;
 	}
 
-	// -------------------------------
-	// 弾生成
-	// -------------------------------
 	entt::entity bullet = registry.create();
 
 	TagComponent& bulletTag = registry.emplace<TagComponent>(bullet);
@@ -277,12 +286,13 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 
 	SetVar(bullet, scene, "HasTarget", 1.0f);
 	SetVar(bullet, scene, "TargetEntity", static_cast<float>(static_cast<uint32_t>(currentTarget_)));
-
-	// ここでスキル反映後の完成値を渡す
 	SetVar(bullet, scene, "Damage", finalDamage);
 	SetVar(bullet, scene, "ExplosionRadius", finalExplosionRadius);
 
+	SetVar(entity, scene, "MissileGaugeRate", 0.0f);
+	SetVar(entity, scene, "MissileGaugeState", 2.0f);
 	attackTimer_ = currentAttackInterval;
+
 }
 void MissileCanonScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 

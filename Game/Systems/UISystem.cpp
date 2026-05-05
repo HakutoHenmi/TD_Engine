@@ -195,7 +195,7 @@ void UISystem::DrawUI(entt::registry& registry, GameContext& ctx) {
 	}
 	// cannonのクールタイムを描画
 	DrawCoolTimeUI(registry, ctx, drawList, TagType::Canon);
-	DrawCoolTimeUI(registry, ctx, drawList, TagType::Missile);
+	DrawMissileCoolTimeUI(registry, ctx, drawList);
 	DrawPoisonCoolTimeUI(registry, ctx, drawList);
 //	DrawCoolTimeUI(registry, ctx, drawList, TagType::);
 #endif
@@ -476,7 +476,6 @@ void UISystem::DrawCoolTimeUI(entt::registry& registry, GameContext& ctx, ImDraw
 
 void UISystem::DrawCanonCoolTimeUI(entt::registry& registry, GameContext& ctx, ImDrawList* drawList) {
 
-
 	if (!ctx.camera) {
 		return;
 	}
@@ -615,5 +614,75 @@ void UISystem::DrawPoisonCoolTimeUI(entt::registry& registry, GameContext& ctx, 
 }
 #pragma endregion
 
+#pragma region // ミサイルのクールタイムUI描画
+void UISystem::DrawMissileCoolTimeUI(entt::registry& registry, GameContext& ctx, ImDrawList* drawList) {
+	if (!ctx.camera) {
+		return;
+	}
+
+	if (!ctx.scene) {
+		return;
+	}
+
+	if (!drawList) {
+		return;
+	}
+
+	auto view = registry.view<TagComponent, TransformComponent>();
+
+	for (entt::entity entity : view) {
+		TagComponent& tag = view.get<TagComponent>(entity);
+
+		if (tag.tag != TagType::Missile) {
+			continue;
+		}
+
+		TransformComponent& transform = view.get<TransformComponent>(entity);
+
+		DirectX::XMFLOAT3 uiPosition;
+		uiPosition.x = transform.translate.x;
+		uiPosition.y = transform.translate.y + 3.0f;
+		uiPosition.z = transform.translate.z;
+
+		float screenX = 0.0f;
+		float screenY = 0.0f;
+
+		bool isVisible = WorldToScreenWithView(uiPosition, *ctx.camera, ctx.viewportOffset, ctx.viewportSize, screenX, screenY);
+
+		if (!isVisible) {
+			continue;
+		}
+
+		float missileGaugeRate = ctx.scene->GetVar(entity, "MissileGaugeRate", 0.0f);
+
+		if (missileGaugeRate < 0.0f) {
+			missileGaugeRate = 0.0f;
+		}
+
+		if (missileGaugeRate > 1.0f) {
+			missileGaugeRate = 1.0f;
+		}
+
+		ImVec2 center(screenX, screenY - 30.0f);
+		float radius = 18.0f;
+
+		ImU32 backgroundColor = IM_COL32(40, 40, 40, 180);
+		ImU32 gaugeColor = IM_COL32(80, 180, 255, 255);
+
+		drawList->AddCircleFilled(center, radius, backgroundColor);
+		drawList->AddCircle(center, radius, gaugeColor, 32, 2.0f);
+
+		if (missileGaugeRate <= 0.0f) {
+			continue;
+		}
+
+		float startAngle = -3.141592f * 0.5f;
+		float endAngle = startAngle + 3.141592f * 2.0f * missileGaugeRate;
+
+		drawList->PathArcTo(center, radius, startAngle, endAngle, 32);
+		drawList->PathStroke(gaugeColor, false, 4.0f);
+	}
+}
+#pragma endregion
 
 } // namespace Game

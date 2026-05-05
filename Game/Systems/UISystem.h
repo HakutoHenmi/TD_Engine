@@ -27,6 +27,7 @@ private:
     void ProcessButton(entt::entity entity, entt::registry& registry, UIButtonComponent& btn, float worldX, float worldY, float worldW, float worldH, GameContext& ctx);
 	void DrawCoolTimeUI(entt::registry& registry, GameContext& ctx, ImDrawList* drawList, TagType targetTag);
 	void DrawPoisonCoolTimeUI(entt::registry& registry, GameContext& ctx, ImDrawList* drawList);
+	void DrawMissileCoolTimeUI(entt::registry& registry, GameContext& ctx, ImDrawList* drawList);
 
 private:
 	// ★追加: キャノンのクールタイムUI描画用
