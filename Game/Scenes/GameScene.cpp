@@ -1614,4 +1614,32 @@ void GameScene::OnScriptDestroyed(entt::registry& /*reg*/, entt::entity entity) 
 	ScriptEngine::GetInstance()->ExecuteDestroy(entity, this);
 }
 
+float GameScene::GetVar(entt::entity entity, const std::string& key, float defaultVal) {
+	if (registry_.all_of<VariableComponent>(entity)) {
+		return registry_.get<VariableComponent>(entity).GetValue(key, defaultVal);
+	}
+	return defaultVal;
+}
+
+void GameScene::SetVar(entt::entity entity, const std::string& key, float value) {
+	if (!registry_.all_of<VariableComponent>(entity)) {
+		registry_.emplace<VariableComponent>(entity);
+	}
+	registry_.get<VariableComponent>(entity).SetValue(key, value);
+}
+
+std::string GameScene::GetVarString(entt::entity entity, const std::string& key, const std::string& defaultVal) {
+	if (registry_.all_of<VariableComponent>(entity)) {
+		return registry_.get<VariableComponent>(entity).GetString(key, defaultVal);
+	}
+	return defaultVal;
+}
+
+void GameScene::SetVarString(entt::entity entity, const std::string& key, const std::string& value) {
+	if (!registry_.all_of<VariableComponent>(entity)) {
+		registry_.emplace<VariableComponent>(entity);
+	}
+	registry_.get<VariableComponent>(entity).SetString(key, value);
+}
+
 } // namespace Game

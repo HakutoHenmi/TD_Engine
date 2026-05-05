@@ -186,6 +186,7 @@ enum class TagType : uint32_t {
 	HitDistortion_VFX,
 	Core,
 	EnemyBullet,
+	IceCanon,
 };
 
 inline const char* TagToString(TagType tag) {
@@ -217,6 +218,7 @@ inline const char* TagToString(TagType tag) {
 	case TagType::Core: return "Core";
 	case TagType::EnemyBullet: return "EnemyBullet";
     case TagType::Missile: return "Missile";
+	case TagType::IceCanon: return "IceCanon";
 	default: return "Untagged";
 	}
 }
@@ -249,6 +251,7 @@ inline TagType StringToTag(const std::string& s) {
 	if (s == "Core") return TagType::Core;
 	if (s == "EnemyBullet") return TagType::EnemyBullet;
 	if (s=="Missile")return TagType::Missile;
+	if (s == "IceCanon") return TagType::IceCanon;
 	return TagType::Untagged;
 }
 
