@@ -123,6 +123,7 @@ private:
 	entt::entity costTextEntity_ = entt::null;
 	entt::entity descTextEntity_ = entt::null;
 	entt::entity statusTextEntity_ = entt::null;
+	entt::entity pageTitleEntity_ = entt::null;
 };
 
 } // namespace Game

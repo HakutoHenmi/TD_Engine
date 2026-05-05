@@ -197,6 +197,34 @@ void SkillTree::Update(entt::entity entity, GameScene* scene, float dt) {
 	auto& descRect = registry.get<RectTransformComponent>(descE);
 	auto& statusComp = registry.get<UITextComponent>(statusE);
 	auto& statusRect = registry.get<RectTransformComponent>(statusE);
+	// ページタイトル用
+	entt::entity pageTitleE = getOrCreateTextEntity(pageTitleEntity_);
+
+	auto& pageComp = registry.get<UITextComponent>(pageTitleE);
+	auto& pageRect = registry.get<RectTransformComponent>(pageTitleE);
+
+	// タイトル決定
+	std::string pageTitle = "";
+
+	if (currentPageId_ == 0) {
+		pageTitle = "Canon Skill";
+	} else if (currentPageId_ == 1) {
+		pageTitle = "Poison Skill";
+	} else if (currentPageId_ == 2) {
+		pageTitle = "Missile Skill";
+	}
+
+	// UI反映
+	pageComp.text = pageTitle;
+	pageComp.fontSize = 70.0f;
+	pageComp.color = {1, 1, 1, 1};
+
+	// 上の方に表示
+	pageRect.pos = {screenW_ * 0.5f - 150.0f, 120.0f};
+
+
+
+
 
 	if (showText) {
 		const SkillNode& node = nodes_[hoveredIndex];
@@ -294,24 +322,30 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 
 	// page1
 	if (IsSkillUnlocked(1)) {
-		attackPowerRateCanon *= 1.50f;
+		attackPowerRateCanon *= 1.10f;
 	}
 
 	if (IsSkillUnlocked(2)) {
-		attackSpeedRateCanon *= 1.50f;
+		attackSpeedRateCanon *= 1.10f;
 	}
 
 	if (IsSkillUnlocked(3)) {
-		attackSpeedRateCanon *= 1.20f;
-		attackRangeRateCanon *= 1.20f;
-		attackPowerRateCanon *= 1.20f;
+		attackRangeRateCanon *= 1.10f;
 	}
+
 	if (IsSkillUnlocked(4)) {
+		attackPowerRateCanon *= 1.15f;
 	}
+
 	if (IsSkillUnlocked(5)) {
+		attackPowerRateCanon *= 1.05f;
+		attackSpeedRateCanon *= 1.05f;
+		attackRangeRateCanon *= 1.05f;
 	}
+
 	if (IsSkillUnlocked(6)) {
-		attackPowerRateCanon *= 1.20f;
+		attackPowerRateCanon *= 1.10f;
+		attackSpeedRateCanon *= 1.10f;
 	}
 
 	// poisonTrap

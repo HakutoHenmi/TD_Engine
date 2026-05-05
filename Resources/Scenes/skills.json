@@ -19,7 +19,7 @@
       "unlocked": false,
       "gridX": 0.0,
       "gridY": 0.0,
-      "description": "大砲の攻撃力が1.5倍になります。",
+      "description": "大砲の攻撃力が\n1.1倍になります。",
       "pageId": 0
     },
     {
@@ -30,7 +30,7 @@
       "unlocked": false,
       "gridX": 2.0,
       "gridY": 0.0,
-      "description": "大砲の攻撃速度が1.5倍になります。",
+      "description":  "大砲の攻撃速度が\n1.1倍になります。",
       "pageId": 0
     },
     {
@@ -41,7 +41,7 @@
       "unlocked": false,
       "gridX": 1.0,
       "gridY": 1.0,
-      "description": "大砲の攻撃力、攻撃速度、\n射程が1.2倍になります。",
+      "description":  "大砲の射程が\n1.1倍になります。",
       "pageId": 0
     },
     {
@@ -52,7 +52,7 @@
       "unlocked": false,
       "gridX": 0.0,
       "gridY": 1.0,
-      "description": "設定中",
+      "description":  "大砲の攻撃力が\nさらに1.15倍になります。",
       "pageId": 0
     },
     {
@@ -63,7 +63,7 @@
       "unlocked": false,
       "gridX": 2.0,
       "gridY": 1.0,
-      "description": "設定中",
+      "description": "大砲の攻撃速度が\nさらに1.15倍になります。",
       "pageId": 0
     },
     {
@@ -74,7 +74,7 @@
       "unlocked": false,
       "gridX": 1.0,
       "gridY": 3.0,
-      "description": "設定中",
+      "description":  "大砲の攻撃力と攻撃速度が\n1.1倍になります。",
       "pageId": 0
     },
 
