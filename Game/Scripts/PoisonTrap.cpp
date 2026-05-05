@@ -96,7 +96,7 @@ static void CollectConnectedBulletTanks(
 	}
 }
 
-void PoisonTrap::Start(entt::entity /*entity*/, GameScene* /*scene*/) { poisonTimer_ = 0.0f; }
+void PoisonTrap::Start(entt::entity /*entity*/, GameScene* /*scene*/) { poisonActiveTimer_ = 0.0f; }
 
 void PoisonTrap::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (!scene) {
@@ -109,15 +109,12 @@ void PoisonTrap::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	}
 
+	// 接続チェック
 	connectionCheckTimer_ -= dt;
 	if (connectionCheckTimer_ <= 0.0f) {
 		connectionCheckTimer_ = 0.5f;
 		UpdateConnection(entity, scene);
 	}
-
-	// Debug(isConnectedToTank_); // ★削除: Update 内での ImGui 呼び出しは例外の原因となる可能性があるため
-
-	//タンクと接続確認するためのやつ
 
 	if (!isConnectedToTank_) {
 		return;
@@ -127,48 +124,90 @@ void PoisonTrap::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	}
 
+	//--------------------------------
+	// ① 毒を出している時間（青ゲージ）
+	//--------------------------------
+	if (poisonActiveTimer_ > 0.0f) {
+		poisonActiveTimer_ -= dt;
+
+		float rate = poisonActiveTimer_ / poisonActiveTime_;
+
+		if (rate < 0.0f) {
+			rate = 0.0f;
+		}
+
+		SetVar(entity, scene, "PoisonGaugeRate", rate);
+		SetVar(entity, scene, "PoisonGaugeState", 1.0f); // 青
+
+		// 毒終了 → クールダウンへ
+		if (poisonActiveTimer_ <= 0.0f) {
+			poisonCoolTimer_ = poisonCoolTime_;
+		}
+
+		return;
+	}
+
+	//--------------------------------
+	// ② クールダウン（グレー）
+	//--------------------------------
+	if (poisonCoolTimer_ > 0.0f) {
+		poisonCoolTimer_ -= dt;
+
+		float rate = poisonCoolTimer_ / poisonCoolTime_;
+
+		if (rate < 0.0f) {
+			rate = 0.0f;
+		}
+
+		SetVar(entity, scene, "PoisonGaugeRate", rate);
+		SetVar(entity, scene, "PoisonGaugeState", 2.0f); // グレー
+
+		return;
+	}
+
+	//--------------------------------
+	// ③ 発射（ここで毒スタート）
+	//--------------------------------
+
 	entt::entity gm = entt::null;
 	auto viewScript = registry.view<ScriptComponent>();
-	for (auto e : viewScript) {
-		const auto& sc = viewScript.get<ScriptComponent>(e);
+
+	for (entt::entity e : viewScript) {
+		const ScriptComponent& sc = viewScript.get<ScriptComponent>(e);
+
 		for (const auto& instance : sc.scripts) {
 			if (instance.scriptPath == "PhaseSystemScript" || instance.scriptPath == "TutorialScript") {
 				gm = e;
 				break;
 			}
 		}
-		if (gm != entt::null)
+
+		if (gm != entt::null) {
 			break;
+		}
 	}
 
 	if (gm != entt::null) {
-		skillPowerRate = GetVar(gm, scene, "AttackPowerRatePoison", 1.0f);
-		skillSpeedRate = GetVar(gm, scene, "AttackRangeRatePoison", 1.0f);
-		
+		skillPowerRate_ = GetVar(gm, scene, "AttackPowerRatePoison", 1.0f);
+		skillRangeRate_ = GetVar(gm, scene, "AttackRangeRatePoison", 1.0f);
 	}
-	poisonDamage_ *= skillPowerRate;
-	poisonRange_ *= skillRangeRate;
-	
 
-	CreatePoisonAttackArea(entity, scene);
-	poisonTimer_ = poisonInterval_;
+	float finalDamage = poisonDamage_ * skillPowerRate_;
+	float finalRange = poisonRange_ * skillRangeRate_;
+
+	CreatePoisonAttackArea(entity, scene, finalDamage, finalRange);
+
+	// タイマー開始
+	poisonActiveTimer_ = poisonActiveTime_;
+
+	SetVar(entity, scene, "PoisonGaugeRate", 1.0f);
+	SetVar(entity, scene, "PoisonGaugeState", 1.0f);
 }
 
 void PoisonTrap::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 void PoisonTrap::OnEditorUI() {
-#if defined(USE_IMGUI) && !defined(NDEBUG)
-	ImGui::DragFloat("Poison Damage", &poisonDamage_, 0.1f, 0.0f, 100.0f);
-	ImGui::DragFloat("Poison Range", &poisonRange_, 0.1f, 0.1f, 20.0f);
-	ImGui::DragFloat("Poison Interval", &poisonInterval_, 0.01f, 0.05f, 10.0f);
 
-	ImGui::Separator();
-	ImGui::Text("Status (Debug)");
-	ImGui::Text("Connected Tanks: %d", connectedTankCount);
-	ImGui::Text("Connected to Tank: %s", isConnectedToTank_ ? "YES" : "NO");
-	ImGui::Text("Poison Range: %.2f", poisonRange_);
-	ImGui::Text("Poison Interval: %.2f", poisonInterval_);
-#endif
 }
 
 void PoisonTrap::UpdateConnection(entt::entity entity, GameScene* scene) {
@@ -193,9 +232,9 @@ void PoisonTrap::UpdateConnection(entt::entity entity, GameScene* scene) {
 		CollectConnectedBulletTanks(registry, pipe, visitedPipesForTanks, foundTanks, allPipes, allTanks, connectRange);
 	}
 
-	connectedTankCount = static_cast<int>(foundTanks.size());
+	connectedTankCount_ = static_cast<int>(foundTanks.size());
 
-	if (connectedTankCount > 0) {
+	if (connectedTankCount_ > 0) {
 		isConnectedToTank_ = true;
 	} else {
 		isConnectedToTank_ = false;
@@ -247,7 +286,7 @@ bool PoisonTrap::IsEnemyInRange(entt::entity entity, GameScene* scene, float ran
 
 #pragma endregion
 
-void PoisonTrap::CreatePoisonAttackArea(entt::entity entity, GameScene* scene) {
+void PoisonTrap::CreatePoisonAttackArea(entt::entity entity, GameScene* scene, float damage, float range) {
 	if (!scene) {
 		return;
 	}
@@ -277,13 +316,13 @@ void PoisonTrap::CreatePoisonAttackArea(entt::entity entity, GameScene* scene) {
 	TransformComponent& poisonTransform = registry.emplace<TransformComponent>(poisonAttackArea);
 	poisonTransform.translate = trapTransform.translate;
 	poisonTransform.rotate = trapTransform.rotate;
-	poisonTransform.scale = {poisonRange_ / 2.0f, poisonRange_ / 2.0f, poisonRange_ / 2.0f};
+	poisonTransform.scale = {range / 2.0f, range / 2.0f, range / 2.0f};
 
 	HitboxComponent& poisonHitbox = registry.emplace<HitboxComponent>(poisonAttackArea);
 	poisonHitbox.isActive = true;
-	poisonHitbox.damage = poisonDamage_;
+	poisonHitbox.damage = damage;
 	poisonHitbox.tag = TagType::Poison;
-	poisonHitbox.size = {poisonRange_, poisonRange_, poisonRange_};
+	poisonHitbox.size = {range, range, range};
 
 	ScriptComponent& poisonScript = registry.emplace<ScriptComponent>(poisonAttackArea);
 	poisonScript.scripts.push_back({"PoisonAttackArea", "", nullptr});

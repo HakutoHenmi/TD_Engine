@@ -20,12 +20,13 @@ public:
     // ★追加: 3Dワールド座標からスクリーン座標に変換 (Viewport考慮版)
     static bool WorldToScreen(const DirectX::XMFLOAT3& worldPos, const Engine::Camera& camera, float& screenX, float& screenY);
     static bool WorldToScreenWithView(const DirectX::XMFLOAT3& worldPos, const Engine::Camera& camera, const DirectX::XMFLOAT2& viewOffset, const DirectX::XMFLOAT2& viewSize, float& screenX, float& screenY);
-
+  //  void DrawPoisonCoolTimeUI(entt::registry& registry, GameContext& ctx, ImDrawList* drawList);
 private:
     void RenderNodeWithRect(entt::entity entity, entt::registry& registry, const WorldRect& wr, GameContext& ctx);
     void DrawTextW(entt::entity entity, entt::registry& registry, const UITextComponent& text, float worldX, float worldY, float worldW, float worldH, Engine::Renderer* renderer);
     void ProcessButton(entt::entity entity, entt::registry& registry, UIButtonComponent& btn, float worldX, float worldY, float worldW, float worldH, GameContext& ctx);
 	void DrawCoolTimeUI(entt::registry& registry, GameContext& ctx, ImDrawList* drawList, TagType targetTag);
+	void DrawPoisonCoolTimeUI(entt::registry& registry, GameContext& ctx, ImDrawList* drawList);
 
 private:
 	// ★追加: キャノンのクールタイムUI描画用

@@ -14,24 +14,28 @@ public:
 	void OnEditorUI() override;
 
 private:
-	float poisonDamage_ = 3.0f;
-	float poisonRange_ = 6.0f;
-	float poisonInterval_ = 0.2f;
-	float poisonTimer_ = 0.0f;
-
-	int connectedTankCount = 0;
-	float connectionCheckTimer_ = 0.0f;
-	bool isConnectedToTank_ = false;
-
-private:
 	void Debug(bool connected);
 	void UpdateConnection(entt::entity entity, GameScene* scene);
 	bool IsEnemyInRange(entt::entity entity, GameScene* scene, float range);
-	void CreatePoisonAttackArea(entt::entity entity, GameScene* scene);
-	float skillPowerRate = 1.0f;
-	float skillSpeedRate = 1.0f;
-	float skillRangeRate = 1.0f;
+	void CreatePoisonAttackArea(entt::entity entity, GameScene* scene, float damage, float range);
 
+private:
+	float poisonDamage_ = 3.0f;
+	float poisonRange_ = 6.0f;
+
+	float poisonActiveTime_ = 2.0f;
+	float poisonCoolTime_ = 3.0f;
+
+	float poisonActiveTimer_ = 0.0f;
+	float poisonCoolTimer_ = 0.0f;
+
+	float connectionCheckTimer_ = 0.0f;
+	int connectedTankCount_ = 0;
+	bool isConnectedToTank_ = false;
+
+	float skillPowerRate_ = 1.0f;
+	float skillSpeedRate_ = 1.0f;
+	float skillRangeRate_ = 1.0f;
 };
 
 } // namespace Game
