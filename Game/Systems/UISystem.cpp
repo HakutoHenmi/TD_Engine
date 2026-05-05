@@ -194,7 +194,10 @@ void UISystem::DrawUI(entt::registry& registry, GameContext& ctx) {
 		}
 	}
 	// cannonのクールタイムを描画
-	DrawCanonCoolTimeUI(registry, ctx, drawList);
+	DrawCoolTimeUI(registry, ctx, drawList, TagType::Canon);
+	DrawCoolTimeUI(registry, ctx, drawList, TagType::Missile);
+	DrawCoolTimeUI(registry, ctx, drawList, TagType::Poison);
+//	DrawCoolTimeUI(registry, ctx, drawList, TagType::);
 #endif
 }
 
@@ -406,6 +409,47 @@ void UISystem::ProcessButton(entt::entity entity, entt::registry& registry, UIBu
 				}
 			}
 		}
+	}
+}
+void UISystem::DrawCoolTimeUI(entt::registry& registry, GameContext& ctx, ImDrawList* drawList, TagType targetTag) {
+	if (!ctx.camera) {
+		return;
+	}
+
+	if (!drawList) {
+		return;
+	}
+
+	auto view = registry.view<TagComponent, TransformComponent>();
+
+	for (entt::entity entity : view) {
+		TagComponent& tag = view.get<TagComponent>(entity);
+
+		if (tag.tag != targetTag) {
+			continue;
+		}
+
+		TransformComponent& transform = view.get<TransformComponent>(entity);
+
+		DirectX::XMFLOAT3 uiPosition;
+		uiPosition.x = transform.translate.x;
+		uiPosition.y = transform.translate.y + 2.0f;
+		uiPosition.z = transform.translate.z;
+
+		float screenX = 0.0f;
+		float screenY = 0.0f;
+
+		bool isVisible = WorldToScreenWithView(uiPosition, *ctx.camera, ctx.viewportOffset, ctx.viewportSize, screenX, screenY);
+
+		if (!isVisible) {
+			continue;
+		}
+
+		ImVec2 center(screenX, screenY - 30.0f);
+		float radius = 18.0f;
+
+		drawList->AddCircleFilled(center, radius, IM_COL32(40, 40, 40, 180));
+		drawList->AddCircle(center, radius, IM_COL32(80, 180, 255, 255), 32, 4.0f);
 	}
 }
 void UISystem::DrawCanonCoolTimeUI(entt::registry& registry, GameContext& ctx, ImDrawList* drawList) {
