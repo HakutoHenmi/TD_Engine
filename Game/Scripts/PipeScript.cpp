@@ -250,9 +250,10 @@ void PipeScript::Update(entt::entity obj, GameScene* scene, float dt) {
 
 void PipeScript::OnDestroy(entt::entity obj, GameScene* scene) {
 	(void)obj;
+	auto& registry = scene->GetRegistry();
 	for (auto& pair : connectionCylinders_) {
-		if (scene->GetRegistry().valid(pair.second)) {
-			scene->DestroyObject(static_cast<uint32_t>(pair.second));
+		if (registry.valid(pair.second)) {
+			registry.destroy(pair.second);
 		}
 	}
 	connectionCylinders_.clear();
