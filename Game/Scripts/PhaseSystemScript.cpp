@@ -396,6 +396,9 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 					const auto& name = registry.get<NameComponent>(e).name;
 					// 地形などは削除できないようにする
 					if (name.find("Terrain") != std::string::npos || name.find("Plane") != std::string::npos || name.find("Core") != std::string::npos || name.find("Floor") != std::string::npos) return;
+					// PipeConnectionはパイプのつなぎ目（導線）なのでレイキャスト対象から除外する
+					// パイプ本体を削除すれば PipeScript::OnDestroy が自動的に消してくれる
+					if (name.find("PipeConnection") != std::string::npos) return;
 				}
 
 				Engine::Model* model = nullptr;
