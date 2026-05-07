@@ -914,7 +914,7 @@ void SkillTree::DrawPageButtons(Engine::Renderer* renderer, float screenW, float
 	} else {
 		prev.color = {0.8f, 0.8f, 0.2f, 0.9f};
 	}
-
+	//前ページ戻る
 	renderer->DrawSprite(texBg_, prev);
 
 	Engine::Renderer::SpriteDesc next;
@@ -928,7 +928,7 @@ void SkillTree::DrawPageButtons(Engine::Renderer* renderer, float screenW, float
 	} else {
 		next.color = {0.8f, 0.8f, 0.2f, 0.9f};
 	}
-
+	// 次ページ進む
 	renderer->DrawSprite(texBg_, next);
 
 #ifdef USE_IMGUI
