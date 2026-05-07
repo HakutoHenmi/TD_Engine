@@ -491,14 +491,23 @@ void GameScene::Update() {
 			// 一旦、pendingSpawns_ をダミーとして運用するか、直接 `registry_.create()` するのでここは実質空になる
 			pendingSpawns_.clear();
 		}
+	}
 
-		if (!pendingDestroys_.empty()) {
-			for (auto id : pendingDestroys_) {
-				if (registry_.valid(id)) {
-					registry_.destroy(id);
-				}
+	// ★修正: registry_.destroy() はロック外で実行する
+	// PipeScript::OnDestroy() などのスクリプト破棄コールバック内で scene->DestroyObject() が呼ばれると、
+	// spawnMutex_ を再ロックしようとしてデッドロック（std::system_error）が発生するため、
+	// リストをスワップで安全に取り出してからロックなしで破棄処理を行う。
+	{
+		std::vector<entt::entity> destroysThisFrame;
+		{
+			std::lock_guard<std::mutex> lock(spawnMutex_);
+			destroysThisFrame.swap(pendingDestroys_);
+		}
+
+		for (auto id : destroysThisFrame) {
+			if (registry_.valid(id)) {
+				registry_.destroy(id); // ← OnDestroy コールバック内で DestroyObject が呼ばれても再入しない
 			}
-			pendingDestroys_.clear();
 		}
 	}
 
