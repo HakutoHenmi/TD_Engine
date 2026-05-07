@@ -31,12 +31,17 @@ private:
 
 	// ★追加: プレイヤータイプと銃関連
 	enum class PlayerType { Sword, Gun };
-	enum class GunType { AssaultRifle, Shotgun };
 	PlayerType playerType_ = PlayerType::Sword;
-	GunType gunType_ = GunType::AssaultRifle;
-
 	bool isAiming_ = false;
 	float skillCooldown_ = 0.0f;
+
+	// ★スキルバフ関連
+	bool isSkillActive_ = false;
+	float skillDuration_ = 0.0f;
+	const float SKILL_MAX_DURATION = 10.0f;
+	const float SKILL_COOLDOWN_TIME = 15.0f;
+	const float SKILL_SPEED_MULTIPLIER = 1.8f;
+	const float SKILL_DAMAGE_MULTIPLIER = 2.5f;
 	float gunShootTimer_ = 0.0f;
 	
 	bool prevPlayerSwitchKeyDown_ = false;
@@ -73,8 +78,9 @@ private:
 	void UpdateGunAttack(entt::entity entity, GameScene* scene, float dt);
 	void SwitchPlayerType(entt::entity entity, GameScene* scene);
 	void ExecuteSkill(entt::entity entity, GameScene* scene);
-	void SpawnBullet(entt::entity entity, GameScene* scene, float spreadYaw, float spreadPitch, float damage, float lifeTime = 5.0f);
+	void SpawnBullet(entt::entity entity, GameScene* scene, float spreadYaw, float spreadPitch, float damage, float lifeTime = 5.0f, bool enhanced = false);
 	void ShootGun(entt::entity entity, GameScene* scene);
+	void SpawnCrystalBurst(const DirectX::XMFLOAT3& pos, int count, bool enhanced);
 
 	float experience_ = 0.0f;
 	int level_ = 1;
@@ -119,6 +125,21 @@ private:
 		float life;
 	};
 	std::deque<ShellCasing> shellCasings_;
+
+	// ★追加: クリスタル飛散エフェクト
+	struct CrystalParticle {
+		DirectX::XMFLOAT3 pos;
+		DirectX::XMFLOAT3 velocity;
+		float life;
+		float maxLife;
+		float size;
+		float rotSpeed;  // 回転速度
+		float rot;       // 現在の回転角
+		DirectX::XMFLOAT4 color;
+	};
+	std::deque<CrystalParticle> crystalParticles_;
+
+
 };
 
 } // namespace Game
