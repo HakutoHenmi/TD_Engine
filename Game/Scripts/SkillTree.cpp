@@ -77,11 +77,9 @@ void SkillTree::SetUIContext(Engine::Renderer* renderer, float screenW, float sc
 
 void SkillTree::Start(entt::entity entity, GameScene* scene) {
 	(void)entity;
-	
+
 	if (!eventSubscribed_ && scene) {
-		scene->GetEventSystem().Subscribe("GainSkillPoint", [this](float pts) {
-			AddSkillPoints(static_cast<int>(pts));
-		});
+		scene->GetEventSystem().Subscribe("GainSkillPoint", [this](float pts) { AddSkillPoints(static_cast<int>(pts)); });
 		eventSubscribed_ = true;
 	}
 
@@ -96,9 +94,7 @@ void SkillTree::Start(entt::entity entity, GameScene* scene) {
 		texNodeUnlocked_ = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
 		texLine_ = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
 
-		scene->GetEventSystem().Subscribe("GainSkillPoint", [this](float pts) {
-			skillPoints_ += static_cast<int>(pts);
-		});
+		scene->GetEventSystem().Subscribe("GainSkillPoint", [this](float pts) { skillPoints_ += static_cast<int>(pts); });
 
 		initialized_ = true;
 	}
@@ -118,6 +114,7 @@ void SkillTree::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 
 	if (!isOpen_) {
+		ClearText(scene);
 		return;
 	}
 
@@ -222,10 +219,6 @@ void SkillTree::Update(entt::entity entity, GameScene* scene, float dt) {
 	// 上の方に表示
 	pageRect.pos = {screenW_ * 0.5f - 150.0f, 120.0f};
 
-
-
-
-
 	if (showText) {
 		const SkillNode& node = nodes_[hoveredIndex];
 		float panelWidth = 400.0f;
@@ -268,18 +261,31 @@ void SkillTree::Update(entt::entity entity, GameScene* scene, float dt) {
 }
 
 void SkillTree::ClearText(GameScene* scene) {
-	if (!scene)
+	if (!scene) {
 		return;
+	}
+
 	auto& registry = scene->GetRegistry();
 
-	if (registry.valid(titleTextEntity_))
+	if (registry.valid(titleTextEntity_)) {
 		registry.get<UITextComponent>(titleTextEntity_).text = "";
-	if (registry.valid(costTextEntity_))
+	}
+
+	if (registry.valid(costTextEntity_)) {
 		registry.get<UITextComponent>(costTextEntity_).text = "";
-	if (registry.valid(descTextEntity_))
+	}
+
+	if (registry.valid(descTextEntity_)) {
 		registry.get<UITextComponent>(descTextEntity_).text = "";
-	if (registry.valid(statusTextEntity_))
+	}
+
+	if (registry.valid(statusTextEntity_)) {
 		registry.get<UITextComponent>(statusTextEntity_).text = "";
+	}
+
+	if (registry.valid(pageTitleEntity_)) {
+		registry.get<UITextComponent>(pageTitleEntity_).text = "";
+	}
 }
 
 void SkillTree::OnDestroy(entt::entity entity, GameScene* scene) {
@@ -750,8 +756,6 @@ void SkillTree::DrawDescriptionPanel(Engine::Renderer* renderer, float screenW, 
 	// ImGui での描画処理は削除されました。
 #endif
 }
-
-
 
 void SkillTree::DrawConfirmationDialog(Engine::Renderer* renderer, float screenW, float screenH) {
 	if (pendingUnlockId_ < 0 || pendingUnlockId_ >= (int)nodes_.size()) {
