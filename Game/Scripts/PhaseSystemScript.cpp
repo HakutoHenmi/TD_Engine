@@ -254,9 +254,12 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			skillTree_.Toggle(scene);
 		}
 
-		// スキルツリーが開いている間はスキルツリーの更新のみ
+// スキルツリーが開いている間はスキルツリーの更新のみ
 		if (skillTree_.IsOpen()) {
-			float mx = 0, my = 0;
+			SetVar(entity, scene, "IsSkillTreeOpen", 1.0f);
+
+			float mx = 0.0f;
+			float my = 0.0f;
 			float tW = (float)Engine::WindowDX::kW;
 			float tH = (float)Engine::WindowDX::kH;
 
@@ -266,18 +269,23 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			ImVec2 gameMax = EditorUI::GetGameImageMax();
 			float viewW = gameMax.x - gameMin.x;
 			float viewH = gameMax.y - gameMin.y;
-			if (viewW > 0 && viewH > 0) {
+
+			if (viewW > 0.0f && viewH > 0.0f) {
 				mx = (mousePos.x - gameMin.x) * (tW / viewW);
 				my = (mousePos.y - gameMin.y) * (tH / viewH);
 			}
 #else
 			input->GetMousePos(mx, my);
 #endif
+
 			skillTree_.SetUIContext(renderer, tW, tH, mx, my);
 			skillTree_.Update(entity, scene, dt);
+
 			preKeyN_ = keyN;
-			return; // 設置モードの入力を抑制
+			return;
 		}
+
+		SetVar(entity, scene, "IsSkillTreeOpen", 0.0f);
 
 		// 設置モードへの切り替え
 

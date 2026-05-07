@@ -193,6 +193,16 @@ void UISystem::DrawUI(entt::registry& registry, GameContext& ctx) {
 			}
 		}
 	}
+	// 2. スキルツリーが開いているかの判定（開いている場合はクールタイムUIを描画しない）
+	auto view = registry.view<ScriptComponent>();
+
+	for (entt::entity entity : view) {
+		float isSkillTreeOpen = ctx.scene->GetVar(entity, "IsSkillTreeOpen", 0.0f);
+
+		if (isSkillTreeOpen > 0.5f) {
+			return;
+		}
+	}
 	// cannonのクールタイムを描画
 	DrawCoolTimeUI(registry, ctx, drawList, TagType::Canon);
 	DrawMissileCoolTimeUI(registry, ctx, drawList);
