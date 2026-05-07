@@ -445,7 +445,7 @@ void Renderer::FlushDrawCalls() {
 	}
 
 	for (const auto& dc : drawCalls_) {
-		if (dc.shaderName == "Distortion") continue; // 空間のゆがみは EndFrame で別途描画
+		if (dc.shaderName == "Distortion" || dc.shaderName == "GlassShatter") continue; // 空間のゆがみは EndFrame で別途描画
 
 		auto* model = GetModel(dc.mesh);
 		if (!model) continue;
@@ -579,7 +579,7 @@ void Renderer::FlushDrawCalls() {
 			}
 			// ★修正: Toon系や新しく追加したリッチシェーダーはインスタンス描画非対応のためデフォルトにフォールバック
 			if (sName == "Toon" || sName == "ToonSkinning" || sName == "ToonOutline" || sName == "ToonSkinningOutline" ||
-				sName == "Hologram" || sName == "EmissiveGlow" || sName == "ForceField" || sName == "Dissolve" || sName == "Distortion") {
+				sName == "Hologram" || sName == "EmissiveGlow" || sName == "ForceField" || sName == "Dissolve" || sName == "Distortion" || sName == "GlassShatter") {
 				sName = defaultShaderName;
 			}
 
@@ -706,7 +706,7 @@ void Renderer::EndFrame() {
 		
 		// Normal Shadow Pass
 		for (const auto& dc : drawCalls_) {
-			if (dc.isParticle || dc.shaderName == "Particle" || dc.shaderName == "ParticleAdditive" || dc.shaderName == "ProceduralSmoke" || dc.shaderName == "ProceduralSmokeAdditive" || dc.shaderName == "2D" || dc.shaderName == "Distortion") continue;
+			if (dc.isParticle || dc.shaderName == "Particle" || dc.shaderName == "ParticleAdditive" || dc.shaderName == "ProceduralSmoke" || dc.shaderName == "ProceduralSmokeAdditive" || dc.shaderName == "2D" || dc.shaderName == "Distortion" || dc.shaderName == "GlassShatter") continue;
 
 			auto* model = GetModel(dc.mesh);
 			if (!model) continue;
@@ -744,7 +744,7 @@ void Renderer::EndFrame() {
 
 		// Instanced Shadow Pass
 		for (const auto& idc : instancedDrawCalls_) {
-			if (idc.shaderName == "Particle" || idc.shaderName == "ParticleInstanced" || idc.shaderName == "ProceduralSmoke" || idc.shaderName == "ProceduralSmokeInstanced" || idc.shaderName == "2D" || idc.shaderName == "Distortion") continue;
+			if (idc.shaderName == "Particle" || idc.shaderName == "ParticleInstanced" || idc.shaderName == "ProceduralSmoke" || idc.shaderName == "ProceduralSmokeInstanced" || idc.shaderName == "2D" || idc.shaderName == "Distortion" || idc.shaderName == "GlassShatter") continue;
 			
 			auto* model = GetModel(idc.mesh);
 			if (!model || idc.instances.empty()) continue;
@@ -777,22 +777,24 @@ void Renderer::EndFrame() {
 	struct DistortionKey {
 		MeshHandle mesh;
 		TextureHandle tex;
+		std::string shaderName;
 		bool operator<(const DistortionKey& o) const {
 			if (mesh != o.mesh) return mesh < o.mesh;
-			return tex < o.tex;
+			if (tex != o.tex) return tex < o.tex;
+			return shaderName < o.shaderName;
 		}
 	};
 	std::map<DistortionKey, std::vector<InstanceData>> aggregatedJobs;
 
 	for (const auto& dc : drawCalls_) {
-		if (dc.shaderName == "Distortion") {
+		if (dc.shaderName == "Distortion" || dc.shaderName == "GlassShatter") {
 			InstanceData id; id.world = dc.worldMatrix; id.color = dc.color; id.uvScaleOffset = dc.uvScaleOffset;
-			aggregatedJobs[{dc.mesh, dc.tex}].push_back(id);
+			aggregatedJobs[{dc.mesh, dc.tex, dc.shaderName}].push_back(id);
 		}
 	}
 	for (auto it = instancedDrawCalls_.begin(); it != instancedDrawCalls_.end(); ) {
-		if (it->shaderName == "Distortion") {
-			auto& target = aggregatedJobs[{it->mesh, it->tex}];
+		if (it->shaderName == "Distortion" || it->shaderName == "GlassShatter") {
+			auto& target = aggregatedJobs[{it->mesh, it->tex, it->shaderName}];
 			target.insert(target.end(), it->instances.begin(), it->instances.end());
 			it = instancedDrawCalls_.erase(it);
 		} else ++it;
@@ -850,8 +852,8 @@ void Renderer::EndFrame() {
 				const auto& instances = pair.second;
 				auto* model = GetModel(key.mesh);
 				if (!model || instances.empty()) continue;
-				if (pipelines_.count("Distortion")) {
-					list_->SetPipelineState(pipelines_["Distortion"].Get());
+				if (pipelines_.count(key.shaderName)) {
+					list_->SetPipelineState(pipelines_[key.shaderName].Get());
 				} else continue;
 
 				uint32_t sIdx = AllocateDynamicSrvIndex(1);
@@ -3315,6 +3317,39 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 
 			if (SUCCEEDED(dev_->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelines_["Distortion"])))) {
 				OutputDebugStringA("[Renderer] Distortion PSO created.\n");
+			}
+		}
+
+		// ★追加: GlassShatter PSOの作成
+		auto vsGlass = CompileShaderFromFile(L"Resources/shaders/GlassShatter.hlsl", "main", "vs_5_0");
+		auto psGlass = CompileShaderFromFile(L"Resources/shaders/GlassShatter.hlsl", "ps_main", "ps_5_0");
+		if (vsGlass && psGlass) {
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
+			psoDesc.pRootSignature = rootSigDistortion_.Get(); // 専用RootSig
+			psoDesc.VS = { vsGlass->GetBufferPointer(), vsGlass->GetBufferSize() };
+			psoDesc.PS = { psGlass->GetBufferPointer(), psGlass->GetBufferSize() };
+			psoDesc.SampleMask = UINT_MAX;
+			psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+			psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE; // 破片は両面描画
+			psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+			psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+			psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO; // 深度は書かない
+			D3D12_INPUT_ELEMENT_DESC localSkinLayout[] = {
+				{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+				{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+				{"NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+				{"WEIGHTS",  0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 36, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+				{"BONES",    0, DXGI_FORMAT_R32G32B32A32_UINT,  0, 52, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+			};
+			psoDesc.InputLayout = { localSkinLayout, _countof(localSkinLayout) };
+			psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			psoDesc.NumRenderTargets = 1;
+			psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+			psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+			psoDesc.SampleDesc.Count = 1;
+
+			if (SUCCEEDED(dev_->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelines_["GlassShatter"])))) {
+				OutputDebugStringA("[Renderer] GlassShatter PSO created.\n");
 			}
 		}
 	}

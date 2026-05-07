@@ -5,6 +5,7 @@
 #include "ObjectTypes.h"
 #include "PhaseSystemScript.h"
 #include "BulletScript.h"
+#include "MirrorShatterScript.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
 #include "../Systems/UISystem.h"
@@ -255,6 +256,34 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 				cam->StartShake(0.2f, 0.6f);  // 強
 			}
 		});
+		// ★追加: 強化弾ヒットイベント → 鏡割れエフェクト生成
+		scene->GetEventSystem().Subscribe("EnhancedBulletHit", [this, entity, scene](float entityVal) {
+			entt::entity target = static_cast<entt::entity>(static_cast<uint32_t>(entityVal));
+			if (scene->GetRegistry().valid(target) && scene->GetRegistry().all_of<TransformComponent>(target)) {
+				auto& tc = scene->GetRegistry().get<TransformComponent>(target);
+				DirectX::XMFLOAT3 hitPos = tc.translate;
+				hitPos.y += 1.0f;
+				// 新しい鏡割れエフェクト(Distortionベース)を生成
+				entt::entity shatterVfx = scene->CreateEntity("MirrorShatter");
+				auto& vfxTc = scene->GetRegistry().get<TransformComponent>(shatterVfx);
+				vfxTc.translate = hitPos;
+				// ★弾の飛来方向をVariableComponentで渡す（プレイヤー→敵）
+				auto& vc = scene->GetRegistry().emplace<VariableComponent>(shatterVfx);
+				if (scene->GetRegistry().all_of<TransformComponent>(entity)) {
+					auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
+					float dx = tc.translate.x - pTc.translate.x;
+					float dy = (tc.translate.y + 1.0f) - (pTc.translate.y + 1.0f);
+					float dz = tc.translate.z - pTc.translate.z;
+					float len = std::sqrt(dx*dx + dy*dy + dz*dz);
+					if (len > 0.01f) { dx /= len; dy /= len; dz /= len; }
+					vc.SetValue("DirX", dx);
+					vc.SetValue("DirY", dy);
+					vc.SetValue("DirZ", dz);
+				}
+				auto& sc = scene->GetRegistry().emplace<ScriptComponent>(shatterVfx);
+				sc.scripts.push_back({"MirrorShatterScript", "", nullptr});
+			}
+		});
 		debugSubscribeCount_ += 1;
 		isSubscribed_ = true;
 	}
@@ -276,6 +305,16 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	if (skillCooldown_ > 0.0f) skillCooldown_ -= dt;
 	if (gunShootTimer_ > 0.0f) gunShootTimer_ -= dt;
+
+	// ★スキルバフ持続時間の管理
+	if (isSkillActive_) {
+		skillDuration_ -= dt;
+		if (skillDuration_ <= 0.0f) {
+			isSkillActive_ = false;
+			skillDuration_ = 0.0f;
+			std::cout << "Gun Skill Deactivated\n";
+		}
+	}
 
 	bool currentSwitchKeyDown = (GetAsyncKeyState('T') & 0x8000) != 0;
 	if (currentSwitchKeyDown && !prevPlayerSwitchKeyDown_) {
@@ -350,6 +389,10 @@ void PlayerScript::UpdateMovement(entt::entity entity, GameScene* scene, float /
 	}
 	if (isAiming_ && playerType_ == PlayerType::Gun) {
 		speedMul = 0.4f;
+	}
+	// ★スキルバフ中は移動速度UP
+	if (isSkillActive_ && playerType_ == PlayerType::Gun) {
+		speedMul *= SKILL_SPEED_MULTIPLIER;
 	}
 	input.moveDir.x *= speedMul;
 	input.moveDir.y *= speedMul;
@@ -592,7 +635,7 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 			rapidTimer2 -= dt;
 			if (rapidTimer2 <= 0.0f) {
 				ShootGun(entity, scene);
-				rapidTimer2 = (gunType_ == GunType::Shotgun) ? 0.35f : 0.08f;
+				rapidTimer2 = 0.08f;
 			}
 		} else if (gunComboStep_ == 3) {
 			// ★変更: 入力された方向（左or右）へ大きく回り込む高速ダッシュ
@@ -616,7 +659,7 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 			rapidTimer3 -= dt;
 			if (rapidTimer3 <= 0.0f) {
 				ShootGun(entity, scene);
-				rapidTimer3 = (gunType_ == GunType::Shotgun) ? 0.35f : 0.08f; 
+				rapidTimer3 = 0.08f;
 			}
 		}
 	}
@@ -640,20 +683,22 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 }
 
 void PlayerScript::ShootGun(entt::entity entity, GameScene* scene) {
-	if (gunType_ == GunType::AssaultRifle) {
-		// AR: 威力15、寿命2.0秒（長射程）
-		SpawnBullet(entity, scene, 0.0f, 0.0f, 15.0f, 2.0f);
-	} else if (gunType_ == GunType::Shotgun) {
-		// SG: 威力4x5発=20、寿命0.2秒（約16mで消滅する超短射程）、拡散範囲を広く
-		for (int i = 0; i < 5; ++i) {
-			float spreadYaw = (rand() % 100 / 100.0f - 0.5f) * 0.4f; 
-			float spreadPitch = (rand() % 100 / 100.0f - 0.5f) * 0.4f;
-			SpawnBullet(entity, scene, spreadYaw, spreadPitch, 4.0f, 0.2f);
-		}
-	}
+	float baseDamage = 15.0f;
+	float damage = isSkillActive_ ? baseDamage * SKILL_DAMAGE_MULTIPLIER : baseDamage;
+	SpawnBullet(entity, scene, 0.0f, 0.0f, damage, 2.0f, isSkillActive_);
+
+	// ★クリスタル飛散エフェクト
+	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
+	DirectX::XMFLOAT3 muzzlePos = pTc.translate;
+	muzzlePos.y += 1.0f;
+	float fwdX = std::sin(pTc.rotate.y);
+	float fwdZ = std::cos(pTc.rotate.y);
+	muzzlePos.x += fwdX * 2.0f;
+	muzzlePos.z += fwdZ * 2.0f;
+	SpawnCrystalBurst(muzzlePos, isSkillActive_ ? 12 : 6, isSkillActive_);
 }
 
-void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spreadYaw, float spreadPitch, float damage, float lifeTime) {
+void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spreadYaw, float spreadPitch, float damage, float lifeTime, bool enhanced) {
 	if (!scene->GetRegistry().all_of<TransformComponent>(entity)) return;
 	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
 
@@ -704,7 +749,7 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 		auto& mr = scene->GetRegistry().emplace<MeshRendererComponent>(bullet);
 		mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
 		mr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-		mr.color = { 1.0f, 0.8f, 0.2f, 1.0f }; // 黄色っぽい弾
+		mr.color = enhanced ? DirectX::XMFLOAT4{0.4f, 0.9f, 1.0f, 1.0f} : DirectX::XMFLOAT4{1.0f, 0.8f, 0.2f, 1.0f};
 	}
 
 	auto& hb = scene->GetRegistry().emplace<HitboxComponent>(bullet);
@@ -718,6 +763,30 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 
 	auto& vc = scene->GetRegistry().emplace<VariableComponent>(bullet);
 	vc.SetValue("MaxLifeTime", lifeTime);
+	if (enhanced) {
+		vc.SetValue("Enhanced", 1.0f);
+	}
+
+	// ★強化: マズルでの空間割れエフェクト（着弾時と同等の迫力へ）
+	{
+		entt::entity muzzleShatter = scene->CreateEntity("MuzzleShatter_VFX");
+		auto& msTc = scene->GetRegistry().get<TransformComponent>(muzzleShatter);
+		msTc.translate = bTc.translate; // 銃口位置
+		
+		auto& msVc = scene->GetRegistry().emplace<VariableComponent>(muzzleShatter);
+		msVc.SetValue("Scale", 0.35f); 
+		msVc.SetValue("Count", 35.0f); 
+		msVc.SetValue("Radius", 2.5f); 
+		msVc.SetValue("Duration", 0.6f); 
+		msVc.SetValue("NoFlash", 1.0f);  // 十字フラッシュを無効化
+		msVc.SetValue("NoCracks", 1.0f); // ヒビ割れ線を無効化
+		msVc.SetValue("DirX", moveX);
+		msVc.SetValue("DirY", moveY);
+		msVc.SetValue("DirZ", moveZ);
+
+		auto& msSc = scene->GetRegistry().emplace<ScriptComponent>(muzzleShatter);
+		msSc.scripts.push_back({"MirrorShatterScript", "", std::make_shared<MirrorShatterScript>(), false});
+	}
 
 	// ★追加: マズルフラッシュ生成（疑似ライト）
 	MuzzleFlash flash;
@@ -740,6 +809,32 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 	shell.life = 0.6f;
 	shellCasings_.push_back(shell);
 	if (shellCasings_.size() > 30) shellCasings_.pop_front();
+}
+
+void PlayerScript::SpawnCrystalBurst(const DirectX::XMFLOAT3& pos, int count, bool enhanced) {
+	for (int i = 0; i < count; ++i) {
+		CrystalParticle cp;
+		cp.pos = pos;
+		float angle = (rand() % 360) * 3.14159f / 180.0f;
+		float upAngle = (rand() % 100 / 100.0f - 0.3f) * 3.14159f * 0.5f;
+		float speed = 3.0f + (rand() % 100 / 100.0f) * 5.0f;
+		cp.velocity.x = std::cos(angle) * std::cos(upAngle) * speed;
+		cp.velocity.y = std::sin(upAngle) * speed * 0.5f + 1.5f;
+		cp.velocity.z = std::sin(angle) * std::cos(upAngle) * speed;
+		cp.life = 0.3f + (rand() % 100 / 100.0f) * 0.4f;
+		cp.maxLife = cp.life;
+		cp.size = 0.05f + (rand() % 100 / 100.0f) * 0.1f;
+		cp.rotSpeed = (rand() % 100 / 100.0f - 0.5f) * 20.0f;
+		cp.rot = 0.0f;
+		if (enhanced) {
+			cp.color = {0.3f + (rand() % 100 / 100.0f) * 0.2f, 0.8f + (rand() % 100 / 100.0f) * 0.2f, 1.0f, 1.0f};
+			cp.size *= 1.5f;
+		} else {
+			cp.color = {0.5f + (rand() % 100 / 100.0f) * 0.3f, 0.7f + (rand() % 100 / 100.0f) * 0.3f, 0.9f + (rand() % 100 / 100.0f) * 0.1f, 1.0f};
+		}
+		crystalParticles_.push_back(cp);
+		if (crystalParticles_.size() > 100) crystalParticles_.pop_front();
+	}
 }
 
 void PlayerScript::SwitchPlayerType(entt::entity /*entity*/, GameScene* scene) {
@@ -812,14 +907,11 @@ void PlayerScript::ExecuteSkill(entt::entity entity, GameScene* scene) {
 		}
 		std::cout << "Executed Sword Skill: Dimension Wave\n";
 	} else {
-		skillCooldown_ = 0.2f;
-		if (gunType_ == GunType::AssaultRifle) {
-			gunType_ = GunType::Shotgun;
-			std::cout << "Switched to Shotgun\n";
-		} else {
-			gunType_ = GunType::AssaultRifle;
-			std::cout << "Switched to AssaultRifle\n";
-		}
+		// ★銃スキル: 移動速度UP + ダメージUP + エフェクト強化バフ
+		skillCooldown_ = SKILL_COOLDOWN_TIME;
+		isSkillActive_ = true;
+		skillDuration_ = SKILL_MAX_DURATION;
+		std::cout << "Gun Skill Activated: Crystal Enhancement!\n";
 	}
 }
 
@@ -964,6 +1056,35 @@ void PlayerScript::DrawUI(entt::entity entity, GameScene* scene) {
 	}
 	while (!muzzleFlashes_.empty() && muzzleFlashes_.front().life <= 0) muzzleFlashes_.pop_front();
 
+	// ==== ★追加: クリスタル飛散エフェクト描画 ====
+	for (auto& cp : crystalParticles_) {
+		cp.life -= dt;
+		cp.pos.x += cp.velocity.x * dt;
+		cp.pos.y += cp.velocity.y * dt;
+		cp.pos.z += cp.velocity.z * dt;
+		cp.velocity.y -= 8.0f * dt;
+		cp.rot += cp.rotSpeed * dt;
+		if (cp.life > 0.0f) {
+			float alpha = (cp.life / cp.maxLife);
+			float s = cp.size;
+			float c = std::cos(cp.rot);
+			float sn = std::sin(cp.rot);
+			Engine::Vector3 top    = {cp.pos.x + sn * s, cp.pos.y + c * s, cp.pos.z};
+			Engine::Vector3 right  = {cp.pos.x + c * s, cp.pos.y - sn * s, cp.pos.z + s * 0.3f};
+			Engine::Vector3 bottom = {cp.pos.x - sn * s, cp.pos.y - c * s, cp.pos.z};
+			Engine::Vector3 left   = {cp.pos.x - c * s, cp.pos.y + sn * s, cp.pos.z - s * 0.3f};
+			Engine::Vector4 col = {cp.color.x, cp.color.y, cp.color.z, alpha * cp.color.w};
+			renderer->DrawLine3D(top, right, col, true);
+			renderer->DrawLine3D(right, bottom, col, true);
+			renderer->DrawLine3D(bottom, left, col, true);
+			renderer->DrawLine3D(left, top, col, true);
+			Engine::Vector4 colInner = {cp.color.x * 1.2f, cp.color.y * 1.2f, cp.color.z * 1.2f, alpha * 0.6f};
+			renderer->DrawLine3D(top, bottom, colInner, true);
+			renderer->DrawLine3D(left, right, colInner, true);
+		}
+	}
+	while (!crystalParticles_.empty() && crystalParticles_.front().life <= 0) crystalParticles_.pop_front();
+
 	// ==== ★追加: 残像描画 (3Dラインでシルエット) ====
 	for (auto& ai : afterImages_) {
 		ai.life -= dt;
@@ -1007,6 +1128,38 @@ void PlayerScript::DrawUI(entt::entity entity, GameScene* scene) {
 		}
 	}
 	while (!shellCasings_.empty() && shellCasings_.front().life <= 0) shellCasings_.pop_front();
+
+
+	// ==== ★追加: スキルバフ中のUI表示 ====
+	if (isSkillActive_ && playerType_ == PlayerType::Gun) {
+		float remaining = skillDuration_;
+		float ratio = remaining / SKILL_MAX_DURATION;
+		Engine::Renderer::SdfUIDesc skillBg{};
+		skillBg.centerPx = {640.0f, 680.0f};
+		skillBg.sizePx = {200.0f, 16.0f};
+		skillBg.lineWidth = 0.0f;
+		skillBg.glow = 0.0f;
+		skillBg.color = {0.05f, 0.05f, 0.1f, 0.7f};
+		skillBg.shape = 0;
+		skillBg.round = 4.0f;
+		skillBg.progress = 1.0f;
+		skillBg.fill = 1.0f;
+		renderer->DrawSDFUI(skillBg);
+		Engine::Renderer::SdfUIDesc skillBar{};
+		skillBar.centerPx = {640.0f, 680.0f};
+		skillBar.sizePx = {200.0f, 16.0f};
+		skillBar.lineWidth = 0.0f;
+		skillBar.glow = 3.0f;
+		skillBar.color = {0.3f, 0.9f, 1.0f, 1.0f};
+		skillBar.shape = 0;
+		skillBar.round = 4.0f;
+		skillBar.progress = ratio;
+		skillBar.fill = 1.0f;
+		renderer->DrawSDFUI(skillBar);
+		char skillText[64];
+		snprintf(skillText, sizeof(skillText), "CRYSTAL ENHANCE  %.1fs", remaining);
+		renderer->DrawString(skillText, 560.0f, 674.0f, 0.4f, {0.3f, 0.9f, 1.0f, 1.0f});
+	}
 }
 
 void PlayerScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}

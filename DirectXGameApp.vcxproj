@@ -211,6 +211,7 @@ exit /b 0
     <ClCompile Include="Game\Scripts\IScript.cpp" />
     <ClCompile Include="Game\Scripts\CommunicationTestScript.cpp" />
     <ClCompile Include="Game\Scripts\HitDistortionScript.cpp" />
+    <ClCompile Include="Game\Scripts\MirrorShatterScript.cpp" />
     <ClCompile Include="Game\Scripts\SkillTree.cpp" />
     <ClCompile Include="Game\Scripts\WaveManagement.cpp" />
     <ClCompile Include="Game\Systems\UISystem.cpp" />
@@ -261,6 +262,7 @@ exit /b 0
     <ClInclude Include="Game\Scripts\CommunicationTestScript.h" />
     <ClInclude Include="Game\Scripts\ScriptUtils.h" />
     <ClInclude Include="Game\Scripts\HitDistortionScript.h" />
+    <ClInclude Include="Game\Scripts\MirrorShatterScript.h" />
     <ClInclude Include="Game\Scripts\SkillTree.h" />
     <ClInclude Include="Game\Scripts\WaveManagement.h" />
     <ClInclude Include="Game\Systems\UISystem.h" />
