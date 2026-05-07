@@ -250,9 +250,15 @@ void PipeScript::Update(entt::entity obj, GameScene* scene, float dt) {
 
 void PipeScript::OnDestroy(entt::entity obj, GameScene* scene) {
 	(void)obj;
+	// ★修正: scene->DestroyObject() はミューテックスを使用するが、
+	// OnDestroy はすでに registry_.destroy() の処理中（ミューテックスロック中）に
+	// 呼ばれるため、再入によるデッドロック（std::system_error）が発生する。
+	// PipeConnection の円柱エンティティは ScriptComponent を持たないため、
+	// registry_.destroy() を直接呼び出しても安全。
+	auto& registry = scene->GetRegistry();
 	for (auto& pair : connectionCylinders_) {
-		if (scene->GetRegistry().valid(pair.second)) {
-			scene->DestroyObject(static_cast<uint32_t>(pair.second));
+		if (registry.valid(pair.second)) {
+			registry.destroy(pair.second);
 		}
 	}
 	connectionCylinders_.clear();
