@@ -65,7 +65,8 @@ private:
 	int gunComboStep_ = 0;
 	float gunComboResetTimer_ = 0.0f;
 	float gunComboAnimTimer_ = 0.0f;
-	float gunCombo3Dir_ = 1.0f; // ★追加: 3段目のダッシュ方向 (-1.0: 左, 1.0: 右)
+	int gunSubStep_ = 0; // アニメーション中の発射状態を管理する用
+	float gunSubTimer_ = 0.0f; // 次の弾までの間隔
 
 	std::string swordName_ = "PlayerSword";
 

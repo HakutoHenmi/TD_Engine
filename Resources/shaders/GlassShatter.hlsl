@@ -1,4 +1,4 @@
-// GlassShatter.hlsl - 高光沢・環境反射シャード
+// GlassShatter.hlsl - 3Dクリスタル用 フレネル・半透明・HDRシェーダー
 cbuffer CBFrame : register(b0) { row_major float4x4 gView; row_major float4x4 gProj; row_major float4x4 gViewProj; float3 gCamPos; float gTime; };
 cbuffer CBObj : register(b1) { row_major float4x4 gWorld; float4 gColor; };
 
@@ -16,54 +16,60 @@ VSOut main(VSIn v, uint instanceID : SV_InstanceID) {
     o.worldNrm = normalize(mul(v.nrm, (float3x3)world)); o.worldPos = wp.xyz;
     return o;
 }
-
-float hash1(float2 p) { return frac(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453); }
+Texture2D gBackdropTex : register(t0); // 画面の背景キャプチャ
+SamplerState gSmp : register(s0);
 
 float4 ps_main(VSOut i) : SV_TARGET {
-    float seed = i.color.r * 17.31;
-    float intensity = min(i.color.a, 1.0);
-    float2 cuv = i.uv - 0.5;
-    
-    // 鋭利な破片マスク
-    float aspect = 0.15 + hash1(float2(seed, 0.5)) * 0.3;
-    float2 stUV = cuv; stUV.x /= aspect;
-    float distStr = length(stUV);
-    float numVerts = 3.0 + floor(frac(seed * 0.91) * 1.5);
-    float polyAngle = 6.28318 / numVerts;
-    float sector = fmod(atan2(stUV.y, stUV.x) + seed, polyAngle);
-    float polyDist = (0.38 + hash1(float2(seed * 1.3, 0.7)) * 0.1) * cos(polyAngle * 0.5) / max(cos(sector - polyAngle * 0.5), 0.001);
-    if (smoothstep(polyDist, polyDist - 0.015, distStr) < 0.01) discard;
-
-    // =============================================
-    // 鏡面反射 (擬似環境マップ)
-    // =============================================
+    // 1. 視線ベクトルと法線の計算
     float3 viewDir = normalize(gCamPos - i.worldPos);
-    float3 reflDir = reflect(-viewDir, i.worldNrm);
+    float3 normal = normalize(i.worldNrm);
     
-    // 擬似空・地反射
-    float3 skyColor = float3(0.4, 0.8, 1.2);    // 明るいネオン空
-    float3 groundColor = float3(0.05, 0.1, 0.2); // 暗い底面
-    float horizon = smoothstep(-0.2, 0.2, reflDir.y);
-    float3 envColor = lerp(groundColor, skyColor, horizon);
+    // 2. セルルック調（アニメ調）の鋭いフレネル
+    float NdotV = saturate(dot(normal, viewDir));
     
-    // フネル反射
-    float fresnel = pow(1.0 - saturate(dot(viewDir, i.worldNrm)), 4.0);
+    // 鳴潮などのアニメ調クリスタルは、境界線がクッキリ発光するのが特徴
+    // 緩やかなグラデーションではなく、smoothstepでパキッとしたエッジを作る
+    float fresnel = smoothstep(0.2, 0.35, 1.0 - NdotV);
     
-    // ネオンカラー・グレーズ
-    float3 neonBlue = float3(0.1, 0.5, 1.0);
-    float3 magenta  = float3(1.0, 0.2, 0.8);
-    float3 baseColor = lerp(neonBlue, magenta, horizon * 0.4 + hash1(float2(seed, 1.0)) * 0.3);
+    // --- 屈折 (Refraction) の計算 ---
+    float3 baseColor = i.color.rgb;
+    float baseAlpha = i.color.a;
     
-    // 反射光の合成
-    float3 finalColor = baseColor * 0.5 + envColor * (0.5 + fresnel * 1.5);
-    
-    // 鋭いハイライト（太陽のような光源）
-    float spec = pow(saturate(dot(reflDir, normalize(float3(0.5, 1.0, 0.3)))), 128.0);
-    finalColor += float3(1, 1, 1) * spec * 5.0;
-    
-    // エッジ発光
-    float edge = 1.0 - smoothstep(polyDist, polyDist - 0.06, distStr);
-    finalColor += lerp(neonBlue, magenta, frac(seed * 2.0)) * edge * 4.0 * intensity;
+    // 画面空間のUV座標を計算
+    float2 screenUV = i.clipPos.xy / i.clipPos.w;
+    screenUV.x = screenUV.x * 0.5 + 0.5;
+    screenUV.y = -screenUV.y * 0.5 + 0.5;
 
-    return float4(finalColor, 1.0 * intensity);
+    // ワールド法線をビュー空間（画面空間）に投影して、歪みの方向を決定
+    float3 viewNormal = mul(normal, (float3x3)gView); 
+    
+    // アニメ調の屈折：歪みすぎるとノイズになるので、一定の強さで面ごとにパキッと歪ませる
+    float distortionStrength = 0.04 * baseAlpha;
+    float2 distortedUV = clamp(screenUV + viewNormal.xy * distortionStrength, 0.001, 0.999);
+    
+    // 背景色を取得
+    float3 refractionColor = gBackdropTex.SampleLevel(gSmp, distortedUV, 0).rgb;
+    
+    // --- 色の合成 (AAAアニメ調・白飛び抑制) ---
+    // 内部: 屈折した背景色にベースカラーを乗算
+    float3 innerColor = refractionColor * saturate(baseColor * 0.8) + (baseColor * 0.2);
+    
+    // エッジ (輪郭): 真鍮や高熱の金属を思わせる暖色（オレンジ/ブラウン系）のハイライトを加算
+    float3 edgeColor = baseColor * 1.5 + float3(0.6, 0.4, 0.1); 
+    
+    // フレネルで内部とエッジを合成
+    float3 finalRGB = lerp(innerColor, edgeColor, fresnel);
+    
+    // 4. シャープなハイライト (Specular) で硬質なガラス感を強調
+    float3 lightDir = normalize(float3(0.5, 1.0, 0.3));
+    float3 halfVector = normalize(lightDir + viewDir);
+    float NdotH = saturate(dot(normal, halfVector));
+    
+    // アニメ調なので、ハイライトもグラデーションではなく2値化（step）する
+    float specular = step(0.98, NdotH); 
+    // スチームパンクの金属や琥珀が光を反射したような、少し温かみのある白〜黄色の輝き
+    finalRGB += (baseColor * 0.5 + float3(0.7, 0.6, 0.3)) * specular;
+    
+    // 不透明度は1.0（背景は既に屈折して取り込んでいるため）
+    return float4(finalRGB, 1.0);
 }
