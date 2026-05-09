@@ -58,17 +58,36 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 
 	#if defined(USE_IMGUI) && !defined(NDEBUG) 
 	auto* renderer = Engine::Renderer::GetInstance();
-	bool shouldDrawPreview = false;
+	bool isEditorMode = false;
+	bool isPrepOrBattle = false;
 	if (scene) {
 		if (!scene->IsPlaying()) {
-			shouldDrawPreview = true;
-		} else if (PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase) {
-			shouldDrawPreview = true;
+			isEditorMode = true;
+		} else {
+			auto phase = PhaseSystemScript::IsPhase();
+			if (phase == PhaseSystemScript::PreparationPhase || phase == PhaseSystemScript::BattlePhase) {
+				isPrepOrBattle = true;
+			}
 		}
 	}
 
-	if (renderer && shouldDrawPreview) {
+	if (renderer && (isEditorMode || isPrepOrBattle)) {
 		for (size_t wi = 0; wi < enemySpawners_.size(); ++wi) {
+			// ゲームプレイ中は現在の（次に来る）ウェーブのものだけ表示する
+			if (!isEditorMode) {
+				int targetWave = 0;
+				auto phase = PhaseSystemScript::IsPhase();
+				if (phase == PhaseSystemScript::PreparationPhase) {
+					targetWave = PhaseSystemScript::GetCurrentPhase();
+				} else if (phase == PhaseSystemScript::BattlePhase) {
+					targetWave = PhaseSystemScript::GetCurrentPhase() - 1;
+				}
+
+				if (static_cast<int>(wi) != targetWave) {
+					continue;
+				}
+			}
+
 			for (entt::entity spawnerEntity : enemySpawners_[wi]) {
 				if (scene->GetRegistry().valid(spawnerEntity)) {
 					// スポナーの位置にプレビューを描画
@@ -76,8 +95,53 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 						Engine::Matrix4x4 wm = scene->GetWorldMatrix(static_cast<int>(spawnerEntity));
 						Engine::Vector3 p = { wm.m[3][0], wm.m[3][1], wm.m[3][2] };
 
+						// ビルボード付きのplaneを描画
+						static uint32_t planeMeshHandle = 0;
+						static uint32_t whiteTexHandle = 0;
+						if (planeMeshHandle == 0) {
+							planeMeshHandle = renderer->LoadObjMesh("Resources/Models/plane.obj");
+							whiteTexHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+						}
+
+						Engine::Camera& cam = scene->GetCamera();
+						auto cp = cam.Position();
+						Engine::Vector3 camPos = { cp.x, cp.y, cp.z };
+						Engine::Vector3 d = { camPos.x - p.x, camPos.y - p.y, camPos.z - p.z };
+						float len = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
+						if (len > 1e-6f) { d.x /= len; d.y /= len; d.z /= len; } else { d = {0,0,1}; }
+						float yaw = std::atan2(d.x, d.z);
+						float pitch = std::atan2(-d.y, std::sqrt(d.x * d.x + d.z * d.z));
+
+						Engine::Vector4 planeColor = {1.0f, 1.0f, 1.0f, 1.0f};
+						Engine::Vector4 lineColor = { 1.0f, 0.5f, 0.0f, 1.0f };
+						
+						if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(spawnerEntity)) {
+							for (auto& entry : sc->scripts) {
+								if (entry.scriptPath == "EnemySpawnerScript" && entry.instance) {
+									auto* spawner = static_cast<EnemySpawnerScript*>(entry.instance.get());
+									if (spawner->enemyScriptPath == "Warrior") {
+										planeColor = {1.0f, 0.0f, 0.0f, 1.0f}; // 赤
+										lineColor = {1.0f, 0.0f, 0.0f, 1.0f};
+									} else if (spawner->enemyScriptPath == "Guardian") {
+										planeColor = {1.0f, 1.0f, 0.0f, 1.0f}; // 黄色
+										lineColor = {1.0f, 1.0f, 0.0f, 1.0f};
+									} else if (spawner->enemyScriptPath == "Gunner") {
+										planeColor = {0.0f, 0.0f, 1.0f, 1.0f}; // 青
+										lineColor = {0.0f, 0.0f, 1.0f, 1.0f};
+									}
+								}
+							}
+						}
+
+						Engine::Transform planeTr;
+						planeTr.translate = { p.x, p.y, p.z };
+						planeTr.rotate = { pitch, yaw, 0.0f };
+						planeTr.scale = { tc->scale.x, tc->scale.y, tc->scale.z }; // 必要に応じてスケール反映
+						planeTr.scale = {2, 2, 2};
+						renderer->DrawMesh(planeMeshHandle, whiteTexHandle, planeTr, planeColor, "Default");
+
 						float s = 0.5f;
-						Engine::Vector4 c = { 1.0f, 0.5f, 0.0f, 1.0f };
+						Engine::Vector4 c = lineColor;
 						// 底面
 						renderer->DrawLine3D({p.x - s, p.y - s, p.z - s}, {p.x + s, p.y - s, p.z - s}, c, true);
 						renderer->DrawLine3D({p.x + s, p.y - s, p.z - s}, {p.x + s, p.y - s, p.z + s}, c, true);
