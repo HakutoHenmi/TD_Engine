@@ -11,6 +11,7 @@ class MirrorShatterScript : public IScript {
 public:
     void Start(entt::entity entity, GameScene* scene) override;
     void Update(entt::entity entity, GameScene* scene, float dt) override;
+    void Draw(entt::entity entity, GameScene* scene) override;
     void DrawUI(entt::entity entity, GameScene* scene) override;
     void OnDestroy(entt::entity, GameScene*) override {}
 
@@ -40,6 +41,7 @@ private:
         float appearDelay; // 扇状に割れるためのディレイ
         bool isAppeared = false;
         bool isScattering = false;
+        bool isGlassPanel = false; // 空間割れガラス板
     };
     std::vector<ShardPiece> shards_;
 
@@ -73,6 +75,7 @@ private:
     std::deque<SparkParticle> sparks_;
 
     void GenerateShards(GameScene* scene, int count);
+    void GenerateGlassPanel(GameScene* scene, int count);
     void GenerateCurvedCracks(int numBranches);
     void GenerateLightStreaks(int count);
     void SpawnSparks(int count);

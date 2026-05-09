@@ -581,90 +581,126 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 		}
 	}
 
-	if (currentAttackKeyDown && !prevAttackKeyDown_) { // クリック時のみ進行
+	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
+	float forwardX = std::sin(pTc.rotate.y);
+	float forwardZ = std::cos(pTc.rotate.y);
+	float moveDist = 1.2f; // ちょっと移動する距離
+
+	// クリック処理（コンボの進行）
+	if (currentAttackKeyDown && !prevAttackKeyDown_) {
 		if (gunShootTimer_ <= 0.0f && gunComboAnimTimer_ <= 0.0f) {
-			gunComboStep_++;
-			if (gunComboStep_ > 3) gunComboStep_ = 1;
 			
-			if (gunComboStep_ == 1) {
-				gunShootTimer_ = 0.3f;
-				gunComboResetTimer_ = 1.0f;
-				ShootGun(entity, scene); // 1回目：普通に射撃
-			} else if (gunComboStep_ == 2) {
-				gunShootTimer_ = 0.6f;
-				gunComboResetTimer_ = 1.5f;
-				gunComboAnimTimer_ = 0.6f;
-				// 2回目：反復横跳び（アニメーション中に自動で連射する）
-			} else if (gunComboStep_ == 3) {
-				gunShootTimer_ = 0.8f;
-				gunComboResetTimer_ = 1.5f;
-				gunComboAnimTimer_ = 0.4f; // 0.4秒の短く鋭いダッシュ
-				
-				// ★追加: 3段目発動時のA/Dキー入力で回り込む方向を決定する
-				bool isA_Pressed = (GetAsyncKeyState('A') & 0x8000) != 0;
-				bool isD_Pressed = (GetAsyncKeyState('D') & 0x8000) != 0;
-				if (isA_Pressed) {
-					gunCombo3Dir_ = -1.0f; // 左へ回り込む
-				} else if (isD_Pressed) {
-					gunCombo3Dir_ = 1.0f; // 右へ回り込む
-				} else {
-					gunCombo3Dir_ = 1.0f; // 指定がなければデフォルトは右
+			if (isSkillActive_) {
+				// ----------------------------------------
+				// 特殊射撃 (Eキー状態)
+				// 1段目: 1発 (前へ)
+				// 2段目: 3発 (前、後、そのまま)
+				// 3段目: 4発 (前、後、そのまま、後)
+				// ----------------------------------------
+				gunComboStep_++;
+				if (gunComboStep_ > 3) gunComboStep_ = 1;
+
+				if (gunComboStep_ == 1) {
+					ShootGun(entity, scene);
+					pTc.translate.x += forwardX * moveDist;
+					pTc.translate.z += forwardZ * moveDist;
+					gunShootTimer_ = 0.35f;
+					gunComboResetTimer_ = 1.0f;
+				} else if (gunComboStep_ == 2) {
+					gunComboAnimTimer_ = 0.45f;
+					gunSubStep_ = 0;
+					gunSubTimer_ = 0.0f;
+					gunComboResetTimer_ = 1.2f;
+				} else if (gunComboStep_ == 3) {
+					gunComboAnimTimer_ = 0.6f;
+					gunSubStep_ = 0;
+					gunSubTimer_ = 0.0f;
+					gunComboResetTimer_ = 1.5f;
+				}
+			} else {
+				// ----------------------------------------
+				// 通常射撃
+				// 1段目: 1発
+				// 2段目: 3発 (前、後、少し後)
+				// ----------------------------------------
+				gunComboStep_++;
+				if (gunComboStep_ > 2) gunComboStep_ = 1;
+
+				if (gunComboStep_ == 1) {
+					ShootGun(entity, scene);
+					gunShootTimer_ = 0.3f;
+					gunComboResetTimer_ = 1.0f;
+				} else if (gunComboStep_ == 2) {
+					gunComboAnimTimer_ = 0.45f;
+					gunSubStep_ = 0;
+					gunSubTimer_ = 0.0f;
+					gunComboResetTimer_ = 1.2f;
 				}
 			}
 		}
 	}
 	prevAttackKeyDown_ = currentAttackKeyDown;
 
+	// 連射アクションの処理
 	if (gunComboAnimTimer_ > 0.0f) {
 		gunComboAnimTimer_ -= dt;
-		auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
+		gunSubTimer_ -= dt;
 
-		if (gunComboStep_ == 2) {
-			// 左右に反復横跳び
-			float progress = 1.0f - (gunComboAnimTimer_ / 0.6f);
-			float rightX = std::cos(pTc.rotate.y);
-			float rightZ = -std::sin(pTc.rotate.y);
-			
-			// 左右に素早く揺れる (cos波の速度で位置をズラす、振幅を2倍に)
-			float oscillationSpeed = std::cos(progress * DirectX::XM_PI * 6.0f) * 50.0f; 
-			pTc.translate.x += rightX * oscillationSpeed * dt;
-			pTc.translate.z += rightZ * oscillationSpeed * dt;
-
-			// アニメーション中に連射
-			static float rapidTimer2 = 0.0f;
-			rapidTimer2 -= dt;
-			if (rapidTimer2 <= 0.0f) {
-				ShootGun(entity, scene);
-				rapidTimer2 = 0.08f;
+		if (isSkillActive_) {
+			// 特殊射撃の連射
+			if (gunComboStep_ == 2) {
+				// 3発 (間隔 0.15s)
+				if (gunSubTimer_ <= 0.0f && gunSubStep_ < 3) {
+					ShootGun(entity, scene);
+					if (gunSubStep_ == 0) {
+						pTc.translate.x += forwardX * moveDist; pTc.translate.z += forwardZ * moveDist;
+					} else if (gunSubStep_ == 1) {
+						pTc.translate.x -= forwardX * moveDist; pTc.translate.z -= forwardZ * moveDist;
+					} else if (gunSubStep_ == 2) {
+						// そのまま
+					}
+					gunSubStep_++;
+					gunSubTimer_ = 0.15f;
+				}
+			} else if (gunComboStep_ == 3) {
+				// 4発 (間隔 0.15s)
+				if (gunSubTimer_ <= 0.0f && gunSubStep_ < 4) {
+					ShootGun(entity, scene);
+					if (gunSubStep_ == 0) {
+						pTc.translate.x += forwardX * moveDist; pTc.translate.z += forwardZ * moveDist;
+					} else if (gunSubStep_ == 1) {
+						pTc.translate.x -= forwardX * moveDist; pTc.translate.z -= forwardZ * moveDist;
+					} else if (gunSubStep_ == 2) {
+						// そのまま
+					} else if (gunSubStep_ == 3) {
+						pTc.translate.x -= forwardX * moveDist; pTc.translate.z -= forwardZ * moveDist;
+					}
+					gunSubStep_++;
+					gunSubTimer_ = 0.15f;
+				}
 			}
-		} else if (gunComboStep_ == 3) {
-			// ★変更: 入力された方向（左or右）へ大きく回り込む高速ダッシュ
-			// 常に敵の方を向いているので、横へ移動すると自動的に敵を中心に円弧を描く動きになる
-			
-			// gunCombo3Dir_ を掛けて右(1.0)か左(-1.0)かを決定
-			float sideX = std::cos(pTc.rotate.y) * gunCombo3Dir_;
-			float sideZ = -std::sin(pTc.rotate.y) * gunCombo3Dir_;
-			
-			float dashSpeed = 40.0f; 
-			
-			// アニメーションの最初と最後で減速させる（イージング）
-			float t = 1.0f - (gunComboAnimTimer_ / 0.4f); // 0.0 ~ 1.0
-			float currentSpeed = dashSpeed * std::sin(t * DirectX::XM_PI); // サイン波で滑らかに加速・減速
-
-			pTc.translate.x += sideX * currentSpeed * dt;
-			pTc.translate.z += sideZ * currentSpeed * dt;
-
-			// ダッシュ中に猛烈な連射
-			static float rapidTimer3 = 0.0f;
-			rapidTimer3 -= dt;
-			if (rapidTimer3 <= 0.0f) {
-				ShootGun(entity, scene);
-				rapidTimer3 = 0.08f;
+		} else {
+			// 通常射撃の連射
+			if (gunComboStep_ == 2) {
+				// 3発 (間隔 0.15s)
+				if (gunSubTimer_ <= 0.0f && gunSubStep_ < 3) {
+					ShootGun(entity, scene);
+					if (gunSubStep_ == 0) {
+						pTc.translate.x += forwardX * moveDist; pTc.translate.z += forwardZ * moveDist;
+					} else if (gunSubStep_ == 1) {
+						pTc.translate.x -= forwardX * moveDist; pTc.translate.z -= forwardZ * moveDist;
+					} else if (gunSubStep_ == 2) {
+						pTc.translate.x -= forwardX * (moveDist * 0.5f); pTc.translate.z -= forwardZ * (moveDist * 0.5f);
+					}
+					gunSubStep_++;
+					gunSubTimer_ = 0.15f;
+				}
 			}
 		}
 	}
 
-	// ★追加: コンボダッシュ中に残像を生成
+	// ★追加: コンボダッシュ中に残像を生成 (ユーザー要望により無効化)
+	/*
 	if (gunComboAnimTimer_ > 0.0f) {
 		afterImageTimer_ -= dt;
 		if (afterImageTimer_ <= 0.0f) {
@@ -680,6 +716,7 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 			afterImageTimer_ = 0.03f; // 約30FPSで残像を発生
 		}
 	}
+	*/
 }
 
 void PlayerScript::ShootGun(entt::entity entity, GameScene* scene) {
@@ -687,15 +724,32 @@ void PlayerScript::ShootGun(entt::entity entity, GameScene* scene) {
 	float damage = isSkillActive_ ? baseDamage * SKILL_DAMAGE_MULTIPLIER : baseDamage;
 	SpawnBullet(entity, scene, 0.0f, 0.0f, damage, 2.0f, isSkillActive_);
 
-	// ★クリスタル飛散エフェクト
+	// ★空間割れマズルエフェクト（銃口の前に小規模なガラス割れを生成）
 	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
 	DirectX::XMFLOAT3 muzzlePos = pTc.translate;
 	muzzlePos.y += 1.0f;
 	float fwdX = std::sin(pTc.rotate.y);
 	float fwdZ = std::cos(pTc.rotate.y);
-	muzzlePos.x += fwdX * 2.0f;
-	muzzlePos.z += fwdZ * 2.0f;
-	SpawnCrystalBurst(muzzlePos, isSkillActive_ ? 12 : 6, isSkillActive_);
+	muzzlePos.x += fwdX * 2.5f;
+	muzzlePos.z += fwdZ * 2.5f;
+
+	entt::entity muzzleVfx = scene->CreateEntity("MuzzleShatter_VFX");
+	auto& mTc = scene->GetRegistry().get<TransformComponent>(muzzleVfx);
+	mTc.translate = muzzlePos;
+	scene->SetTag(muzzleVfx, TagType::VFX);
+
+	auto& mvc = scene->GetRegistry().emplace<VariableComponent>(muzzleVfx);
+	mvc.SetValue("DirX", fwdX);
+	mvc.SetValue("DirY", 0.0f);
+	mvc.SetValue("DirZ", fwdZ);
+	mvc.SetValue("Scale", 0.35f);             // 銃口用に小さいスケール
+	mvc.SetValue("Count", isSkillActive_ ? 30.0f : 12.0f); // 破片数
+	mvc.SetValue("Duration", 0.8f);            // 短い持続時間
+	mvc.SetValue("Radius", 1.5f);              // 小さい半径
+	mvc.SetValue("NoCracks", 0.0f);            // ひび割れ描画あり
+
+	auto& msc = scene->GetRegistry().emplace<ScriptComponent>(muzzleVfx);
+	msc.scripts.push_back({"MirrorShatterScript", "", nullptr});
 }
 
 void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spreadYaw, float spreadPitch, float damage, float lifeTime, bool enhanced) {
@@ -1057,6 +1111,8 @@ void PlayerScript::DrawUI(entt::entity entity, GameScene* scene) {
 	while (!muzzleFlashes_.empty() && muzzleFlashes_.front().life <= 0) muzzleFlashes_.pop_front();
 
 	// ==== ★追加: クリスタル飛散エフェクト描画 ====
+	// (ユーザー要望により、古い青い線のクリスタルは描画しない)
+	/*
 	for (auto& cp : crystalParticles_) {
 		cp.life -= dt;
 		cp.pos.x += cp.velocity.x * dt;
@@ -1084,8 +1140,11 @@ void PlayerScript::DrawUI(entt::entity entity, GameScene* scene) {
 		}
 	}
 	while (!crystalParticles_.empty() && crystalParticles_.front().life <= 0) crystalParticles_.pop_front();
+	*/
 
 	// ==== ★追加: 残像描画 (3Dラインでシルエット) ====
+	// (ユーザー要望により、ワイヤーフレームの残像は描画しない)
+	/*
 	for (auto& ai : afterImages_) {
 		ai.life -= dt;
 		if (ai.life > 0.0f) {
@@ -1109,6 +1168,7 @@ void PlayerScript::DrawUI(entt::entity entity, GameScene* scene) {
 		}
 	}
 	while (!afterImages_.empty() && afterImages_.front().life <= 0) afterImages_.pop_front();
+	*/
 
 	// ==== ★追加: 薬莢描画 (3Dラインで小さな金色の線) ====
 	for (auto& sc : shellCasings_) {
