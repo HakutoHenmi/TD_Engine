@@ -8,6 +8,12 @@ enum MoveType {
 	Fly
 };
 
+enum EnemyCategory {
+	Tank,
+	Attacker,
+	Other
+};
+
 //敵の挙動になる基底クラス
 namespace Game {
 
@@ -42,6 +48,9 @@ protected:
 	// デバッグ情報表示
 	void Debug();
 
+	// カテゴリーを設定する（変数コンポーネントにも保存）
+	void SetCategory(entt::entity entity, GameScene* scene, EnemyCategory category);
+
 protected: // メンバ変数
 	// 自身の情報を持たせておく
 	uint32_t ownerId_ = 0; // 自分のオブジェクトのID
@@ -61,6 +70,11 @@ protected: // メンバ変数
 	// 動きのタイプ
 	MoveType type_ = Walk;	// 初期値はWalk
 	entt::entity currentTarget_ = entt::null;
+	
+	EnemyCategory category_ = Other;
+	float cautionRange_ = 75.0f;
+	float maxWaitTime_ = 3.0f;
+	float currentWaitTime_ = 0.0f;
 
 	float hp_ = 0.0f;
 	float maxHp_ = 0.0f;

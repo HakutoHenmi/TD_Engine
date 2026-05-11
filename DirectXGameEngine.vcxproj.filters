@@ -80,6 +80,10 @@
       <Filter>ECS</Filter>
     </ClCompile>
     <ClCompile Include="Engine\QuadTree.cpp" />
+    <ClCompile Include="Engine\DynamicGlyphCache.cpp" />
+    <ClCompile Include="Engine\Font.cpp" />
+    <ClCompile Include="externals\stb\stb_truetype_impl.cpp" />
+    <ClCompile Include="Engine\RibbonRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="externals\imgui\imgui.h">
@@ -200,6 +204,12 @@
       <Filter>ECS</Filter>
     </ClInclude>
     <ClInclude Include="Engine\QuadTree.h" />
+    <ClInclude Include="Engine\SceneParameters.h" />
+    <ClInclude Include="Engine\DynamicGlyphCache.h" />
+    <ClInclude Include="Engine\Font.h" />
+    <ClInclude Include="Engine\UnicodeUtils.h" />
+    <ClInclude Include="externals\stb\stb_truetype.h" />
+    <ClInclude Include="Engine\RibbonRenderer.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />

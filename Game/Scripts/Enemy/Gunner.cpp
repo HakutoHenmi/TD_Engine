@@ -15,6 +15,7 @@ void Gunner::Start(entt::entity entity, GameScene* scene) {
 	attackRange_ = 20.0f;
 
 	attackCooltime_ = kCooltime;
+	SetCategory(entity, scene, Attacker);
 }
 
 void Game::Gunner::ExecuteAttack(entt::entity entity, GameScene* scene, float /*dt*/) {
