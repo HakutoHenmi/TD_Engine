@@ -158,22 +158,39 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float dt) {
 	// ターゲットがタワーでなくても、進路上にタワーがあれば警戒する
 	if (category_ == Attacker) {
 		entt::entity nearestTower = entt::null;
-		float minTowerDistSq = cautionRange_ * cautionRange_;
+		float minTowerDistSq = 9999999.0f;
 		DirectX::XMFLOAT3 towerPos = {};
+		float nearestTowerAttackRange = 50.0f; // デフォルトの射程
 
 		TagType towerTags[] = { TagType::Defender, TagType::Canon, TagType::Cannon, TagType::IceCanon, TagType::PipeCannon };
 		for (int i = 0; i < 5; ++i) {
 			const auto& towers = scene->GetEntitiesByTag(towerTags[i]);
 			for (auto t : towers) {
 				if (!registry.valid(t) || !registry.all_of<TransformComponent>(t)) continue;
+				
+				float tAttackRange = cautionRange_; // デフォルトの警戒範囲
+				float rawAttackRange = 50.0f;       // デフォルトの射程
+				if (registry.all_of<VariableComponent>(t)) {
+					float ar = registry.get<VariableComponent>(t).GetValue("AttackRange", 0.0f);
+					if (ar > 0.0f) {
+						rawAttackRange = ar;
+						tAttackRange = ar + 25.0f; // 射程 + 25m を警戒範囲とする
+					}
+				}
+
 				auto& tTc = registry.get<TransformComponent>(t);
 				float dx = tTc.translate.x - tc.translate.x;
 				float dz = tTc.translate.z - tc.translate.z;
 				float distSq = dx * dx + dz * dz;
-				if (distSq < minTowerDistSq) {
-					minTowerDistSq = distSq;
-					nearestTower = t;
-					towerPos = tTc.translate;
+				
+				// タワーの警戒範囲内であれば候補とする
+				if (distSq < tAttackRange * tAttackRange) {
+					if (distSq < minTowerDistSq) {
+						minTowerDistSq = distSq;
+						nearestTower = t;
+						towerPos = tTc.translate;
+						nearestTowerAttackRange = rawAttackRange;
+					}
 				}
 			}
 		}
@@ -184,6 +201,7 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float dt) {
 			if (dist > attackRange_) {
 				// 自分よりタワーに近いタンクがいるかチェック
 				bool isTankAhead = false;
+				bool isTankComing = false;
 
 				const auto& enemies = scene->GetEntitiesByTag(TagType::Enemy);
 				for (auto e : enemies) {
@@ -196,10 +214,15 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float dt) {
 							float tankDz = towerPos.z - tankTc.translate.z;
 							float tankDist = std::sqrt(tankDx * tankDx + tankDz * tankDz);
 							
-							// タンクが自分よりタワーに近ければOK
-							if (tankDist < dist) {
+							// タンクが自分よりタワーに十分に近ければOK (例: 射程内に入っている、あるいは15m以上前にいる)
+							if (tankDist < nearestTowerAttackRange || tankDist < dist - 15.0f) {
 								isTankAhead = true;
 								break;
+							}
+							
+							// タンクがこのタワー周辺（警戒範囲より少し外まで）にいるなら諦めずに待つ
+							if (tankDist < nearestTowerAttackRange + 55.0f) {
+								isTankComing = true;
 							}
 						}
 					}
@@ -207,12 +230,18 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float dt) {
 
 				// タンクが前にいない場合、指定秒数だけ待機する
 				if (!isTankAhead) {
-					if (currentWaitTime_ < maxWaitTime_) {
-						currentWaitTime_ += dt;
+					if (isTankComing) {
+						currentWaitTime_ = 0.0f; // タンクが来る予定なら待機時間をリセットし続ける
 						dirX = 0.0f;
 						dirZ = 0.0f;
+					} else {
+						if (currentWaitTime_ < maxWaitTime_) {
+							currentWaitTime_ += dt;
+							dirX = 0.0f;
+							dirZ = 0.0f;
+						}
+						// maxWaitTime_ を超えたら諦めて進む
 					}
-					// maxWaitTime_ を超えたら諦めて進む
 				} else {
 					// タンクが前に出たら待機時間をリセット（別のタワーに備える）
 					currentWaitTime_ = 0.0f;

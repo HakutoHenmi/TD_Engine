@@ -203,6 +203,7 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 
 	float finalDamage = damage_ * attackPowerRateMisile;
 	float finalExplosionRadius = explosionRadius_ * attackAreaRateMisile;
+	SetVar(entity, scene, "AttackRange", attackRange_);
 
 	currentTarget_ = entt::null;
 	float bestDistance = attackRange_;

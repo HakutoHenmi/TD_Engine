@@ -35,6 +35,7 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 	// ===== ターゲット探す =====
 	entt::entity target = entt::null;
 	float bestDistance = attackRange_;
+	SetVar(entity, scene, "AttackRange", attackRange_);
 
 	const std::vector<entt::entity>& enemies = scene->GetEntitiesByTag(TagType::Enemy);
 
