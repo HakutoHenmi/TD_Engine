@@ -1079,7 +1079,7 @@ ComPtr<ID3DBlob> Renderer::CompileShaderFromFile(const wchar_t* filePath, const 
 	if (FAILED(hr)) {
 		if (err) {
 			::MessageBoxA(nullptr, (const char*)err->GetBufferPointer(), "HLSL CompileFromFile Error", MB_OK);
-		} else {
+		} else if (hr != 0x80070002) { // 0x80070002: ERROR_FILE_NOT_FOUND の場合はメッセージを出さない
 			wchar_t msg[512];
 			wsprintfW(msg, L"File: %s\nHRESULT: 0x%08X", unifiedPath.c_str(), hr);
 			::MessageBoxW(nullptr, msg, L"HLSL CompileFromFile Error (no message)", MB_OK);
@@ -3224,6 +3224,9 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 
 		// ★追加: Anime PostProcess パイプライン
 		auto psAnime = CompileShaderFromFile(L"Resources/shaders/AnimePostProcess.hlsl", "main", "ps_5_0");
+		if (!psAnime) {
+			psAnime = psRich; // ファイルがない場合は Rich を代用
+		}
 		if (psAnime) {
 			pso.PS = { psAnime->GetBufferPointer(), psAnime->GetBufferSize() };
 			Microsoft::WRL::ComPtr<ID3D12PipelineState> psoAnime;

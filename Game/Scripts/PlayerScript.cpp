@@ -366,6 +366,26 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			UpdateGunAttack(entity, scene, dt);
 			UpdateGun(entity, scene, dt);
 		}
+
+		// ★追加: 蒸気圧リチャージ処理 (モードに関わらず共通で実行)
+		if (isRecharging_) {
+			rechargeTimer_ -= dt;
+			// リチャージ中は徐々に蒸気圧が回復する
+			float rechargeRate = maxSteamPressure_ / RECHARGE_TIME;
+			steamPressure_ += rechargeRate * dt;
+			if (steamPressure_ >= maxSteamPressure_) {
+				steamPressure_ = maxSteamPressure_;
+				isRecharging_ = false;
+				rechargeTimer_ = 0.0f;
+			}
+		}
+
+		// ★追加: 圧力ゲージの描画 (リチャージ中や銃モードなら常に表示)
+		bool shouldShowGauge = (playerType_ == PlayerType::Gun) || isRecharging_ || (steamPressure_ < maxSteamPressure_) || isSkillActive_;
+		if (shouldShowGauge) {
+			DrawPressureGauge(scene);
+		}
+
 		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) scene->GetRegistry().get<CameraTargetComponent>(entity).enabled = true;
 		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))  scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = true;
 	}
@@ -554,6 +574,12 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 	isAiming_ = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
 	bool currentAttackKeyDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
 
+	// ★リチャージ中は射撃不可（スキル発動中のみオーバークロックで許可）
+	if (isRecharging_ && !isSkillActive_) {
+		prevAttackKeyDown_ = currentAttackKeyDown;
+		return;
+	}
+
 	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
 
 	// ★ロック中は敵の方を向く
@@ -572,21 +598,6 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 				pTc.rotate.y += diff * std::min(1.0f, 30.0f * dt);
 			}
 		}
-	}
-
-	// ★蒸気圧リチャージ処理
-	if (isRecharging_) {
-		rechargeTimer_ -= dt;
-		// リチャージ中は徐々に蒸気圧が回復する
-		float rechargeRate = maxSteamPressure_ / RECHARGE_TIME;
-		steamPressure_ += rechargeRate * dt;
-		if (steamPressure_ >= maxSteamPressure_) {
-			steamPressure_ = maxSteamPressure_;
-			isRecharging_ = false;
-			rechargeTimer_ = 0.0f;
-		}
-		prevAttackKeyDown_ = currentAttackKeyDown;
-		return; // リチャージ中は射撃不可
 	}
 
 	// ★反動後退の物理更新
@@ -671,10 +682,11 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 	if (!currentAttackKeyDown && prevAttackKeyDown_ && isCharging_) {
 		isCharging_ = false;
 
-		if (chargeTime_ >= CHARGE_TIME_MIN && steamPressure_ >= CHARGE_SHOT_COST * 0.5f) {
+		// スキル発動中（オーバークロック）はコストを無視して撃てる
+		if (chargeTime_ >= CHARGE_TIME_MIN && (isSkillActive_ || steamPressure_ >= CHARGE_SHOT_COST * 0.5f)) {
 			// ★チャージショット発射！
 			ShootChargeShot(entity, scene);
-			steamPressure_ -= CHARGE_SHOT_COST;
+			if (!isSkillActive_) steamPressure_ -= CHARGE_SHOT_COST;
 
 			// 反動後退
 			float forwardX = std::sin(pTc.rotate.y);
@@ -684,16 +696,16 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 			recoilVelocity_.z = -forwardZ * recoilPower;
 
 			gunShootTimer_ = 0.5f;
-		} else if (steamPressure_ > 0.0f) {
+		} else if (isSkillActive_ || steamPressure_ > 0.0f) {
 			// 通常射撃（短押し）- 残量に関わらず撃てる
 			ShootGun(entity, scene);
-			steamPressure_ -= NORMAL_SHOT_COST;
+			if (!isSkillActive_) steamPressure_ -= NORMAL_SHOT_COST;
 			gunShootTimer_ = 0.3f;
 		}
 
 		chargeTime_ = 0.0f;
 
-		// 圧力がなくなったらリチャージ開始
+		// 圧力がなくなったらリチャージ開始（スキル中は減らないが、念のためチェック）
 		if (steamPressure_ <= 0.0f) {
 			steamPressure_ = 0.0f;
 			isRecharging_ = true;
@@ -705,22 +717,16 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 	if (gunShootTimer_ > 0.0f) gunShootTimer_ -= dt;
 
 	prevAttackKeyDown_ = currentAttackKeyDown;
-
-	// ★圧力ゲージの描画
-	DrawPressureGauge(scene);
 }
 
-
 void PlayerScript::ShootChargeShot(entt::entity entity, GameScene* scene) {
-	float baseDamage = 45.0f; // 通常の3倍
-	float chargeMul = chargeTime_ / CHARGE_TIME_MAX; // 0.0 ~ 1.0
+	float baseDamage = 45.0f;
+	float chargeMul = chargeTime_ / CHARGE_TIME_MAX;
 	float damage = baseDamage * (0.5f + chargeMul * 0.5f);
 	if (isSkillActive_) damage *= SKILL_DAMAGE_MULTIPLIER;
 
-	// 巨大な弾を発射
 	SpawnBullet(entity, scene, 0.0f, 0.0f, damage, 3.0f, true);
 
-	// ★巨大マズルフラッシュ + 大量スモーク
 	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
 	entt::entity gun = scene->FindObjectByName(gunName_);
 	DirectX::XMFLOAT3 muzzlePos = pTc.translate;
@@ -738,7 +744,6 @@ void PlayerScript::ShootChargeShot(entt::entity entity, GameScene* scene) {
 		fwdZ = DirectX::XMVectorGetZ(forward);
 	}
 
-	// 巨大なマズルVFX
 	entt::entity muzzleVfx = scene->CreateEntity("ChargeShot_VFX");
 	auto& mTc = scene->GetRegistry().get<TransformComponent>(muzzleVfx);
 	mTc.translate = muzzlePos;
@@ -748,7 +753,7 @@ void PlayerScript::ShootChargeShot(entt::entity entity, GameScene* scene) {
 	mvc.SetValue("NormalX", fwdX);
 	mvc.SetValue("NormalY", 0.0f);
 	mvc.SetValue("NormalZ", fwdZ);
-	mvc.SetValue("Radius", 5.0f + chargeMul * 3.0f);  // チャージ量に比例して巨大
+	mvc.SetValue("Radius", 5.0f + chargeMul * 3.0f);
 	mvc.SetValue("Duration", 0.8f);
 	mvc.SetValue("ScatterMode", 0.0f);
 	mvc.SetValue("ScatterDelay", 0.0f);
@@ -759,7 +764,6 @@ void PlayerScript::ShootChargeShot(entt::entity entity, GameScene* scene) {
 	auto& msc = scene->GetRegistry().emplace<ScriptComponent>(muzzleVfx);
 	msc.scripts.push_back({"SpaceShatterScript", "", nullptr});
 
-	// マズルフラッシュ
 	MuzzleFlash flash;
 	flash.pos = muzzlePos;
 	flash.life = 0.12f;
@@ -771,72 +775,155 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 	auto* renderer = scene->GetRenderer();
 	if (!renderer) return;
 
-	// ゲージ位置 (画面右下)
-	float gaugeX = 1160.0f;
-	float gaugeY = 620.0f;
-	float gaugeSize = 70.0f;
+	// ===== 1. 基本設定 =====
+	float gaugeX = (float)Engine::WindowDX::kW * 0.5f;
+	float gaugeY = (float)Engine::WindowDX::kH - 140.0f;
+	float R = 85.0f; 
+	float pressureRatio = std::clamp(steamPressure_ / maxSteamPressure_, 0.0f, 1.0f);
+	float startAngle = DirectX::XM_PI * 0.75f; 
+	float totalAngle = DirectX::XM_PI * 1.5f;
 
-	float pressureRatio = steamPressure_ / maxSteamPressure_;
+	// ===== 2. 背景・ベゼル =====
+	renderer->DrawSDFUI({ {gaugeX + 3, gaugeY + 3}, {R + 8, R + 8}, 0, 6.0f, {0,0,0,0.3f}, 1, 0, 0, 1 });
+	renderer->DrawSDFUI({ {gaugeX, gaugeY}, {R + 6, R + 6}, 0, 0, {0.25f, 0.18f, 0.06f, 1.0f}, 1, 0, 0, 1 });
+	renderer->DrawSDFUI({ {gaugeX, gaugeY}, {R + 4, R + 4}, 1.5f, 0, {0.85f, 0.75f, 0.4f, 1.0f}, 1, 0, 0 });
+	renderer->DrawSDFUI({ {gaugeX, gaugeY}, {R + 1, R + 1}, 1.0f, 0, {0.2f, 0.15f, 0.05f, 0.8f}, 1, 0, 0 });
+	renderer->DrawSDFUI({ {gaugeX, gaugeY}, {R - 4, R - 4}, 0, 0, {0.96f, 0.94f, 0.88f, 1.0f}, 1, 0, 0, 1 });
+	renderer->DrawSDFUI({ {gaugeX, gaugeY}, {R - 5, R - 5}, 8.0f, 4.0f, {0.3f, 0.2f, 0.1f, 0.15f}, 1, 0, 0 });
 
-	// 背景リング（暗い外枠）
-	Engine::Renderer::SdfUIDesc bgRing;
-	bgRing.centerPx = {gaugeX, gaugeY};
-	bgRing.sizePx = {gaugeSize, gaugeSize};
-	bgRing.shape = 1; // Circle
-	bgRing.lineWidth = 6.0f;
-	bgRing.fill = 0.0f; // アウトライン
-	bgRing.progress = 1.0f;
-	bgRing.color = {0.15f, 0.12f, 0.1f, 0.8f};
-	bgRing.glow = 0.0f;
-	renderer->DrawSDFUI(bgRing);
-
-	// 蒸気圧ゲージ本体（充填率で進捗表示）
-	Engine::Renderer::SdfUIDesc gauge;
-	gauge.centerPx = {gaugeX, gaugeY};
-	gauge.sizePx = {gaugeSize, gaugeSize};
-	gauge.shape = 1; // Circle
-	gauge.lineWidth = 5.0f;
-	gauge.fill = 0.0f;
-	gauge.progress = pressureRatio;
-
-	if (isRecharging_) {
-		// リチャージ中は赤く点滅
-		float blink = std::sin(rechargeTimer_ * 8.0f) * 0.5f + 0.5f;
-		gauge.color = {0.9f, 0.2f + blink * 0.3f, 0.1f, 0.7f + blink * 0.3f};
-		gauge.glow = blink * 3.0f;
-	} else if (isCharging_) {
-		// チャージ中は青白く光る
-		float t = chargeTime_ / CHARGE_TIME_MAX;
-		gauge.color = {0.3f + t * 0.5f, 0.7f + t * 0.3f, 1.0f, 0.9f};
-		gauge.glow = t * 5.0f;
-	} else {
-		// 通常時はスチームパンク風の暖色
-		gauge.color = {0.9f, 0.7f, 0.3f, 0.85f};
-		gauge.glow = 1.0f;
+	// ===== 3. リベット =====
+	float rivetR = R + 3.0f;
+	for (int i = 0; i < 4; ++i) {
+		float angle = DirectX::XM_PIDIV4 + DirectX::XM_PIDIV2 * (float)i;
+		float rx = gaugeX + std::cos(angle) * rivetR;
+		float ry = gaugeY + std::sin(angle) * rivetR;
+		renderer->DrawSDFUI({ {rx, ry}, {3.0f, 3.0f}, 0, 0, {0.6f, 0.5f, 0.2f, 1.0f}, 1, 0, 0, 1 });
+		renderer->DrawSDFUI({ {rx - 0.5f, ry - 0.5f}, {1.0f, 1.0f}, 0, 0, {1, 1, 1, 0.3f}, 1, 0, 0, 1 });
 	}
-	renderer->DrawSDFUI(gauge);
 
-	// 中央に圧力値のテキスト表示
-	int pct = (int)(pressureRatio * 100.0f);
-	std::string pctText = std::to_string(pct);
-	float textW = renderer->MeasureTextWidth(pctText, 0.5f);
-	float textH = renderer->GetTextLineHeight(0.5f);
-	Engine::Vector4 textCol = isRecharging_ ? Engine::Vector4{1.0f, 0.3f, 0.2f, 1.0f} : Engine::Vector4{1.0f, 0.9f, 0.7f, 1.0f};
-	renderer->DrawString(pctText, gaugeX - textW * 0.5f, gaugeY - textH * 0.35f, 0.5f, textCol);
+	// ===== 4. 危険ゾーン（赤いドット）=====
+	{
+		float dangerStart = 0.75f;
+		float zoneR = R - 10.0f;
+		for (int i = 0; i < 8; ++i) {
+			float t = dangerStart + (float)i / 8.0f * (1.0f - dangerStart);
+			float angle = startAngle + t * totalAngle;
+			float dotSize = 3.5f;
+			renderer->DrawSDFUI({
+				{ gaugeX + std::cos(angle) * zoneR, gaugeY + std::sin(angle) * zoneR },
+				{ dotSize, dotSize }, 0, 0, {0.8f, 0.1f, 0.05f, 0.6f}, 1, 0, 0, 1
+			});
+		}
+	}
 
-	// チャージ中は内側にチャージ進捗リングを追加表示
-	if (isCharging_ && chargeTime_ > 0.1f) {
-		float chargeRatio = chargeTime_ / CHARGE_TIME_MAX;
-		Engine::Renderer::SdfUIDesc chargeRing;
-		chargeRing.centerPx = {gaugeX, gaugeY};
-		chargeRing.sizePx = {gaugeSize * 0.65f, gaugeSize * 0.65f};
-		chargeRing.shape = 1;
-		chargeRing.lineWidth = 3.0f;
-		chargeRing.fill = 0.0f;
-		chargeRing.progress = chargeRatio;
-		chargeRing.color = {0.4f, 0.85f, 1.0f, 0.9f};
-		chargeRing.glow = chargeRatio * 8.0f;
-		renderer->DrawSDFUI(chargeRing);
+	// ===== 5. 目盛り（ドットを高密度化）=====
+	for (int i = 0; i <= 50; ++i) {
+		float angle = startAngle + (float)i / 50.0f * totalAngle;
+		bool isMajor = (i % 10 == 0);
+		bool isMid = (i % 5 == 0);
+		float dotSize = isMajor ? 4.8f : (isMid ? 3.2f : 1.6f); 
+		float tickR = R - 10.0f; 
+		float alpha = isMajor ? 1.0f : (isMid ? 0.7f : 0.35f);
+		renderer->DrawSDFUI({
+			{ gaugeX + std::cos(angle) * tickR, gaugeY + std::sin(angle) * tickR },
+			{ dotSize, dotSize }, 0, 0, {0.15f, 0.1f, 0.05f, alpha}, 1, 0, 0, 1
+		});
+	}
+
+	// ===== 6. 漢字数字ラベル（縦書き対応）=====
+	const char* kanjiLabels[] = { (const char*)u8"零", (const char*)u8"五十", (const char*)u8"百" };
+	float labelSteps[] = {0.0f, 0.5f, 1.0f};
+	for (int i = 0; i < 3; ++i) {
+		float angle = startAngle + labelSteps[i] * totalAngle;
+		float labelR = R - 30.0f; 
+		float sx = gaugeX + std::cos(angle) * labelR;
+		float sy = gaugeY + std::sin(angle) * labelR;
+		float fontSize = 0.45f;
+		
+		// 縦書き描画ロジック（簡易版）
+		std::vector<std::string> chars;
+		if (i == 1) { // "五十"
+			chars.push_back((const char*)u8"五");
+			chars.push_back((const char*)u8"十");
+		} else {
+			chars.push_back(kanjiLabels[i]);
+		}
+
+		float totalH = chars.size() * 15.0f;
+		for (size_t c = 0; c < chars.size(); ++c) {
+			float tw = renderer->MeasureTextWidth(chars[c].c_str(), fontSize);
+			float offsetX = -tw * 0.5f;
+			float offsetY = -totalH * 0.5f + c * 15.0f;
+			renderer->DrawString(chars[c].c_str(), sx + offsetX, sy + offsetY, fontSize, {0.1f, 0.08f, 0.05f, 1.0f});
+		}
+	}
+
+	// ===== 7. 中央ラベル（圧力計 - 軸の下側に配置）=====
+	{
+		const char* titleChars[] = { (const char*)u8"圧", (const char*)u8"力", (const char*)u8"計" };
+		float fontSize = 0.28f;
+		float startY = gaugeY + R * 0.15f; // 軸の下側に移動
+		for (int i = 0; i < 3; ++i) {
+			float tw = renderer->MeasureTextWidth(titleChars[i], fontSize);
+			renderer->DrawString(titleChars[i], gaugeX - tw * 0.5f, startY + i * 14.0f, fontSize, {0.25f, 0.18f, 0.1f, 0.8f});
+		}
+	}
+
+	// ===== 8. 針 & カウンターウェイト（微細な振動を追加）=====
+	float currentAngle = startAngle + pressureRatio * totalAngle;
+	
+	// プルプルした振動（ジッター）の計算
+	{
+		float time = (float)GetTickCount() * 0.001f;
+		float jitterBase = std::sin(time * 60.0f) * 0.012f; // 高速なサイン波
+		jitterBase += (float(rand() % 100) / 100.0f - 0.5f) * 0.008f; // 不規則なノイズ
+		
+		float jitterIntensity = 0.4f + pressureRatio * 0.6f; // 圧力が高いほど震える
+		if (isSkillActive_) jitterIntensity *= 2.2f;         // スキル中はさらに激しく
+
+		// ★チャージ中の暴力的な揺れを追加
+		if (isCharging_) {
+			float cRatio = std::clamp(chargeTime_ / CHARGE_TIME_MAX, 0.0f, 1.0f);
+			// チャージが進むほど、振幅の大きい不規則なガタつきを加える
+			jitterBase += (float(rand() % 100) / 100.0f - 0.5f) * 0.15f * cRatio;
+			jitterIntensity += cRatio * 2.0f;
+		}
+		
+		currentAngle += jitterBase * jitterIntensity;
+	}
+	
+	float cLen = 14.0f;
+	float cAngle = currentAngle + DirectX::XM_PI;
+	Engine::Renderer::SdfUIDesc counter;
+	counter.centerPx = { gaugeX + std::cos(cAngle) * (cLen * 0.5f), gaugeY + std::sin(cAngle) * (cLen * 0.5f) };
+	counter.sizePx = { cLen, 4.5f };
+	counter.shape = 0;
+	counter.rotateRad = -cAngle;
+	counter.color = { 0.12f, 0.1f, 0.06f, 1.0f };
+	counter.fill = 1.0f;
+	renderer->DrawSDFUI(counter);
+
+	float nLen = R * 0.9f;
+	Engine::Renderer::SdfUIDesc needle;
+	needle.centerPx = { gaugeX + std::cos(currentAngle) * (nLen * 0.5f), gaugeY + std::sin(currentAngle) * (nLen * 0.5f) };
+	needle.sizePx = { nLen, 3.2f };
+	needle.shape = 0;
+	needle.rotateRad = -currentAngle;
+	needle.color = isRecharging_ ? Engine::Vector4{0.9f, 0.1f, 0.1f, 1.0f} : Engine::Vector4{0.12f, 0.1f, 0.06f, 1.0f};
+	needle.fill = 1.0f;
+	renderer->DrawSDFUI(needle);
+
+	renderer->DrawSDFUI({ {gaugeX, gaugeY}, {12, 12}, 0, 0, {0.22f, 0.16f, 0.06f, 1.0f}, 1, 0, 0, 1 });
+	renderer->DrawSDFUI({ {gaugeX, gaugeY}, {8, 8}, 0, 0, {0.6f, 0.5f, 0.25f, 1.0f}, 1, 0, 0, 1 });
+
+	// ===== 9. 特殊演出 =====
+	if (isSkillActive_) {
+		float p = std::sin(skillDuration_ * 12.0f) * 0.5f + 0.5f;
+		renderer->DrawSDFUI({ {gaugeX, gaugeY}, {R + 6, R + 6}, 2.0f, 10.0f, {0.2f, 0.8f, 1.0f, 0.2f + p * 0.4f}, 1, 0, 0 });
+		renderer->DrawString("OVERCLOCK", gaugeX - 55, gaugeY + R + 15, 0.4f, {0.3f, 0.9f, 1.0f, 1.0f});
+	} else if (isRecharging_) {
+		float b = std::sin(rechargeTimer_ * 10.0f) * 0.5f + 0.5f;
+		renderer->DrawString("RECHARGING", gaugeX - 55, gaugeY + R + 15, 0.4f, {1.0f, 0.2f, 0.1f, 0.5f + b * 0.5f});
 	}
 }
 
@@ -1120,6 +1207,8 @@ void PlayerScript::ExecuteSkill(entt::entity entity, GameScene* scene) {
 		skillCooldown_ = SKILL_COOLDOWN_TIME;
 		isSkillActive_ = true;
 		skillDuration_ = SKILL_MAX_DURATION;
+		steamPressure_ = maxSteamPressure_; // ★オーバークロック発動時に圧力を100まで戻す
+		isRecharging_ = false; // リチャージ状態も強制解除
 		std::cout << "Gun Skill Activated: Crystal Enhancement!\n";
 	}
 }
