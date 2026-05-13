@@ -200,6 +200,19 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 		skillTree_.Start(entity, scene);
 		skillTree_.LoadFromJson("Resources/Scenes/skills.json");
 	}
+
+	// 設置開始イベントの購読
+	SubscribeString(scene, "StartInstallation", [this](const std::string& dataStr) {
+		try {
+			json data = json::parse(dataStr);
+			selectedObjPath_ = data.value("prefab", "");
+			selectedObjCost_ = data.value("cost", 0);
+			isPipeSet_ = data.value("isPipe", false);
+			isPlacementMode_ = true;
+			isSellMode_ = false;
+			hasPipeStartPoint_ = false;
+		} catch (...) {}
+	});
 }
 
 void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) {
@@ -289,50 +302,52 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		// 設置モードへの切り替え
 
-		if (key1 || InstallationButton::IsButtonPressed(InstallationButton::Tank)) {
+		// 設置モードへの切り替え
+
+		if (key1) {
 			selectedObjPath_ = "Resources/Prefabs/BulletTank.prefab";
 			selectedObjCost_ = tankCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
-           placementSelectionChangedThisFrame = true;
+			placementSelectionChangedThisFrame = true;
 		}
 
-		if (key2 || InstallationButton::IsButtonPressed(InstallationButton::Pipe)) {
+		if (key2) {
 			selectedObjPath_ = "Resources/Prefabs/Pipe.prefab";
 			selectedObjCost_ = pipeCost_;
 			isPipeSet_ = true;
 			isPlacementMode_ = true;
 			hasPipeStartPoint_ = false;
-           placementSelectionChangedThisFrame = true;
+			placementSelectionChangedThisFrame = true;
 		}
 
-		if (key3 || InstallationButton::IsButtonPressed(InstallationButton::Cannon)) {
+		if (key3) {
 			selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
 			selectedObjCost_ = canonCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
-           placementSelectionChangedThisFrame = true;
+			placementSelectionChangedThisFrame = true;
 		}
 
-		if (key4 || InstallationButton::IsButtonPressed(InstallationButton::Missile)) {
+		if (key4) {
 			selectedObjPath_ = "Resources/Prefabs/Missile.prefab";
 			selectedObjCost_ = missileCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
-           placementSelectionChangedThisFrame = true;
+			placementSelectionChangedThisFrame = true;
 		}
 
-		if (key5 || InstallationButton::IsButtonPressed(InstallationButton::PoisonTrap)) {
+		if (key5) {
 			selectedObjPath_ = "Resources/Prefabs/Poison.prefab";
 			selectedObjCost_ = poisonCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			isSellMode_ = false;
 			hasPipeStartPoint_ = false;
-		   placementSelectionChangedThisFrame = true;
+			placementSelectionChangedThisFrame = true;
 		}
 
 		// Xキーで削除(売却)モードへの切り替え

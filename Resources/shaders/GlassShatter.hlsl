@@ -24,21 +24,16 @@ float4 ps_main(VSOut i) : SV_TARGET {
     float3 viewDir = normalize(gCamPos - i.worldPos);
     float3 normal = normalize(i.worldNrm);
     
-    // 両面表示対応：裏面（視線の逆向き）を見ている場合は法線を反転する
-    if (dot(normal, viewDir) < 0.0) {
-        normal = -normal;
-    }
-    
-    // 2. フレネル計算
+    // 2. セルルック調（アニメ調）の鋭いフレネル
     float NdotV = saturate(dot(normal, viewDir));
+    
+    // 鳴潮などのアニメ調クリスタルは、境界線がクッキリ発光するのが特徴
+    // 緩やかなグラデーションではなく、smoothstepでパキッとしたエッジを作る
     float fresnel = smoothstep(0.2, 0.35, 1.0 - NdotV);
     
-    // --- 基本パラメータ ---
+    // --- 屈折 (Refraction) の計算 ---
     float3 baseColor = i.color.rgb;
     float baseAlpha = i.color.a;
-    
-    // プリズムモード判定: alpha 0.5~0.8 の場合にプリズム効果を強調
-    float prismStrength = smoothstep(0.4, 0.6, baseAlpha) * smoothstep(0.9, 0.75, baseAlpha);
     
     // 画面空間のUV座標を計算
     float2 screenUV = i.clipPos.xy / i.clipPos.w;
@@ -47,37 +42,20 @@ float4 ps_main(VSOut i) : SV_TARGET {
 
     // ワールド法線をビュー空間（画面空間）に投影して、歪みの方向を決定
     float3 viewNormal = mul(normal, (float3x3)gView); 
+    
+    // アニメ調の屈折：歪みすぎるとノイズになるので、一定の強さで面ごとにパキッと歪ませる
     float distortionStrength = 0.04 * baseAlpha;
+    float2 distortedUV = clamp(screenUV + viewNormal.xy * distortionStrength, 0.001, 0.999);
     
-    // === プリズム効果: 色収差 (Chromatic Aberration) ===
-    // R, G, B チャンネルそれぞれを異なる屈折率でサンプリングし、虹色の分光を再現
-    float aberrationScale = (0.012 + prismStrength * 0.025) * baseAlpha;
-    float2 uvR = clamp(screenUV + viewNormal.xy * (distortionStrength + aberrationScale * 1.0), 0.001, 0.999);
-    float2 uvG = clamp(screenUV + viewNormal.xy * (distortionStrength), 0.001, 0.999);
-    float2 uvB = clamp(screenUV + viewNormal.xy * (distortionStrength - aberrationScale * 1.0), 0.001, 0.999);
+    // 背景色を取得
+    float3 refractionColor = gBackdropTex.SampleLevel(gSmp, distortedUV, 0).rgb;
     
-    float3 refractionColor;
-    refractionColor.r = gBackdropTex.SampleLevel(gSmp, uvR, 0).r;
-    refractionColor.g = gBackdropTex.SampleLevel(gSmp, uvG, 0).g;
-    refractionColor.b = gBackdropTex.SampleLevel(gSmp, uvB, 0).b;
-    
-    // --- 色の合成 ---
+    // --- 色の合成 (AAAアニメ調・白飛び抑制) ---
     // 内部: 屈折した背景色にベースカラーを乗算
     float3 innerColor = refractionColor * saturate(baseColor * 0.8) + (baseColor * 0.2);
     
-    // === プリズム・フレネル: エッジにスペクトル虹色を生成 ===
-    // 視線角度に応じて虹色のグラデーションを計算（薄膜干渉風）
-    float spectrumPhase = NdotV * 6.28318 * 2.0 + gTime * 0.5;
-    float3 spectrumColor = float3(
-        0.5 + 0.5 * sin(spectrumPhase),
-        0.5 + 0.5 * sin(spectrumPhase + 2.094),
-        0.5 + 0.5 * sin(spectrumPhase + 4.189)
-    );
-    
-    // プリズムモードのとき: エッジに虹色 / 通常モード: 従来の暖色系エッジ
-    float3 warmEdge = baseColor * 1.5 + float3(0.6, 0.4, 0.1);
-    float3 prismEdge = spectrumColor * 2.5 + baseColor * 0.5;
-    float3 edgeColor = lerp(warmEdge, prismEdge, prismStrength);
+    // エッジ (輪郭): 真鍮や高熱の金属を思わせる暖色（オレンジ/ブラウン系）のハイライトを加算
+    float3 edgeColor = baseColor * 1.5 + float3(0.6, 0.4, 0.1); 
     
     // フレネルで内部とエッジを合成
     float3 finalRGB = lerp(innerColor, edgeColor, fresnel);
@@ -86,12 +64,11 @@ float4 ps_main(VSOut i) : SV_TARGET {
     float3 lightDir = normalize(float3(0.5, 1.0, 0.3));
     float3 halfVector = normalize(lightDir + viewDir);
     float NdotH = saturate(dot(normal, halfVector));
-    float specular = step(0.98, NdotH); 
     
-    // プリズムモードでは虹色スペキュラ、通常は暖色系
-    float3 specWarm = baseColor * 0.5 + float3(0.7, 0.6, 0.3);
-    float3 specPrism = spectrumColor * 1.5 + float3(0.8, 0.8, 0.8);
-    finalRGB += lerp(specWarm, specPrism, prismStrength) * specular;
+    // アニメ調なので、ハイライトもグラデーションではなく2値化（step）する
+    float specular = step(0.98, NdotH); 
+    // スチームパンクの金属や琥珀が光を反射したような、少し温かみのある白〜黄色の輝き
+    finalRGB += (baseColor * 0.5 + float3(0.7, 0.6, 0.3)) * specular;
     
     // 不透明度は1.0（背景は既に屈折して取り込んでいるため）
     return float4(finalRGB, 1.0);

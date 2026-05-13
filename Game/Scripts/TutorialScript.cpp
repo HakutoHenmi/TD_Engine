@@ -16,6 +16,9 @@
 #include <fstream>
 #include <vector>
 #include <unordered_map>
+#include "../../Engine/ThirdParty/nlohmann/json.hpp"
+
+using json = nlohmann::json;
 #if defined(USE_IMGUI) && !defined(NDEBUG)
 #include <imgui.h>
 #endif
@@ -116,6 +119,17 @@ void TutorialScript::Start(entt::entity entity, GameScene* scene) {
     }
     if (scene) {
         ShowStepGuide();
+
+        // 設置開始イベントの購読
+        SubscribeString(scene, "StartInstallation", [this](const std::string& dataStr) {
+            try {
+                json data = json::parse(dataStr);
+                selectedObjPath_ = data.value("prefab", "");
+                isPipeSet_ = data.value("isPipe", false);
+                isPlacementMode_ = true;
+                hasPipeStartPoint_ = false;
+            } catch (...) {}
+        });
     }
 }
 
@@ -283,7 +297,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
         if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
             break;
 
-        if (key3 || InstallationButton::IsButtonPressed(InstallationButton::Cannon)) {
+        if (key3) {
             selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
             isPlacementMode_ = true;
             isPipeSet_ = false;
@@ -316,7 +330,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
         if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
             break;
 
-        if (key1 || InstallationButton::IsButtonPressed(InstallationButton::Tank)) {
+        if (key1) {
             selectedObjPath_ = "Resources/Prefabs/BulletTank.prefab";
             isPlacementMode_ = true;
             isPipeSet_ = false;
@@ -349,7 +363,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
         if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
             break;
 
-        if (key2 || InstallationButton::IsButtonPressed(InstallationButton::Pipe)) {
+        if (key2) {
             selectedObjPath_ = "Resources/Prefabs/Pipe.prefab";
             isPipeSet_ = true;
             isPlacementMode_ = true;

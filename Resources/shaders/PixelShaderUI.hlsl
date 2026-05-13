@@ -118,19 +118,11 @@ float4 mainPS(PSIn i) : SV_TARGET
         innerMask = innerMaskByInnerCircle(p, uInner);
     }
 
-    // プログレス(クリッピング)処理
+    // 左から右へのプログレス(クリッピング)処理
     if (uProgress >= 0.0 && uProgress <= 1.0) {
-        if (uShape == 0) {
-            // 四角形：左から右へ
-            float width = uSizePx.x;
-            float t = (p.x + width * 0.5) / width;
-            innerMask *= step(t, uProgress);
-        } else {
-            // 円形：12時の位置から時計回りに充填
-            float angle = atan2(p.x, -p.y); // 12時=0, 時計回りで正
-            float normalizedAngle = (angle + 3.14159265) / (2.0 * 3.14159265); // 0~1に正規化
-            innerMask *= step(normalizedAngle, uProgress);
-        }
+        float width = (uShape == 0) ? uSizePx.x : uSizePx.x * 2.0;
+        float t = (p.x + width * 0.5) / width;
+        innerMask *= step(t, uProgress);
     }
 
     return drawLineGlow(d, uLineWidth, uGlow, uColor, innerMask, uFill);
