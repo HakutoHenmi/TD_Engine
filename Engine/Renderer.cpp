@@ -1,3 +1,4 @@
+#include <mutex>
 #include "Renderer.h"
 #include "Model.h"
 #include "PathUtils.h"
@@ -312,6 +313,8 @@ void Renderer::WaitGPU() {
 }
 
 void Renderer::BeginFrame(const float clearColorRGBA[4]) {
+	ApplyPostEffectInternal_();
+
 	ID3D12DescriptorHeap* heaps[] = {srvHeap_};
 	list_->SetDescriptorHeaps(1, heaps);
 
@@ -1644,6 +1647,13 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD, float4 color:COLOR) : 
 		CreatePSO_Transparent("ParticleAdditiveInstanced", vsPartInst.Get(), psPart.Get(), true);
 	}
 
+	// ★追加: 頂点カラー対応のボリューメトリックライトウェッジ用加算シェーダー
+	auto vsLightWedge = CompileShaderFromFile(L"Resources/Shaders/LightWedgeVS.hlsl", "main", "vs_5_0");
+	auto psLightWedge = CompileShaderFromFile(L"Resources/Shaders/LightWedgePS.hlsl", "main", "ps_5_0");
+	if (vsLightWedge && psLightWedge) {
+		CreatePSO_Transparent("LightWedge", vsLightWedge.Get(), psLightWedge.Get(), true);
+	}
+
 	// ★追加: プロシージャル煙パーティクル (FBMノイズベース)
 	static const char* kPSProceduralSmoke = R"(
 cbuffer CBFrame : register(b0) {
@@ -2395,6 +2405,10 @@ void Renderer::DrawMeshInstanced(MeshHandle mesh, TextureHandle texture, const M
 }
 
 void Renderer::DrawParticleInstanced(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, const Vector4& uvScaleOffset, const std::string& shaderName) {
+	DrawParticleInstanced(mesh, texture, transform.ToMatrix(), mulColor, uvScaleOffset, shaderName);
+}
+
+void Renderer::DrawParticleInstanced(MeshHandle mesh, TextureHandle texture, const Matrix4x4& worldMatrix, const Vector4& mulColor, const Vector4& uvScaleOffset, const std::string& shaderName) {
 	auto it = std::find_if(instancedParticleDrawCalls_.begin(), instancedParticleDrawCalls_.end(), [&](const InstancedDrawCall& idc) {
 		return idc.mesh == mesh && idc.tex == texture && idc.shaderName == shaderName;
 	});
@@ -2409,7 +2423,7 @@ void Renderer::DrawParticleInstanced(MeshHandle mesh, TextureHandle texture, con
 	}
 
 	InstanceData data;
-	data.world = transform.ToMatrix();
+	data.world = worldMatrix;
 	data.color = mulColor;
 	data.uvScaleOffset = uvScaleOffset;
 	it->instances.push_back(data);
@@ -3185,6 +3199,7 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 		if (FAILED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoPP_))))
 			return false;
 
+
 		// ★追加：PostProcessと同様、そのままテクスチャをコピーするだけのパイプライン
 		static const char* kPSCopy = R"(
 Texture2D gScene : register(t0); SamplerState gSmp : register(s0);
@@ -3206,6 +3221,21 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 				pipelines_["Rich"] = psoRich;
 			}
 		}
+
+		// ★追加: Anime PostProcess パイプライン
+		auto psAnime = CompileShaderFromFile(L"Resources/shaders/AnimePostProcess.hlsl", "main", "ps_5_0");
+		if (psAnime) {
+			pso.PS = { psAnime->GetBufferPointer(), psAnime->GetBufferSize() };
+			Microsoft::WRL::ComPtr<ID3D12PipelineState> psoAnime;
+			if (SUCCEEDED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoAnime)))) {
+				pipelines_["Anime"] = psoAnime;
+			}
+		}
+
+		// ★全初期化の最後に、現在の psoPP_ をデフォルトとして保存する
+		// これにより、SetPostEffect("") でいつでも初期状態（CRTなど）に戻せるようになる
+		pipelines_["Default"] = psoPP_;
+		pipelines_[""] = psoPP_;
 	}
 
 	// ★追加: 最終描画用テクスチャの作成
@@ -3357,20 +3387,70 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 	return true;
 }
 
+
+#include <atomic>
+
+namespace {
+	// std::system_errorを避けるため、OSリソース(mutex)を使わずアトミック変数で管理する
+	static std::atomic_flag sPPLock = ATOMIC_FLAG_INIT;
+	// 適用予約。ヒープ割り当てを避けるためconst char*で保持（静的文字列のみを想定）
+	static std::atomic<const char*> sNextEffectRequest{ nullptr }; 
+
+	// スピンロックによる簡易的な排他制御（ポストプロセス名は短いのでこれで十分）
+	struct SpinLock {
+		void lock() { while (sPPLock.test_and_set(std::memory_order_acquire)); }
+		void unlock() { sPPLock.clear(std::memory_order_release); }
+	};
+}
+
 void Renderer::SetPostEffect(const std::string& name) {
-	// 空文字の場合は無効化
-	if (name.empty()) {
+	// 文字列の内容をアトミックに伝えるため、既知の定数ポインタに変換
+	const char* req = nullptr;
+	if (name == "Anime") req = "Anime";
+	else if (name == "Rich") req = "Rich";
+	else if (name == "Default" || name == "") req = "";
+	else return; // 未知の名前は無視（安全性のため）
+
+	sNextEffectRequest.store(req, std::memory_order_release);
+}
+
+void Renderer::ResetPostEffect() {
+	sNextEffectRequest.store("", std::memory_order_release);
+}
+
+// 内部用：実際にPSOを切り替える（BeginFrameから呼ばれる）
+void Renderer::ApplyPostEffectInternal_() {
+	const char* req = sNextEffectRequest.exchange(nullptr, std::memory_order_acq_rel);
+	if (!req) return; // 変更予約なし
+
+	std::string name = req;
+	
+	// 空文字または None の場合は完全に無効化する（ノイズ等のデフォルトPPも消す）
+	if (name.empty() || name == "None") {
 		ppEnabled_ = false;
 		return;
 	}
 
-	// パイプラインマップから検索
+	// 指定された名前のパイプラインを探す
 	auto it = pipelines_.find(name);
 	if (it != pipelines_.end()) {
-		psoPP_ = it->second; // パイプラインステートを切り替え
-		ppEnabled_ = true;   // 有効化
+		if (psoPP_ == it->second && ppEnabled_) return; 
+		psoPP_ = it->second;
+		ppEnabled_ = true;
+		return;
+	}
+
+	// 見つからない場合は「Default」に戻す
+	it = pipelines_.find("Default");
+	if (it != pipelines_.end()) {
+		if (psoPP_ == it->second && ppEnabled_) return;
+		psoPP_ = it->second;
+		ppEnabled_ = true;
+	} else {
+		ppEnabled_ = false;
 	}
 }
+
 
 // ★追加: 外部用のカスタムレンダーターゲット生成
 Renderer::CustomRenderTarget Renderer::CreateRenderTarget(uint32_t width, uint32_t height) {

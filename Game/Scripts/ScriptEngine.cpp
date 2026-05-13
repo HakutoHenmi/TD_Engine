@@ -25,6 +25,8 @@
 #include "InstallationButton.h"
 #include "PhaseTransition.h"
 #include "WaveManagement.h"
+#include "SpaceShatterScript.h" // ★追加
+
 
 namespace Game {
 
@@ -64,6 +66,7 @@ void ScriptEngine::Initialize() {
 	RegisterScript("InstallationButton", []() { return std::make_shared<InstallationButton>(); });
 	RegisterScript("PhaseTransition", []() { return std::make_shared<PhaseTransition>(); });
 	RegisterScript("WaveManagement", []() { return std::make_shared<WaveManagement>(); });
+	RegisterScript("SpaceShatterScript", []() { return std::make_shared<SpaceShatterScript>(); }); // ★追加
 }
 
 void ScriptEngine::Shutdown() {

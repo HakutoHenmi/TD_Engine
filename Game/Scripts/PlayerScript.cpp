@@ -214,7 +214,7 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 			mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
 			mr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 			mr.color = { 0.2f, 0.2f, 0.2f, 1.0f };
-			mr.enabled = false;
+			mr.enabled = true; // 銃を表示する
 		}
 	} else {
 		if (!scene->GetRegistry().all_of<HierarchyComponent>(gun)) {
@@ -223,7 +223,7 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 			scene->GetRegistry().get<HierarchyComponent>(gun).parentId = entity;
 		}
 		if (scene->GetRegistry().all_of<MeshRendererComponent>(gun)) {
-			scene->GetRegistry().get<MeshRendererComponent>(gun).enabled = false;
+			scene->GetRegistry().get<MeshRendererComponent>(gun).enabled = true; // 銃を表示する
 		}
 	}
 }
@@ -539,33 +539,33 @@ void PlayerScript::UpdateGun(entt::entity /*entity*/, GameScene* scene, float /*
 	auto& gunTc = scene->GetRegistry().get<TransformComponent>(gun);
 	
 	if (isAiming_) {
-		// エイム時：構える
-		gunTc.translate = { 0.4f, 1.2f, 0.8f };
+		// エイム時：しっかり構える（平行に、少し低く）
+		gunTc.translate = { 0.6f, 1.0f, 1.0f };
 		gunTc.rotate = { 0.0f, 0.0f, 0.0f };
 	} else {
-		// 非エイム時：腰だめ
-		gunTc.translate = { 0.5f, 0.8f, 0.5f };
-		gunTc.rotate = { 0.0f, 0.0f, 0.0f };
+		// 非エイム時：腰だめ（平行に、もっと低く）
+		gunTc.translate = { 0.8f, 0.7f, 0.6f };
+		gunTc.rotate = { 0.0f, 0.0f, 0.0f }; // 地面と平行に
 	}
+	gunTc.scale = { 0.15f, 0.15f, 1.2f }; 
 }
 
 void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float dt) {
 	isAiming_ = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
 	bool currentAttackKeyDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
 
-	// ★追加: ロック機能中かつ攻撃アクション中は、プレイヤーが必ず敵の方を向くようにする
+	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
+
+	// ★ロック中は敵の方を向く
 	if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) {
 		auto& ct = scene->GetRegistry().get<CameraTargetComponent>(entity);
 		if (ct.lockedTarget != entt::null && scene->GetRegistry().valid(ct.lockedTarget)) {
-			bool isActionActive = gunComboAnimTimer_ > 0.0f || gunShootTimer_ > 0.0f || currentAttackKeyDown;
+			bool isActionActive = isCharging_ || currentAttackKeyDown || gunShootTimer_ > 0.0f;
 			if (isActionActive) {
-				auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
 				auto& eTc = scene->GetRegistry().get<TransformComponent>(ct.lockedTarget);
 				float dx = eTc.translate.x - pTc.translate.x;
 				float dz = eTc.translate.z - pTc.translate.z;
 				float targetYaw = std::atan2(dx, dz);
-				
-				// 高速で敵の方へ向き直る
 				float diff = targetYaw - pTc.rotate.y;
 				while (diff >  DirectX::XM_PI) diff -= DirectX::XM_2PI;
 				while (diff < -DirectX::XM_PI) diff += DirectX::XM_2PI;
@@ -574,149 +574,270 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 		}
 	}
 
-	if (gunComboResetTimer_ > 0.0f) {
-		gunComboResetTimer_ -= dt;
-		if (gunComboResetTimer_ <= 0.0f && gunComboAnimTimer_ <= 0.0f) {
-			gunComboStep_ = 0;
+	// ★蒸気圧リチャージ処理
+	if (isRecharging_) {
+		rechargeTimer_ -= dt;
+		// リチャージ中は徐々に蒸気圧が回復する
+		float rechargeRate = maxSteamPressure_ / RECHARGE_TIME;
+		steamPressure_ += rechargeRate * dt;
+		if (steamPressure_ >= maxSteamPressure_) {
+			steamPressure_ = maxSteamPressure_;
+			isRecharging_ = false;
+			rechargeTimer_ = 0.0f;
 		}
+		prevAttackKeyDown_ = currentAttackKeyDown;
+		return; // リチャージ中は射撃不可
 	}
 
-	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
-	float forwardX = std::sin(pTc.rotate.y);
-	float forwardZ = std::cos(pTc.rotate.y);
-	float moveDist = 1.2f; // ちょっと移動する距離
+	// ★反動後退の物理更新
+	float recoilLen = std::sqrt(recoilVelocity_.x * recoilVelocity_.x + recoilVelocity_.z * recoilVelocity_.z);
+	if (recoilLen > 0.01f) {
+		pTc.translate.x += recoilVelocity_.x * dt;
+		pTc.translate.z += recoilVelocity_.z * dt;
+		// 減衰
+		float damping = std::pow(0.05f, dt); // 速やかに減衰
+		recoilVelocity_.x *= damping;
+		recoilVelocity_.z *= damping;
+	}
 
-	// クリック処理（コンボの進行）
-	if (currentAttackKeyDown && !prevAttackKeyDown_) {
-		if (gunShootTimer_ <= 0.0f && gunComboAnimTimer_ <= 0.0f) {
-			
-			if (isSkillActive_) {
-				// ----------------------------------------
-				// 特殊射撃 (Eキー状態)
-				// 1段目: 1発 (前へ)
-				// 2段目: 3発 (前、後、そのまま)
-				// 3段目: 4発 (前、後、そのまま、後)
-				// ----------------------------------------
-				gunComboStep_++;
-				if (gunComboStep_ > 3) gunComboStep_ = 1;
+	// ★チャージショット処理
+	if (currentAttackKeyDown && gunShootTimer_ <= 0.0f) {
+		if (!isCharging_ && !prevAttackKeyDown_) {
+			// チャージ開始
+			isCharging_ = true;
+			chargeTime_ = 0.0f;
+			chargeVfxTimer_ = 0.0f;
+		}
 
-				if (gunComboStep_ == 1) {
-					ShootGun(entity, scene);
-					pTc.translate.x += forwardX * moveDist;
-					pTc.translate.z += forwardZ * moveDist;
-					gunShootTimer_ = 0.35f;
-					gunComboResetTimer_ = 1.0f;
-				} else if (gunComboStep_ == 2) {
-					gunComboAnimTimer_ = 0.45f;
-					gunSubStep_ = 0;
-					gunSubTimer_ = 0.0f;
-					gunComboResetTimer_ = 1.2f;
-				} else if (gunComboStep_ == 3) {
-					gunComboAnimTimer_ = 0.6f;
-					gunSubStep_ = 0;
-					gunSubTimer_ = 0.0f;
-					gunComboResetTimer_ = 1.5f;
+		if (isCharging_) {
+			chargeTime_ += dt;
+			chargeTime_ = std::min(chargeTime_, CHARGE_TIME_MAX);
+
+			// チャージ中の蒸気排出VFX（断続的に）
+			chargeVfxTimer_ -= dt;
+			if (chargeVfxTimer_ <= 0.0f && chargeTime_ > 0.15f) {
+				// 銃の横から蒸気を少しずつ出す
+				entt::entity gun = scene->FindObjectByName(gunName_);
+				if (gun != entt::null) {
+					Engine::Matrix4x4 gunWorld = scene->GetWorldMatrix((int)gun);
+					DirectX::XMMATRIX m = DirectX::XMLoadFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&gunWorld));
+					DirectX::XMVECTOR gunPos = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(0, 0, 0.0f, 1), m);
+					DirectX::XMVECTOR gunRight = DirectX::XMVector3Normalize(DirectX::XMVector3TransformNormal(DirectX::XMVectorSet(1, 0, 0, 0), m));
+					DirectX::XMVECTOR gunFwd = DirectX::XMVector3Normalize(DirectX::XMVector3TransformNormal(DirectX::XMVectorSet(0, 0, 1, 0), m));
+
+					DirectX::XMFLOAT3 steamPos;
+					DirectX::XMStoreFloat3(&steamPos, gunPos);
+					DirectX::XMFLOAT3 fwd;
+					DirectX::XMStoreFloat3(&fwd, gunFwd);
+
+					// 短い蒸気エフェクト
+					entt::entity steamVfx = scene->CreateEntity("ChargeSteam_VFX");
+					auto& sTc = scene->GetRegistry().get<TransformComponent>(steamVfx);
+					sTc.translate = steamPos;
+					scene->SetTag(steamVfx, TagType::VFX);
+
+					auto& sVc = scene->GetRegistry().emplace<VariableComponent>(steamVfx);
+					sVc.SetValue("NormalX", fwd.x);
+					sVc.SetValue("NormalY", fwd.y);
+					sVc.SetValue("NormalZ", fwd.z);
+					sVc.SetValue("Radius", 1.0f + chargeTime_ * 1.5f); // チャージが進むと大きく
+					sVc.SetValue("Duration", 0.25f);
+					sVc.SetValue("ScatterMode", 0.0f);
+					sVc.SetValue("ScatterDelay", 0.0f);
+					sVc.SetValue("ScatterSpeed", 2.0f);
+					sVc.SetValue("Count", 5.0f);
+
+					auto& sSc = scene->GetRegistry().emplace<ScriptComponent>(steamVfx);
+					sSc.scripts.push_back({"SpaceShatterScript", "", nullptr});
 				}
-			} else {
-				// ----------------------------------------
-				// 通常射撃
-				// 1段目: 1発
-				// 2段目: 3発 (前、後、少し後)
-				// ----------------------------------------
-				gunComboStep_++;
-				if (gunComboStep_ > 2) gunComboStep_ = 1;
 
-				if (gunComboStep_ == 1) {
-					ShootGun(entity, scene);
-					gunShootTimer_ = 0.3f;
-					gunComboResetTimer_ = 1.0f;
-				} else if (gunComboStep_ == 2) {
-					gunComboAnimTimer_ = 0.45f;
-					gunSubStep_ = 0;
-					gunSubTimer_ = 0.0f;
-					gunComboResetTimer_ = 1.2f;
-				}
+				// チャージが進むほど頻度が上がる（プシュッ、プシュッ → プシュシュシュ）
+				float interval = 0.25f - (chargeTime_ / CHARGE_TIME_MAX) * 0.15f;
+				chargeVfxTimer_ = std::max(0.08f, interval);
+			}
+
+			// 銃の振動（チャージが進むほど激しく）
+			entt::entity gun = scene->FindObjectByName(gunName_);
+			if (gun != entt::null) {
+				auto& gunTc = scene->GetRegistry().get<TransformComponent>(gun);
+				float intensity = (chargeTime_ / CHARGE_TIME_MAX) * 0.06f;
+				gunTc.translate.x += ((rand() % 100) / 100.0f - 0.5f) * intensity;
+				gunTc.translate.y += ((rand() % 100) / 100.0f - 0.5f) * intensity;
 			}
 		}
 	}
+
+	// ★ボタンを離した時の処理
+	if (!currentAttackKeyDown && prevAttackKeyDown_ && isCharging_) {
+		isCharging_ = false;
+
+		if (chargeTime_ >= CHARGE_TIME_MIN && steamPressure_ >= CHARGE_SHOT_COST * 0.5f) {
+			// ★チャージショット発射！
+			ShootChargeShot(entity, scene);
+			steamPressure_ -= CHARGE_SHOT_COST;
+
+			// 反動後退
+			float forwardX = std::sin(pTc.rotate.y);
+			float forwardZ = std::cos(pTc.rotate.y);
+			float recoilPower = 12.0f * (chargeTime_ / CHARGE_TIME_MAX);
+			recoilVelocity_.x = -forwardX * recoilPower;
+			recoilVelocity_.z = -forwardZ * recoilPower;
+
+			gunShootTimer_ = 0.5f;
+		} else if (steamPressure_ > 0.0f) {
+			// 通常射撃（短押し）- 残量に関わらず撃てる
+			ShootGun(entity, scene);
+			steamPressure_ -= NORMAL_SHOT_COST;
+			gunShootTimer_ = 0.3f;
+		}
+
+		chargeTime_ = 0.0f;
+
+		// 圧力がなくなったらリチャージ開始
+		if (steamPressure_ <= 0.0f) {
+			steamPressure_ = 0.0f;
+			isRecharging_ = true;
+			rechargeTimer_ = RECHARGE_TIME;
+		}
+	}
+
+	// クールダウン
+	if (gunShootTimer_ > 0.0f) gunShootTimer_ -= dt;
+
 	prevAttackKeyDown_ = currentAttackKeyDown;
 
-	// 連射アクションの処理
-	if (gunComboAnimTimer_ > 0.0f) {
-		gunComboAnimTimer_ -= dt;
-		gunSubTimer_ -= dt;
+	// ★圧力ゲージの描画
+	DrawPressureGauge(scene);
+}
 
-		if (isSkillActive_) {
-			// 特殊射撃の連射
-			if (gunComboStep_ == 2) {
-				// 3発 (間隔 0.15s)
-				if (gunSubTimer_ <= 0.0f && gunSubStep_ < 3) {
-					ShootGun(entity, scene);
-					if (gunSubStep_ == 0) {
-						pTc.translate.x += forwardX * moveDist; pTc.translate.z += forwardZ * moveDist;
-					} else if (gunSubStep_ == 1) {
-						pTc.translate.x -= forwardX * moveDist; pTc.translate.z -= forwardZ * moveDist;
-					} else if (gunSubStep_ == 2) {
-						// そのまま
-					}
-					gunSubStep_++;
-					gunSubTimer_ = 0.15f;
-				}
-			} else if (gunComboStep_ == 3) {
-				// 4発 (間隔 0.15s)
-				if (gunSubTimer_ <= 0.0f && gunSubStep_ < 4) {
-					ShootGun(entity, scene);
-					if (gunSubStep_ == 0) {
-						pTc.translate.x += forwardX * moveDist; pTc.translate.z += forwardZ * moveDist;
-					} else if (gunSubStep_ == 1) {
-						pTc.translate.x -= forwardX * moveDist; pTc.translate.z -= forwardZ * moveDist;
-					} else if (gunSubStep_ == 2) {
-						// そのまま
-					} else if (gunSubStep_ == 3) {
-						pTc.translate.x -= forwardX * moveDist; pTc.translate.z -= forwardZ * moveDist;
-					}
-					gunSubStep_++;
-					gunSubTimer_ = 0.15f;
-				}
-			}
-		} else {
-			// 通常射撃の連射
-			if (gunComboStep_ == 2) {
-				// 3発 (間隔 0.15s)
-				if (gunSubTimer_ <= 0.0f && gunSubStep_ < 3) {
-					ShootGun(entity, scene);
-					if (gunSubStep_ == 0) {
-						pTc.translate.x += forwardX * moveDist; pTc.translate.z += forwardZ * moveDist;
-					} else if (gunSubStep_ == 1) {
-						pTc.translate.x -= forwardX * moveDist; pTc.translate.z -= forwardZ * moveDist;
-					} else if (gunSubStep_ == 2) {
-						pTc.translate.x -= forwardX * (moveDist * 0.5f); pTc.translate.z -= forwardZ * (moveDist * 0.5f);
-					}
-					gunSubStep_++;
-					gunSubTimer_ = 0.15f;
-				}
-			}
-		}
+
+void PlayerScript::ShootChargeShot(entt::entity entity, GameScene* scene) {
+	float baseDamage = 45.0f; // 通常の3倍
+	float chargeMul = chargeTime_ / CHARGE_TIME_MAX; // 0.0 ~ 1.0
+	float damage = baseDamage * (0.5f + chargeMul * 0.5f);
+	if (isSkillActive_) damage *= SKILL_DAMAGE_MULTIPLIER;
+
+	// 巨大な弾を発射
+	SpawnBullet(entity, scene, 0.0f, 0.0f, damage, 3.0f, true);
+
+	// ★巨大マズルフラッシュ + 大量スモーク
+	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
+	entt::entity gun = scene->FindObjectByName(gunName_);
+	DirectX::XMFLOAT3 muzzlePos = pTc.translate;
+	muzzlePos.y += 1.0f;
+	float fwdX = std::sin(pTc.rotate.y);
+	float fwdZ = std::cos(pTc.rotate.y);
+
+	if (gun != entt::null) {
+		Engine::Matrix4x4 gunWorld = scene->GetWorldMatrix((int)gun);
+		DirectX::XMMATRIX m = DirectX::XMLoadFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&gunWorld));
+		DirectX::XMVECTOR tip = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(0, 0, 0.6f, 1), m);
+		DirectX::XMStoreFloat3(&muzzlePos, tip);
+		DirectX::XMVECTOR forward = DirectX::XMVector3Normalize(DirectX::XMVector3TransformNormal(DirectX::XMVectorSet(0, 0, 1, 0), m));
+		fwdX = DirectX::XMVectorGetX(forward);
+		fwdZ = DirectX::XMVectorGetZ(forward);
 	}
 
-	// ★追加: コンボダッシュ中に残像を生成 (ユーザー要望により無効化)
-	/*
-	if (gunComboAnimTimer_ > 0.0f) {
-		afterImageTimer_ -= dt;
-		if (afterImageTimer_ <= 0.0f) {
-			auto& pTc2 = scene->GetRegistry().get<TransformComponent>(entity);
-			AfterImage ai;
-			ai.pos = pTc2.translate;
-			ai.rotate = pTc2.rotate;
-			ai.scale = pTc2.scale;
-			ai.life = 0.2f;
-			ai.maxLife = 0.2f;
-			afterImages_.push_back(ai);
-			if (afterImages_.size() > 15) afterImages_.pop_front();
-			afterImageTimer_ = 0.03f; // 約30FPSで残像を発生
-		}
+	// 巨大なマズルVFX
+	entt::entity muzzleVfx = scene->CreateEntity("ChargeShot_VFX");
+	auto& mTc = scene->GetRegistry().get<TransformComponent>(muzzleVfx);
+	mTc.translate = muzzlePos;
+	scene->SetTag(muzzleVfx, TagType::VFX);
+
+	auto& mvc = scene->GetRegistry().emplace<VariableComponent>(muzzleVfx);
+	mvc.SetValue("NormalX", fwdX);
+	mvc.SetValue("NormalY", 0.0f);
+	mvc.SetValue("NormalZ", fwdZ);
+	mvc.SetValue("Radius", 5.0f + chargeMul * 3.0f);  // チャージ量に比例して巨大
+	mvc.SetValue("Duration", 0.8f);
+	mvc.SetValue("ScatterMode", 0.0f);
+	mvc.SetValue("ScatterDelay", 0.0f);
+	mvc.SetValue("ScatterSpeed", 15.0f);
+	mvc.SetValue("Count", 50.0f + chargeMul * 30.0f);
+	mvc.SetValue("IsSpecial", 1.0f);
+
+	auto& msc = scene->GetRegistry().emplace<ScriptComponent>(muzzleVfx);
+	msc.scripts.push_back({"SpaceShatterScript", "", nullptr});
+
+	// マズルフラッシュ
+	MuzzleFlash flash;
+	flash.pos = muzzlePos;
+	flash.life = 0.12f;
+	flash.maxLife = 0.12f;
+	muzzleFlashes_.push_back(flash);
+}
+
+void PlayerScript::DrawPressureGauge(GameScene* scene) {
+	auto* renderer = scene->GetRenderer();
+	if (!renderer) return;
+
+	// ゲージ位置 (画面右下)
+	float gaugeX = 1160.0f;
+	float gaugeY = 620.0f;
+	float gaugeSize = 70.0f;
+
+	float pressureRatio = steamPressure_ / maxSteamPressure_;
+
+	// 背景リング（暗い外枠）
+	Engine::Renderer::SdfUIDesc bgRing;
+	bgRing.centerPx = {gaugeX, gaugeY};
+	bgRing.sizePx = {gaugeSize, gaugeSize};
+	bgRing.shape = 1; // Circle
+	bgRing.lineWidth = 6.0f;
+	bgRing.fill = 0.0f; // アウトライン
+	bgRing.progress = 1.0f;
+	bgRing.color = {0.15f, 0.12f, 0.1f, 0.8f};
+	bgRing.glow = 0.0f;
+	renderer->DrawSDFUI(bgRing);
+
+	// 蒸気圧ゲージ本体（充填率で進捗表示）
+	Engine::Renderer::SdfUIDesc gauge;
+	gauge.centerPx = {gaugeX, gaugeY};
+	gauge.sizePx = {gaugeSize, gaugeSize};
+	gauge.shape = 1; // Circle
+	gauge.lineWidth = 5.0f;
+	gauge.fill = 0.0f;
+	gauge.progress = pressureRatio;
+
+	if (isRecharging_) {
+		// リチャージ中は赤く点滅
+		float blink = std::sin(rechargeTimer_ * 8.0f) * 0.5f + 0.5f;
+		gauge.color = {0.9f, 0.2f + blink * 0.3f, 0.1f, 0.7f + blink * 0.3f};
+		gauge.glow = blink * 3.0f;
+	} else if (isCharging_) {
+		// チャージ中は青白く光る
+		float t = chargeTime_ / CHARGE_TIME_MAX;
+		gauge.color = {0.3f + t * 0.5f, 0.7f + t * 0.3f, 1.0f, 0.9f};
+		gauge.glow = t * 5.0f;
+	} else {
+		// 通常時はスチームパンク風の暖色
+		gauge.color = {0.9f, 0.7f, 0.3f, 0.85f};
+		gauge.glow = 1.0f;
 	}
-	*/
+	renderer->DrawSDFUI(gauge);
+
+	// 中央に圧力値のテキスト表示
+	int pct = (int)(pressureRatio * 100.0f);
+	std::string pctText = std::to_string(pct);
+	float textW = renderer->MeasureTextWidth(pctText, 0.5f);
+	float textH = renderer->GetTextLineHeight(0.5f);
+	Engine::Vector4 textCol = isRecharging_ ? Engine::Vector4{1.0f, 0.3f, 0.2f, 1.0f} : Engine::Vector4{1.0f, 0.9f, 0.7f, 1.0f};
+	renderer->DrawString(pctText, gaugeX - textW * 0.5f, gaugeY - textH * 0.35f, 0.5f, textCol);
+
+	// チャージ中は内側にチャージ進捗リングを追加表示
+	if (isCharging_ && chargeTime_ > 0.1f) {
+		float chargeRatio = chargeTime_ / CHARGE_TIME_MAX;
+		Engine::Renderer::SdfUIDesc chargeRing;
+		chargeRing.centerPx = {gaugeX, gaugeY};
+		chargeRing.sizePx = {gaugeSize * 0.65f, gaugeSize * 0.65f};
+		chargeRing.shape = 1;
+		chargeRing.lineWidth = 3.0f;
+		chargeRing.fill = 0.0f;
+		chargeRing.progress = chargeRatio;
+		chargeRing.color = {0.4f, 0.85f, 1.0f, 0.9f};
+		chargeRing.glow = chargeRatio * 8.0f;
+		renderer->DrawSDFUI(chargeRing);
+	}
 }
 
 void PlayerScript::ShootGun(entt::entity entity, GameScene* scene) {
@@ -726,12 +847,27 @@ void PlayerScript::ShootGun(entt::entity entity, GameScene* scene) {
 
 	// ★空間割れマズルエフェクト（銃口の前に小規模なガラス割れを生成）
 	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
+	entt::entity gun = scene->FindObjectByName(gunName_);
 	DirectX::XMFLOAT3 muzzlePos = pTc.translate;
 	muzzlePos.y += 1.0f;
 	float fwdX = std::sin(pTc.rotate.y);
 	float fwdZ = std::cos(pTc.rotate.y);
-	muzzlePos.x += fwdX * 2.5f;
-	muzzlePos.z += fwdZ * 2.5f;
+
+	if (gun != entt::null) {
+		Engine::Matrix4x4 gunWorld = scene->GetWorldMatrix((int)gun);
+		DirectX::XMMATRIX m = DirectX::XMLoadFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&gunWorld));
+		// 銃のモデルの先端（ローカルZ前方）を計算
+		DirectX::XMVECTOR tip = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(0, 0, 0.6f, 1), m);
+		DirectX::XMStoreFloat3(&muzzlePos, tip);
+		
+		// 向きも銃の向きに合わせる
+		DirectX::XMVECTOR forward = DirectX::XMVector3Normalize(DirectX::XMVector3TransformNormal(DirectX::XMVectorSet(0, 0, 1, 0), m));
+		fwdX = DirectX::XMVectorGetX(forward);
+		fwdZ = DirectX::XMVectorGetZ(forward);
+	} else {
+		muzzlePos.x += fwdX * 1.5f;
+		muzzlePos.z += fwdZ * 1.5f;
+	}
 
 	entt::entity muzzleVfx = scene->CreateEntity("MuzzleShatter_VFX");
 	auto& mTc = scene->GetRegistry().get<TransformComponent>(muzzleVfx);
@@ -739,17 +875,17 @@ void PlayerScript::ShootGun(entt::entity entity, GameScene* scene) {
 	scene->SetTag(muzzleVfx, TagType::VFX);
 
 	auto& mvc = scene->GetRegistry().emplace<VariableComponent>(muzzleVfx);
-	mvc.SetValue("DirX", fwdX);
-	mvc.SetValue("DirY", 0.0f);
-	mvc.SetValue("DirZ", fwdZ);
-	mvc.SetValue("Scale", 0.35f);             // 銃口用に小さいスケール
-	mvc.SetValue("Count", isSkillActive_ ? 30.0f : 12.0f); // 破片数
-	mvc.SetValue("Duration", 0.8f);            // 短い持続時間
-	mvc.SetValue("Radius", 1.5f);              // 小さい半径
-	mvc.SetValue("NoCracks", 0.0f);            // ひび割れ描画あり
+	mvc.SetValue("NormalX", fwdX);
+	mvc.SetValue("NormalY", 0.0f);
+	mvc.SetValue("NormalZ", fwdZ);
+	mvc.SetValue("Radius", 3.0f);             // 拡大
+	mvc.SetValue("Duration", 0.5f);           // 素早く消える
+	mvc.SetValue("ScatterMode", 0.0f);        // マズルモード
+	mvc.SetValue("ScatterDelay", 0.0f);       // 即座に噴射
+	mvc.SetValue("ScatterSpeed", 12.0f);      // 勢いよく
 
 	auto& msc = scene->GetRegistry().emplace<ScriptComponent>(muzzleVfx);
-	msc.scripts.push_back({"MirrorShatterScript", "", nullptr});
+	msc.scripts.push_back({"SpaceShatterScript", "", nullptr});
 }
 
 void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spreadYaw, float spreadPitch, float damage, float lifeTime, bool enhanced) {
@@ -786,15 +922,34 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 		}
 	}
 
-	// ★追加: プレイヤー自身の当たり判定と被らないよう、前方にオフセットする
 	float cosX = std::cos(bTc.rotate.x);
 	float moveX = std::sin(bTc.rotate.y) * cosX;
 	float moveZ = std::cos(bTc.rotate.y) * cosX;
 	float moveY = -std::sin(bTc.rotate.x);
 
-	bTc.translate.x += moveX * 2.0f;
-	bTc.translate.y += moveY * 2.0f;
-	bTc.translate.z += moveZ * 2.0f;
+	// ★銃の先端から弾を出す
+	entt::entity gun = scene->FindObjectByName(gunName_);
+	if (gun != entt::null) {
+		Engine::Matrix4x4 gunWorld = scene->GetWorldMatrix((int)gun);
+		DirectX::XMMATRIX m = DirectX::XMLoadFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&gunWorld));
+		DirectX::XMVECTOR tip = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(0, 0, 0.6f, 1), m);
+		DirectX::XMStoreFloat3(&bTc.translate, tip);
+		
+		// 弾の向きを銃の向き（プラス拡散分）に合わせる
+		DirectX::XMVECTOR forward = DirectX::XMVector3Normalize(DirectX::XMVector3TransformNormal(DirectX::XMVectorSet(0, 0, 1, 0), m));
+		moveX = DirectX::XMVectorGetX(forward);
+		moveY = DirectX::XMVectorGetY(forward);
+		moveZ = DirectX::XMVectorGetZ(forward);
+
+		float fYaw = std::atan2(moveX, moveZ);
+		float fPitch = -std::asin(std::max(-1.0f, std::min(1.0f, moveY)));
+		bTc.rotate.y = fYaw + spreadYaw;
+		bTc.rotate.x = fPitch + spreadPitch;
+	} else {
+		bTc.translate.x += moveX * 2.0f;
+		bTc.translate.y += moveY * 2.0f;
+		bTc.translate.z += moveZ * 2.0f;
+	}
 
 	bTc.scale = { 0.2f, 0.2f, 0.6f };
 
@@ -828,18 +983,18 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 		msTc.translate = bTc.translate; // 銃口位置
 		
 		auto& msVc = scene->GetRegistry().emplace<VariableComponent>(muzzleShatter);
-		msVc.SetValue("Scale", 0.35f); 
+		msVc.SetValue("NormalX", moveX);
+		msVc.SetValue("NormalY", moveY);
+		msVc.SetValue("NormalZ", moveZ);
+		msVc.SetValue("Radius", 2.8f);            // ★スチームの迫力を出すため拡大
 		msVc.SetValue("Count", 35.0f); 
-		msVc.SetValue("Radius", 2.5f); 
-		msVc.SetValue("Duration", 0.6f); 
-		msVc.SetValue("NoFlash", 1.0f);  // 十字フラッシュを無効化
-		msVc.SetValue("NoCracks", 1.0f); // ヒビ割れ線を無効化
-		msVc.SetValue("DirX", moveX);
-		msVc.SetValue("DirY", moveY);
-		msVc.SetValue("DirZ", moveZ);
+		msVc.SetValue("Duration", 0.6f);          // ★少し長めに残る
+		msVc.SetValue("ScatterMode", 0.0f);       // ★射撃（マズル）モードに設定
+		msVc.SetValue("ScatterDelay", 0.15f);     // ★綺麗な状態を長く(0.15秒)
+		msVc.SetValue("ScatterSpeed", 1.5f);      // ★飛びすぎないように調整
 
 		auto& msSc = scene->GetRegistry().emplace<ScriptComponent>(muzzleShatter);
-		msSc.scripts.push_back({"MirrorShatterScript", "", std::make_shared<MirrorShatterScript>(), false});
+		msSc.scripts.push_back({"SpaceShatterScript", "", nullptr});
 	}
 
 	// ★追加: マズルフラッシュ生成（疑似ライト）

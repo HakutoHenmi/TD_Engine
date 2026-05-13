@@ -42,17 +42,17 @@ float3 PseudoBloom(float2 uv)
     // クロス状の強いブラーで光の溢れを作る
     float weight[5] = {0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216};
     
-    // しきい値を1.5fに上げて、本当に明るい場所だけBloomさせる。強度も0.3fに下げる
-    float bloomThreshold = 1.3f;
-    float bloomIntensity = 0.3f;
+    // 高めの閾値設定（0.85以上にすることで、背景の山などは光らず、フラッシュの芯だけを光らせる）
+    float bloomThreshold = 0.90f; // ★少し高くして対象を絞る
+    float bloomIntensity = 0.15f; // ★強すぎたブルームを弱める
     
     for(int i = -4; i <= 4; ++i) {
-        float2 offset = float2(i, 0) * texel * 3.0f;
+        float2 offset = float2(i, 0) * texel * 6.0f; // 適度な広がり
         float3 c = gScene.Sample(gSmp, uv + offset).rgb;
         float brightness = dot(c, float3(0.2126, 0.7152, 0.0722));
         if(brightness > bloomThreshold) bloom += c * weight[abs(i)] * bloomIntensity;
         
-        offset = float2(0, i) * texel * 3.0f;
+        offset = float2(0, i) * texel * 6.0f; // 適度な広がり
         c = gScene.Sample(gSmp, uv + offset).rgb;
         brightness = dot(c, float3(0.2126, 0.7152, 0.0722));
         if(brightness > bloomThreshold) bloom += c * weight[abs(i)] * bloomIntensity;
@@ -98,7 +98,7 @@ float4 main(PSIn i) : SV_TARGET
     col = ColorGrade(col);
     
     // 追加: 露出の調整（全体が明るすぎるのを防ぐ）
-    float exposure = 0.8f;
+    float exposure = 0.9f; // ★少し暗くなりすぎていたかもしれないので微調整
     col *= exposure;
     
     // 4. ACES Tone mapping (HDRからLDRへマッピング)

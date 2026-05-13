@@ -32,16 +32,17 @@ private:
 
     // すべて plane 破片
     struct ShardPiece {
-        entt::entity entity = entt::null;
-        DirectX::XMFLOAT3 targetPos; // 最終的な割れた位置
-        DirectX::XMFLOAT3 arcNormal;
-        DirectX::XMFLOAT3 velocity;
-        DirectX::XMFLOAT3 rotSpeed;
-        float sizeX, sizeY;
-        float appearDelay; // 扇状に割れるためのディレイ
-        bool isAppeared = false;
-        bool isScattering = false;
-        bool isGlassPanel = false; // 空間割れガラス板
+        entt::entity entity{entt::null};
+        DirectX::XMFLOAT3 targetPos{0.0f, 0.0f, 0.0f};
+        DirectX::XMFLOAT3 arcNormal{0.0f, 0.0f, 0.0f};
+        DirectX::XMFLOAT3 velocity{0.0f, 0.0f, 0.0f};
+        DirectX::XMFLOAT3 rotSpeed{0.0f, 0.0f, 0.0f};
+        float sizeX{0.0f};
+        float sizeY{0.0f};
+        float appearDelay{0.0f};
+        bool isAppeared{false};
+        bool isScattering{false};
+        bool isGlassPanel{false}; // 空間割れガラス板
     };
     std::vector<ShardPiece> shards_;
 
