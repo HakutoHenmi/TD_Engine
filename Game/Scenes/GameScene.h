@@ -97,7 +97,7 @@ private:
 	std::string sceneName_; // ★追加: シーン名 ("Title", "Select", "Game", "Result")
     entt::registry pendingSpawns_;
     std::vector<entt::entity> pendingDestroys_;
-    std::mutex spawnMutex_; // ★追加: マルチスレッドから安全にスポーン・破棄登録を行えるようにする
+    std::recursive_mutex spawnMutex_; // ★追加: マルチスレッドから安全にスポーン・破棄登録を行えるようにする
 	
 	// タグ検索キャッシュ
 	std::unordered_map<TagType, std::vector<entt::entity>> tagCache_;

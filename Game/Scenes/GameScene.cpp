@@ -171,6 +171,26 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 			registry_.emplace<NameComponent>(ps, "PhaseSystem");
 			auto& sc = registry_.emplace<ScriptComponent>(ps);
 			sc.scripts.push_back({"PhaseSystemScript"});
+
+			// ★追加: プレイヤーの作成 (フォールバック)
+			auto player = registry_.create();
+			registry_.emplace<NameComponent>(player, "Player");
+			registry_.emplace<TagComponent>(player, TagType::Player);
+			auto& pTc = registry_.emplace<TransformComponent>(player);
+			pTc.translate = DirectX::XMFLOAT3{0, 1, 0};
+
+			auto& pSc = registry_.emplace<ScriptComponent>(player);
+			pSc.scripts.push_back({"PlayerScript"});
+			// プレイヤーに必要な他コンポーネント
+			registry_.emplace<PlayerInputComponent>(player);
+			registry_.emplace<CharacterMovementComponent>(player);
+			auto& pHc = registry_.emplace<HealthComponent>(player);
+			pHc.hp = 100.0f; pHc.maxHp = 100.0f;
+			
+			registry_.emplace<CameraTargetComponent>(player);
+			auto& pMr = registry_.emplace<MeshRendererComponent>(player);
+			pMr.modelHandle = renderer_->LoadObjMesh("Resources/Models/cube/cube.obj");
+			pMr.textureHandle = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
 		}
 	}
 
@@ -485,20 +505,21 @@ void GameScene::Update() {
 
 	// ★ ペンディングオブジェクト（弾など）をflushし、破棄要求を処理
 	{
-		std::lock_guard<std::mutex> lock(spawnMutex_);
+		std::lock_guard<std::recursive_mutex> lock(spawnMutex_);
 
 		if (!pendingSpawns_.storage<entt::entity>().empty()) {
 			// 一旦、pendingSpawns_ をダミーとして運用するか、直接 `registry_.create()` するのでここは実質空になる
 			pendingSpawns_.clear();
 		}
 
-		if (!pendingDestroys_.empty()) {
-			for (auto id : pendingDestroys_) {
+		while (!pendingDestroys_.empty()) {
+			std::vector<entt::entity> currentDestroys;
+			currentDestroys.swap(pendingDestroys_);
+			for (auto id : currentDestroys) {
 				if (registry_.valid(id)) {
 					registry_.destroy(id);
 				}
 			}
-			pendingDestroys_.clear();
 		}
 	}
 
@@ -575,7 +596,7 @@ void GameScene::Update() {
 
 // ★ 汎用スポーン
 entt::entity GameScene::CreateEntity(const std::string& name) {
-	std::lock_guard<std::mutex> lock(spawnMutex_);
+	std::lock_guard<std::recursive_mutex> lock(spawnMutex_);
 	auto entity = registry_.create();
 	registry_.emplace<NameComponent>(entity, name);
 	registry_.emplace<TransformComponent>(entity);
@@ -584,7 +605,7 @@ entt::entity GameScene::CreateEntity(const std::string& name) {
 
 // ★追加: IDでオブジェクトを検索し、破棄フラグを立てる
 void GameScene::DestroyObject(uint32_t id) {
-	std::lock_guard<std::mutex> lock(spawnMutex_);
+	std::lock_guard<std::recursive_mutex> lock(spawnMutex_);
 	// IDをそのままentt::entityとして扱う（ダウンキャスト）
 	pendingDestroys_.push_back(static_cast<entt::entity>(id));
 }
@@ -1329,7 +1350,7 @@ void GameScene::SetIsPlaying(bool play) {
 		});
 
 		// ペンディングデータのクリア
-		std::lock_guard<std::mutex> lock(spawnMutex_);
+		std::lock_guard<std::recursive_mutex> lock(spawnMutex_);
 		pendingDestroys_.clear();
 		pendingSpawns_.clear();
 
