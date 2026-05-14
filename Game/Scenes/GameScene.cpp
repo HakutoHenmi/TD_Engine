@@ -203,18 +203,18 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	// スクリプトエンジンの初期化
 	ScriptEngine::GetInstance()->Initialize();
 
-	// ★ Systemの登録（順序が重要）
+	// ★ Systemの登録（順序が重要：ScriptSystemをカメラや物理の前に持ってくる）
 	systems_.clear();
 	systems_.push_back(std::make_unique<PlayerInputSystem>());
-	systems_.push_back(std::make_unique<CharacterMovementSystem>());
-	systems_.push_back(std::make_unique<PhysicsSystem>());
-	systems_.push_back(std::make_unique<CameraFollowSystem>());
-	systems_.push_back(std::make_unique<HealthSystem>());
 
 	auto scriptSys = std::make_unique<ScriptSystem>();
 	scriptSys->SetScene(this);
 	systems_.push_back(std::move(scriptSys));
 
+	systems_.push_back(std::make_unique<CharacterMovementSystem>());
+	systems_.push_back(std::make_unique<PhysicsSystem>());
+	systems_.push_back(std::make_unique<CameraFollowSystem>());
+	systems_.push_back(std::make_unique<HealthSystem>());
 	systems_.push_back(std::make_unique<CombatSystem>());
 	systems_.push_back(std::make_unique<AudioSystem>());
 	systems_.push_back(std::make_unique<UISystem>());

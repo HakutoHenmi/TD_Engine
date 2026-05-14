@@ -50,181 +50,123 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		hc.maxHp = 100.0f;
 	}
 
-	// 剣がシーンに既にあるか確認
-	entt::entity sword = entt::null;
-	auto view = scene->GetRegistry().view<NameComponent>();
-	for (auto e : view) {
-		if (view.get<NameComponent>(e).name == swordName_) {
-			sword = e;
-			break;
-		}
-	}
-
+	// ---- 剣（大剣）の初期化 ----
+	entt::entity sword = scene->FindObjectByName(swordName_);
 	if (sword == entt::null) {
-		// 剣がなければ生成
 		sword = scene->GetRegistry().create();
 		scene->GetRegistry().emplace<NameComponent>(sword).name = swordName_;
-		auto& tc = scene->GetRegistry().emplace<TransformComponent>(sword);
-		tc.scale = { 0.15f, 0.15f, 1.8f };
+	}
+
+	// 必須コンポーネントを確実に付与・更新
+	auto& sTc = scene->GetRegistry().get_or_emplace<TransformComponent>(sword);
+	sTc.scale = { 0.45f, 0.40f, 3.2f }; // 大剣サイズ
+
+	auto& sHierarchy = scene->GetRegistry().get_or_emplace<HierarchyComponent>(sword);
+	sHierarchy.parentId = entity; // プレイヤーの子にする
+
+	auto& sTag = scene->GetRegistry().get_or_emplace<TagComponent>(sword);
+	sTag.tag = TagType::PlayerSword;
+
+	auto* renderer = scene->GetRenderer();
+	if (renderer) {
+		auto& sMr = scene->GetRegistry().get_or_emplace<MeshRendererComponent>(sword);
+		sMr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+		sMr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+		sMr.color = { 0.8f, 0.8f, 0.85f, 1.0f }; // 少し金属質なグレー
+		sMr.enabled = true;
+	}
+
+	auto& sMotion = scene->GetRegistry().get_or_emplace<MotionComponent>(sword);
+	// 大剣用コンボモーションの定義
+	auto setupGreatswordCombo = [&](const std::string& name, int index) {
+		MotionComponent::MotionClip clip;
+		clip.name = name;
+		clip.loop = false;
+		float bsz = 3.2f;
+		if (index == 1) { // 横薙ぎ
+			clip.totalDuration = 0.7f;
+			clip.keyframes.push_back({0.00f, { 1.5f, 1.2f, -0.5f }, { 0.0f, 2.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
+			clip.keyframes.push_back({0.25f, { 1.8f, 1.0f, 0.0f }, { 0.0f, 1.8f, 0.0f }, { 0.45f, 0.40f, bsz + 0.5f }});
+			clip.keyframes.push_back({0.45f, { 0.0f, 1.0f, 2.5f }, { 0.0f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 1.2f }});
+			clip.keyframes.push_back({0.70f, {-2.2f, 0.8f, -0.8f }, { 0.0f, -2.2f, 0.0f }, { 0.45f, 0.40f, bsz }});
+		} else if (index == 2) { // 振り下ろし
+			clip.totalDuration = 0.8f;
+			clip.keyframes.push_back({0.00f, { 0.0f, 3.5f, -1.0f }, { -1.5f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
+			clip.keyframes.push_back({0.30f, { 0.0f, 3.8f, -0.5f }, { -1.8f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
+			clip.keyframes.push_back({0.50f, { 0.0f, 0.5f, 3.5f }, { 0.5f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 1.5f }});
+			clip.keyframes.push_back({0.80f, { 0.0f, 0.2f, 2.8f }, { 0.8f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
+		} else { // 飛翔大回転（前方に飛ばして戻す）
+			clip.totalDuration = 1.2f;
+			// 0.0s: 始動
+			clip.keyframes.push_back({0.00f, { 0.0f, 1.2f, 0.5f }, { 0.0f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
+			// 0.3s: 前方に射出開始 + 回転
+			clip.keyframes.push_back({0.30f, { 0.0f, 1.2f, 4.5f }, { 0.0f, 6.28f, 0.0f }, { 0.45f, 0.40f, bsz + 0.5f }});
+			// 0.6s: 最遠地点で激しく回転 (Boomerang Peak)
+			clip.keyframes.push_back({0.60f, { 0.0f, 1.2f, 7.5f }, { 0.0f, 12.56f, 0.0f }, { 0.45f, 0.40f, bsz + 1.0f }});
+			// 0.9s: 帰還開始
+			clip.keyframes.push_back({0.90f, { 0.0f, 1.2f, 3.5f }, { 0.0f, 18.84f, 0.0f }, { 0.45f, 0.40f, bsz + 0.5f }});
+			// 1.2s: キャッチ
+			clip.keyframes.push_back({1.20f, { -1.0f, 0.8f, -0.5f }, { 0.0f, 20.41f, 0.0f }, { 0.45f, 0.40f, bsz }});
+		}
+		sMotion.clips[name] = clip;
+	};
+	setupGreatswordCombo("Combo1", 1);
+	setupGreatswordCombo("Combo2", 2);
+	setupGreatswordCombo("Combo3", 3);
+
+	// ★追加: 大剣の溜め攻撃モーション「スチーム・ダイブ・スラッシュ」
+	if (auto* motion = scene->GetRegistry().try_get<MotionComponent>(sword)) {
+		MotionComponent::MotionClip clip;
+		clip.name = "SwordChargeAttack";
+		clip.totalDuration = 1.1f;
+		clip.loop = false;
+		float bsz = 3.2f;
+
+		// 0.0s: 溜め・溜め開放（身構える）
+		clip.keyframes.push_back({0.00f, { 0.0f, 0.5f, 0.0f }, { -0.5f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
+		// 0.2s: 跳躍開始（少し上へ、少し前へ）
+		clip.keyframes.push_back({0.20f, { 0.0f, 2.5f, 1.5f }, { -1.5f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 0.5f }});
+		// 0.45s: 空中ピーク（最大限に振りかぶる）
+		clip.keyframes.push_back({0.45f, { 0.0f, 5.0f, 3.5f }, { -2.8f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 1.0f }});
+		// 0.7s: 叩きつけ（最速で地面へ、前方に大きくリーチ）
+		clip.keyframes.push_back({0.70f, { 0.0f, 0.2f, 5.5f }, { 0.8f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 1.8f }});
+		// 1.1s: 着地硬直
+		clip.keyframes.push_back({1.10f, { 0.0f, 0.1f, 4.0f }, { 1.2f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
 		
-		auto& cc = scene->GetRegistry().emplace<ColorComponent>(sword);
-		cc.color = { 0.9f, 0.9f, 0.9f, 1.0f };
-
-		auto& tcTag = scene->GetRegistry().emplace<TagComponent>(sword);
-		tcTag.tag = TagType::PlayerSword;
-
-		// ★追加: 親子関係の設定
-		auto& hierarchy = scene->GetRegistry().emplace<HierarchyComponent>(sword);
-		hierarchy.parentId = entity;
-
-		// ★追加: モーションコンポーネントの追加
-		auto& motion = scene->GetRegistry().emplace<MotionComponent>(sword);
-		motion.isPlaying = false;
-		motion.activeClip = ""; // ★追加: デフォルトクリップによるTransform上書きを防ぐ
-
-		auto* renderer = scene->GetRenderer();
-		if (renderer) {
-			auto& mr = scene->GetRegistry().emplace<MeshRendererComponent>(sword);
-			mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
-			mr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png"); // 必要ならテクスチャも指定可
-			mr.color = { 0.9f, 0.9f, 0.9f, 1.0f };
-			mr.enabled = true;
-		}
-
-		auto& hb = scene->GetRegistry().emplace<HitboxComponent>(sword);
-		hb.isActive = false;
-		hb.damage = 30.0f;
-		hb.tag = TagType::Sword;
-		hb.size = { 3.0f, 3.0f, 1.0f }; 
-		hb.center = { 0.0f, 0.0f, 0.5f };
-		hb.enabled = true;
-	} else {
-		// 既にタグがない場合は追加
-		if (!scene->GetRegistry().all_of<TagComponent>(sword)) {
-			scene->GetRegistry().emplace<TagComponent>(sword).tag = TagType::PlayerSword;
-		}
-		// ★追加: 親子関係の確認・設定
-		if (!scene->GetRegistry().all_of<HierarchyComponent>(sword)) {
-			auto& hc = scene->GetRegistry().emplace<HierarchyComponent>(sword);
-			hc.parentId = entity;
-		} else {
-			auto& hc = scene->GetRegistry().get<HierarchyComponent>(sword);
-			hc.parentId = entity; // デシリアライズ後などはIDが変わっている可能性があるため強制上書き
-		}
-		// ★追加: モーションコンポーネントの確認・設定
-		if (!scene->GetRegistry().all_of<MotionComponent>(sword)) {
-			auto& motion = scene->GetRegistry().emplace<MotionComponent>(sword);
-			motion.isPlaying = false;
-			motion.activeClip = ""; // ★追加: デフォルトクリップによるTransform上書きを防ぐ
-		}
-
-		// 既にある場合は基本的なプロパティを維持
-		scene->GetRegistry().get<TransformComponent>(sword).scale = { 0.15f, 0.15f, 1.8f };
-
-		// ★最重要: Hitbox がなければ追加する
-		if (!scene->GetRegistry().all_of<HitboxComponent>(sword)) {
-			auto& hb = scene->GetRegistry().emplace<HitboxComponent>(sword);
-			hb.isActive = false;
-			hb.damage = 30.0f;
-			hb.tag = TagType::Sword;
-			hb.size = { 3.0f, 3.0f, 1.0f }; 
-			hb.center = { 0.0f, 0.0f, 0.5f };
-			hb.enabled = true;
-		}
-
-		if (scene->GetRegistry().all_of<MeshRendererComponent>(sword)) {
-			auto& mr = scene->GetRegistry().get<MeshRendererComponent>(sword);
-			auto* renderer = scene->GetRenderer();
-			if (renderer) {
-				mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
-				mr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-				mr.enabled = true;
-			}
-		}
+		motion->clips[clip.name] = clip;
 	}
 
-	if (scene->GetRegistry().all_of<NameComponent>(entity)) {
-		std::cout << "PlayerScript Started: " << scene->GetRegistry().get<NameComponent>(entity).name << std::endl;
-	}
+	auto& sHb = scene->GetRegistry().get_or_emplace<HitboxComponent>(sword);
+	sHb.damage = 110.0f;
+	sHb.tag = TagType::Sword;
+	sHb.size = { 6.0f, 4.0f, 2.5f };
+	sHb.center = { 0.0f, 0.0f, 1.2f };
+	sHb.enabled = true;
+	if (!isAttacking_) sHb.isActive = false;
 
-	// ★追加: 剣にコンボモーションがない場合はデフォルトで作成
-	sword = scene->FindObjectByName(swordName_);
-	if (sword != entt::null) {
-		if (auto* motion = scene->GetRegistry().try_get<MotionComponent>(sword)) {
-			auto setupDefaultCombo = [&](const std::string& name, int index) {
-				if (motion->clips.find(name) == motion->clips.end()) {
-					MotionComponent::MotionClip clip;
-					clip.name = name;
-					clip.totalDuration = 0.4f;
-					clip.loop = false;
-					
-					if (index == 1) { // 横薙ぎ（より広く、伸縮追加）
-						clip.keyframes.push_back({0.00f, { 1.2f, 0.8f, -0.3f }, { 0.0f, 1.57f, 0.0f }, { 0.15f, 0.15f, 1.8f }});
-						clip.keyframes.push_back({0.20f, { 0.0f, 0.8f, 1.8f }, { 0.0f, 0.0f, 0.0f }, { 0.15f, 0.15f, 2.5f }});
-						clip.keyframes.push_back({0.40f, {-1.2f, 0.8f, -0.3f }, { 0.0f, -1.57f, 0.0f }, { 0.15f, 0.15f, 1.8f }});
-					} else if (index == 2) { // 斜め斬り（右上から左下）
-						clip.keyframes.push_back({0.00f, { 1.2f, 2.0f, -0.5f }, { -0.7f, 0.0f, 0.7f }, { 0.15f, 0.15f, 1.8f }});
-						clip.keyframes.push_back({0.20f, { 0.0f, 1.0f, 2.0f }, { 0.0f, 0.0f, 0.0f }, { 0.15f, 0.15f, 2.5f }});
-						clip.keyframes.push_back({0.40f, { -1.2f, -0.5f, 0.2f }, { 0.7f, 0.0f, -0.7f }, { 0.15f, 0.15f, 1.8f }});
-					} else { // 突き/回転（超推力・多回転）
-						clip.keyframes.push_back({0.00f, { 0.0f, 0.8f, 0.5f }, { 0.0f, 0.0f, 0.0f }, { 0.15f, 0.15f, 1.8f }});
-						clip.keyframes.push_back({0.15f, { 0.0f, 0.8f, 2.5f }, { 0.0f, 0.0f, 6.28f }, { 0.15f, 0.15f, 3.0f }});
-						clip.keyframes.push_back({0.40f, { 0.0f, 0.8f, 1.0f }, { 0.0f, 0.0f, 12.56f }, { 0.15f, 0.15f, 1.8f }});
-					}
-					motion->clips[name] = clip;
-				}
-			};
-			setupDefaultCombo("Combo1", 1);
-			setupDefaultCombo("Combo2", 2);
-			setupDefaultCombo("Combo3", 3);
-
-			// ★追加: ソードスキルのモーション
-			if (motion->clips.find("SwordSkill") == motion->clips.end()) {
-				MotionComponent::MotionClip clip;
-				clip.name = "SwordSkill";
-				clip.totalDuration = 0.6f;
-				clip.loop = false;
-				clip.keyframes.push_back({0.0f, {0.0f, 0.8f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.15f, 0.15f, 2.5f}});
-				clip.keyframes.push_back({0.15f, {0.0f, 0.8f, 1.0f}, {0.0f, 6.28f, 0.0f}, {0.15f, 0.15f, 2.5f}});
-				clip.keyframes.push_back({0.3f, {0.0f, 0.8f, 1.0f}, {0.0f, 12.56f, 0.0f}, {0.15f, 0.15f, 2.5f}});
-				clip.keyframes.push_back({0.45f, {0.0f, 0.8f, 1.0f}, {0.0f, 18.84f, 0.0f}, {0.15f, 0.15f, 2.5f}});
-				clip.keyframes.push_back({0.6f, {0.0f, 0.8f, 1.0f}, {0.0f, 25.12f, 0.0f}, {0.15f, 0.15f, 2.5f}});
-				motion->clips["SwordSkill"] = clip;
-			}
-		}
-	}
-
-	// ★追加: 銃の生成
+	// ---- 銃の初期化 ----
 	entt::entity gun = scene->FindObjectByName(gunName_);
 	if (gun == entt::null) {
 		gun = scene->GetRegistry().create();
 		scene->GetRegistry().emplace<NameComponent>(gun).name = gunName_;
-		auto& tc = scene->GetRegistry().emplace<TransformComponent>(gun);
-		tc.scale = { 0.1f, 0.1f, 0.8f };
-		
-		auto& cc = scene->GetRegistry().emplace<ColorComponent>(gun);
-		cc.color = { 0.2f, 0.2f, 0.2f, 1.0f };
+	}
 
-		scene->GetRegistry().emplace<TagComponent>(gun).tag = TagType::Untagged;
-		scene->GetRegistry().emplace<HierarchyComponent>(gun).parentId = entity;
+	auto& gTc = scene->GetRegistry().get_or_emplace<TransformComponent>(gun);
+	gTc.scale = { 0.1f, 0.1f, 0.8f };
 
-		auto* renderer = scene->GetRenderer();
-		if (renderer) {
-			auto& mr = scene->GetRegistry().emplace<MeshRendererComponent>(gun);
-			mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
-			mr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-			mr.color = { 0.2f, 0.2f, 0.2f, 1.0f };
-			mr.enabled = true; // 銃を表示する
-		}
-	} else {
-		if (!scene->GetRegistry().all_of<HierarchyComponent>(gun)) {
-			scene->GetRegistry().emplace<HierarchyComponent>(gun).parentId = entity;
-		} else {
-			scene->GetRegistry().get<HierarchyComponent>(gun).parentId = entity;
-		}
-		if (scene->GetRegistry().all_of<MeshRendererComponent>(gun)) {
-			scene->GetRegistry().get<MeshRendererComponent>(gun).enabled = true; // 銃を表示する
-		}
+	auto& gHierarchy = scene->GetRegistry().get_or_emplace<HierarchyComponent>(gun);
+	gHierarchy.parentId = entity;
+
+	if (renderer) {
+		auto& gMr = scene->GetRegistry().get_or_emplace<MeshRendererComponent>(gun);
+		gMr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+		gMr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+		gMr.color = { 0.2f, 0.2f, 0.2f, 1.0f };
+		gMr.enabled = true;
+	}
+
+	if (scene->GetRegistry().all_of<NameComponent>(entity)) {
+		std::cout << "PlayerScript Started: Greatsword & Gun Initialized.\n";
 	}
 }
 
@@ -351,8 +293,123 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			SetCursorPos(pt.x, pt.y);
 		}
 	}
+	
+	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
 
-	if (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase) {
+	bool isPrep = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase);
+
+	if (!isPrep) {
+		// ★追加: スチーム・ブースト（剣士モード専用の高速回避）
+		bool currentDashKeyDown = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+		if (currentDashKeyDown && !prevDashKeyDown_ && playerType_ == PlayerType::Sword) {
+			if (steamPressure_ > 0.0f && !isRecharging_) { // ★少しでもあれば発動可能に
+				steamPressure_ -= DASH_COST;
+				if (steamPressure_ < 0.0f) steamPressure_ = 0.0f; // リチャージ判定へ
+
+				float dx = 0.0f, dz = 0.0f;
+				if (scene->GetRegistry().all_of<PlayerInputComponent>(entity)) {
+					auto& input = scene->GetRegistry().get<PlayerInputComponent>(entity);
+					if (std::abs(input.moveDir.x) > 0.1f || std::abs(input.moveDir.y) > 0.1f) {
+						// ★修正: カメラの向きに合わせてダッシュ方向を計算 (CharacterMovementSystemと同期)
+						if (auto* camera = scene->GetContext().camera) {
+							auto camRot = camera->Rotation();
+							float cy = std::cos(camRot.y);
+							float sy = std::sin(camRot.y);
+							dx = input.moveDir.x * cy + input.moveDir.y * sy;
+							dz = -input.moveDir.x * sy + input.moveDir.y * cy;
+						} else {
+							dx = input.moveDir.x;
+							dz = input.moveDir.y;
+						}
+					} else {
+						dx = std::sin(pTc.rotate.y);
+						dz = std::cos(pTc.rotate.y);
+					}
+				}
+
+				float len = std::sqrt(dx * dx + dz * dz);
+				if (len > 0.001f) {
+					dx /= len; dz /= len;
+					recoilVelocity_.x = dx * DASH_POWER;
+					recoilVelocity_.z = dz * DASH_POWER;
+
+					// ★演出: ブースト噴射エフェクト (進行方向と逆へ大量に噴射)
+					for (int i = 0; i < 2; ++i) { // 2回生成して密度を倍増
+						entt::entity boostVfx = scene->CreateEntity("SteamBoost_VFX");
+						auto& bTc = scene->GetRegistry().get<TransformComponent>(boostVfx);
+						// ★修正: 発生位置を1フレーム後の予測位置に合わせて離れすぎを防ぐ
+						bTc.translate.x = pTc.translate.x + recoilVelocity_.x * dt;
+						bTc.translate.y = pTc.translate.y + 1.0f;
+						bTc.translate.z = pTc.translate.z + recoilVelocity_.z * dt;
+
+						// 進行方向と逆（背面）に少しずらしてスラスター感を出す
+						float backOffset = 0.8f;
+						bTc.translate.x -= dx * backOffset;
+						bTc.translate.z -= dz * backOffset;
+
+						// 少しだけ横にずらして「ツインスラスター」感を出す
+						float offsetX = (i == 0 ? -0.4f : 0.4f);
+						float sideX = -dz * offsetX; 
+						float sideZ = dx * offsetX;
+						bTc.translate.x += sideX;
+						bTc.translate.z += sideZ;
+
+						scene->SetTag(boostVfx, TagType::VFX);
+
+						auto& bVc = scene->GetRegistry().emplace<VariableComponent>(boostVfx);
+						bVc.SetValue("NormalX", -dx);
+						bVc.SetValue("NormalY", 0.05f); // わずか斜め上
+						bVc.SetValue("NormalZ", -dz);
+						bVc.SetValue("Radius", 4.0f);
+						bVc.SetValue("Duration", 0.4f);
+						bVc.SetValue("ScatterMode", 0.0f);
+						bVc.SetValue("ScatterSpeed", 13.0f);
+						bVc.SetValue("Count", 40.0f);
+
+						auto& bSc = scene->GetRegistry().emplace<ScriptComponent>(boostVfx);
+						bSc.scripts.push_back({ "SpaceShatterScript", "", nullptr });
+					}
+
+					// ★追加: ブースト発動時のカメラシェイク (弱体化)
+					if (auto* camera = scene->GetContext().camera) {
+						camera->StartShake(0.12f, 0.15f, 0.01f);
+					}
+				}
+			}
+		}
+		prevDashKeyDown_ = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+
+		// ★追加: 物理・反動移動の更新 (全モード共通)
+		float recoilLenSq = recoilVelocity_.x * recoilVelocity_.x + recoilVelocity_.y * recoilVelocity_.y + recoilVelocity_.z * recoilVelocity_.z;
+		if (recoilLenSq > 0.001f) {
+			pTc.translate.x += recoilVelocity_.x * dt;
+			pTc.translate.y += recoilVelocity_.y * dt; // ★高さ移動
+			pTc.translate.z += recoilVelocity_.z * dt;
+
+			// 減衰 (XZのみ): 慣性を持たせるため少し緩める (0.02 -> 0.4)
+			float damping = std::pow(0.4f, dt);
+			recoilVelocity_.x *= damping;
+			recoilVelocity_.z *= damping;
+
+			// ★重力と着地判定 (地形の高さを考慮)
+			recoilVelocity_.y -= 55.0f * dt; // 重力
+			
+			float groundY = scene->GetHeightAt(pTc.translate.x, pTc.translate.z, pTc.translate.y + 1.0f);
+			float landingY = groundY + 1.0f; // キャラクター中心の接地高さ
+
+			if (pTc.translate.y < landingY) {
+				// 落下速度が一定以上（空中からの着地）の時だけ摩擦をかける
+				if (recoilVelocity_.y < -1.0f) {
+					recoilVelocity_.x *= 0.75f;
+					recoilVelocity_.z *= 0.75f;
+				}
+				pTc.translate.y = landingY;
+				recoilVelocity_.y = 0.0f;
+			}
+		}
+	}
+
+	if (isPrep) {
 		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) scene->GetRegistry().get<CameraTargetComponent>(entity).enabled = false;
 		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))  scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = false;
 		UpdateSword(entity, scene, dt);
@@ -380,8 +437,16 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			}
 		}
 
-		// ★追加: 圧力ゲージの描画 (リチャージ中や銃モードなら常に表示)
-		bool shouldShowGauge = (playerType_ == PlayerType::Gun) || isRecharging_ || (steamPressure_ < maxSteamPressure_) || isSkillActive_;
+		// ★追加: 圧力が尽きた際のリチャージ開始判定 (全モード共通)
+		if (steamPressure_ <= 0.0f && !isRecharging_) {
+			steamPressure_ = 0.0f;
+			isRecharging_ = true;
+			rechargeTimer_ = RECHARGE_TIME;
+		}
+
+		// ★追加: 圧力ゲージの描画 (リチャージ中、銃モード、消費中、スキル中、または戦闘フェーズなら表示)
+		bool isBattle = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::BattlePhase);
+		bool shouldShowGauge = (playerType_ == PlayerType::Gun) || isRecharging_ || (steamPressure_ < maxSteamPressure_) || isSkillActive_ || isBattle;
 		if (shouldShowGauge) {
 			DrawPressureGauge(scene);
 		}
@@ -418,10 +483,77 @@ void PlayerScript::UpdateMovement(entt::entity entity, GameScene* scene, float /
 	input.moveDir.y *= speedMul;
 }
 
-void PlayerScript::UpdateAttack(entt::entity /*entity*/, GameScene* scene, float /*dt*/) {
+void PlayerScript::UpdateAttack(entt::entity entity, GameScene* scene, float dt) {
 	bool currentAttackKeyDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+	
+	// ★追加: 大剣の溜め攻撃ロジック
+	if (playerType_ == PlayerType::Sword && !isRecharging_) {
+		if (currentAttackKeyDown) {
+			if (!isAttacking_ && !isSwordCharging_) {
+				isSwordCharging_ = true;
+				swordChargeTime_ = 0.0f;
+			}
+			
+			if (isSwordCharging_) {
+				swordChargeTime_ += dt;
+				// 溜め中の蒸気エフェクト
+				swordChargeVfxTimer_ += dt;
+				if (swordChargeVfxTimer_ > 0.15f) {
+					swordChargeVfxTimer_ = 0.0f;
+					auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
+					entt::entity vfx = scene->CreateEntity("SwordCharge_Steam");
+					auto& vTc = scene->GetRegistry().get<TransformComponent>(vfx);
+					vTc.translate = pTc.translate;
+					vTc.translate.y += 0.5f;
+					scene->SetTag(vfx, TagType::VFX);
+					auto& bVc = scene->GetRegistry().emplace<VariableComponent>(vfx);
+					bVc.SetValue("NormalY", 1.0f);
+					bVc.SetValue("Radius", 3.0f + std::min(swordChargeTime_, 1.0f) * 4.0f);
+					bVc.SetValue("Count", 15.0f);
+					bVc.SetValue("ScatterSpeed", 5.0f);
+					bVc.SetValue("Duration", 0.5f);
+					auto& bSc = scene->GetRegistry().emplace<ScriptComponent>(vfx);
+					bSc.scripts.push_back({"SpaceShatterScript", "", nullptr});
+				}
+			}
+		} else {
+			if (isSwordCharging_) {
+				isSwordCharging_ = false;
+				if (swordChargeTime_ >= 0.35f && (steamPressure_ > 0.0f || isSkillActive_)) { // ★少しでもあれば発動可能
+					// ★溜め攻撃発動！
+					steamPressure_ -= SWORD_CHARGE_COST;
+					if (steamPressure_ < 0.0f) steamPressure_ = 0.0f;
+
+					isAttacking_ = true;
+					comboCount_ = 0; // 0は溜め攻撃用
+					entt::entity sword = scene->FindObjectByName(swordName_);
+					if (sword != entt::null) {
+						auto& motion = scene->GetRegistry().get<MotionComponent>(sword);
+						motion.PlayAnimation("SwordChargeAttack");
+						
+						// ★前方にジャンプする推進力を与える
+						auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
+						float dx = std::sin(pTc.rotate.y);
+						float dz = std::cos(pTc.rotate.y);
+						recoilVelocity_.x = dx * 38.0f;
+						recoilVelocity_.z = dz * 38.0f;
+						recoilVelocity_.y = 22.0f; // ★垂直方向の推進力を追加
+
+						if (auto* camera = scene->GetContext().camera) {
+							camera->StartShake(0.35f, 0.45f, 0.02f);
+						}
+					}
+				} else {
+					// 溜めが足りない場合は通常攻撃（またはキャンセル）
+					attackQueued_ = true;
+				}
+				swordChargeTime_ = 0.0f;
+			}
+		}
+	}
+
 	if (currentAttackKeyDown && !prevAttackKeyDown_) {
-		attackQueued_ = true;
+		if (!isSwordCharging_) attackQueued_ = true;
 	}
 	prevAttackKeyDown_ = currentAttackKeyDown;
 
@@ -435,7 +567,7 @@ void PlayerScript::UpdateAttack(entt::entity /*entity*/, GameScene* scene, float
 		isSheathed_ = false;
 
 		if (!motion.isPlaying) {
-			if (attackQueued_ && comboCount_ < 3) {
+			if (attackQueued_ && comboCount_ < 3 && comboCount_ >= 0) {
 				comboCount_++;
 				attackQueued_ = false;
 				motion.PlayAnimation("Combo" + std::to_string(comboCount_));
@@ -471,9 +603,9 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 	
 	if (!isAttacking_) {
 		// 非攻撃時は常に背中に背負う配置にする
-		swordTc.translate = { -0.3f, 1.0f, -0.4f };
+		swordTc.translate = { -0.3f, 1.2f, -0.6f };
 		swordTc.rotate = { DirectX::XMConvertToRadians(35.0f), 0.0f, DirectX::XMConvertToRadians(25.0f) };
-		swordTc.scale = { 0.15f, 0.15f, 1.8f }; // ★待機中の細長さ（スケール）を維持する
+		swordTc.scale = { 0.45f, 0.40f, 3.2f }; // ★大剣サイズ
 
 		// ★MotionSystemによる待機中のスケール＆座標リセットを防ぐため、再生クリップを空にする
 		if (auto* motion = scene->GetRegistry().try_get<MotionComponent>(sword)) {
@@ -496,6 +628,66 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 				if (auto* hb = scene->GetRegistry().try_get<HitboxComponent>(sword)) {
 					hb->isActive = active;
 				}
+
+				// ★追加: 溜め攻撃の着地衝撃 (t=0.7s)
+				if (motion->activeClip == "SwordChargeAttack") {
+					static float lastImpactTime = -1.0f;
+					if (t >= 0.7f && t < 0.8f && lastImpactTime < 0.0f) {
+						lastImpactTime = t;
+						
+						// ワールド座標を取得
+						Engine::Matrix4x4 worldMat = scene->GetWorldMatrix((int)sword);
+						Engine::Vector3 worldPos = { worldMat.m[3][0], worldMat.m[3][1], worldMat.m[3][2] };
+						float groundY = scene->GetHeightAt(worldPos.x, worldPos.z, worldPos.y + 1.0f);
+
+						// 1. 地面が歪む巨大な衝撃波 (SpaceShatter)
+						entt::entity impactVfx = scene->CreateEntity("GroundSmash_VFX");
+						auto& iTc = scene->GetRegistry().get<TransformComponent>(impactVfx);
+						iTc.translate = { worldPos.x, groundY + 0.1f, worldPos.z };
+						scene->SetTag(impactVfx, TagType::VFX);
+
+						auto& iVc = scene->GetRegistry().emplace<VariableComponent>(impactVfx);
+						iVc.SetValue("NormalY", 1.0f);
+						iVc.SetValue("Radius", 25.0f);     // 巨大な歪み
+						iVc.SetValue("Duration", 0.9f);
+						iVc.SetValue("ScatterMode", 0.0f);
+						iVc.SetValue("ScatterSpeed", 35.0f);
+						iVc.SetValue("Count", 120.0f);      // 密度高め
+						auto& iSc = scene->GetRegistry().emplace<ScriptComponent>(impactVfx);
+						iSc.scripts.push_back({"SpaceShatterScript", "", nullptr});
+
+						// 2. スチームバースト (白い蒸気の爆発)
+						entt::entity steamVfx = scene->CreateEntity("GroundSmash_Steam");
+						auto& sTc = scene->GetRegistry().get<TransformComponent>(steamVfx);
+						sTc.translate = iTc.translate;
+						scene->SetTag(steamVfx, TagType::VFX);
+						auto& sVc = scene->GetRegistry().emplace<VariableComponent>(steamVfx);
+						sVc.SetValue("NormalY", 0.8f);
+						sVc.SetValue("Radius", 15.0f);
+						sVc.SetValue("Count", 60.0f);
+						sVc.SetValue("ScatterSpeed", 18.0f);
+						sVc.SetValue("Duration", 0.7f);
+						auto& sSc = scene->GetRegistry().emplace<ScriptComponent>(steamVfx);
+						sSc.scripts.push_back({"SpaceShatterScript", "", nullptr});
+
+						// 3. 範囲ダメージ (Hitbox)
+						entt::entity aoe = scene->GetRegistry().create();
+						scene->GetRegistry().emplace<TagComponent>(aoe).tag = TagType::PlayerSword;
+						auto& aTc = scene->GetRegistry().emplace<TransformComponent>(aoe);
+						aTc.translate = iTc.translate;
+						auto& aHb = scene->GetRegistry().emplace<HitboxComponent>(aoe);
+						aHb.isActive = true;
+						aHb.damage = 250.0f; // 溜め攻撃の超ダメージ
+						aHb.size = { 18.0f, 5.0f, 18.0f };
+						aHb.tag = TagType::Sword;
+						scene->DestroyObject((uint32_t)aoe);
+
+						if (auto* camera = scene->GetContext().camera) {
+							camera->StartShake(0.5f, 0.8f, 0.04f); // 激しい揺れ
+						}
+					}
+					if (t < 0.1f) lastImpactTime = -1.0f; // リセット
+				}
 			}
 		} else {
 			if (auto* hb = scene->GetRegistry().try_get<HitboxComponent>(sword)) {
@@ -512,17 +704,17 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 	if (isAttacking_ && hitboxActive) {
 		Engine::Matrix4x4 worldMat = scene->GetWorldMatrix((int)sword);
 		DirectX::XMMATRIX m = DirectX::XMLoadFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&worldMat));
-		float bladeLen = 1.6f;
-		DirectX::XMVECTOR basePos = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(0, 0, -bladeLen*0.2f, 1), m);
-		DirectX::XMVECTOR tipPos = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(0, 0, bladeLen*0.8f, 1), m);
+		float bladeLen = 3.2f; // ★大剣の長さに合わせる
+		DirectX::XMVECTOR basePos = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(0, 0, -bladeLen*0.1f, 1), m);
+		DirectX::XMVECTOR tipPos = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(0, 0, bladeLen*0.9f, 1), m);
 
 		TrailPoint tp;
 		DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&tp.base), basePos);
 		DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&tp.tip), tipPos);
-		tp.life = 0.35f;
-		tp.maxLife = 0.35f;
+		tp.life = 0.5f;     // ★重さを出すため軌跡を少し長く残す
+		tp.maxLife = 0.5f;
 		trailPoints_.push_back(tp);
-		if (trailPoints_.size() > 60) trailPoints_.pop_front();
+		if (trailPoints_.size() > 80) trailPoints_.pop_front();
 	}
 
 	for (auto& tp : trailPoints_) tp.life -= dt;
@@ -600,16 +792,8 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 		}
 	}
 
-	// ★反動後退の物理更新
-	float recoilLen = std::sqrt(recoilVelocity_.x * recoilVelocity_.x + recoilVelocity_.z * recoilVelocity_.z);
-	if (recoilLen > 0.01f) {
-		pTc.translate.x += recoilVelocity_.x * dt;
-		pTc.translate.z += recoilVelocity_.z * dt;
-		// 減衰
-		float damping = std::pow(0.05f, dt); // 速やかに減衰
-		recoilVelocity_.x *= damping;
-		recoilVelocity_.z *= damping;
-	}
+	// ★反動後退の物理更新 (Updateへ移動)
+
 
 	// ★チャージショット処理
 	if (currentAttackKeyDown && gunShootTimer_ <= 0.0f) {
@@ -705,12 +889,8 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 
 		chargeTime_ = 0.0f;
 
-		// 圧力がなくなったらリチャージ開始（スキル中は減らないが、念のためチェック）
-		if (steamPressure_ <= 0.0f) {
-			steamPressure_ = 0.0f;
-			isRecharging_ = true;
-			rechargeTimer_ = RECHARGE_TIME;
-		}
+		// 圧力がなくなったらリチャージ開始 (Updateの共通処理へ移動)
+
 	}
 
 	// クールダウン
@@ -725,7 +905,7 @@ void PlayerScript::ShootChargeShot(entt::entity entity, GameScene* scene) {
 	float damage = baseDamage * (0.5f + chargeMul * 0.5f);
 	if (isSkillActive_) damage *= SKILL_DAMAGE_MULTIPLIER;
 
-	SpawnBullet(entity, scene, 0.0f, 0.0f, damage, 3.0f, true);
+	SpawnBullet(entity, scene, 0.0f, 0.0f, damage, 3.0f, true, true);
 
 	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
 	entt::entity gun = scene->FindObjectByName(gunName_);
@@ -930,7 +1110,7 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 void PlayerScript::ShootGun(entt::entity entity, GameScene* scene) {
 	float baseDamage = 15.0f;
 	float damage = isSkillActive_ ? baseDamage * SKILL_DAMAGE_MULTIPLIER : baseDamage;
-	SpawnBullet(entity, scene, 0.0f, 0.0f, damage, 2.0f, isSkillActive_);
+	SpawnBullet(entity, scene, 0.0f, 0.0f, damage, 2.0f, isSkillActive_, false);
 
 	// ★空間割れマズルエフェクト（銃口の前に小規模なガラス割れを生成）
 	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
@@ -975,7 +1155,7 @@ void PlayerScript::ShootGun(entt::entity entity, GameScene* scene) {
 	msc.scripts.push_back({"SpaceShatterScript", "", nullptr});
 }
 
-void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spreadYaw, float spreadPitch, float damage, float lifeTime, bool enhanced) {
+void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spreadYaw, float spreadPitch, float damage, float lifeTime, bool enhanced, bool explode) {
 	if (!scene->GetRegistry().all_of<TransformComponent>(entity)) return;
 	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
 
@@ -1059,7 +1239,7 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 
 	auto& vc = scene->GetRegistry().emplace<VariableComponent>(bullet);
 	vc.SetValue("MaxLifeTime", lifeTime);
-	if (enhanced) {
+	if (explode) {
 		vc.SetValue("Enhanced", 1.0f);
 	}
 
