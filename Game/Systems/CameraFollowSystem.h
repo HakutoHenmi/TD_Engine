@@ -113,6 +113,22 @@ public:
 				}
 			}
 
+			// ★調整: 『鳴潮』風のフレーミング（キャラクターを中央より少し下に配置）
+			float verticalFraming = 0.8f; // キャラクターが画面中央より少し下に見えるように調整
+			targetPos.y += verticalFraming;
+
+			// ★速度計算と動的スムージング
+			DirectX::XMFLOAT3 prevPos = ctx.camera->Position();
+			static DirectX::XMFLOAT3 lastTargetPos = targetPos;
+			float dx = targetPos.x - lastTargetPos.x;
+			float dz = targetPos.z - lastTargetPos.z;
+			float moveDist = std::sqrt(dx * dx + dz * dz);
+			float currentSpeed = moveDist / (ctx.dt > 0 ? ctx.dt : 0.016f);
+			lastTargetPos = targetPos;
+
+			// ★動的距離調整: スピードに合わせて距離を引く
+			float targetDistance = ct.distance + std::min(currentSpeed * 0.15f, 12.0f);
+			
 			auto curRot = ctx.camera->Rotation();
 			float camSy = std::sin(curRot.y);
 			float camCy = std::cos(curRot.y);
@@ -120,9 +136,9 @@ public:
 			float camCx = std::cos(curRot.x);
 
 			DirectX::XMFLOAT3 offset = {
-				-camSy * camCx * ct.distance,
-				ct.height + camSx * ct.distance,
-				-camCy * camCx * ct.distance
+				-camSy * camCx * targetDistance,
+				ct.height + camSx * targetDistance,
+				-camCy * camCx * targetDistance
 			};
 
 			DirectX::XMFLOAT3 desiredPos = {
@@ -131,8 +147,23 @@ public:
 				targetPos.z + offset.z
 			};
 
-			// ★変更: カメラの回転と同期させるため、位置の遅延を無くし即座に追従させる
-			ctx.camera->SetPosition(desiredPos);
+			// ★スピードに応じて追従の「粘り」を変える
+			float followStiffness = (currentSpeed > 30.0f) ? 0.005f : 0.0001f;
+			float lerpFactor = 1.0f - std::pow(followStiffness, ctx.dt);
+			
+			DirectX::XMFLOAT3 nextPos;
+			nextPos.x = prevPos.x + (desiredPos.x - prevPos.x) * lerpFactor;
+			nextPos.y = prevPos.y + (desiredPos.y - prevPos.y) * lerpFactor;
+			nextPos.z = prevPos.z + (desiredPos.z - prevPos.z) * lerpFactor;
+
+			// ★FOV Kick: 高速移動時に視野を広げてがたつきを抑える
+			float baseFov = 0.785f;
+			float targetFov = baseFov + std::min(currentSpeed * 0.002f, 0.25f);
+			static float currentFov = baseFov;
+			currentFov += (targetFov - currentFov) * std::min(1.0f, 5.0f * ctx.dt);
+			ctx.camera->SetProjection(currentFov, 1280.0f/720.0f, 0.1f, 1000.0f);
+
+			ctx.camera->SetPosition(nextPos);
 			break;
 		}
 	}
