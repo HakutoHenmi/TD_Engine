@@ -3160,7 +3160,9 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
     col -= sin(uv.y * 900.0).xxx * gScanline;
     col += (hash(uv * 1000.0 + gTime) - 0.5).xxx * gNoiseStrength;
     float2 d = uv - 0.5;
-    col *= saturate(1.0 - dot(d,d) * gVignette);
+    col *= saturate(1.0 - dot(d,d) * 0.8);
+    float dv = saturate(dot(d,d) * gVignette);
+    col = lerp(col, float3(1,0,0), dv * 0.8);
     return float4(col, 1);
 })";
 		auto vs = CompileShader(kVSPP, "main", "vs_5_0");
@@ -3411,7 +3413,8 @@ void Renderer::SetPostEffect(const std::string& name) {
 	const char* req = nullptr;
 	if (name == "Anime") req = "Anime";
 	else if (name == "Rich") req = "Rich";
-	else if (name == "Default" || name == "") req = "";
+	else if (name == "Default") req = "Default";
+	else if (name == "") req = "";
 	else return; // 未知の名前は無視（安全性のため）
 
 	sNextEffectRequest.store(req, std::memory_order_release);

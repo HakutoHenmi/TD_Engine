@@ -169,6 +169,10 @@ private:
 	// ★追加: 反動後退
 	DirectX::XMFLOAT3 recoilVelocity_ = {0, 0, 0};
 
+	// ★追加: ダメージ演出
+	float damageEffectTimer_ = 0.0f;
+	const float DAMAGE_EFFECT_DURATION = 0.6f;
+
 	void ShootChargeShot(entt::entity entity, GameScene* scene);
 	void DrawPressureGauge(GameScene* scene);
 };

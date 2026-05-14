@@ -27,10 +27,12 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
     // -----------------------------------------------------------------
     // 1. Chromatic Aberration (色収差) - レンズの歪みのような色ズレ
     // -----------------------------------------------------------------
-    // 画面端ほど色ズレが大きくなるように
     float2 centerOffset = uv - 0.5;
     float dist = length(centerOffset);
-    float2 shift = centerOffset * dist * 0.03; // デフォルトの色収差強度
+
+    // 1. Chromatic Aberration (色収差)
+    float chromaPower = 0.005 + gChromaShift;
+    float2 shift = centerOffset * dist * chromaPower;
 
     float r = gScene.Sample(gSmp, saturate(uv + shift)).r;
     float g = gScene.Sample(gSmp, uv).g;
@@ -40,18 +42,15 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
     // -----------------------------------------------------------------
     // 2. Simple Bloom (シングルパス・ボックスブルーム)
     // -----------------------------------------------------------------
-    // 本来はダウンスケール＆アップスケールが必要ですが、シングルパスのガウスぼかしで疑似ブレンド
-    float2 texelSize = float2(1.0 / 1280.0, 1.0 / 720.0); // 画面解像度の近似値
+    float2 texelSize = float2(1.0 / 1280.0, 1.0 / 720.0);
     float3 bloomColor = 0;
     int samples = 3;
     float weightSum = 0;
     
-    // 軽量な数ピクセルのぼかし
     for(int x = -samples; x <= samples; x++){
         for(int y = -samples; y <= samples; y++){
             float2 offset = float2(x,y) * texelSize * 2.0;
             float3 c = gScene.Sample(gSmp, uv + offset).rgb;
-            // 明度が閾値を超えている部分だけ足す
             if(luminance(c) > BLOOM_THRESH) {
                 bloomColor += c;
             }
@@ -59,16 +58,19 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
         }
     }
     bloomColor /= weightSum;
-    
-    // ブルーム加算 (Tonemappingを簡単にかける)
     baseColor += bloomColor * BLOOM_INTENSITY;
 
     // -----------------------------------------------------------------
     // 3. Vignette (周辺減光) ＆ Noise
     // -----------------------------------------------------------------
-    // Vingette
-    float vig = saturate(1.0 - dot(centerOffset, centerOffset) * 2.5);
-    baseColor *= vig;
+    // 通常のビネット（暗がり）を薄めに変更
+    float vig = saturate(1.0 - dot(centerOffset, centerOffset) * 1.0);
+    baseColor *= lerp(0.9, 1.0, vig);
+    
+    // 被ダメージビネット（赤色）: gVignetteを使用
+    float dVig = saturate(dot(centerOffset, centerOffset) * gVignette);
+    float3 redColor = float3(1.0, 0.0, 0.0);
+    baseColor = lerp(baseColor, redColor, dVig * 0.9);
     
     // フィルムノイズ
     baseColor += (hash(uv * 1000.0 + gTime) - 0.5) * 0.03;

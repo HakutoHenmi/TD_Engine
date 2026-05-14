@@ -226,6 +226,21 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 				sc.scripts.push_back({"MirrorShatterScript", "", nullptr});
 			}
 		});
+		// ★追加: プレイヤー被ダメージイベント
+		scene->GetEventSystem().Subscribe("PlayerTakeDamage", [this, entity, scene](float) {
+			if (!scene || !scene->GetContext().camera) return;
+			// 1. 強めのカメラシェイク
+			scene->GetContext().camera->StartShake(0.5f, 0.4f, 0.02f);
+			
+			// 2. ダメージ演出タイマーセット
+			damageEffectTimer_ = DAMAGE_EFFECT_DURATION;
+			
+			// 3. プレイヤーの無敵時間を延長（少し長めの1.0秒に設定）
+			if (scene->GetRegistry().all_of<HealthComponent>(entity)) {
+				auto& hc = scene->GetRegistry().get<HealthComponent>(entity);
+				hc.invincibleTime = 1.0f; 
+			}
+		});
 		debugSubscribeCount_ += 1;
 		isSubscribed_ = true;
 	}
@@ -247,6 +262,40 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	if (skillCooldown_ > 0.0f) skillCooldown_ -= dt;
 	if (gunShootTimer_ > 0.0f) gunShootTimer_ -= dt;
+
+	// ★追加: ダメージ演出の更新
+	if (damageEffectTimer_ > 0.0f) {
+		damageEffectTimer_ -= dt;
+		if (damageEffectTimer_ < 0.0f) damageEffectTimer_ = 0.0f;
+		
+		auto* renderer = scene->GetRenderer();
+		if (renderer) {
+			renderer->SetPostEffect("Rich"); // ★追加: 赤色ビネット対応の高品質シェーダーに切り替え
+			auto params = renderer->GetPostProcessParams();
+			float rate = damageEffectTimer_ / DAMAGE_EFFECT_DURATION; // 1.0 -> 0.0
+			
+			// ビネット強度 (最大1.5)
+			params.vignette = rate * 1.5f;
+			// 色収差 (最大0.05)
+			params.chromaShift = rate * 0.05f;
+			
+			renderer->SetPostProcessParams(params);
+			renderer->SetPostProcessEnabled(true);
+		}
+	} else {
+		// 演出終了時はパラメータをリセット
+		auto* renderer = scene->GetRenderer();
+		if (renderer) {
+			auto params = renderer->GetPostProcessParams();
+			if (params.vignette > 0.0f || params.chromaShift > 0.0f) {
+				params.vignette = 0.0f;
+				params.chromaShift = 0.0f;
+				renderer->SetPostProcessParams(params);
+				renderer->ResetPostEffect(); // ★追加: 元のエフェクトに戻す
+				renderer->SetPostProcessEnabled(false);
+			}
+		}
+	}
 
 	// ★スキルバフ持続時間の管理
 	if (isSkillActive_) {

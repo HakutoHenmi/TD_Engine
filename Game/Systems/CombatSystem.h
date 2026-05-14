@@ -116,6 +116,9 @@ public:
 							hc.invincibleTime = 0.5f;
 
 							if (ctx.scene) {
+								if (dTag == TagType::Player) {
+									ctx.scene->GetEventSystem().Emit("PlayerTakeDamage", hitbox.damage);
+								}
 								if (aTag == TagType::PlayerSword || aTag == TagType::Sword) {
 									ctx.scene->GetEventSystem().Emit("PlayerSwordHit", 1.0f);
 								}
@@ -127,7 +130,7 @@ public:
 									if (vc.GetValue("Enhanced", 0.0f) > 0.5f) isEnhanced = true;
 								}
 
-								if (!isEnhanced) {
+								if (!isEnhanced && dTag != TagType::Player) { // ★修正: プレイヤー被弾時は出さない
 									auto hitDistortion = ctx.scene->CreateEntity("HitDistortion_VFX");
 									if (registry.all_of<BoxColliderComponent>(hitDistortion)) registry.remove<BoxColliderComponent>(hitDistortion);
 									if (registry.all_of<HurtboxComponent>(hitDistortion)) registry.remove<HurtboxComponent>(hitDistortion);
