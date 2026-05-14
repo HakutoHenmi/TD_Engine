@@ -6,7 +6,7 @@
 #include "../../Engine/SceneParameters.h"
 #include "../../Engine/WindowDX.h"
 #include "Editor/EditorUI.h"
-#include "InstallationButton.h"
+#include "InstallationManager.h"
 #include "PhaseTransition.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
@@ -283,7 +283,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
         if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
             break;
 
-        if (key3 || InstallationButton::IsButtonPressed(InstallationButton::Cannon)) {
+        if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/Canon.prefab")) {
             selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
             isPlacementMode_ = true;
             isPipeSet_ = false;
@@ -316,7 +316,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
         if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
             break;
 
-        if (key1 || InstallationButton::IsButtonPressed(InstallationButton::Tank)) {
+        if (key1 || InstallationManager::IsButtonPressed("Resources/Prefabs/BulletTank.prefab")) {
             selectedObjPath_ = "Resources/Prefabs/BulletTank.prefab";
             isPlacementMode_ = true;
             isPipeSet_ = false;
@@ -349,7 +349,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
         if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
             break;
 
-        if (key2 || InstallationButton::IsButtonPressed(InstallationButton::Pipe)) {
+        if (key2 || InstallationManager::IsButtonPressed("Resources/Prefabs/Pipe.prefab")) {
             selectedObjPath_ = "Resources/Prefabs/Pipe.prefab";
             isPipeSet_ = true;
             isPlacementMode_ = true;

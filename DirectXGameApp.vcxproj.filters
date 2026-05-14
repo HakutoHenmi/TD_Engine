@@ -68,7 +68,6 @@
     </ClCompile>
     <ClCompile Include="Game\Scripts\BulletTank.cpp" />
     <ClCompile Include="Game\Scripts\SkillTree.cpp" />
-    <ClCompile Include="Game\Scripts\InstallationButton.cpp" />
     <ClCompile Include="Game\EnemySystem\NavigationManager.cpp" />
     <ClCompile Include="Game\Scripts\HitDistortionScript.cpp" />
     <ClCompile Include="Game\Scripts\PoisonTrap.cpp" />
@@ -87,6 +86,8 @@
     <ClCompile Include="Game\Scripts\ResultManagerScript.cpp" />
     <ClCompile Include="Game\Scripts\IceBulletScript.cpp" />
     <ClCompile Include="Game\Scripts\IceCanon.cpp" />
+    <ClCompile Include="Game\Scripts\MirrorShatterScript.cpp" />
+    <ClCompile Include="Game\Scripts\InstallationManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\GameScene.h">
@@ -186,7 +187,6 @@
     </ClInclude>
     <ClInclude Include="Game\Scripts\BulletTank.h" />
     <ClInclude Include="Game\Scripts\SkillTree.h" />
-    <ClInclude Include="Game\Scripts\InstallationButton.h" />
     <ClInclude Include="Game\EnemySystem\NavigationManager.h" />
     <ClInclude Include="Game\Scripts\HitDistortionScript.h" />
     <ClInclude Include="Game\Scripts\PoisonTrap.h" />
@@ -207,6 +207,8 @@
     <ClInclude Include="Game\Scripts\ResultManagerScript.h" />
     <ClInclude Include="Game\Scripts\IceBulletScript.h" />
     <ClInclude Include="Game\Scripts\IceCanon.h" />
+    <ClInclude Include="Game\Scripts\MirrorShatterScript.h" />
+    <ClInclude Include="Game\Scripts\InstallationManager.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">

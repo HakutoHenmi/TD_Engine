@@ -19,7 +19,7 @@
 #include <unordered_map>
 
 // Button UI
-#include "InstallationButton.h"
+#include "InstallationManager.h"
 
 #include "WaveManagement.h"
 
@@ -33,7 +33,7 @@ bool IsPointerOverInstallationButton(GameScene* scene) {
 		return false;
 
 	auto& registry = scene->GetRegistry();
-	auto view = registry.view<UIButtonComponent, ScriptComponent>();
+	auto view = registry.view<UIButtonComponent>();
 	for (auto entity : view) {
 		const auto& btn = view.get<UIButtonComponent>(entity);
 		if (!btn.enabled || !btn.isHovered)
@@ -42,14 +42,8 @@ bool IsPointerOverInstallationButton(GameScene* scene) {
 		if (registry.all_of<RectTransformComponent>(entity) && !registry.get<RectTransformComponent>(entity).enabled)
 			continue;
 
-		const auto& sc = view.get<ScriptComponent>(entity);
-		if (!sc.enabled)
-			continue;
-
-		for (const auto& entry : sc.scripts) {
-			if (entry.scriptPath == "InstallationButton") {
-				return true;
-			}
+		if (InstallationManager::IsManagedButton(entity)) {
+			return true;
 		}
 	}
 
@@ -289,45 +283,50 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		// 設置モードへの切り替え
 
-		if (key1 || InstallationButton::IsButtonPressed(InstallationButton::Tank)) {
+		if (key1 || InstallationManager::IsButtonPressed("Resources/Prefabs/BulletTank.prefab")) {
 			selectedObjPath_ = "Resources/Prefabs/BulletTank.prefab";
-			selectedObjCost_ = tankCost_;
+			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
+			if (selectedObjCost_ == 0) selectedObjCost_ = tankCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
            placementSelectionChangedThisFrame = true;
 		}
 
-		if (key2 || InstallationButton::IsButtonPressed(InstallationButton::Pipe)) {
+		if (key2 || InstallationManager::IsButtonPressed("Resources/Prefabs/Pipe.prefab")) {
 			selectedObjPath_ = "Resources/Prefabs/Pipe.prefab";
-			selectedObjCost_ = pipeCost_;
+			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
+			if (selectedObjCost_ == 0) selectedObjCost_ = pipeCost_;
 			isPipeSet_ = true;
 			isPlacementMode_ = true;
 			hasPipeStartPoint_ = false;
            placementSelectionChangedThisFrame = true;
 		}
 
-		if (key3 || InstallationButton::IsButtonPressed(InstallationButton::Cannon)) {
+		if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/Canon.prefab")) {
 			selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
-			selectedObjCost_ = canonCost_;
+			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
+			if (selectedObjCost_ == 0) selectedObjCost_ = canonCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
            placementSelectionChangedThisFrame = true;
 		}
 
-		if (key4 || InstallationButton::IsButtonPressed(InstallationButton::Missile)) {
+		if (key4 || InstallationManager::IsButtonPressed("Resources/Prefabs/Missile.prefab")) {
 			selectedObjPath_ = "Resources/Prefabs/Missile.prefab";
-			selectedObjCost_ = missileCost_;
+			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
+			if (selectedObjCost_ == 0) selectedObjCost_ = missileCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
            placementSelectionChangedThisFrame = true;
 		}
 
-		if (key5 || InstallationButton::IsButtonPressed(InstallationButton::PoisonTrap)) {
+		if (key5 || InstallationManager::IsButtonPressed("Resources/Prefabs/Poison.prefab")) {
 			selectedObjPath_ = "Resources/Prefabs/Poison.prefab";
-			selectedObjCost_ = poisonCost_;
+			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
+			if (selectedObjCost_ == 0) selectedObjCost_ = poisonCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			isSellMode_ = false;
