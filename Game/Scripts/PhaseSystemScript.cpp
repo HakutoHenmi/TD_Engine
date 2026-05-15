@@ -182,6 +182,7 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	hasPipeStartPoint_ = false;
 
 	enemyCountUI_ = entt::null;
+	installationCostUI_ = entt::null;
 
 	// キー入力の初期化
 	preKeyP_ = false;
@@ -616,6 +617,38 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		}
 	}
 
+	// ★ 設置コストUIの更新
+	if (isPlacementMode_) {
+		if (installationCostUI_ == entt::null || !scene->GetRegistry().valid(installationCostUI_)) {
+			installationCostUI_ = scene->CreateEntity("InstallationCostUI");
+			auto& rect = scene->GetRegistry().emplace<RectTransformComponent>(installationCostUI_);
+			rect.pos = { 0, -400 }; // 画面上部
+			rect.anchor = { 0.5f, 0.5f };
+			rect.pivot = { 0.5f, 0.5f };
+
+			auto& text = scene->GetRegistry().emplace<UITextComponent>(installationCostUI_);
+			text.fontSize = 48.0f;
+			text.color = { 1, 1, 1, 1 };
+			text.outlineEnabled = true;
+		}
+
+		auto& text = scene->GetRegistry().get<UITextComponent>(installationCostUI_);
+		text.text = "Cost: " + std::to_string(currentInstallationCost_);
+		// お金が足りない場合は赤色にする
+		if (CoinCount < currentInstallationCost_) {
+			text.color = { 1, 0, 0, 1 };
+		}
+		else {
+			text.color = { 1, 1, 1, 1 };
+		}
+		scene->GetRegistry().get<RectTransformComponent>(installationCostUI_).enabled = true;
+	}
+	else {
+		if (installationCostUI_ != entt::null && scene->GetRegistry().valid(installationCostUI_)) {
+			scene->GetRegistry().get<RectTransformComponent>(installationCostUI_).enabled = false;
+		}
+	}
+
 	preKeyN_ = keyN;
 }
 
@@ -660,8 +693,10 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 	if (!input)
 		return;
 	Engine::Vector3 hitPoint{};
-	if (!TryGetTerrainHitPoint(scene, hitPoint))
+	if (!TryGetTerrainHitPoint(scene, hitPoint)) {
+		currentInstallationCost_ = 0;
 		return;
+	}
 
 	Engine::Vector3 snappedHitPoint = hitPoint;
 	snappedHitPoint.x = SnapTo2x2Grid(snappedHitPoint.x);
@@ -681,6 +716,7 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 				pipeStartZ_ = snappedHitPoint.z;
 				hasPipeStartPoint_ = true;
 			}
+			currentInstallationCost_ = selectedObjCost_;
 			return;
 		}
 
@@ -707,6 +743,7 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 				canPlaceAll = false;
 			}
 		}
+		currentInstallationCost_ = static_cast<int>(pathPoints.size()) * selectedObjCost_;
 
 		// パイプ間の接続ラインを描画
 		auto* pipeRenderer = scene->GetRenderer();
@@ -744,6 +781,7 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 		CoinCount -= selectedObjCost_;
 		isPlacementMode_ = false;
 	}
+	currentInstallationCost_ = selectedObjCost_;
 }
 
 bool PhaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3& outHitPoint) const {

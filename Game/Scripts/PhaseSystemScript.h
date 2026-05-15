@@ -86,12 +86,14 @@ private:
 	float pipeStartZ_ = 0.0f;
 
 	int selectedObjCost_ = 0; // 追加
+	int currentInstallationCost_ = 0; // 現在の設置コスト
 
 	// スキルツリー
 	SkillTree skillTree_;
 	bool preKeyN_ = false;
 
 	entt::entity enemyCountUI_ = entt::null;
+	entt::entity installationCostUI_ = entt::null;
 };
 
 } // namespace Game
