@@ -22,6 +22,9 @@
 #include "InstallationButton.h"
 
 #include "WaveManagement.h"
+#include "../../Engine/ThirdParty/nlohmann/json.hpp"
+
+using json = nlohmann::json;
 
 namespace Game {
 
@@ -177,6 +180,8 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	isSellMode_ = false;
 	isPipeSet_ = false;
 	hasPipeStartPoint_ = false;
+
+	enemyCountUI_ = entt::null;
 
 	// キー入力の初期化
 	preKeyP_ = false;
@@ -570,6 +575,46 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 	if (scene->GetRegistry().all_of<UITextComponent>(entity))
 		scene->GetRegistry().get<UITextComponent>(entity).text = "$"+ std::to_string(CoinCount);
+
+	// ★ 敵の数UIの更新
+	if (isPhase_ == BattlePhase) {
+		auto waveManagerEntity = WaveManagement::GetManagerEntity();
+		if (scene->GetRegistry().valid(waveManagerEntity)) {
+			auto* sc = scene->GetRegistry().try_get<ScriptComponent>(waveManagerEntity);
+			if (sc) {
+				for (auto& entry : sc->scripts) {
+					if (entry.scriptPath == "WaveManagement" && entry.instance) {
+						auto* wm = static_cast<WaveManagement*>(entry.instance.get());
+						int total = wm->GetTotalMaxEnemies(scene);
+						int remaining = wm->GetTotalRemainingEnemies(scene);
+
+						// UIエンティティの作成（まだなければ）
+						if (enemyCountUI_ == entt::null || !scene->GetRegistry().valid(enemyCountUI_)) {
+							enemyCountUI_ = scene->CreateEntity("EnemyCountUI");
+							auto& rect = scene->GetRegistry().emplace<RectTransformComponent>(enemyCountUI_);
+							rect.pos = { 0, -450 }; // 画面上部中央
+							rect.anchor = { 0.5f, 0.5f }; // 中央基準で上へ
+							rect.pivot = { 0.5f, 0.5f };
+
+							auto& text = scene->GetRegistry().emplace<UITextComponent>(enemyCountUI_);
+							text.fontSize = 64.0f;
+							text.color = { 1, 1, 1, 1 };
+							text.outlineEnabled = true;
+						}
+
+						auto& text = scene->GetRegistry().get<UITextComponent>(enemyCountUI_);
+						text.text = std::to_string(remaining) + " / " + std::to_string(total);
+						scene->GetRegistry().get<RectTransformComponent>(enemyCountUI_).enabled = true;
+					}
+				}
+			}
+		}
+	} else {
+		// 戦闘フェーズ以外では非表示
+		if (enemyCountUI_ != entt::null && scene->GetRegistry().valid(enemyCountUI_)) {
+			scene->GetRegistry().get<RectTransformComponent>(enemyCountUI_).enabled = false;
+		}
+	}
 
 	preKeyN_ = keyN;
 }

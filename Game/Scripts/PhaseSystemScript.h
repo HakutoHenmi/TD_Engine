@@ -90,6 +90,8 @@ private:
 	// スキルツリー
 	SkillTree skillTree_;
 	bool preKeyN_ = false;
+
+	entt::entity enemyCountUI_ = entt::null;
 };
 
 } // namespace Game
