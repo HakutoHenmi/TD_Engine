@@ -16,6 +16,15 @@ public:
 private:
 	float rotationSpeed_ = 1.0f; // パイプの回転速度（ラジアン/秒）
 	std::unordered_map<entt::entity, entt::entity> connectionCylinders_;
+
+private:
+
+
+private:
+	float connectionCheckTimer_ = 0.0f;
+	float connectionCheckInterval_ = 0.5f;
+
+	std::vector<entt::entity> currentConnections_;
 };
 
 }// namespace Game
