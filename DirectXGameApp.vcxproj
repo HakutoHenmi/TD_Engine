@@ -180,7 +180,6 @@ exit /b 0
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Game\Scripts\ExplosionAttackArea.cpp" />
-    <ClCompile Include="Game\Scripts\InstallationButton.cpp" />
     <ClCompile Include="Game\Editor\EditorUI.cpp" />
     <ClCompile Include="Game\Editor\PipeEditor.cpp" />
     <ClCompile Include="Game\Editor\EnemySpawnerEditor.cpp" />
