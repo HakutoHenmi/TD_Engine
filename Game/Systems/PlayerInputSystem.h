@@ -44,6 +44,10 @@ public:
 
 			// ★追加: Shiftダッシュ入力
 			pi.sprintRequested = (GetAsyncKeyState(VK_LSHIFT) & 0x8000) != 0;
+			// 準備フェーズ中はShiftキーの影響を受けないようにする
+			if (PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase) {
+				pi.sprintRequested = false;
+			}
 
 			// ★変更: カメラ操作
 			// 準備フェーズの場合は右クリック押下時のみ視点移動可能にする

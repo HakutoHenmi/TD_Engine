@@ -41,6 +41,12 @@ float CalcShadow(float3 worldPos) {
     projCoords.y = -projCoords.y * 0.5f + 0.5f;
     if (projCoords.x < 0.0f || projCoords.x > 1.0f || projCoords.y < 0.0f || projCoords.y > 1.0f || projCoords.z < 0.0f || projCoords.z > 1.0f)
         return 1.0f;
+
+    // シャドウマップの境界で急に影が現れないようにフェードさせる
+    float fadeX = min(projCoords.x, 1.0f - projCoords.x);
+    float fadeY = min(projCoords.y, 1.0f - projCoords.y);
+    float edgeFade = saturate(min(fadeX, fadeY) * 10.0f); // 境界の10%領域でフェード
+
     float shadow = 0.0f;
     float texelSize = 1.0f / 2048.0f;
     for(int x = -1; x <= 1; ++x) {
@@ -48,7 +54,10 @@ float CalcShadow(float3 worldPos) {
             shadow += gShadowMap.SampleCmpLevelZero(gShadowSmp, projCoords.xy + float2(x, y) * texelSize, projCoords.z).r;
         }
     }
-    return shadow / 9.0f;
+    float finalShadow = shadow / 9.0f;
+    
+    // edgeFadeが0(境界)に近いほど影を消す(1.0にする)
+    return lerp(1.0f, finalShadow, edgeFade);
 }
 
 float4 main(VSOut input) : SV_TARGET {

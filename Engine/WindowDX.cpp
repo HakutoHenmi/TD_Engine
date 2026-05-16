@@ -345,7 +345,9 @@ bool WindowDX::CreateRTVDSV_() {
 			return false;
 		dsvInc_ = dev_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
-		D3D12_RESOURCE_DESC rd = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, kW, kH, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+		// ★修正: DOF用にSRVとしても参照できるよう、R32_TYPELESSで作成する
+		// DSV作成時にD32_FLOAT、SRV作成時にR32_FLOATとして解釈する
+		D3D12_RESOURCE_DESC rd = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R32_TYPELESS, kW, kH, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
 		D3D12_CLEAR_VALUE c{};
 		c.Format = DXGI_FORMAT_D32_FLOAT;
 		c.DepthStencil.Depth = 1.0f;
@@ -355,7 +357,7 @@ bool WindowDX::CreateRTVDSV_() {
 			return false;
 
 		D3D12_DEPTH_STENCIL_VIEW_DESC dsvd{};
-		dsvd.Format = DXGI_FORMAT_D32_FLOAT;
+		dsvd.Format = DXGI_FORMAT_D32_FLOAT; // DSVとしてはD32_FLOATで解釈
 		dsvd.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 		dev_->CreateDepthStencilView(depth_.Get(), &dsvd, dsvH_->GetCPUDescriptorHandleForHeapStart());
 	}

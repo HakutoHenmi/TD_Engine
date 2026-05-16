@@ -51,7 +51,10 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	camera_.SetPosition(0, 2, -5);
 	camera_.SetRotation(0.2f, 0, 0);
 	renderer_->SetAmbientColor({0.4f, 0.4f, 0.45f});
-
+	
+	// ★追加: ゲームシーンではデフォルトでRichポストプロセスを有効にして高品質な描画を行う
+	renderer_->SetPostEffect("Rich");
+	renderer_->SetPostProcessEnabled(true);
 	bool loaded = false;
 	// ★変更: シーン名に応じてロードするJSONパスを決定
 	std::string sceneName = params.sceneName;
@@ -870,10 +873,11 @@ void GameScene::Draw() {
 				if (hasAnim) {
 					renderer_->DrawSkinnedMesh(mr.modelHandle, mr.textureHandle, world, bonePalette, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w});
 				} else {
-					if (mr.shaderName == "Toon" || mr.shaderName == "ToonSkinning" || mr.shaderName == "Hologram" || mr.shaderName == "EmissiveGlow" || mr.shaderName == "ForceField" ||
-					    mr.shaderName == "Dissolve" || mr.shaderName == "Distortion") {
+					if (mr.shaderName == "Distortion" || mr.shaderName == "GlassShatter") {
+						// ★ 特殊エフェクト系のみ個別描画
 						renderer_->DrawMesh(mr.modelHandle, mr.textureHandle, world, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w}, mr.shaderName);
 					} else {
+						// ★ Toon含む通常シェーダーはインスタンシング（一括描画）
 						renderer_->DrawMeshInstanced(
 						    mr.modelHandle, mr.textureHandle, world, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w}, mr.shaderName, mr.extraTextureHandles);
 					}

@@ -2,6 +2,8 @@
 #include "PostProcessCommon.hlsli"
 
 Texture2D gScene : register(t0);
+Texture2D gBloom : register(t1);  // ★追加: ブルームテクスチャ
+Texture2D gDepth : register(t2);  // ★追加: 深度テクスチャ (DOF用)
 SamplerState gSmp : register(s0);
 
 // Engine から送る
@@ -15,7 +17,10 @@ cbuffer CBPost : register(b0)
     float gScanline;
 
     float gSan; // 0..1
-    float pad0;
+    float gBloomIntensity;    // ★追加: ブルーム強度
+    float gDofFocusDistance;  // ★追加: DOFフォーカス距離
+    float gDofFocusRange;     // ★追加: DOFピント範囲
+    float gDofIntensity;      // ★追加: DOFぼかし強度
 };
 
 struct PSIn
@@ -83,6 +88,39 @@ float4 main(PSIn i) : SV_TARGET
     float2 uv = i.uv;
 
     // --------------------
+    // ★追加: 被写界深度 (DOF) - シーンカラーをぼかす
+    // --------------------
+    float3 baseColor = 0.0;
+    if (gDofIntensity > 0.0) {
+        float depth = gDepth.Sample(gSmp, uv).r;
+        float nearZ = 0.1;
+        float farZ = 1000.0;
+        float linearDepth = nearZ * farZ / (farZ - depth * (farZ - nearZ));
+        float coc = saturate(abs(linearDepth - gDofFocusDistance) / gDofFocusRange);
+        coc *= gDofIntensity;
+        
+        if (coc > 0.001) {
+            float2 texSize = float2(1.0 / 1280.0, 1.0 / 720.0);
+            float2 blurOff = texSize * coc * 6.0;
+            float3 sum = 0.0;
+            float weightSum = 0.0;
+            for (int x = -1; x <= 1; x++) {
+                for (int y = -1; y <= 1; y++) {
+                    float2 offset = float2(x, y) * blurOff;
+                    float w = 1.0 / (1.0 + length(float2(x, y)));
+                    sum += gScene.Sample(gSmp, saturate(uv + offset)).rgb * w;
+                    weightSum += w;
+                }
+            }
+            baseColor = sum / weightSum;
+        } else {
+            baseColor = gScene.Sample(gSmp, uv).rgb;
+        }
+    } else {
+        baseColor = gScene.Sample(gSmp, uv).rgb;
+    }
+
+    // --------------------
     // SAN を作る（0..1）
     // --------------------
     FxParams fx = MakeFxParams(gSan);
@@ -145,6 +183,16 @@ float4 main(PSIn i) : SV_TARGET
     float lum = Luminance(col);
     col = lerp(lum.xxx * 0.85, col, edge);
     col *= (1.0 - fx.san * 0.10);
+
+    // --------------------
+    // ★追加: ブルーム合成
+    // ブルームテクスチャから輝きを加算合成する。
+    // gBloomIntensityで強さをコントロール。
+    // --------------------
+    if (gBloomIntensity > 0.0) {
+        float3 bloom = gBloom.Sample(gSmp, i.uv).rgb;
+        col += bloom * gBloomIntensity;
+    }
 
     return float4(Saturate3(col), 1.0);
 }

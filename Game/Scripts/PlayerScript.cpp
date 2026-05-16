@@ -264,11 +264,11 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (gunShootTimer_ > 0.0f) gunShootTimer_ -= dt;
 
 	// ★追加: ダメージ演出の更新
+	auto* renderer = scene->GetRenderer();
 	if (damageEffectTimer_ > 0.0f) {
 		damageEffectTimer_ -= dt;
 		if (damageEffectTimer_ < 0.0f) damageEffectTimer_ = 0.0f;
 		
-		auto* renderer = scene->GetRenderer();
 		if (renderer) {
 			renderer->SetPostEffect("Rich"); // ★追加: 赤色ビネット対応の高品質シェーダーに切り替え
 			auto params = renderer->GetPostProcessParams();
@@ -284,16 +284,30 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		}
 	} else {
 		// 演出終了時はパラメータをリセット
-		auto* renderer = scene->GetRenderer();
 		if (renderer) {
 			auto params = renderer->GetPostProcessParams();
 			if (params.vignette > 0.0f || params.chromaShift > 0.0f) {
 				params.vignette = 0.0f;
 				params.chromaShift = 0.0f;
 				renderer->SetPostProcessParams(params);
-				renderer->ResetPostEffect(); // ★追加: 元のエフェクトに戻す
-				renderer->SetPostProcessEnabled(false);
+				// ★修正: 常時ブルーム等を表示するため、ポストプロセスの無効化は行わない
 			}
+		}
+	}
+
+	// ★追加: フェーズに応じて被写界深度(DOF)を切り替える
+	// 準備フェーズ(PreparationPhase)の時だけミニチュア風のピンボケ効果を有効化
+	if (renderer) {
+		// ゲームシーンでは常にRichポストプロセスを有効化する
+		renderer->SetPostEffect("Rich");
+		renderer->SetPostProcessEnabled(true);
+		
+		auto params = renderer->GetPostProcessParams();
+		bool isPrep = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase);
+		float targetDof = isPrep ? 0.3f : 0.0f; // ★Renderer.hに合わせた値
+		if (params.dofIntensity != targetDof) {
+			params.dofIntensity = targetDof;
+			renderer->SetPostProcessParams(params);
 		}
 	}
 

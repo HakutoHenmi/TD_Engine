@@ -146,6 +146,14 @@ public:
 		float vignette = 0.0f;
 		float scanline = 0.0f;
 		float san = 0.0f;
+
+		// ★追加: ブルーム＆DOFパラメータ
+		float bloomIntensity = 0.6f;     // ブルームの強さ (0=無効, 1=標準)
+		float bloomThreshold = 0.95f;    // 輝度抽出の閾値 (0.95以上にすることで、本当に明るい場所だけ光る)
+		float bloomRadius = 1.2f;        // ブルームの広がり半径
+		float dofFocusDistance = 50.0f;  // DOFのフォーカス距離を少し遠くに（40->50）
+		float dofFocusRange = 100.0f;    // DOFのピントが合う範囲をさらに広く（50->100）
+		float dofIntensity = 0.3f;       // DOFのぼかし強度 (タワーディフェンスなので控えめに0.3)
 	};
 
 	// ★追加: フレーム統計情報
@@ -469,6 +477,8 @@ private:
 
 	bool InitPipelines();
 	bool InitPostProcess_();
+	bool InitBloom_();           // ★追加: ブルームパイプライン初期化
+	void ExecuteBloomPass_();    // ★追加: ブルームパス実行
 	bool CreatePSO(const std::string& name, ID3DBlob* vsBlob, ID3DBlob* psBlob);
 	bool CreatePSO(const std::string& name, ID3DBlob* vsBlob, ID3DBlob* psBlob, const D3D12_INPUT_ELEMENT_DESC* layout, UINT numElements);
 
@@ -552,7 +562,7 @@ private:
 	D3D12_VIEWPORT viewport_{};
 	D3D12_RECT scissor_{};
 
-	bool ppEnabled_ = false;
+	bool ppEnabled_ = true;
 	PostProcessParams ppParams_{};
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> ppSceneColor_;
@@ -581,6 +591,26 @@ private:
 
 	// ★追加: 最終テクスチャをバックバッファにそのままコピーして映すパイプライン
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoCopy_;
+
+	// ★追加: ブルーム用リソース (Dual Kawase Bloom)
+	// ダウンサンプル4段階: 1/2, 1/4, 1/8, 1/16 のレンダーターゲット
+	static constexpr uint32_t kBloomMipCount = 4;
+	struct BloomMip {
+		Microsoft::WRL::ComPtr<ID3D12Resource> texture;    // テクスチャリソース
+		D3D12_CPU_DESCRIPTOR_HANDLE rtv{};                 // レンダーターゲットビュー
+		D3D12_GPU_DESCRIPTOR_HANDLE srvGpu{};              // シェーダーリソースビュー
+		uint32_t width = 0, height = 0;                    // このMIPレベルの解像度
+		D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+	};
+	BloomMip bloomMips_[kBloomMipCount];
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> bloomRtvHeap_;  // ブルーム用RTVヒープ
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSigBloom_;   // ブルーム用ルートシグネチャ
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoBloomDown_;   // ダウンサンプルPSO
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoBloomUp_;     // アップサンプルPSO
+	bool bloomInitialized_ = false;
+
+	// ★追加: 深度バッファSRV (DOF用)
+	D3D12_GPU_DESCRIPTOR_HANDLE depthSrvGpu_{};
 
 	// ★追加: シャドウマップ用リソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> shadowMap_;

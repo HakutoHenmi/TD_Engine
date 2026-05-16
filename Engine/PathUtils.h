@@ -63,11 +63,20 @@ public:
     static std::string GetUnifiedPath(const std::string& relPath) {
         if (relPath.empty()) return "";
         std::filesystem::path p = FromUTF8(relPath);
-        if (p.is_absolute()) return ToUTF8(p.wstring());
-        
-        std::filesystem::path finalPath = GetRootPathInternal() / p;
-        std::string result = ToUTF8(finalPath.wstring());
+        std::string result;
+        if (p.is_absolute()) {
+            result = ToUTF8(p.wstring());
+        } else {
+            std::filesystem::path finalPath = GetRootPathInternal() / p;
+            result = ToUTF8(finalPath.wstring());
+        }
         std::replace(result.begin(), result.end(), '\\', '/');
+        
+        // ★追加: 大文字小文字の違いによるキャッシュミスを防ぐため小文字に統一
+        std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) -> char {
+            return static_cast<char>(::tolower(c));
+        });
+        
         return result;
     }
 
