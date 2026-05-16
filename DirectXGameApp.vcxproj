@@ -180,12 +180,12 @@ exit /b 0
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Game\Scripts\ExplosionAttackArea.cpp" />
-    <ClCompile Include="Game\Scripts\InstallationButton.cpp" />
     <ClCompile Include="Game\Editor\EditorUI.cpp" />
     <ClCompile Include="Game\Editor\PipeEditor.cpp" />
     <ClCompile Include="Game\Editor\EnemySpawnerEditor.cpp" />
     <ClCompile Include="Game\main.cpp" />
     <ClCompile Include="Game\Scenes\GameScene.cpp" />
+    <ClCompile Include="Game\Scripts\InstallationManager.cpp" />
     <ClCompile Include="Game\Scripts\TitleManagerScript.cpp" />
     <ClCompile Include="Game\Scripts\SelectManagerScript.cpp" />
     <ClCompile Include="Game\Scripts\ResultManagerScript.cpp" />
@@ -237,6 +237,7 @@ exit /b 0
     <ClInclude Include="Game\Editor\PipeEditor.h" />
     <ClInclude Include="Game\Editor\EnemySpawnerEditor.h" />
     <ClInclude Include="Game\Scenes\GameScene.h" />
+    <ClInclude Include="Game\Scripts\InstallationManager.h" />
     <ClInclude Include="Game\Scripts\TitleManagerScript.h" />
     <ClInclude Include="Game\Scripts\SelectManagerScript.h" />
     <ClInclude Include="Game\Scripts\ResultManagerScript.h" />

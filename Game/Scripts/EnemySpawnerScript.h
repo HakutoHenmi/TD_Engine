@@ -41,6 +41,9 @@ public:
 	SpawnPattern pattern = SpawnPattern::Point; // 配列パターン
 	float patternRadius = 3.0f;   // Circle/Line の半径・長さ
 	int maxCount = 5;             // 1ウェーブあたりの最大出現数
+	int GetMaxCount() const { return maxCount; }
+	int GetCurrentWave() const { return currentWave_; }
+	int GetSpawnedCount() const { return spawnedThisWave_; }
 
 private:
 	// ランタイム用

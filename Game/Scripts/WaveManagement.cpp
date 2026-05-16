@@ -174,6 +174,27 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 	#endif
 
 	if (currentWave_ != previousWave_) {
+		if (scene->IsPlaying()) {
+			// ウェーブ開始時の初期化
+			currentWaveMax_ = 0;
+			if (currentWave_ >= 0 && currentWave_ < static_cast<int>(enemySpawners_.size())) {
+				for (entt::entity e : enemySpawners_[currentWave_]) {
+					if (scene->GetRegistry().valid(e)) {
+						if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(e)) {
+							for (auto& entry : sc->scripts) {
+								if (entry.scriptPath == "EnemySpawnerScript" && entry.instance) {
+									currentWaveMax_ += static_cast<EnemySpawnerScript*>(entry.instance.get())->GetMaxCount();
+								}
+							}
+						}
+					}
+				}
+			}
+			currentWaveKilled_ = 0;
+			lastAliveCount_ = 0;
+			lastTotalSpawned_ = 0;
+		}
+
 		if (scene->IsPlaying() && currentWave_ == -1) {
 			// 準備フェーズなどに移行した場合、残存している敵を全て消去する
 			const auto& enemies = scene->GetEntitiesByTag(TagType::Enemy);
@@ -192,6 +213,51 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 
 		SpawnSpanner(currentWave_, scene);
 	}
+
+	// 敵の死亡トラッキング
+	if (scene->IsPlaying() && currentWave_ >= 0) {
+		int aliveCount = 0;
+		{
+			auto view = scene->GetRegistry().view<TagComponent>();
+			for (auto e : view) {
+				if (view.get<TagComponent>(e).tag == TagType::Enemy) {
+					aliveCount++;
+				}
+			}
+		}
+		int currentTotalSpawned = 0;
+
+		if (currentWave_ < static_cast<int>(enemySpawners_.size())) {
+			for (entt::entity e : enemySpawners_[currentWave_]) {
+				if (scene->GetRegistry().valid(e)) {
+					if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(e)) {
+						for (auto& entry : sc->scripts) {
+							if (entry.scriptPath == "EnemySpawnerScript" && entry.instance) {
+								auto* sp = static_cast<EnemySpawnerScript*>(entry.instance.get());
+								if (sp->GetCurrentWave() > currentWave_) {
+									currentTotalSpawned += sp->GetMaxCount();
+								} else if (sp->GetCurrentWave() == currentWave_) {
+									currentTotalSpawned += sp->GetSpawnedCount();
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		int spawnedThisFrame = currentTotalSpawned - lastTotalSpawned_;
+		if (spawnedThisFrame < 0) spawnedThisFrame = 0;
+
+		int killedThisFrame = (lastAliveCount_ + spawnedThisFrame) - aliveCount;
+		if (killedThisFrame > 0) {
+			currentWaveKilled_ += killedThisFrame;
+		}
+
+		lastAliveCount_ = aliveCount;
+		lastTotalSpawned_ = currentTotalSpawned;
+	}
+
 	previousWave_ = currentWave_;
 }
 
@@ -229,6 +295,15 @@ void WaveManagement::SpawnSpanner(int currentWave, GameScene* scene) {
 			}
 		}
 	}
+}
+
+int WaveManagement::GetTotalMaxEnemies(GameScene* /*scene*/) {
+	return currentWaveMax_;
+}
+
+int WaveManagement::GetTotalRemainingEnemies(GameScene* /*scene*/) {
+	int remaining = currentWaveMax_ - currentWaveKilled_;
+	return (remaining > 0) ? remaining : 0;
 }
 
 #if defined(USE_IMGUI) && !defined(NDEBUG)

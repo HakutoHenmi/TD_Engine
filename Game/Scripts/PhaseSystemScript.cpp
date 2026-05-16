@@ -19,9 +19,12 @@
 #include <unordered_map>
 
 // Button UI
-#include "InstallationButton.h"
+#include "InstallationManager.h"
 
 #include "WaveManagement.h"
+#include "../../Engine/ThirdParty/nlohmann/json.hpp"
+
+using json = nlohmann::json;
 
 namespace Game {
 
@@ -33,7 +36,7 @@ bool IsPointerOverInstallationButton(GameScene* scene) {
 		return false;
 
 	auto& registry = scene->GetRegistry();
-	auto view = registry.view<UIButtonComponent, ScriptComponent>();
+	auto view = registry.view<UIButtonComponent>();
 	for (auto entity : view) {
 		const auto& btn = view.get<UIButtonComponent>(entity);
 		if (!btn.enabled || !btn.isHovered)
@@ -42,14 +45,8 @@ bool IsPointerOverInstallationButton(GameScene* scene) {
 		if (registry.all_of<RectTransformComponent>(entity) && !registry.get<RectTransformComponent>(entity).enabled)
 			continue;
 
-		const auto& sc = view.get<ScriptComponent>(entity);
-		if (!sc.enabled)
-			continue;
-
-		for (const auto& entry : sc.scripts) {
-			if (entry.scriptPath == "InstallationButton") {
-				return true;
-			}
+		if (InstallationManager::IsManagedButton(entity)) {
+			return true;
 		}
 	}
 
@@ -178,6 +175,9 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	isPipeSet_ = false;
 	hasPipeStartPoint_ = false;
 
+	enemyCountUI_ = entt::null;
+	installationCostUI_ = entt::null;
+
 	// キー入力の初期化
 	preKeyP_ = false;
 	preKeySpace_ = false;
@@ -200,6 +200,19 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 		skillTree_.Start(entity, scene);
 		skillTree_.LoadFromJson("Resources/Scenes/skills.json");
 	}
+
+	// 設置開始イベントの購読
+	SubscribeString(scene, "StartInstallation", [this](const std::string& dataStr) {
+		try {
+			json data = json::parse(dataStr);
+			selectedObjPath_ = data.value("prefab", "");
+			selectedObjCost_ = data.value("cost", 0);
+			isPipeSet_ = data.value("isPipe", false);
+			isPlacementMode_ = true;
+			isSellMode_ = false;
+			hasPipeStartPoint_ = false;
+		} catch (...) {}
+	});
 }
 
 void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) {
@@ -230,6 +243,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	bool key3 = input->Trigger(DIK_3) || (GetAsyncKeyState('3') & 0x8001);
 	bool key4 = input->Trigger(DIK_4) || (GetAsyncKeyState('4') & 0x8001);
 	bool key5 = input->Trigger(DIK_5) || (GetAsyncKeyState('5') & 0x8001);
+	bool key6 = input->Trigger(DIK_6) || (GetAsyncKeyState('6') & 0x8001);
 	bool keyX = input->Trigger(DIK_X) || (GetAsyncKeyState('X') & 0x8001); // 削除モード用
 	bool keyP = false;
 #ifndef NDEBUG
@@ -289,50 +303,66 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		// 設置モードへの切り替え
 
-		if (key1 || InstallationButton::IsButtonPressed(InstallationButton::Tank)) {
+		if (key1 || InstallationManager::IsButtonPressed("Resources/Prefabs/BulletTank.prefab")) {
 			selectedObjPath_ = "Resources/Prefabs/BulletTank.prefab";
-			selectedObjCost_ = tankCost_;
+			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
+			if (selectedObjCost_ == 0) selectedObjCost_ = tankCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
-           placementSelectionChangedThisFrame = true;
+			placementSelectionChangedThisFrame = true;
 		}
 
-		if (key2 || InstallationButton::IsButtonPressed(InstallationButton::Pipe)) {
+		if (key2 || InstallationManager::IsButtonPressed("Resources/Prefabs/Pipe.prefab")) {
 			selectedObjPath_ = "Resources/Prefabs/Pipe.prefab";
-			selectedObjCost_ = pipeCost_;
+			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
+			if (selectedObjCost_ == 0) selectedObjCost_ = pipeCost_;
 			isPipeSet_ = true;
 			isPlacementMode_ = true;
 			hasPipeStartPoint_ = false;
-           placementSelectionChangedThisFrame = true;
+			placementSelectionChangedThisFrame = true;
 		}
 
-		if (key3 || InstallationButton::IsButtonPressed(InstallationButton::Cannon)) {
+		if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/Canon.prefab")) {
 			selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
-			selectedObjCost_ = canonCost_;
+			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
+			if (selectedObjCost_ == 0) selectedObjCost_ = canonCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
-           placementSelectionChangedThisFrame = true;
+			placementSelectionChangedThisFrame = true;
 		}
 
-		if (key4 || InstallationButton::IsButtonPressed(InstallationButton::Missile)) {
+		if (key4 || InstallationManager::IsButtonPressed("Resources/Prefabs/Missile.prefab")) {
 			selectedObjPath_ = "Resources/Prefabs/Missile.prefab";
-			selectedObjCost_ = missileCost_;
+			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
+			if (selectedObjCost_ == 0) selectedObjCost_ = missileCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			hasPipeStartPoint_ = false;
-           placementSelectionChangedThisFrame = true;
+			placementSelectionChangedThisFrame = true;
 		}
 
-		if (key5 || InstallationButton::IsButtonPressed(InstallationButton::PoisonTrap)) {
+		if (key5 || InstallationManager::IsButtonPressed("Resources/Prefabs/Poison.prefab")) {
 			selectedObjPath_ = "Resources/Prefabs/Poison.prefab";
-			selectedObjCost_ = poisonCost_;
+			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
+			if (selectedObjCost_ == 0) selectedObjCost_ = poisonCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
 			isSellMode_ = false;
 			hasPipeStartPoint_ = false;
-		   placementSelectionChangedThisFrame = true;
+			placementSelectionChangedThisFrame = true;
+		}
+
+		if (key6 || InstallationManager::IsButtonPressed("Resources/Prefabs/IceCanon.prefab")) {
+			selectedObjPath_ = "Resources/Prefabs/IceCanon.prefab";
+			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
+			if (selectedObjCost_ == 0) selectedObjCost_ = iceCanonCost_;
+			isPlacementMode_ = true;
+			isPipeSet_ = false;
+			isSellMode_ = false;
+			hasPipeStartPoint_ = false;
+			placementSelectionChangedThisFrame = true;
 		}
 
 		// Xキーで削除(売却)モードへの切り替え
@@ -475,6 +505,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 							else if (name.find("Canon") != std::string::npos || name.find("Cannon") != std::string::npos) { refundCost = canonCost_; }
 							else if (name.find("Missile") != std::string::npos) { refundCost = missileCost_; }
 							else if (name.find("Poison") != std::string::npos) { refundCost = poisonCost_; }
+							else if (name.find("Ice") != std::string::npos) { refundCost = iceCanonCost_; }
 							else { refundCost = 0; } // 未知のオブジェクト
 						}
 
@@ -556,6 +587,78 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	if (scene->GetRegistry().all_of<UITextComponent>(entity))
 		scene->GetRegistry().get<UITextComponent>(entity).text = "$"+ std::to_string(CoinCount);
 
+	// ★ 敵の数UIの更新
+	if (isPhase_ == BattlePhase) {
+		auto waveManagerEntity = WaveManagement::GetManagerEntity();
+		if (scene->GetRegistry().valid(waveManagerEntity)) {
+			auto* sc = scene->GetRegistry().try_get<ScriptComponent>(waveManagerEntity);
+			if (sc) {
+				for (auto& entry : sc->scripts) {
+					if (entry.scriptPath == "WaveManagement" && entry.instance) {
+						auto* wm = static_cast<WaveManagement*>(entry.instance.get());
+						int total = wm->GetTotalMaxEnemies(scene);
+						int remaining = wm->GetTotalRemainingEnemies(scene);
+
+						// UIエンティティの作成（まだなければ）
+						if (enemyCountUI_ == entt::null || !scene->GetRegistry().valid(enemyCountUI_)) {
+							enemyCountUI_ = scene->CreateEntity("EnemyCountUI");
+							auto& rect = scene->GetRegistry().emplace<RectTransformComponent>(enemyCountUI_);
+							rect.pos = { 0, -450 }; // 画面上部中央
+							rect.anchor = { 0.5f, 0.5f }; // 中央基準で上へ
+							rect.pivot = { 0.5f, 0.5f };
+
+							auto& text = scene->GetRegistry().emplace<UITextComponent>(enemyCountUI_);
+							text.fontSize = 64.0f;
+							text.color = { 1, 1, 1, 1 };
+							text.outlineEnabled = true;
+						}
+
+						auto& text = scene->GetRegistry().get<UITextComponent>(enemyCountUI_);
+						text.text = std::to_string(remaining) + " / " + std::to_string(total);
+						scene->GetRegistry().get<RectTransformComponent>(enemyCountUI_).enabled = true;
+					}
+				}
+			}
+		}
+	} else {
+		// 戦闘フェーズ以外では非表示
+		if (enemyCountUI_ != entt::null && scene->GetRegistry().valid(enemyCountUI_)) {
+			scene->GetRegistry().get<RectTransformComponent>(enemyCountUI_).enabled = false;
+		}
+	}
+
+	// ★ 設置コストUIの更新
+	if (isPlacementMode_) {
+		if (installationCostUI_ == entt::null || !scene->GetRegistry().valid(installationCostUI_)) {
+			installationCostUI_ = scene->CreateEntity("InstallationCostUI");
+			auto& rect = scene->GetRegistry().emplace<RectTransformComponent>(installationCostUI_);
+			rect.pos = { 0, -400 }; // 画面上部
+			rect.anchor = { 0.5f, 0.5f };
+			rect.pivot = { 0.5f, 0.5f };
+
+			auto& text = scene->GetRegistry().emplace<UITextComponent>(installationCostUI_);
+			text.fontSize = 48.0f;
+			text.color = { 1, 1, 1, 1 };
+			text.outlineEnabled = true;
+		}
+
+		auto& text = scene->GetRegistry().get<UITextComponent>(installationCostUI_);
+		text.text = "Cost: " + std::to_string(currentInstallationCost_);
+		// お金が足りない場合は赤色にする
+		if (CoinCount < currentInstallationCost_) {
+			text.color = { 1, 0, 0, 1 };
+		}
+		else {
+			text.color = { 1, 1, 1, 1 };
+		}
+		scene->GetRegistry().get<RectTransformComponent>(installationCostUI_).enabled = true;
+	}
+	else {
+		if (installationCostUI_ != entt::null && scene->GetRegistry().valid(installationCostUI_)) {
+			scene->GetRegistry().get<RectTransformComponent>(installationCostUI_).enabled = false;
+		}
+	}
+
 	preKeyN_ = keyN;
 }
 
@@ -600,8 +703,10 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 	if (!input)
 		return;
 	Engine::Vector3 hitPoint{};
-	if (!TryGetTerrainHitPoint(scene, hitPoint))
+	if (!TryGetTerrainHitPoint(scene, hitPoint)) {
+		currentInstallationCost_ = 0;
 		return;
+	}
 
 	Engine::Vector3 snappedHitPoint = hitPoint;
 	snappedHitPoint.x = SnapTo2x2Grid(snappedHitPoint.x);
@@ -621,6 +726,7 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 				pipeStartZ_ = snappedHitPoint.z;
 				hasPipeStartPoint_ = true;
 			}
+			currentInstallationCost_ = selectedObjCost_;
 			return;
 		}
 
@@ -647,6 +753,7 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 				canPlaceAll = false;
 			}
 		}
+		currentInstallationCost_ = static_cast<int>(pathPoints.size()) * selectedObjCost_;
 
 		// パイプ間の接続ラインを描画
 		auto* pipeRenderer = scene->GetRenderer();
@@ -684,6 +791,7 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 		CoinCount -= selectedObjCost_;
 		isPlacementMode_ = false;
 	}
+	currentInstallationCost_ = selectedObjCost_;
 }
 
 bool PhaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3& outHitPoint) const {

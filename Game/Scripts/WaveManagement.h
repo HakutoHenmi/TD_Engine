@@ -25,6 +25,9 @@ public:
 		managerEntity_ = static_cast<entt::entity>(entt::null);
 	}
 
+	int GetTotalMaxEnemies(GameScene* scene);
+	int GetTotalRemainingEnemies(GameScene* scene);
+
 private:
 	static int currentWave_;
 	static inline entt::entity managerEntity_ = static_cast<entt::entity>(entt::null);
@@ -39,6 +42,11 @@ private:
 
 	// 最後に Update で参照したシーン (UI生成用)
 	GameScene* cachedScene_ = nullptr;
+
+	int currentWaveMax_ = 0;
+	int currentWaveKilled_ = 0;
+	int lastAliveCount_ = 0;
+	int lastTotalSpawned_ = 0;
 };
 
 } // namespace Game
