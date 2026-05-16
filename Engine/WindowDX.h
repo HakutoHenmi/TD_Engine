@@ -54,6 +54,9 @@ public:
 	D3D12_CPU_DESCRIPTOR_HANDLE SRV_CPU_Master(int offset) const; // ★追加
 	D3D12_GPU_DESCRIPTOR_HANDLE SRV_GPU(int offset) const;
 
+	// ★追加: 深度バッファリソース取得 (DOFポストプロセス用)
+	ID3D12Resource* GetDepthResource() const { return depth_.Get(); }
+
 	HWND GetHwnd() const { return hwnd_; }
 	void ToggleFullscreen();
 	bool IsFullscreen() const { return isFullscreen_; }

@@ -2,6 +2,7 @@
 #include <cmath>
 #include <algorithm>
 #include "../Engine/Input.h" // ★追加
+#include "../Scripts/PhaseSystemScript.h" // ★追加: 準備フェーズ判定用
 
 namespace Game {
 
@@ -17,7 +18,7 @@ public:
 
 			// ★追加: マウスホイールによるズーム
 			auto* inputIns = ::Engine::Input::GetInstance();
-			if (inputIns) {
+			if (inputIns && Game::PhaseSystemScript::IsPhase() != Game::PhaseSystemScript::PreparationPhase) {
 				float wheel = inputIns->GetMouseWheelDelta();
 				if (std::abs(wheel) > 0.001f) {
 					ct.distance -= wheel * 2.0f; // 感度調整（1クリックで2m移動）
@@ -115,6 +116,9 @@ public:
 
 			// ★調整: 『鳴潮』風のフレーミング（キャラクターを中央より少し下に配置）
 			float verticalFraming = 0.8f; // キャラクターが画面中央より少し下に見えるように調整
+			if (Game::PhaseSystemScript::IsPhase() == Game::PhaseSystemScript::PreparationPhase) {
+				verticalFraming -= 5.0f; // ★追加: 準備フェーズのカメラをさらに下げる（5mほど）
+			}
 			targetPos.y += verticalFraming;
 
 			// ★速度計算と動的スムージング

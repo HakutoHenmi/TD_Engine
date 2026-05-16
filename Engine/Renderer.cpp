@@ -889,6 +889,9 @@ void Renderer::EndFrame() {
 		ppSceneState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 	}
 
+	// ★追加: ブルームパスの実行（ppSceneColor_ → bloomMips_[0]）
+	ExecuteBloomPass_();
+
 	// --- 2. finalSceneColor_ をRenderTargetStateに遷移し描画 ---
 	if (finalSceneState_ != D3D12_RESOURCE_STATE_RENDER_TARGET) {
 		auto b = CD3DX12_RESOURCE_BARRIER::Transition(finalSceneColor_.Get(), finalSceneState_, D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -918,6 +921,7 @@ void Renderer::EndFrame() {
 #pragma warning(push)
 #pragma warning(disable : 4324)
 #endif
+		// ★修正: CBPost構造体にブルーム・DOFパラメータを追加
 		struct alignas(256) CBPost {
 			float time;
 			float noiseStrength;
@@ -926,8 +930,11 @@ void Renderer::EndFrame() {
 			float vignette;
 			float scanline;
 			float san;
-			float pad0;
-			float pad[8];
+			float bloomIntensity;     // ★追加: ブルーム強度
+			float dofFocusDistance;   // ★追加: DOFフォーカス距離
+			float dofFocusRange;      // ★追加: DOFフォーカス範囲
+			float dofIntensity;       // ★追加: DOFぼかし強度
+			float pad[5];
 		};
 #ifdef _MSC_VER
 #pragma warning(pop)
@@ -940,6 +947,10 @@ void Renderer::EndFrame() {
 		cb.vignette = ppParams_.vignette;
 		cb.scanline = ppParams_.scanline;
 		cb.san = ppParams_.san;
+		cb.bloomIntensity = ppParams_.bloomIntensity;     // ★追加
+		cb.dofFocusDistance = ppParams_.dofFocusDistance; // ★追加
+		cb.dofFocusRange = ppParams_.dofFocusRange;       // ★追加
+		cb.dofIntensity = ppParams_.dofIntensity;          // ★追加
 
 		const uint32_t off = upload_[fi].Allocate(sizeof(CBPost), 256);
 		if (off != UINT32_MAX) {
@@ -949,9 +960,28 @@ void Renderer::EndFrame() {
 		}
 	}
 
-	list_->SetGraphicsRootDescriptorTable(1, ppSrvGpu_);
+	// ★追加: 深度バッファをPIXEL_SHADER_RESOURCEに遷移
+	if (ID3D12Resource* depthRes = window_->GetDepthResource()) {
+		auto b = CD3DX12_RESOURCE_BARRIER::Transition(depthRes, D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		list_->ResourceBarrier(1, &b);
+	}
+
+	// ★修正: シーンテクスチャ(t0)、ブルームテクスチャ(t1)、深度テクスチャ(t2)をバインド
+	list_->SetGraphicsRootDescriptorTable(1, ppSrvGpu_);          // t0: シーンカラー
+	if (bloomInitialized_ && ppParams_.bloomIntensity > 0.0f) {
+		list_->SetGraphicsRootDescriptorTable(2, bloomMips_[0].srvGpu); // t1: ブルームテクスチャ
+	}
+	if (depthSrvGpu_.ptr != 0) {
+		list_->SetGraphicsRootDescriptorTable(3, depthSrvGpu_);     // t2: 深度テクスチャ
+	}
 	list_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	list_->DrawInstanced(3, 1, 0, 0);
+
+	// ★追加: 深度バッファを元のDEPTH_WRITEに戻す
+	if (ID3D12Resource* depthRes = window_->GetDepthResource()) {
+		auto b = CD3DX12_RESOURCE_BARRIER::Transition(depthRes, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+		list_->ResourceBarrier(1, &b);
+	}
 
 	FlushSprites();
 	FlushSDFUI(); // ★追加: SDF UIの描画を実行
@@ -2393,6 +2423,12 @@ void Renderer::DrawMeshInstanced(MeshHandle mesh, TextureHandle texture, const M
 		newIdc.shaderName = shaderName;
 		instancedDrawCalls_.push_back(newIdc);
 		it = instancedDrawCalls_.end() - 1;
+
+		// ★ デバッグ用：新しいバッチが作られた理由を確認する
+		char buf[256];
+		sprintf_s(buf, "[Batching] New Batch Created: Mesh=%u, Tex=%u, Shader=%s, ExtraTexSize=%zu\n", 
+				  (uint32_t)mesh, (uint32_t)texture, shaderName.c_str(), extraTex.size());
+		OutputDebugStringA(buf);
 	}
 
 	lastIDCIndex_ = static_cast<int>(std::distance(instancedDrawCalls_.begin(), it));
@@ -3150,8 +3186,8 @@ VSOut main(uint vid : SV_VertexID) {
     VSOut o; o.svpos = float4(p, 0, 1); o.uv = float2((p.x + 1) * 0.5, 1.0 - (p.y + 1) * 0.5); return o;
 })";
 		static const char* kPSPP = R"(
-Texture2D gScene : register(t0); SamplerState gSmp : register(s0);
-cbuffer CBPost : register(b0) { float gTime; float gNoiseStrength; float gDistortion; float gChromaShift; float gVignette; float gScanline; float2 pad; };
+Texture2D gScene : register(t0); Texture2D gBloom : register(t1); SamplerState gSmp : register(s0);
+cbuffer CBPost : register(b0) { float gTime; float gNoiseStrength; float gDistortion; float gChromaShift; float gVignette; float gScanline; float gSan; float gBloomIntensity; float gDofFocusDist; float gDofFocusRange; float gDofIntensity; };
 float hash(float2 p) { return frac(sin(dot(p, float2(12.9898,78.233))) * 43758.5453); }
 float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
     float wave = sin(uv.y * 900.0 + gTime * 12.0) * gDistortion;
@@ -3163,7 +3199,8 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
     col *= saturate(1.0 - dot(d,d) * 0.8);
     float dv = saturate(dot(d,d) * gVignette);
     col = lerp(col, float3(1,0,0), dv * 0.8);
-    return float4(col, 1);
+    if (gBloomIntensity > 0.0) { col += gBloom.Sample(gSmp, uv).rgb * gBloomIntensity; }
+    return float4(saturate(col), 1);
 })";
 		auto vs = CompileShader(kVSPP, "main", "vs_5_0");
 		auto ps = CompileShaderFromFile(L"Resources/shaders/CRTPost.hlsl", "main", "ps_5_0");
@@ -3172,11 +3209,16 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 		if (!vs || !ps)
 			return false;
 
-		CD3DX12_DESCRIPTOR_RANGE rangeSRV;
-		rangeSRV.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
-		CD3DX12_ROOT_PARAMETER params[2]{};
+		// ★修正: PPルートシグネチャにブルーム(t1)と深度(t2)のSRVスロットを追加
+		CD3DX12_DESCRIPTOR_RANGE rangeSRV0, rangeSRV1, rangeSRV2;
+		rangeSRV0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0); // t0: シーンカラー
+		rangeSRV1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1); // t1: ブルームテクスチャ
+		rangeSRV2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2); // t2: 深度テクスチャ
+		CD3DX12_ROOT_PARAMETER params[4]{};
 		params[0].InitAsConstantBufferView(0);
-		params[1].InitAsDescriptorTable(1, &rangeSRV, D3D12_SHADER_VISIBILITY_PIXEL);
+		params[1].InitAsDescriptorTable(1, &rangeSRV0, D3D12_SHADER_VISIBILITY_PIXEL);
+		params[2].InitAsDescriptorTable(1, &rangeSRV1, D3D12_SHADER_VISIBILITY_PIXEL);
+		params[3].InitAsDescriptorTable(1, &rangeSRV2, D3D12_SHADER_VISIBILITY_PIXEL);
 		CD3DX12_STATIC_SAMPLER_DESC samp(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
 		CD3DX12_ROOT_SIGNATURE_DESC rs{};
 		rs.Init(_countof(params), params, 1, &samp, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -3389,7 +3431,359 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 		}
 	}
 
+	// ★追加: ブルームパイプラインの初期化
+	InitBloom_();
+
 	return true;
+}
+
+// ============================================================================
+// ★追加: InitBloom_() - ブルームパイプラインの初期化
+// ============================================================================
+// Dual Kawase Bloom用の中間レンダーターゲット（4段階）と、
+// ダウンサンプル／アップサンプル用のPSOを作成する。
+// また、DOF用に深度バッファのSRVも作成する。
+// ============================================================================
+bool Renderer::InitBloom_() {
+	if (!dev_ || !window_) return false;
+
+	const UINT W = Engine::WindowDX::kW;
+	const UINT H = Engine::WindowDX::kH;
+
+	// -----------------------------------------------------------------
+	// 1. ブルーム用RTVヒープの作成
+	// 4つのMIPレベル分のRTVが必要
+	// -----------------------------------------------------------------
+	{
+		D3D12_DESCRIPTOR_HEAP_DESC hd{};
+		hd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+		hd.NumDescriptors = kBloomMipCount;
+		if (FAILED(dev_->CreateDescriptorHeap(&hd, IID_PPV_ARGS(&bloomRtvHeap_)))) {
+			OutputDebugStringA("[Renderer] Failed to create bloom RTV heap.\n");
+			return false;
+		}
+	}
+
+	// -----------------------------------------------------------------
+	// 2. 各MIPレベルのレンダーターゲットを作成
+	// 1/2 → 1/4 → 1/8 → 1/16 の解像度で段階的に縮小
+	// R11G11B10_FLOAT形式で、HDRの明るさを保持しつつメモリを節約
+	// -----------------------------------------------------------------
+	UINT rtvInc = dev_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	UINT mipW = W / 2, mipH = H / 2;
+
+	for (uint32_t i = 0; i < kBloomMipCount; ++i) {
+		bloomMips_[i].width = mipW;
+		bloomMips_[i].height = mipH;
+
+		D3D12_RESOURCE_DESC rd = CD3DX12_RESOURCE_DESC::Tex2D(
+			DXGI_FORMAT_R11G11B10_FLOAT, mipW, mipH, 1, 1, 1, 0,
+			D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET
+		);
+		D3D12_CLEAR_VALUE cv = { DXGI_FORMAT_R11G11B10_FLOAT, {0, 0, 0, 0} };
+		CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_DEFAULT);
+
+		HRESULT hr = dev_->CreateCommittedResource(
+			&heap, D3D12_HEAP_FLAG_NONE, &rd,
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &cv,
+			IID_PPV_ARGS(&bloomMips_[i].texture)
+		);
+		if (FAILED(hr)) {
+			char buf[128];
+			sprintf_s(buf, "[Renderer] Failed to create bloom mip %u (%ux%u).\n", i, mipW, mipH);
+			OutputDebugStringA(buf);
+			return false;
+		}
+		bloomMips_[i].state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+		// RTV作成
+		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = bloomRtvHeap_->GetCPUDescriptorHandleForHeapStart();
+		rtvHandle.ptr += i * rtvInc;
+		dev_->CreateRenderTargetView(bloomMips_[i].texture.Get(), nullptr, rtvHandle);
+		bloomMips_[i].rtv = rtvHandle;
+
+		// SRV作成（メインのSRVヒープに割り当て）
+		uint32_t srvIdx = AllocateSrvIndex();
+		D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
+		srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srv.Format = DXGI_FORMAT_R11G11B10_FLOAT;
+		srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srv.Texture2D.MipLevels = 1;
+		dev_->CreateShaderResourceView(bloomMips_[i].texture.Get(), &srv, window_->SRV_CPU((int)srvIdx));
+		dev_->CreateShaderResourceView(bloomMips_[i].texture.Get(), &srv, window_->SRV_CPU_Master((int)srvIdx));
+		bloomMips_[i].srvGpu = window_->SRV_GPU((int)srvIdx);
+
+		// 次のMIPレベルは半分の解像度
+		mipW = (std::max)(1u, mipW / 2);
+		mipH = (std::max)(1u, mipH / 2);
+
+		char buf[128];
+		sprintf_s(buf, "[Renderer] Bloom mip %u: %ux%u created.\n", i, bloomMips_[i].width, bloomMips_[i].height);
+		OutputDebugStringA(buf);
+	}
+
+	// -----------------------------------------------------------------
+	// 3. 深度バッファのSRV作成 (DOF用)
+	// 深度バッファはD32_FLOAT形式だが、SRVとしてはR32_FLOATで参照する
+	// -----------------------------------------------------------------
+	{
+		uint32_t srvIdx = AllocateSrvIndex();
+		D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
+		srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srv.Format = DXGI_FORMAT_R32_FLOAT; // D32_FLOAT → R32_FLOAT としてSRV参照
+		srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srv.Texture2D.MipLevels = 1;
+		// 深度バッファリソースはWindowDXが管理しているため、そこから取得
+		ID3D12Resource* depthRes = window_->GetDepthResource();
+		if (depthRes) {
+			dev_->CreateShaderResourceView(depthRes, &srv, window_->SRV_CPU((int)srvIdx));
+			dev_->CreateShaderResourceView(depthRes, &srv, window_->SRV_CPU_Master((int)srvIdx));
+			depthSrvGpu_ = window_->SRV_GPU((int)srvIdx);
+			OutputDebugStringA("[Renderer] Depth SRV for DOF created.\n");
+		} else {
+			OutputDebugStringA("[Renderer] WARNING: Depth resource not available for DOF.\n");
+		}
+	}
+
+	// -----------------------------------------------------------------
+	// 4. ブルーム用ルートシグネチャの作成
+	// b0: 定数バッファ（テクセルサイズ、閾値など）
+	// t0: 入力テクスチャ（SRV）
+	// s0: リニアサンプラー
+	// -----------------------------------------------------------------
+	{
+		CD3DX12_DESCRIPTOR_RANGE rangeSRV;
+		rangeSRV.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+		CD3DX12_ROOT_PARAMETER params[2]{};
+		params[0].InitAsConstantBufferView(0); // b0: CBBloom
+		params[1].InitAsDescriptorTable(1, &rangeSRV, D3D12_SHADER_VISIBILITY_PIXEL); // t0
+		CD3DX12_STATIC_SAMPLER_DESC samp(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR,
+			D3D12_TEXTURE_ADDRESS_MODE_CLAMP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP);
+		CD3DX12_ROOT_SIGNATURE_DESC rsDesc{};
+		rsDesc.Init(_countof(params), params, 1, &samp,
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+		ComPtr<ID3DBlob> sig, err;
+		if (FAILED(D3D12SerializeRootSignature(&rsDesc, D3D_ROOT_SIGNATURE_VERSION_1, &sig, &err))) {
+			OutputDebugStringA("[Renderer] Failed to serialize bloom root signature.\n");
+			return false;
+		}
+		if (FAILED(dev_->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(),
+			IID_PPV_ARGS(&rootSigBloom_)))) {
+			OutputDebugStringA("[Renderer] Failed to create bloom root signature.\n");
+			return false;
+		}
+	}
+
+	// -----------------------------------------------------------------
+	// 5. ブルーム用PSO（ダウンサンプル＋アップサンプル）の作成
+	// 頂点シェーダーはフルスクリーン三角形（VertexIDから生成）
+	// -----------------------------------------------------------------
+	{
+		// フルスクリーン三角形VS（VertexIDから位置とUVを生成）
+		static const char* kVSFullscreen = R"(
+struct VSOut { float4 svpos : SV_POSITION; float2 uv : TEXCOORD0; };
+VSOut main(uint vid : SV_VertexID) {
+    float2 p = (vid == 0) ? float2(-1, -1) : ((vid == 1) ? float2(-1, 3) : float2(3, -1));
+    VSOut o; o.svpos = float4(p, 0, 1); o.uv = float2((p.x + 1) * 0.5, 1.0 - (p.y + 1) * 0.5); return o;
+})";
+		auto vs = CompileShader(kVSFullscreen, "main", "vs_5_0");
+		auto psDown = CompileShaderFromFile(L"Resources/shaders/BloomDownsample.hlsl", "main", "ps_5_0");
+		auto psUp = CompileShaderFromFile(L"Resources/shaders/BloomUpsample.hlsl", "main", "ps_5_0");
+
+		if (!vs || !psDown || !psUp) {
+			OutputDebugStringA("[Renderer] WARNING: Bloom shaders failed to compile. Bloom disabled.\n");
+			return false;
+		}
+
+		// ダウンサンプルPSO
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC pso{};
+		pso.pRootSignature = rootSigBloom_.Get();
+		pso.VS = { vs->GetBufferPointer(), vs->GetBufferSize() };
+		pso.PS = { psDown->GetBufferPointer(), psDown->GetBufferSize() };
+		pso.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		pso.RTVFormats[0] = DXGI_FORMAT_R11G11B10_FLOAT;
+		pso.NumRenderTargets = 1;
+		pso.SampleDesc.Count = 1;
+		pso.SampleMask = UINT_MAX;
+		pso.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+		pso.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+		pso.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+		pso.DepthStencilState.DepthEnable = FALSE;
+		pso.DSVFormat = DXGI_FORMAT_UNKNOWN;
+		if (FAILED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoBloomDown_)))) {
+			OutputDebugStringA("[Renderer] Failed to create bloom downsample PSO.\n");
+			return false;
+		}
+
+		// アップサンプルPSO（加算ブレンド有効）
+		// アップサンプル時は、前段の結果に加算ブレンドで重ねる
+		pso.PS = { psUp->GetBufferPointer(), psUp->GetBufferSize() };
+		auto& blend = pso.BlendState.RenderTarget[0];
+		blend.BlendEnable = TRUE;
+		blend.SrcBlend = D3D12_BLEND_ONE;
+		blend.DestBlend = D3D12_BLEND_ONE; // 加算ブレンド
+		blend.BlendOp = D3D12_BLEND_OP_ADD;
+		blend.SrcBlendAlpha = D3D12_BLEND_ONE;
+		blend.DestBlendAlpha = D3D12_BLEND_ONE;
+		blend.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+		if (FAILED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoBloomUp_)))) {
+			OutputDebugStringA("[Renderer] Failed to create bloom upsample PSO.\n");
+			return false;
+		}
+	}
+
+	bloomInitialized_ = true;
+	OutputDebugStringA("[Renderer] Bloom pipeline initialized successfully.\n");
+	return true;
+}
+
+// ============================================================================
+// ★追加: ExecuteBloomPass_() - ブルームパスの実行
+// ============================================================================
+// EndFrame内で呼び出される。ppSceneColor_（シーン描画結果）を入力として、
+// 4段階のダウンサンプル→4段階のアップサンプルを実行し、
+// bloomMips_[0] に最終的なブルームテクスチャを生成する。
+// ============================================================================
+void Renderer::ExecuteBloomPass_() {
+	if (!bloomInitialized_ || ppParams_.bloomIntensity <= 0.0f) return;
+
+	const uint32_t fi = window_->FrameIndex();
+	ID3D12DescriptorHeap* heaps[] = { srvHeap_ };
+	list_->SetDescriptorHeaps(1, heaps);
+
+	// ブルーム用の定数バッファ構造体
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4324)
+#endif
+	struct alignas(256) CBBloom {
+		float texelSizeX, texelSizeY; // 入力テクスチャのテクセルサイズ
+		float threshold;              // 輝度抽出閾値（最初のパスのみ）
+		float bloomRadius;            // ブルームの広がり半径
+	};
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+
+	// -----------------------------------------------------------------
+	// ダウンサンプルパス (ppSceneColor_ → mip[0] → mip[1] → mip[2] → mip[3])
+	// -----------------------------------------------------------------
+	list_->SetPipelineState(psoBloomDown_.Get());
+	list_->SetGraphicsRootSignature(rootSigBloom_.Get());
+	list_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	// 入力テクスチャ: 最初はppSceneColor_
+	D3D12_GPU_DESCRIPTOR_HANDLE inputSrv = ppSrvGpu_;
+	float inputW = (float)Engine::WindowDX::kW;
+	float inputH = (float)Engine::WindowDX::kH;
+
+	for (uint32_t i = 0; i < kBloomMipCount; ++i) {
+		auto& mip = bloomMips_[i];
+
+		// 出力MIPをRenderTarget状態に遷移
+		if (mip.state != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+			auto b = CD3DX12_RESOURCE_BARRIER::Transition(
+				mip.texture.Get(), mip.state, D3D12_RESOURCE_STATE_RENDER_TARGET);
+			list_->ResourceBarrier(1, &b);
+			mip.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		}
+
+		// レンダーターゲットとビューポートを設定
+		float clearColor[4] = { 0, 0, 0, 0 };
+		list_->OMSetRenderTargets(1, &mip.rtv, FALSE, nullptr);
+		list_->ClearRenderTargetView(mip.rtv, clearColor, 0, nullptr);
+		D3D12_VIEWPORT vp = { 0, 0, (float)mip.width, (float)mip.height, 0, 1 };
+		D3D12_RECT sc = { 0, 0, (LONG)mip.width, (LONG)mip.height };
+		list_->RSSetViewports(1, &vp);
+		list_->RSSetScissorRects(1, &sc);
+
+		// 定数バッファ: テクセルサイズと輝度閾値
+		CBBloom cb{};
+		cb.texelSizeX = 1.0f / inputW;
+		cb.texelSizeY = 1.0f / inputH;
+		cb.threshold = (i == 0) ? ppParams_.bloomThreshold : 0.0f; // 最初のパスのみ閾値適用
+		cb.bloomRadius = ppParams_.bloomRadius;
+
+		const uint32_t off = upload_[fi].Allocate(sizeof(CBBloom), 256);
+		if (off != UINT32_MAX) {
+			std::memcpy(upload_[fi].mapped + off, &cb, sizeof(CBBloom));
+			list_->SetGraphicsRootConstantBufferView(0, upload_[fi].buffer->GetGPUVirtualAddress() + off);
+		}
+
+		// 入力テクスチャをバインド
+		list_->SetGraphicsRootDescriptorTable(1, inputSrv);
+
+		// フルスクリーン三角形を描画
+		list_->DrawInstanced(3, 1, 0, 0);
+
+		// このMIPをSRV状態に戻す（次のパスの入力として使用するため）
+		{
+			auto b = CD3DX12_RESOURCE_BARRIER::Transition(
+				mip.texture.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			list_->ResourceBarrier(1, &b);
+			mip.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		}
+
+		// 次のパスの入力は今作ったMIP
+		inputSrv = mip.srvGpu;
+		inputW = (float)mip.width;
+		inputH = (float)mip.height;
+	}
+
+	// -----------------------------------------------------------------
+	// アップサンプルパス (mip[3] → mip[2] → mip[1] → mip[0])
+	// 加算ブレンドで、より小さいMIPの結果をより大きいMIPに重ねていく
+	// -----------------------------------------------------------------
+	list_->SetPipelineState(psoBloomUp_.Get());
+
+	for (int i = (int)kBloomMipCount - 2; i >= 0; --i) {
+		auto& dst = bloomMips_[i];
+		auto& src = bloomMips_[i + 1]; // より小さい（ぼけた）MIP
+
+		// 出力MIPをRenderTarget状態に遷移
+		if (dst.state != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+			auto b = CD3DX12_RESOURCE_BARRIER::Transition(
+				dst.texture.Get(), dst.state, D3D12_RESOURCE_STATE_RENDER_TARGET);
+			list_->ResourceBarrier(1, &b);
+			dst.state = D3D12_RESOURCE_STATE_RENDER_TARGET;
+		}
+
+		// 注意: ここではClearしない！ダウンサンプル結果が既に入っているため、
+		// 加算ブレンドでアップサンプル結果を重ねる
+		D3D12_VIEWPORT vp = { 0, 0, (float)dst.width, (float)dst.height, 0, 1 };
+		D3D12_RECT sc = { 0, 0, (LONG)dst.width, (LONG)dst.height };
+		list_->OMSetRenderTargets(1, &dst.rtv, FALSE, nullptr);
+		list_->RSSetViewports(1, &vp);
+		list_->RSSetScissorRects(1, &sc);
+
+		// 定数バッファ: ソースMIPのテクセルサイズ
+		CBBloom cb{};
+		cb.texelSizeX = 1.0f / (float)src.width;
+		cb.texelSizeY = 1.0f / (float)src.height;
+		cb.threshold = 0.0f;
+		cb.bloomRadius = ppParams_.bloomRadius;
+
+		const uint32_t off = upload_[fi].Allocate(sizeof(CBBloom), 256);
+		if (off != UINT32_MAX) {
+			std::memcpy(upload_[fi].mapped + off, &cb, sizeof(CBBloom));
+			list_->SetGraphicsRootConstantBufferView(0, upload_[fi].buffer->GetGPUVirtualAddress() + off);
+		}
+
+		// ソース（より小さいMIP）をバインド
+		list_->SetGraphicsRootDescriptorTable(1, src.srvGpu);
+		list_->DrawInstanced(3, 1, 0, 0);
+
+		// SRV状態に戻す
+		{
+			auto b = CD3DX12_RESOURCE_BARRIER::Transition(
+				dst.texture.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+			list_->ResourceBarrier(1, &b);
+			dst.state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		}
+	}
+
+	// ブルーム完了: bloomMips_[0].srvGpu が最終的なブルームテクスチャ
+	// これを最終合成パスで参照する
 }
 
 
