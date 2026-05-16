@@ -77,6 +77,7 @@ private:
 	int canonCost_ = 150;
 	int missileCost_ = 200;
 	int poisonCost_ = 120;
+	int iceCanonCost_ = 250;
 
 	// パイプ専用
 	bool isPipeSet_ = false;

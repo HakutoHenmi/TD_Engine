@@ -22,7 +22,7 @@
 #include "CommunicationTestScript.h"
 #include "HitDistortionScript.h" // ★追加
 #include "MirrorShatterScript.h" // ★追加
-#include "InstallationButton.h"
+#include "InstallationManager.h"
 #include "PhaseTransition.h"
 #include "WaveManagement.h"
 #include "SpaceShatterScript.h" // ★追加
@@ -63,7 +63,7 @@ void ScriptEngine::Initialize() {
 	RegisterScript("CommunicationTestScript", []() { return std::make_shared<CommunicationTestScript>(); });
 	RegisterScript("HitDistortionScript", []() { return std::make_shared<HitDistortionScript>(); }); // ★追加
 	RegisterScript("MirrorShatterScript", []() { return std::make_shared<MirrorShatterScript>(); }); // ★追加
-	RegisterScript("InstallationButton", []() { return std::make_shared<InstallationButton>(); });
+	RegisterScript("InstallationManager", []() { return std::make_shared<InstallationManager>(); });
 	RegisterScript("PhaseTransition", []() { return std::make_shared<PhaseTransition>(); });
 	RegisterScript("WaveManagement", []() { return std::make_shared<WaveManagement>(); });
 	RegisterScript("SpaceShatterScript", []() { return std::make_shared<SpaceShatterScript>(); }); // ★追加
