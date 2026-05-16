@@ -30,7 +30,7 @@ InstallationManager::InstallationManager() {
 	texPaths_[2] = "Resources/Textures/Button/CannonButton.png";
 	texPaths_[3] = "Resources/Textures/Button/MissileButton.png";
 	texPaths_[4] = "Resources/Textures/Button/PisonTrapButton.png";
-	texPaths_[5] = "Resources/Textures/Button/MissileButton.png";
+	texPaths_[5] = "Resources/Textures/Button/IceCannonButton.png";
 
 	prefabPaths_[0] = "";
 	prefabPaths_[1] = "";
