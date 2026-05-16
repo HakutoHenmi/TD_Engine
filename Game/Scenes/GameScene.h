@@ -17,6 +17,7 @@
 #include "../../Engine/ParticleEmitter.h"
 #include "../../Engine/ParticleEditor.h"
 #include "../EnemySystem/NavigationManager.h"
+#include "../Systems/PerformanceProfiler.h" // ★追加: パフォーマンス計測
 
 namespace Game {
 
@@ -112,6 +113,10 @@ private:
 	mutable uint64_t matrixFrameCount_ = 0;
 	void ClearMatrixCache() const { matrixCache_.clear(); matrixFrameCount_++; }
 
+	// ★追加: 地形レイキャスト高速化用キャッシュ
+	mutable std::vector<entt::entity> staticTerrainEntities_;
+	mutable bool staticTerrainDirty_ = true;
+
 	std::string sceneSnapshot_; // ★追加: Play開始時のシリアライズ文字列
 	std::string initialSceneSnapshot_; // ★追加: 起動（JSONロード）直後の状態
 
@@ -135,6 +140,9 @@ private:
 
 	//フローフィールド用
 	std::unique_ptr<NavigationManager> flowField_ = nullptr;
+
+	// ★追加: パフォーマンスプロファイラー
+	PerformanceProfiler profiler_;
 
 	// ★追加: ポーズメニュー
 	enum class PauseMenuState { Main, Settings };

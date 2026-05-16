@@ -298,8 +298,8 @@ public:
 	};
 
 	struct SdfUIDesc {
-		Vector2 centerPx;
-		Vector2 sizePx;
+		Vector2 centerPx{0.0f, 0.0f};
+		Vector2 sizePx{0.0f, 0.0f};
 		float lineWidth = 1.0f;
 		float glow = 0.0f;
 		Vector4 color = {1, 1, 1, 1};

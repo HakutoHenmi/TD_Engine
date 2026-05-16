@@ -262,14 +262,27 @@ for ri, route in enumerate(base_routes):
     # スムーズ化（subdivisions増やして隙間対策）
     smooth_wps = smooth_path(wps, subdivisions=16)
     
-    # パスセグメント作成（隙間なく接続）
+    # パスセグメント作成（隙間なく接続）→ ルートごとに1メッシュへ結合
+    route_segments = []
     for si in range(len(smooth_wps) - 1):
         p0 = smooth_wps[si]
         p1 = smooth_wps[si + 1]
         seg_name = f"{rname}_Path_{si:03d}"
         seg = create_path_segment(seg_name, p0, p1, PATH_WIDTH, y=0.1)
         if seg:
-            all_objects.append(seg)
+            route_segments.append(seg)
+
+    if route_segments:
+        bpy.ops.object.select_all(action='DESELECT')
+        for seg in route_segments:
+            seg.select_set(True)
+        bpy.context.view_layer.objects.active = route_segments[0]
+        bpy.ops.object.join()
+        merged = bpy.context.view_layer.objects.active
+        merged.name = f"{rname}_Merged"
+        # ★地形出力をオフにするため追加しない
+        # all_objects.append(merged)
+        print(f"  Merged {len(route_segments)} segments -> {merged.name} (Export Skipped)")
     
     # ルートデータ保存（エンジンのフローフィールド用）
     spawn_pt = wps[-1]
@@ -330,7 +343,8 @@ for _ in range(250):
     if is_far_from_path(hx, hz, hr + PATH_WIDTH/2 + 3.0):
         name = f"Hill_{mountain_idx:03d}"
         hill = create_mountain(name, hx, hz, hr, hh, segments=8, rings=3)
-        all_objects.append(hill)
+        # ★地形出力をオフにするため追加しない
+        # all_objects.append(hill)
         mountain_idx += 1
 
 print(f"  Created {mountain_idx} mountains/hills")

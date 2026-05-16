@@ -121,31 +121,30 @@ void WindowDX::EndFrame() {
 	ID3D12CommandList* lists[] = {list_.Get()};
 	que_->ExecuteCommandLists(1, lists);
 
-	// ★修正ポイント1: VSyncをOFFにする (1,0 -> 0,0)
-	// CPU側でWaitを行うため、GPU側(Present)での待機を無効化して競合を防ぎます。
-	swap_->Present(0, 0);
+	// ★VSYNC完全無効化
+	auto startPresent = std::chrono::high_resolution_clock::now();
+	swap_->Present(0, 0); 
+	auto endPresent = std::chrono::high_resolution_clock::now();
+	lastPresentMs_ = std::chrono::duration<float, std::milli>(endPresent - startPresent).count();
 
+	auto startWait = std::chrono::high_resolution_clock::now();
 	WaitGPU();
+	auto endWait = std::chrono::high_resolution_clock::now();
+	lastWaitGPUMs_ = std::chrono::duration<float, std::milli>(endWait - startWait).count();
 
 	fi_ = swap_->GetCurrentBackBufferIndex();
 
-	// 60FPS固定ロジック (1,000,000us / 60fps = 16666.6us)
+	// ★フレームレート制限（Busy Wait）で60FPSに固定する
 	constexpr long long kMinFrameTime = 1000000 / 60;
-
-	// ★修正ポイント2: スリープを使わず、Busy Wait (空ループ) のみに変更
-	// OSのスリープ精度によるカクつきを完全に排除します。
 	while (true) {
 		auto now = std::chrono::steady_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(now - lastFrameTime_).count();
-
 		if (duration >= kMinFrameTime) {
 			lastFrameTime_ = now;
 			break;
 		}
-
-		// CPUリソースを過剰に占有しすぎないよう、ごく短いYieldを入れる（お好みで外してもOK）
-		// std::this_thread::yield();
 	}
+	lastFrameTime_ = std::chrono::steady_clock::now();
 }
 
 void WindowDX::WaitGPU() {

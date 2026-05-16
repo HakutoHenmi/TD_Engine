@@ -77,48 +77,54 @@ public:
 					}
 				}
 
-				float currentFeetY = tc.translate.y - cm.heightOffset;
-				// 移動先の地面高さを先読み (startY は現在地 y。自己判定回避のため中心から発射)
-				float futureGround = ctx.scene->GetHeightAt(futureX, futureZ, tc.translate.y, static_cast<uint32_t>(entity));
+				if (rb.useGravity) {
+					float currentFeetY = tc.translate.y - cm.heightOffset;
+					// 移動先の地面高さを先読み (startY は現在地 y。自己判定回避のため中心から発射)
+					float futureGround = ctx.scene->GetHeightAt(futureX, futureZ, tc.translate.y, static_cast<uint32_t>(entity));
 
-				// ★変更: 地面が見つからない場合(-10000.0f以下)も移動をブロック (マップ外防止)
-				if (futureGround <= -5000.0f) {
-					desiredX = 0;
-					desiredZ = 0;
-				} else if (futureGround > currentFeetY + 0.4f) {
-					// 移動先が 0.4m 以上高いなら壁とみなして移動をブロック
-					desiredX = 0;
-					desiredZ = 0;
-				} else {
-					// 膝くらいの高さから進行方向にレイを飛ばす (通常の壁判定も併用)
-					Engine::Vector3 rayOrig = {tc.translate.x, tc.translate.y + 0.5f, tc.translate.z}; 
-					Engine::Vector3 rayDir = {moveX, 0, moveZ};
-					float hitDist = 0;
-					if (ctx.scene->RayCast(rayOrig, rayDir, 0.6f, static_cast<uint32_t>(entity), hitDist)) {
+					// ★変更: 地面が見つからない場合(-10000.0f以下)も移動をブロック (マップ外防止)
+					if (futureGround <= -5000.0f) {
 						desiredX = 0;
 						desiredZ = 0;
+					} else if (futureGround > currentFeetY + 0.4f) {
+						// 移動先が 0.4m 以上高いなら壁とみなして移動をブロック
+						desiredX = 0;
+						desiredZ = 0;
+					} else {
+						// 膝くらいの高さから進行方向にレイを飛ばす (通常の壁判定も併用)
+						Engine::Vector3 rayOrig = {tc.translate.x, tc.translate.y + 0.5f, tc.translate.z}; 
+						Engine::Vector3 rayDir = {moveX, 0, moveZ};
+						float hitDist = 0;
+						if (ctx.scene->RayCast(rayOrig, rayDir, 0.6f, static_cast<uint32_t>(entity), hitDist)) {
+							desiredX = 0;
+							desiredZ = 0;
+						}
 					}
 				}
 			}
 			tc.translate.x += desiredX;
 			tc.translate.z += desiredZ;
 
-			// 2. 垂直移動と重力の更新 (isKinematic = true 前提での手動計算)
-			if (cm.isGrounded) {
-				if (wantJump) {
+			// 2. ジャンプ判定と重力
+			if (wantJump && cm.isGrounded) {
+				if (rb.useGravity) {
 					rb.velocity.y = cm.jumpPower;
 					cm.isGrounded = false;
 				} else {
-					rb.velocity.y = 0.0f; // 地面では垂直速度ゼロ
+					rb.velocity.y = 0.0f; // 重力無効時はジャンプさせない
 				}
 			} else {
 				// 自由落下
-				rb.velocity.y -= cm.gravity * ctx.dt;
+				if (rb.useGravity) {
+					rb.velocity.y -= cm.gravity * ctx.dt;
+				} else {
+					rb.velocity.y = 0.0f;
+				}
 			}
 			tc.translate.y += rb.velocity.y * ctx.dt;
 
 			// 3. 接地判定とスナップ (レイキャストを使用)
-			if (ctx.scene) {
+			if (ctx.scene && rb.useGravity) {
 				// 自身の位置から真下の地面高さを取得 (excludeIdに自分を指定)
 				// 発射位置を y (中心) にすることで、自分の上半身や剣への誤判定を物理的に防ぐ
 				float groundHeight = ctx.scene->GetHeightAt(tc.translate.x, tc.translate.z, tc.translate.y, static_cast<uint32_t>(entity));
@@ -142,6 +148,9 @@ public:
 					// 打ち上げ中
 					cm.isGrounded = false;
 				}
+			} else if (!rb.useGravity) {
+				// 重力無効の場合は常に空中にいる扱いにする
+				cm.isGrounded = false;
 			}
 
 			// --- 4. 回転 (スムーズな補間) ---

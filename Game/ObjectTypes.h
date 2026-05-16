@@ -468,6 +468,7 @@ struct RiverComponent : public Component {
 	float uvScale = 1.0f;
 	uint32_t meshHandle = 0;               // 動的生成メッシュハンドル
 	std::string texturePath = "Resources/Water/water.png";
+	uint32_t textureHandle = 0;            // キャッシュ用テクスチャハンドル
 	RiverComponent() { type = ComponentType::River; }
 };
 

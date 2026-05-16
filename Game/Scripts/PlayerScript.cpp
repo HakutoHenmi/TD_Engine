@@ -351,9 +351,17 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		if (hwnd) {
 			RECT rect;
 			GetClientRect(hwnd, &rect);
-			POINT pt = { (rect.right - rect.left) / 2, (rect.bottom - rect.top) / 2 };
-			ClientToScreen(hwnd, &pt);
-			SetCursorPos(pt.x, pt.y);
+			POINT center = { (rect.right - rect.left) / 2, (rect.bottom - rect.top) / 2 };
+			ClientToScreen(hwnd, &center);
+			
+			POINT current;
+			if (GetCursorPos(&current)) {
+				// 画面中心からずれている場合のみSetCursorPosを呼ぶ
+				// (毎フレーム呼ぶとWindows11のDWMによってWaitGPUが激増しFPSが低下するため)
+				if (current.x != center.x || current.y != center.y) {
+					SetCursorPos(center.x, center.y);
+				}
+			}
 		}
 	}
 	
@@ -1117,7 +1125,7 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 	
 	// プルプルした振動（ジッター）の計算
 	{
-		float time = (float)GetTickCount() * 0.001f;
+		float time = (float)GetTickCount64() * 0.001f;
 		float jitterBase = std::sin(time * 60.0f) * 0.012f; // 高速なサイン波
 		jitterBase += (float(rand() % 100) / 100.0f - 0.5f) * 0.008f; // 不規則なノイズ
 		

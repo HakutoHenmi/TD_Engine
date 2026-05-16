@@ -132,8 +132,8 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 			mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
 			mr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 			mr.color = (enemyType == 42) ? DirectX::XMFLOAT4{1.0f, 0.2f, 0.2f, 1.0f} : DirectX::XMFLOAT4{1.0f, 0.4f, 0.2f, 1.0f};
-			mr.shaderName = "Toon";
-			mr.enabled = true;
+			mr.shaderName = "Default";
+			mr.enabled = true; // ★パフォーマンステストのため一時的に敵の描画を完全に無効化 を戻した
 		}
 
 		auto& bcComponent = scene->GetRegistry().emplace<BoxColliderComponent>(enemy);
@@ -159,7 +159,7 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 		// ★ 高速タグシステム経由でタグを設定
 		scene->SetTag(enemy, TagType::Enemy);
 
-		// ★追加: 敵HPUI（頭上HPバー）の付与
+		// ★追加: 敵HPUI（頭上HPバー）の付与 (パフォーマンステストのため一時的にコメントアウト を戻した)
 		auto& ui = scene->GetRegistry().emplace<WorldSpaceUIComponent>(enemy);
 		ui.showHealthBar = true;
 		ui.offset = { 0.0f, 2.2f, 0.0f }; // 2mのcubeの少し上

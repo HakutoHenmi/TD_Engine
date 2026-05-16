@@ -4,6 +4,7 @@
 #include "GameScene.h"
 #include "../../Engine/Audio.h"
 #include "../../Engine/PathUtils.h"
+#include "../../Engine/Frustum.h"
 #include "../../Engine/SceneManager.h"
 #include "../Editor/EditorUI.h"
 #include "../Scripts/ScriptEngine.h"
@@ -30,6 +31,53 @@
 #include <cmath>
 
 namespace Game {
+
+namespace {
+
+bool TryGetLocalMeshBounds(Engine::Renderer* renderer, entt::registry& registry, entt::entity entity,
+                           uint32_t modelHandle, Engine::Vector3& outMin, Engine::Vector3& outMax) {
+	if (renderer) {
+		if (Engine::Model* model = renderer->GetModel(modelHandle)) {
+			const auto& data = model->GetData();
+			if (data.min.x <= data.max.x && data.min.y <= data.max.y && data.min.z <= data.max.z) {
+				outMin = data.min;
+				outMax = data.max;
+				return true;
+			}
+		}
+	}
+	if (auto* bc = registry.try_get<BoxColliderComponent>(entity)) {
+		float hx = bc->size.x * 0.5f;
+		float hy = bc->size.y * 0.5f;
+		float hz = bc->size.z * 0.5f;
+		outMin = {bc->center.x - hx, bc->center.y - hy, bc->center.z - hz};
+		outMax = {bc->center.x + hx, bc->center.y + hy, bc->center.z + hz};
+		return true;
+	}
+	outMin = {-0.5f, -0.5f, -0.5f};
+	outMax = {0.5f, 0.5f, 0.5f};
+	return true;
+}
+
+bool IsEntityVisibleInFrustum(const Engine::Frustum& frustum, Engine::Renderer* renderer, entt::registry& registry,
+                              entt::entity entity, uint32_t modelHandle, const Engine::Matrix4x4& world) {
+	Engine::Vector3 localMin, localMax;
+	if (!TryGetLocalMeshBounds(renderer, registry, entity, modelHandle, localMin, localMax))
+		return true;
+
+	// ローカルAABBに小さな余白（細いメッシュの誤カリング防止）
+	const float localMargin = 1.0f;
+	localMin.x -= localMargin;
+	localMin.y -= localMargin;
+	localMin.z -= localMargin;
+	localMax.x += localMargin;
+	localMax.y += localMargin;
+	localMax.z += localMargin;
+
+	return frustum.IntersectsLocalAABB(world, localMin, localMax);
+}
+
+} // namespace
 
 GameScene::~GameScene() {
 	// ★追加: 破棄時にシグナルを解除し、安全にレジストリをクリアする
@@ -224,6 +272,13 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	systems_.push_back(std::make_unique<MotionSystem>());
 	systems_.push_back(std::make_unique<CleanupSystem>());
 
+	// ★追加: プロファイラー初期化
+	profiler_.Initialize((int)systems_.size());
+	const char* sysNames[] = { "PlayerInput", "ScriptSystem", "CharMove", "Physics", "CameraFollow", "Health", "Combat", "Audio", "UISystem", "Motion", "Cleanup" };
+	for (int i = 0; i < (int)systems_.size() && i < 11; ++i) {
+		profiler_.SetSystemName(i, sysNames[i]);
+	}
+
 	// ★追加: 起動直後の状態を初期スナップショットとして保存
 	initialSceneSnapshot_ = EditorUI::SaveToMemory(this);
 
@@ -311,11 +366,24 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 void GameScene::Update() {
 	if (!renderer_) return;
 
+	// ★パフォーマンス検証: ポストプロセスを強制的に無効化
+	renderer_->SetPostProcessEnabled(false);
+
+	// ★追加: プロファイラー フレーム開始
+	profiler_.BeginFrame(std::chrono::duration<float>(std::chrono::steady_clock::now() - std::chrono::steady_clock::now()).count());
+	if (dx_) {
+		profiler_.frameStats.gpuPresentMs = dx_->GetLastPresentMs();
+		profiler_.frameStats.gpuWaitMs = dx_->GetLastWaitGPUMs();
+	}
+	auto updateStart = std::chrono::high_resolution_clock::now();
+
 	// ★追加: 行列キャッシュを毎フレームクリア
-	ClearMatrixCache();
+	{ ScopedTimer _t(profiler_.frameStats.matrixCacheClearMs); ClearMatrixCache(); }
 
 	// ★追加: タグの遅延同期および削除（生成直後や破棄時の同期待ちを処理）
 	// リストが空でない場合のみ処理
+	{
+	ScopedTimer _tagTimer(profiler_.frameStats.tagSyncMs);
 	if (!pendingTagRemoved_.empty() || !pendingTagSync_.empty()) {
 		// 1. 削除・変更予定のエンティティを全キャッシュから取り除く
 		std::vector<entt::entity> toRemove = std::move(pendingTagRemoved_);
@@ -339,6 +407,7 @@ void GameScene::Update() {
 				SyncTag(e);
 			}
 		}
+	}
 	}
 
 	static auto last = std::chrono::steady_clock::now();
@@ -431,6 +500,8 @@ void GameScene::Update() {
 	// GPU Collision Dispatch（エンジンの汎用 PhysicsSystem.h に移行したため、ここでは何もしない）
 
 	// Animation（エンジン固有処理のため残留）
+	{
+	ScopedTimer _animTimer(profiler_.frameStats.animationMs);
 	auto animView = registry_.view<AnimatorComponent, MeshRendererComponent>();
 	if (isPlaying_) {
 		std::vector<entt::entity> animEntities;
@@ -466,6 +537,7 @@ void GameScene::Update() {
 			Engine::JobSystem::Wait();
 		}
 	}
+	}
 
 	// パーティクルエディター
 	particleEditor_.Update(dt);
@@ -483,21 +555,26 @@ void GameScene::Update() {
 		lastViewMode_ = currentViewMode;
 	}
 
-	// ★ 全Systemを順に実行
-	for (auto& system : systems_) {
+	// ★ 全Systemを順に実行 (プロファイラー計測付き)
+	for (int sysIdx = 0; sysIdx < (int)systems_.size(); ++sysIdx) {
+		auto& system = systems_[sysIdx];
 		if (!isPlaying_) {
 			// Gameビュー時はカメラシステムだけ例外的に動かしてプレビューさせる
 			if (currentViewMode == 1) {
 				if (dynamic_cast<CameraFollowSystem*>(system.get())) {
 					bool oldIsPlaying = ctx_.isPlaying;
 					ctx_.isPlaying = true;
-					system->Update(registry_, ctx_);
+					float sysMs = 0.0f;
+					{ ScopedTimer _st(sysMs); system->Update(registry_, ctx_); }
+					profiler_.RecordSystemTime(sysIdx, sysMs);
 					ctx_.isPlaying = oldIsPlaying;
 				}
 			}
 			continue;
 		}
-		system->Update(registry_, ctx_);
+		float sysMs = 0.0f;
+		{ ScopedTimer _st(sysMs); system->Update(registry_, ctx_); }
+		profiler_.RecordSystemTime(sysIdx, sysMs);
 	}
 
 	// ★ 追加: 手動デバッグカメラ操作はSceneビューかつ停止中かつビューポートにマウスがある時のみ
@@ -508,6 +585,7 @@ void GameScene::Update() {
 
 	// ★ ペンディングオブジェクト（弾など）をflushし、破棄要求を処理
 	{
+		ScopedTimer _destroyTimer(profiler_.frameStats.pendingDestroyMs);
 		std::lock_guard<std::recursive_mutex> lock(spawnMutex_);
 
 		if (!pendingSpawns_.storage<entt::entity>().empty()) {
@@ -527,6 +605,8 @@ void GameScene::Update() {
 	}
 
 	// Light System（レンダリング設定のため残留）
+	{
+	ScopedTimer _lightTimer(profiler_.frameStats.lightSystemMs);
 	if (renderer_) {
 		int plCount = 0;
 		int slCount = 0;
@@ -577,8 +657,11 @@ void GameScene::Update() {
 			renderer_->SetSpotLight(i, {0, 0, 0}, {0, -1, 0}, {0, 0, 0}, 0, 0.0f, 0.0f, {1, 0, 0}, false);
 		}
 	}
+	} // lightTimer scope end
 
 	// パーティクルエミッターコンポーネント
+	{
+	ScopedTimer _particleTimer(profiler_.frameStats.particleUpdateMs);
 	auto peView = registry_.view<ParticleEmitterComponent, TransformComponent, NameComponent>();
 	peView.each([&](auto, ParticleEmitterComponent& pe, const TransformComponent& tc, const NameComponent& nc) {
 		if (!pe.enabled)
@@ -595,6 +678,15 @@ void GameScene::Update() {
 		pe.emitter.params.position = {tc.translate.x, tc.translate.y, tc.translate.z};
 		pe.emitter.Update(dt);
 	});
+	}
+
+	// ★追加: プロファイラー データ収集 & フレーム終了
+	{
+		auto updateEnd = std::chrono::high_resolution_clock::now();
+		profiler_.frameStats.totalUpdateMs = std::chrono::duration<float, std::milli>(updateEnd - updateStart).count();
+		profiler_.BeginFrame(dt);
+		profiler_.CollectEntityStats(registry_, tagCache_);
+	}
 }
 
 // ★ 汎用スポーン
@@ -603,6 +695,7 @@ entt::entity GameScene::CreateEntity(const std::string& name) {
 	auto entity = registry_.create();
 	registry_.emplace<NameComponent>(entity, name);
 	registry_.emplace<TransformComponent>(entity);
+	// staticTerrainDirty_ = true; // 動的エンティティ(弾や敵)の生成で地形キャッシュを無効化しないようにする
 	return entity;
 }
 
@@ -611,6 +704,7 @@ void GameScene::DestroyObject(uint32_t id) {
 	std::lock_guard<std::recursive_mutex> lock(spawnMutex_);
 	// IDをそのままentt::entityとして扱う（ダウンキャスト）
 	pendingDestroys_.push_back(static_cast<entt::entity>(id));
+	// staticTerrainDirty_ = true; // キャッシュ無効化はGetHeightAt内でのvalid判定に任せる
 }
 
 
@@ -634,29 +728,55 @@ float GameScene::GetHeightAt(float x, float z, float startY, uint32_t excludeId)
 	DirectX::XMVECTOR rayPos = DirectX::XMVectorSet(x, startY, z, 1.0f);
 	DirectX::XMVECTOR rayDir = DirectX::XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f);
 
-	auto view = registry_.view<TransformComponent>();
-	for (auto entity : view) {
+	if (staticTerrainDirty_) {
+		staticTerrainEntities_.clear();
+		auto view = registry_.view<TransformComponent>();
+		for (auto entity : view) {
+			bool isEnemyOrBullet = false;
+			if (registry_.all_of<TagComponent>(entity)) {
+				const auto tag = registry_.get<TagComponent>(entity).tag;
+				if (tag == TagType::Enemy || tag == TagType::Bullet || tag == TagType::Player || tag == TagType::Sword || tag == TagType::PlayerSword || tag == TagType::Projectile || tag == TagType::Pipe || tag == TagType::Canon || tag == TagType::BulletTank ||
+					tag == TagType::PipeCannon || tag == TagType::VFX || tag == TagType::HitDistortion_VFX || tag == TagType::Missile || tag == TagType::Experience || tag == TagType::ExperienceOrb) {
+					isEnemyOrBullet = true;
+				}
+			}
+			if (isEnemyOrBullet)
+				continue;
+
+			uint32_t modelHandle = 0;
+			if (registry_.all_of<GpuMeshColliderComponent>(entity)) {
+				auto& mc = registry_.get<GpuMeshColliderComponent>(entity);
+				if (mc.enabled)
+					modelHandle = mc.meshHandle;
+			}
+			if (modelHandle == 0 && registry_.all_of<MeshRendererComponent>(entity)) {
+				auto& mr = registry_.get<MeshRendererComponent>(entity);
+				if (mr.enabled)
+					modelHandle = mr.modelHandle;
+			}
+
+			if (modelHandle != 0) {
+				staticTerrainEntities_.push_back(entity);
+			}
+		}
+		staticTerrainDirty_ = false;
+	}
+
+	for (auto entity : staticTerrainEntities_) {
 		if (excludeId != 0 && static_cast<uint32_t>(entity) == excludeId)
 			continue;
 
-		bool isEnemyOrBullet = false;
-		if (registry_.all_of<TagComponent>(entity)) {
-			const auto tag = registry_.get<TagComponent>(entity).tag;
-			if (tag == TagType::Enemy || tag == TagType::Bullet || tag == TagType::Player || tag == TagType::Sword || tag == TagType::PlayerSword || tag == TagType::Projectile || tag == TagType::Pipe || tag == TagType::Canon || tag == TagType::BulletTank ||
-			    tag == TagType::PipeCannon || tag == TagType::VFX || tag == TagType::HitDistortion_VFX) {
-				isEnemyOrBullet = true;
-			}
-		}
-		if (isEnemyOrBullet)
+		if (!registry_.valid(entity)) {
+			staticTerrainDirty_ = true; // 次回再構築
 			continue;
+		}
 
 		uint32_t modelHandle = 0;
 		if (registry_.all_of<GpuMeshColliderComponent>(entity)) {
 			auto& mc = registry_.get<GpuMeshColliderComponent>(entity);
 			if (mc.enabled)
 				modelHandle = mc.meshHandle;
-		}
-		if (modelHandle == 0 && registry_.all_of<MeshRendererComponent>(entity)) {
+		} else if (registry_.all_of<MeshRendererComponent>(entity)) {
 			auto& mr = registry_.get<MeshRendererComponent>(entity);
 			if (mr.enabled)
 				modelHandle = mr.modelHandle;
@@ -672,6 +792,23 @@ float GameScene::GetHeightAt(float x, float z, float startY, uint32_t excludeId)
 		float dist = 0.0f;
 		Engine::Vector3 hitPoint;
 		Engine::Matrix4x4 worldMat = this->GetWorldMatrix(static_cast<int>(entity));
+
+		// 高速化：ワールド空間での簡易な円柱バウンディング判定
+		float scaleX = std::sqrt(worldMat.m[0][0]*worldMat.m[0][0] + worldMat.m[0][1]*worldMat.m[0][1] + worldMat.m[0][2]*worldMat.m[0][2]);
+		float scaleZ = std::sqrt(worldMat.m[2][0]*worldMat.m[2][0] + worldMat.m[2][1]*worldMat.m[2][1] + worldMat.m[2][2]*worldMat.m[2][2]);
+		float radiusX = (model->GetData().max.x - model->GetData().min.x) * scaleX * 0.5f;
+		float radiusZ = (model->GetData().max.z - model->GetData().min.z) * scaleZ * 0.5f;
+		float maxRadius = std::max(radiusX, radiusZ) * 1.5f; // 回転を考慮した余裕
+		
+		float cx = worldMat.m[3][0];
+		float cz = worldMat.m[3][2];
+		
+		// 地形のような巨大メッシュ(maxRadius > 100)以外は、範囲外ならスキップ
+		if (maxRadius < 100.0f) {
+			if (std::abs(x - cx) > maxRadius || std::abs(z - cz) > maxRadius) {
+				continue;
+			}
+		}
 
 		if (model->RayCast(rayPos, rayDir, worldMat, dist, hitPoint)) {
 			if (hitPoint.y > maxHeight) {
@@ -691,16 +828,51 @@ bool GameScene::RayCast(const Engine::Vector3& origin, const Engine::Vector3& di
 	DirectX::XMVECTOR rayPos = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&origin));
 	DirectX::XMVECTOR rayDir = DirectX::XMLoadFloat3(reinterpret_cast<const DirectX::XMFLOAT3*>(&direction));
 
-	auto view = registry_.view<TransformComponent>();
-	for (auto entity : view) {
+	// staticTerrainEntities_ は GetHeightAt で構築されていると仮定（または同じキャッシュを利用）
+	// もし空なら、ここで構築が必要だが、通常は GetHeightAt が先に呼ばれるため構築済み
+	if (staticTerrainDirty_) {
+		// 再構築トリガー (GetHeightAt側と同じロジックを呼ぶか、ここで簡易的に再構築)
+		// 面倒な場合はここで直接再構築
+		staticTerrainEntities_.clear();
+		auto view = registry_.view<TransformComponent>();
+		for (auto entity : view) {
+			bool isEnemyOrBullet = false;
+			if (registry_.all_of<TagComponent>(entity)) {
+				const auto tag = registry_.get<TagComponent>(entity).tag;
+				if (tag == TagType::Enemy || tag == TagType::Bullet || tag == TagType::Player || tag == TagType::Sword || tag == TagType::PlayerSword || tag == TagType::Projectile || tag == TagType::Pipe || tag == TagType::Canon || tag == TagType::BulletTank ||
+					tag == TagType::PipeCannon || tag == TagType::VFX || tag == TagType::HitDistortion_VFX || tag == TagType::Missile || tag == TagType::Experience || tag == TagType::ExperienceOrb) {
+					isEnemyOrBullet = true;
+				}
+			}
+			if (isEnemyOrBullet)
+				continue;
+
+			uint32_t modelHandle = 0;
+			if (registry_.all_of<GpuMeshColliderComponent>(entity)) {
+				auto& mc = registry_.get<GpuMeshColliderComponent>(entity);
+				if (mc.enabled)
+					modelHandle = mc.meshHandle;
+			}
+			if (modelHandle == 0 && registry_.all_of<MeshRendererComponent>(entity)) {
+				auto& mr = registry_.get<MeshRendererComponent>(entity);
+				if (mr.enabled)
+					modelHandle = mr.modelHandle;
+			}
+
+			if (modelHandle != 0) {
+				staticTerrainEntities_.push_back(entity);
+			}
+		}
+		staticTerrainDirty_ = false;
+	}
+
+	for (auto entity : staticTerrainEntities_) {
 		if (excludeId != 0 && static_cast<uint32_t>(entity) == excludeId)
 			continue;
 
-		// タグによるフィルタリング
-		if (registry_.all_of<TagComponent>(entity)) {
-			const auto tag = registry_.get<TagComponent>(entity).tag;
-			if (tag == TagType::Enemy || tag == TagType::Bullet || tag == TagType::Player || tag == TagType::Sword || tag == TagType::PlayerSword || tag == TagType::Projectile || tag == TagType::VFX || tag == TagType::HitDistortion_VFX)
-				continue;
+		if (!registry_.valid(entity)) {
+			staticTerrainDirty_ = true;
+			continue;
 		}
 
 		uint32_t modelHandle = 0;
@@ -708,12 +880,12 @@ bool GameScene::RayCast(const Engine::Vector3& origin, const Engine::Vector3& di
 			auto& mc = registry_.get<GpuMeshColliderComponent>(entity);
 			if (mc.enabled)
 				modelHandle = mc.meshHandle;
-		}
-		if (modelHandle == 0 && registry_.all_of<MeshRendererComponent>(entity)) {
+		} else if (registry_.all_of<MeshRendererComponent>(entity)) {
 			auto& mr = registry_.get<MeshRendererComponent>(entity);
 			if (mr.enabled)
 				modelHandle = mr.modelHandle;
 		}
+
 		if (modelHandle == 0)
 			continue;
 
@@ -724,6 +896,31 @@ bool GameScene::RayCast(const Engine::Vector3& origin, const Engine::Vector3& di
 		float dist = 0.0f;
 		Engine::Vector3 hitPoint;
 		Engine::Matrix4x4 worldMat = GetWorldMatrix(static_cast<int>(entity));
+
+		// 高速化：ワールド空間での簡易な球バウンディング判定
+		float scaleX = std::sqrt(worldMat.m[0][0]*worldMat.m[0][0] + worldMat.m[0][1]*worldMat.m[0][1] + worldMat.m[0][2]*worldMat.m[0][2]);
+		float scaleY = std::sqrt(worldMat.m[1][0]*worldMat.m[1][0] + worldMat.m[1][1]*worldMat.m[1][1] + worldMat.m[1][2]*worldMat.m[1][2]);
+		float scaleZ = std::sqrt(worldMat.m[2][0]*worldMat.m[2][0] + worldMat.m[2][1]*worldMat.m[2][1] + worldMat.m[2][2]*worldMat.m[2][2]);
+		float radiusX = (model->GetData().max.x - model->GetData().min.x) * scaleX * 0.5f;
+		float radiusY = (model->GetData().max.y - model->GetData().min.y) * scaleY * 0.5f;
+		float radiusZ = (model->GetData().max.z - model->GetData().min.z) * scaleZ * 0.5f;
+		float maxRadius = std::max({radiusX, radiusY, radiusZ}) * 1.5f;
+		
+		float cx = worldMat.m[3][0];
+		float cy = worldMat.m[3][1];
+		float cz = worldMat.m[3][2];
+		
+		if (maxRadius < 100.0f) {
+			// レイの始点とオブジェクトの中心距離をチェック (rayDirは正規化されている前提)
+			float dx = origin.x - cx;
+			float dy = origin.y - cy;
+			float dz = origin.z - cz;
+			float sqDist = dx*dx + dy*dy + dz*dz;
+			// もし始点がオブジェクトのバウンディングスフィア + maxDist よりも遠ければ絶対に当たらない
+			if (sqDist > (maxRadius + maxDist) * (maxRadius + maxDist)) {
+				continue;
+			}
+		}
 
 		if (model->RayCast(rayPos, rayDir, worldMat, dist, hitPoint)) {
 			if (dist < minDist) {
@@ -769,6 +966,7 @@ Engine::Matrix4x4 GameScene::GetWorldMatrixRecursive(entt::entity e, int depth) 
 void GameScene::Draw() {
 	if (!renderer_)
 		return;
+	auto drawStart = std::chrono::high_resolution_clock::now();
 
 	// ★★★ GPU負荷テスト: Hキーで大量オブジェクト生成 ★★★
 	{
@@ -829,100 +1027,163 @@ void GameScene::Draw() {
 		}
 	}
 
-	auto renderView = registry_.view<TransformComponent>();
+	auto renderView = registry_.view<TransformComponent, MeshRendererComponent>();
+	int iterCount = 0, meshCount = 0, skinnedCount = 0, culledCount = 0;
+	float meshLoopMs = 0.0f;
+	{
+	ScopedTimer _meshLoop(meshLoopMs);
+
+	Engine::FrustumCullSettings cullSettings;
+	// 描画FOVより広めにカリング（画面端のポップイン/アウト軽減）
+	cullSettings.fovScale = 1.25f;
+	cullSettings.padHorizontal = 0.45f;
+	cullSettings.padTop = 0.35f;
+	cullSettings.padBottom = 0.70f; // 画面下（手前の地面・経路）を優先的に残す
+	cullSettings.padNear = 0.25f;
+	cullSettings.padFar = 0.15f;
+	Engine::Frustum frustum = Engine::Frustum::FromCamera(camera_, cullSettings);
+
+	std::vector<entt::entity> sortedEntities;
 	for (auto entity : renderView) {
-		Engine::Vector4 color = {1, 1, 1, 1};
-		if (registry_.all_of<ColorComponent>(entity)) {
-			const auto& cc = registry_.get<ColorComponent>(entity);
-			color = {cc.color.x, cc.color.y, cc.color.z, cc.color.w};
+		++iterCount;
+		const auto& mr = renderView.get<MeshRendererComponent>(entity);
+		if (!mr.enabled || mr.modelHandle == 0)
+			continue;
+
+		Engine::Matrix4x4 world = this->GetWorldMatrix(static_cast<int>(entity));
+		
+		bool shouldCull = true;
+		if (mr.shaderName == "Distortion" || mr.shaderName == "GlassShatter" || mr.shaderName == "ProceduralSmoke" || mr.shaderName == "ProceduralSmokeInstanced") {
+			shouldCull = false; // エフェクト系は常に描画
+		} else if (registry_.try_get<TagComponent>(entity) && registry_.get<TagComponent>(entity).tag == TagType::VFX) {
+			shouldCull = false;
 		}
 
-		bool hasMeshRenderer = false;
-		if (registry_.all_of<MeshRendererComponent>(entity)) {
-			const auto& mr = registry_.get<MeshRendererComponent>(entity);
-			if (mr.enabled && mr.modelHandle != 0) {
-				hasMeshRenderer = true;
-				bool hasAnim = false;
-				std::vector<Engine::Matrix4x4> bonePalette;
+		if (shouldCull && !IsEntityVisibleInFrustum(frustum, renderer_, registry_, entity, mr.modelHandle, world)) {
+			++culledCount;
+			continue;
+		}
+		sortedEntities.push_back(entity);
+	}
 
-				if (registry_.all_of<AnimatorComponent>(entity)) {
-					const auto& anim = registry_.get<AnimatorComponent>(entity);
-					if (anim.enabled && !anim.currentAnimation.empty()) {
-						auto* m = renderer_->GetModel(mr.modelHandle);
-						if (m) {
-							const auto& data = m->GetData();
-							const Engine::Animation* currAnim = nullptr;
-							for (const auto& a : data.animations) {
-								if (a.name == anim.currentAnimation) {
-									currAnim = &a;
-									break;
-								}
+	// バッチ効率化のため、シェーダー名 -> メッシュハンドル -> テクスチャハンドル でソート
+	std::sort(sortedEntities.begin(), sortedEntities.end(), [&](entt::entity a, entt::entity b) {
+		const auto& mrA = renderView.get<MeshRendererComponent>(a);
+		const auto& mrB = renderView.get<MeshRendererComponent>(b);
+		if (mrA.shaderName != mrB.shaderName) return mrA.shaderName < mrB.shaderName;
+		if (mrA.modelHandle != mrB.modelHandle) return mrA.modelHandle < mrB.modelHandle;
+		if (mrA.textureHandle != mrB.textureHandle) return mrA.textureHandle < mrB.textureHandle;
+		return mrA.extraTextureHandles < mrB.extraTextureHandles;
+	});
+
+	for (auto entity : sortedEntities) {
+		Engine::Vector4 color = {1, 1, 1, 1};
+		if (auto* cc = registry_.try_get<ColorComponent>(entity)) {
+			color = {cc->color.x, cc->color.y, cc->color.z, cc->color.w};
+		}
+
+		const auto& mr = renderView.get<MeshRendererComponent>(entity);
+		if (mr.enabled && mr.modelHandle != 0) {
+			bool hasAnim = false;
+			std::vector<Engine::Matrix4x4> bonePalette;
+
+			if (auto* anim = registry_.try_get<AnimatorComponent>(entity)) {
+				if (anim->enabled && !anim->currentAnimation.empty()) {
+					auto* m = renderer_->GetModel(mr.modelHandle);
+					if (m) {
+						const auto& data = m->GetData();
+						const Engine::Animation* currAnim = nullptr;
+						for (const auto& a : data.animations) {
+							if (a.name == anim->currentAnimation) {
+								currAnim = &a;
+								break;
 							}
-							if (currAnim) {
-								bonePalette.resize(data.bones.size());
-								for (auto& b : bonePalette)
-									b = Engine::Matrix4x4::Identity();
-								m->UpdateSkeleton(data.rootNode, Engine::Matrix4x4::Identity(), *currAnim, anim.time, bonePalette);
-								hasAnim = true;
-							}
+						}
+						if (currAnim) {
+							bonePalette.resize(data.bones.size());
+							for (auto& b : bonePalette)
+								b = Engine::Matrix4x4::Identity();
+							m->UpdateSkeleton(data.rootNode, Engine::Matrix4x4::Identity(), *currAnim, anim->time, bonePalette);
+							hasAnim = true;
 						}
 					}
 				}
+			}
 
-				Engine::Matrix4x4 world = this->GetWorldMatrix(static_cast<int>(entity));
-				if (hasAnim) {
-					renderer_->DrawSkinnedMesh(mr.modelHandle, mr.textureHandle, world, bonePalette, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w});
+			Engine::Matrix4x4 world = this->GetWorldMatrix(static_cast<int>(entity));
+			if (hasAnim) {
+				++skinnedCount;
+				renderer_->DrawSkinnedMesh(mr.modelHandle, mr.textureHandle, world, bonePalette, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w});
+			} else {
+				++meshCount;
+				if (mr.shaderName == "Distortion" || mr.shaderName == "GlassShatter") {
+					// ★ 特殊エフェクト系のみ個別描画
+					renderer_->DrawMesh(mr.modelHandle, mr.textureHandle, world, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w}, mr.shaderName);
 				} else {
-					if (mr.shaderName == "Distortion" || mr.shaderName == "GlassShatter") {
-						// ★ 特殊エフェクト系のみ個別描画
-						renderer_->DrawMesh(mr.modelHandle, mr.textureHandle, world, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w}, mr.shaderName);
-					} else {
-						// ★ Toon含む通常シェーダーはインスタンシング（一括描画）
-						renderer_->DrawMeshInstanced(
-						    mr.modelHandle, mr.textureHandle, world, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w}, mr.shaderName, mr.extraTextureHandles);
-					}
+					// ★ Toon含む通常シェーダーはインスタンシング（一括描画）
+					renderer_->DrawMeshInstanced(
+						mr.modelHandle, mr.textureHandle, world, {color.x * mr.color.x, color.y * mr.color.y, color.z * mr.color.z, color.w * mr.color.w}, mr.shaderName, mr.extraTextureHandles);
 				}
 			}
 		}
+	}
 
-		// 旧SceneObjectの互換用 (もし MeshRenderer コンポーネントがなく自身の modelHandle 等があった場合)
-		// Registry化で基本的には MeshRendererComponent に統合するのが望ましいが、一旦残留
-		/*
-		if (!hasMeshRenderer && obj.modelHandle != 0) { ... }
-		*/
-
-		// ★追加: 川コンポーネントの描画 (メッシュはワールド座標で生成済みなのでIdentity変換)
-		if (registry_.all_of<RiverComponent>(entity)) {
-			const auto& rv = registry_.get<RiverComponent>(entity);
-			if (rv.enabled && rv.meshHandle != 0) {
-				auto tex = renderer_->LoadTexture2D(rv.texturePath);
-				Engine::Transform identity;
-				identity.translate = {0, 0, 0};
-				identity.rotate = {0, 0, 0};
-				identity.scale = {1, 1, 1};
-				renderer_->DrawMesh(rv.meshHandle, tex, identity, {rv.flowSpeed, rv.uvScale, 0.0f, 0.0f}, "River");
+	// ★追加: 川コンポーネントの描画 (独立したループで処理し、テクスチャロードをキャッシュ)
+	auto riverView = registry_.view<RiverComponent>();
+	for (auto entity : riverView) {
+		auto& rv = riverView.get<RiverComponent>(entity);
+		if (rv.enabled && rv.meshHandle != 0) {
+			if (rv.textureHandle == 0 && !rv.texturePath.empty()) {
+				rv.textureHandle = renderer_->LoadTexture2D(rv.texturePath);
 			}
+			Engine::Transform identity;
+			identity.translate = {0, 0, 0};
+			identity.rotate = {0, 0, 0};
+			identity.scale = {1, 1, 1};
+			renderer_->DrawMesh(rv.meshHandle, rv.textureHandle, identity, {rv.flowSpeed, rv.uvScale, 0.0f, 0.0f}, "River");
 		}
 	}
+
+	} // meshLoop scope end
+	profiler_.frameStats.drawMeshLoopMs = meshLoopMs;
+	profiler_.frameStats.drawIteratedCount = iterCount;
+	profiler_.frameStats.drawMeshCount = meshCount;
+	profiler_.frameStats.drawSkinnedCount = skinnedCount;
+	profiler_.frameStats.drawCulledCount = culledCount;
+
 #ifdef USE_IMGUI
+	{
+	ScopedTimer _gizmo(profiler_.frameStats.drawGizmoMs);
 	DrawSelectionHighlight();
 	DrawLightGizmos();
+	}
 #endif
+	{
+	ScopedTimer _particle(profiler_.frameStats.drawParticleMs);
 	auto peView = registry_.view<ParticleEmitterComponent>();
 	peView.each([&](auto, ParticleEmitterComponent& pe) {
 		if (pe.enabled) {
 			pe.emitter.Draw(camera_);
 		}
 	});
+	} // particle scope end
 
 	// ★ 各Systemの描画処理を呼び出す（UISystem等）
+	{
+	ScopedTimer _sysDraw(profiler_.frameStats.drawSystemMs);
 	for (auto& system : systems_) {
 		system->Draw(registry_, ctx_);
 	}
+	}
+
+	// ★追加: Draw時間計測
+	auto drawEnd = std::chrono::high_resolution_clock::now();
+	profiler_.frameStats.totalDrawMs = std::chrono::duration<float, std::milli>(drawEnd - drawStart).count();
 }
 
 extern GizmoMode currentGizmoMode;
 void GameScene::DrawUI() {
+	auto uiStart = std::chrono::high_resolution_clock::now();
 	if (!isPlaying_ && EditorUI::GetViewMode() != ViewMode::Game)
 		return;
 
@@ -950,6 +1211,14 @@ void GameScene::DrawUI() {
 		}
 		pauseUISystem_->DrawUI(pauseRegistry_, pauseCtx_);
 	}
+
+	// ★追加: DrawUI時間計測 & プロファイラーオーバーレイ表示
+	auto uiEnd = std::chrono::high_resolution_clock::now();
+	profiler_.frameStats.totalDrawUIMs = std::chrono::duration<float, std::milli>(uiEnd - uiStart).count();
+	profiler_.EndFrame();
+#ifndef NDEBUG
+	profiler_.DrawImGui();
+#endif
 }
 
 extern bool gizmoDragging;
