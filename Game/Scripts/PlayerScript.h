@@ -49,6 +49,7 @@ private:
 	
 	bool isCursorVisible_ = true;
 	bool prevCursorToggle_ = false;
+	bool prevDashKeyDown_ = false;
 
 	std::string gunName_ = "PlayerGun";
 
@@ -79,7 +80,7 @@ private:
 	void UpdateGunAttack(entt::entity entity, GameScene* scene, float dt);
 	void SwitchPlayerType(entt::entity entity, GameScene* scene);
 	void ExecuteSkill(entt::entity entity, GameScene* scene);
-	void SpawnBullet(entt::entity entity, GameScene* scene, float spreadYaw, float spreadPitch, float damage, float lifeTime = 5.0f, bool enhanced = false);
+	void SpawnBullet(entt::entity entity, GameScene* scene, float spreadYaw, float spreadPitch, float damage, float lifeTime = 5.0f, bool enhanced = false, bool explode = false);
 	void ShootGun(entt::entity entity, GameScene* scene);
 	void SpawnCrystalBurst(const DirectX::XMFLOAT3& pos, int count, bool enhanced);
 
@@ -150,14 +151,27 @@ private:
 	static constexpr float CHARGE_SHOT_COST = 45.0f;    // チャージショットの圧力コスト
 	static constexpr float CHARGE_TIME_MAX = 1.2f;      // 最大チャージ時間
 	static constexpr float CHARGE_TIME_MIN = 0.35f;     // チャージショット判定の最低時間
+	static constexpr float DASH_COST = 20.0f;           // スチーム・ブーストのコスト
+	static constexpr float DASH_POWER = 100.0f;         // スチーム・ブーストの推進力 (半分以下に調整)
 
 	// ★追加: チャージショット
 	bool isCharging_ = false;            // チャージ中か
 	float chargeTime_ = 0.0f;            // 現在のチャージ時間
 	float chargeVfxTimer_ = 0.0f;        // チャージ中の蒸気排出タイマー
 
+	// ★追加: 大剣の溜め攻撃
+	bool isSwordCharging_ = false;
+	float swordChargeTime_ = 0.0f;
+	float swordChargeVfxTimer_ = 0.0f;
+	const float SWORD_CHARGE_MAX = 1.2f;
+	const float SWORD_CHARGE_COST = 35.0f;
+
 	// ★追加: 反動後退
 	DirectX::XMFLOAT3 recoilVelocity_ = {0, 0, 0};
+
+	// ★追加: ダメージ演出
+	float damageEffectTimer_ = 0.0f;
+	const float DAMAGE_EFFECT_DURATION = 0.6f;
 
 	void ShootChargeShot(entt::entity entity, GameScene* scene);
 	void DrawPressureGauge(GameScene* scene);
