@@ -72,7 +72,8 @@ static bool IsAlreadyVisited(const std::vector<entt::entity>& visitedObjects, en
 static bool IsConnectedToBulletTankRecursive(GameScene* scene, entt::entity currentPipe, std::vector<entt::entity>& visitedObjects, float connectRange) {
 	visitedObjects.push_back(currentPipe);
 
-	auto view = scene->GetRegistry().view<TransformComponent>();
+	// ★最適化: TagComponentを持つエンティティのみ走査
+	auto view = scene->GetRegistry().view<TagComponent, TransformComponent>();
 	for (auto other : view) {
 
 		if (other == currentPipe) {
@@ -144,7 +145,8 @@ void PipeScript::Update(entt::entity obj, GameScene* scene, float dt) {
     const float connectRange = 2.5f;
 	std::vector<entt::entity> currentConnections;
 
-	auto view = scene->GetRegistry().view<TransformComponent>();
+	// ★最適化: TagComponentを持つエンティティのみチェック（全エンティティ走査を回避）
+	auto view = scene->GetRegistry().view<TagComponent, TransformComponent>();
 	for (auto other : view) {
 		if (other == obj) continue;
 		
