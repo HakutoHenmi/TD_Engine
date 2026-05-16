@@ -10,6 +10,13 @@
 
 namespace Engine {
 
+DynamicGlyphCache::~DynamicGlyphCache() {
+	if (syncEvent_) {
+		CloseHandle(syncEvent_);
+		syncEvent_ = nullptr;
+	}
+}
+
 bool DynamicGlyphCache::Initialize(Renderer* renderer, const std::string& fontPath, float pixelHeight,
                                    uint32_t atlasWidth, uint32_t atlasHeight) {
 	renderer_ = renderer;
@@ -75,6 +82,10 @@ bool DynamicGlyphCache::Initialize(Renderer* renderer, const std::string& fontPa
 	cursorY_ = 1; // 上端に1px余白
 	rowHeight_ = 0;
 
+	// ★追加: 同期用イベントの事前作成
+	syncEvent_ = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	if (!syncEvent_) return false;
+
 	initialized_ = true;
 	return true;
 }
@@ -82,7 +93,7 @@ bool DynamicGlyphCache::Initialize(Renderer* renderer, const std::string& fontPa
 const CachedGlyph* DynamicGlyphCache::GetGlyph(uint32_t codepoint) {
 	if (!initialized_) return nullptr;
 
-	// キャッシュにある場合はそのまま返す
+	std::lock_guard<std::mutex> lock(mtx_); // ★追加: マルチスレッド保護
 	auto it = cache_.find(codepoint);
 	if (it != cache_.end()) {
 		return &it->second;
@@ -228,13 +239,19 @@ void DynamicGlyphCache::UploadAtlasRegion(uint32_t x, uint32_t y, uint32_t w, ui
 	//       初回ロード時のみの処理なので許容範囲
 	Microsoft::WRL::ComPtr<ID3D12Fence> fence;
 	dev->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
-	HANDLE ev = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	
 	queue->Signal(fence.Get(), 1);
-	if (fence->GetCompletedValue() < 1) {
-		fence->SetEventOnCompletion(1, ev);
-		WaitForSingleObject(ev, INFINITE);
+	if (syncEvent_) {
+		if (fence->GetCompletedValue() < 1) {
+			fence->SetEventOnCompletion(1, syncEvent_);
+			WaitForSingleObject(syncEvent_, INFINITE);
+		}
+	} else {
+		// Fallback
+		while (fence->GetCompletedValue() < 1) {
+			YieldProcessor();
+		}
 	}
-	CloseHandle(ev);
 }
 
 } // namespace Engine

@@ -45,11 +45,13 @@ public:
 		return static_cast<int>(cost * 0.8f);
 	}
 
+	static int GetCurrentPhase() { return currentPhase_; }
+
 private:
 	inline static PhaseState isPhase_ = PreparationPhase;
 	inline static PhaseState NextPhase_ = PreparationPhase;
 	PhaseState preIsPhase_ = PreparationPhase; // フェーズ切り替わり検知用
-	int currentPhase_ = 0;
+	inline static int currentPhase_ = 0;
 
 	int StartCoinCount_ = 60000; // 初期コイン数
 

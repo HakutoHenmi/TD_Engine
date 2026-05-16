@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include <mutex>
 #include <d3d12.h>
 #include <wrl/client.h>
 
@@ -29,7 +30,7 @@ struct CachedGlyph {
 class DynamicGlyphCache {
 public:
 	DynamicGlyphCache() = default;
-	~DynamicGlyphCache() = default;
+	~DynamicGlyphCache(); // 変更: eventの解放
 
 	DynamicGlyphCache(const DynamicGlyphCache&) = delete;
 	DynamicGlyphCache& operator=(const DynamicGlyphCache&) = delete;
@@ -69,6 +70,9 @@ private:
 	void UploadAtlasRegion(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint8_t* data);
 
 private:
+	std::mutex mtx_; // ★追加: マルチスレッド対応
+	HANDLE syncEvent_ = nullptr; // ★追加: 同期用イベント
+
 	Renderer* renderer_ = nullptr;
 	Font font_;
 	float pixelHeight_ = 32.0f;

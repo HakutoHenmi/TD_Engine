@@ -116,35 +116,47 @@ public:
 							hc.invincibleTime = 0.5f;
 
 							if (ctx.scene) {
+								if (dTag == TagType::Player) {
+									ctx.scene->GetEventSystem().Emit("PlayerTakeDamage", hitbox.damage);
+								}
 								if (aTag == TagType::PlayerSword || aTag == TagType::Sword) {
 									ctx.scene->GetEventSystem().Emit("PlayerSwordHit", 1.0f);
 								}
 
-								auto hitDistortion = ctx.scene->CreateEntity("HitDistortion_VFX");
-								if (registry.all_of<BoxColliderComponent>(hitDistortion)) registry.remove<BoxColliderComponent>(hitDistortion);
-								if (registry.all_of<HurtboxComponent>(hitDistortion)) registry.remove<HurtboxComponent>(hitDistortion);
-								if (registry.all_of<RigidbodyComponent>(hitDistortion)) registry.remove<RigidbodyComponent>(hitDistortion);
-
-								auto& tc_hit = registry.get<TransformComponent>(hitDistortion);
-								DirectX::XMStoreFloat3(&tc_hit.translate, dCenter);
-								tc_hit.scale = { 1, 1, 1 };
-
-								auto& mrc_hit = registry.emplace<MeshRendererComponent>(hitDistortion);
-								mrc_hit.shaderName = "Distortion";
-								mrc_hit.texturePath = "Resources/Textures/normal.png";
-								mrc_hit.modelPath = "Resources/Models/Plane/cube.obj";
-								
-								if (ctx.renderer) {
-									mrc_hit.modelHandle = ctx.renderer->LoadObjMesh(mrc_hit.modelPath);
-									mrc_hit.textureHandle = ctx.renderer->LoadTexture2D(mrc_hit.texturePath);
+								// ★修正: 特殊弾（Enhanced）の場合は通常の歪みエフェクトを出さない
+								bool isEnhanced = false;
+								if (aTag == TagType::Bullet && registry.all_of<VariableComponent>(attackerEntity)) {
+									auto& vc = registry.get<VariableComponent>(attackerEntity);
+									if (vc.GetValue("Enhanced", 0.0f) > 0.5f) isEnhanced = true;
 								}
-								mrc_hit.color = { 1, 1, 1, 2.0f };
 
-								auto& sc_hit = registry.emplace<ScriptComponent>(hitDistortion);
-								sc_hit.scripts.push_back({ "HitDistortionScript", "", std::make_shared<HitDistortionScript>(), false });
+								if (!isEnhanced && dTag != TagType::Player) { // ★修正: プレイヤー被弾時は出さない
+									auto hitDistortion = ctx.scene->CreateEntity("HitDistortion_VFX");
+									if (registry.all_of<BoxColliderComponent>(hitDistortion)) registry.remove<BoxColliderComponent>(hitDistortion);
+									if (registry.all_of<HurtboxComponent>(hitDistortion)) registry.remove<HurtboxComponent>(hitDistortion);
+									if (registry.all_of<RigidbodyComponent>(hitDistortion)) registry.remove<RigidbodyComponent>(hitDistortion);
 
-								auto& tcTag_hit = registry.emplace<TagComponent>(hitDistortion);
-								tcTag_hit.tag = TagType::HitDistortion_VFX;
+									auto& tc_hit = registry.get<TransformComponent>(hitDistortion);
+									DirectX::XMStoreFloat3(&tc_hit.translate, dCenter);
+									tc_hit.scale = { 1, 1, 1 };
+
+									auto& mrc_hit = registry.emplace<MeshRendererComponent>(hitDistortion);
+									mrc_hit.shaderName = "Distortion";
+									mrc_hit.texturePath = "Resources/Textures/normal.png";
+									mrc_hit.modelPath = "Resources/Models/Plane/cube.obj";
+									
+									if (ctx.renderer) {
+										mrc_hit.modelHandle = ctx.renderer->LoadObjMesh(mrc_hit.modelPath);
+										mrc_hit.textureHandle = ctx.renderer->LoadTexture2D(mrc_hit.texturePath);
+									}
+									mrc_hit.color = { 1, 1, 1, 2.0f };
+
+									auto& sc_hit = registry.emplace<ScriptComponent>(hitDistortion);
+									sc_hit.scripts.push_back({ "HitDistortionScript", "", std::make_shared<HitDistortionScript>(), false });
+
+									auto& tcTag_hit = registry.emplace<TagComponent>(hitDistortion);
+									tcTag_hit.tag = TagType::HitDistortion_VFX;
+								}
 							}
 
 							hc.hitFlashTimer = 0.2f;
@@ -155,6 +167,13 @@ public:
 
 					// 弾はヒット判定が行われたら（無敵状態でも）消去する
 					if ((aTag == TagType::Bullet || aTag == TagType::EnemyBullet) && ctx.scene) {
+						// ★追加: 強化弾の場合、鏡割れエフェクトイベントを発火
+						if (aTag == TagType::Bullet && registry.all_of<VariableComponent>(attackerEntity)) {
+							auto& vc = registry.get<VariableComponent>(attackerEntity);
+							if (vc.GetValue("Enhanced", 0.0f) > 0.5f) {
+								ctx.scene->GetEventSystem().Emit("EnhancedBulletHit", static_cast<float>(static_cast<uint32_t>(defenderEntity)));
+							}
+						}
 						ctx.scene->DestroyObject(static_cast<uint32_t>(attackerEntity));
 						break; // 弾は消えるのでループ抜ける
 					}

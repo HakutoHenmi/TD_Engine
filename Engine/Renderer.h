@@ -170,6 +170,7 @@ public:
 	Renderer& operator=(const Renderer&) = delete;
 
 	void SetPostEffect(const std::string& name);
+	void ResetPostEffect(); // ★追加
 
 public:
 	bool Initialize(WindowDX* window);
@@ -260,6 +261,7 @@ public:
 
 	// ★追加: パーティクル インスタンス描画
 	void DrawParticleInstanced(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, const Vector4& uvScaleOffset, const std::string& shaderName = "Particle");
+	void DrawParticleInstanced(MeshHandle mesh, TextureHandle texture, const Matrix4x4& worldMatrix, const Vector4& mulColor, const Vector4& uvScaleOffset, const std::string& shaderName = "Particle");
 
 	// ★追加: パーティクル描画 (UVスケール・オフセット付き)
 	void DrawParticle(MeshHandle mesh, TextureHandle texture, const Transform& transform, 
@@ -550,7 +552,7 @@ private:
 	D3D12_VIEWPORT viewport_{};
 	D3D12_RECT scissor_{};
 
-	bool ppEnabled_ = true;
+	bool ppEnabled_ = false;
 	PostProcessParams ppParams_{};
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> ppSceneColor_;
@@ -646,6 +648,7 @@ private:
 
 	// ★追加: フレーム統計
 	FrameStats frameStats_{};
+	void ApplyPostEffectInternal_(); // ★追加: 遅延適用用
 };
 
 } // namespace Engine

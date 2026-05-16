@@ -1,3 +1,4 @@
+#include <mutex>
 #include "Renderer.h"
 #include "Model.h"
 #include "PathUtils.h"
@@ -312,6 +313,8 @@ void Renderer::WaitGPU() {
 }
 
 void Renderer::BeginFrame(const float clearColorRGBA[4]) {
+	ApplyPostEffectInternal_();
+
 	ID3D12DescriptorHeap* heaps[] = {srvHeap_};
 	list_->SetDescriptorHeaps(1, heaps);
 
@@ -445,7 +448,7 @@ void Renderer::FlushDrawCalls() {
 	}
 
 	for (const auto& dc : drawCalls_) {
-		if (dc.shaderName == "Distortion") continue; // 空間のゆがみは EndFrame で別途描画
+		if (dc.shaderName == "Distortion" || dc.shaderName == "GlassShatter") continue; // 空間のゆがみは EndFrame で別途描画
 
 		auto* model = GetModel(dc.mesh);
 		if (!model) continue;
@@ -579,7 +582,7 @@ void Renderer::FlushDrawCalls() {
 			}
 			// ★修正: Toon系や新しく追加したリッチシェーダーはインスタンス描画非対応のためデフォルトにフォールバック
 			if (sName == "Toon" || sName == "ToonSkinning" || sName == "ToonOutline" || sName == "ToonSkinningOutline" ||
-				sName == "Hologram" || sName == "EmissiveGlow" || sName == "ForceField" || sName == "Dissolve" || sName == "Distortion") {
+				sName == "Hologram" || sName == "EmissiveGlow" || sName == "ForceField" || sName == "Dissolve" || sName == "Distortion" || sName == "GlassShatter") {
 				sName = defaultShaderName;
 			}
 
@@ -706,7 +709,7 @@ void Renderer::EndFrame() {
 		
 		// Normal Shadow Pass
 		for (const auto& dc : drawCalls_) {
-			if (dc.isParticle || dc.shaderName == "Particle" || dc.shaderName == "ParticleAdditive" || dc.shaderName == "ProceduralSmoke" || dc.shaderName == "ProceduralSmokeAdditive" || dc.shaderName == "2D" || dc.shaderName == "Distortion") continue;
+			if (dc.isParticle || dc.shaderName == "Particle" || dc.shaderName == "ParticleAdditive" || dc.shaderName == "ProceduralSmoke" || dc.shaderName == "ProceduralSmokeAdditive" || dc.shaderName == "2D" || dc.shaderName == "Distortion" || dc.shaderName == "GlassShatter") continue;
 
 			auto* model = GetModel(dc.mesh);
 			if (!model) continue;
@@ -744,7 +747,7 @@ void Renderer::EndFrame() {
 
 		// Instanced Shadow Pass
 		for (const auto& idc : instancedDrawCalls_) {
-			if (idc.shaderName == "Particle" || idc.shaderName == "ParticleInstanced" || idc.shaderName == "ProceduralSmoke" || idc.shaderName == "ProceduralSmokeInstanced" || idc.shaderName == "2D" || idc.shaderName == "Distortion") continue;
+			if (idc.shaderName == "Particle" || idc.shaderName == "ParticleInstanced" || idc.shaderName == "ProceduralSmoke" || idc.shaderName == "ProceduralSmokeInstanced" || idc.shaderName == "2D" || idc.shaderName == "Distortion" || idc.shaderName == "GlassShatter") continue;
 			
 			auto* model = GetModel(idc.mesh);
 			if (!model || idc.instances.empty()) continue;
@@ -777,22 +780,24 @@ void Renderer::EndFrame() {
 	struct DistortionKey {
 		MeshHandle mesh;
 		TextureHandle tex;
+		std::string shaderName;
 		bool operator<(const DistortionKey& o) const {
 			if (mesh != o.mesh) return mesh < o.mesh;
-			return tex < o.tex;
+			if (tex != o.tex) return tex < o.tex;
+			return shaderName < o.shaderName;
 		}
 	};
 	std::map<DistortionKey, std::vector<InstanceData>> aggregatedJobs;
 
 	for (const auto& dc : drawCalls_) {
-		if (dc.shaderName == "Distortion") {
+		if (dc.shaderName == "Distortion" || dc.shaderName == "GlassShatter") {
 			InstanceData id; id.world = dc.worldMatrix; id.color = dc.color; id.uvScaleOffset = dc.uvScaleOffset;
-			aggregatedJobs[{dc.mesh, dc.tex}].push_back(id);
+			aggregatedJobs[{dc.mesh, dc.tex, dc.shaderName}].push_back(id);
 		}
 	}
 	for (auto it = instancedDrawCalls_.begin(); it != instancedDrawCalls_.end(); ) {
-		if (it->shaderName == "Distortion") {
-			auto& target = aggregatedJobs[{it->mesh, it->tex}];
+		if (it->shaderName == "Distortion" || it->shaderName == "GlassShatter") {
+			auto& target = aggregatedJobs[{it->mesh, it->tex, it->shaderName}];
 			target.insert(target.end(), it->instances.begin(), it->instances.end());
 			it = instancedDrawCalls_.erase(it);
 		} else ++it;
@@ -850,8 +855,8 @@ void Renderer::EndFrame() {
 				const auto& instances = pair.second;
 				auto* model = GetModel(key.mesh);
 				if (!model || instances.empty()) continue;
-				if (pipelines_.count("Distortion")) {
-					list_->SetPipelineState(pipelines_["Distortion"].Get());
+				if (pipelines_.count(key.shaderName)) {
+					list_->SetPipelineState(pipelines_[key.shaderName].Get());
 				} else continue;
 
 				uint32_t sIdx = AllocateDynamicSrvIndex(1);
@@ -1074,7 +1079,7 @@ ComPtr<ID3DBlob> Renderer::CompileShaderFromFile(const wchar_t* filePath, const 
 	if (FAILED(hr)) {
 		if (err) {
 			::MessageBoxA(nullptr, (const char*)err->GetBufferPointer(), "HLSL CompileFromFile Error", MB_OK);
-		} else {
+		} else if (hr != 0x80070002) { // 0x80070002: ERROR_FILE_NOT_FOUND の場合はメッセージを出さない
 			wchar_t msg[512];
 			wsprintfW(msg, L"File: %s\nHRESULT: 0x%08X", unifiedPath.c_str(), hr);
 			::MessageBoxW(nullptr, msg, L"HLSL CompileFromFile Error (no message)", MB_OK);
@@ -1640,6 +1645,13 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD, float4 color:COLOR) : 
 	// パーティクル 加算 インスタンス描画
 	if (vsPartInst && psPart) {
 		CreatePSO_Transparent("ParticleAdditiveInstanced", vsPartInst.Get(), psPart.Get(), true);
+	}
+
+	// ★追加: 頂点カラー対応のボリューメトリックライトウェッジ用加算シェーダー
+	auto vsLightWedge = CompileShaderFromFile(L"Resources/Shaders/LightWedgeVS.hlsl", "main", "vs_5_0");
+	auto psLightWedge = CompileShaderFromFile(L"Resources/Shaders/LightWedgePS.hlsl", "main", "ps_5_0");
+	if (vsLightWedge && psLightWedge) {
+		CreatePSO_Transparent("LightWedge", vsLightWedge.Get(), psLightWedge.Get(), true);
 	}
 
 	// ★追加: プロシージャル煙パーティクル (FBMノイズベース)
@@ -2393,6 +2405,10 @@ void Renderer::DrawMeshInstanced(MeshHandle mesh, TextureHandle texture, const M
 }
 
 void Renderer::DrawParticleInstanced(MeshHandle mesh, TextureHandle texture, const Transform& transform, const Vector4& mulColor, const Vector4& uvScaleOffset, const std::string& shaderName) {
+	DrawParticleInstanced(mesh, texture, transform.ToMatrix(), mulColor, uvScaleOffset, shaderName);
+}
+
+void Renderer::DrawParticleInstanced(MeshHandle mesh, TextureHandle texture, const Matrix4x4& worldMatrix, const Vector4& mulColor, const Vector4& uvScaleOffset, const std::string& shaderName) {
 	auto it = std::find_if(instancedParticleDrawCalls_.begin(), instancedParticleDrawCalls_.end(), [&](const InstancedDrawCall& idc) {
 		return idc.mesh == mesh && idc.tex == texture && idc.shaderName == shaderName;
 	});
@@ -2407,7 +2423,7 @@ void Renderer::DrawParticleInstanced(MeshHandle mesh, TextureHandle texture, con
 	}
 
 	InstanceData data;
-	data.world = transform.ToMatrix();
+	data.world = worldMatrix;
 	data.color = mulColor;
 	data.uvScaleOffset = uvScaleOffset;
 	it->instances.push_back(data);
@@ -3144,7 +3160,9 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
     col -= sin(uv.y * 900.0).xxx * gScanline;
     col += (hash(uv * 1000.0 + gTime) - 0.5).xxx * gNoiseStrength;
     float2 d = uv - 0.5;
-    col *= saturate(1.0 - dot(d,d) * gVignette);
+    col *= saturate(1.0 - dot(d,d) * 0.8);
+    float dv = saturate(dot(d,d) * gVignette);
+    col = lerp(col, float3(1,0,0), dv * 0.8);
     return float4(col, 1);
 })";
 		auto vs = CompileShader(kVSPP, "main", "vs_5_0");
@@ -3183,6 +3201,7 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 		if (FAILED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoPP_))))
 			return false;
 
+
 		// ★追加：PostProcessと同様、そのままテクスチャをコピーするだけのパイプライン
 		static const char* kPSCopy = R"(
 Texture2D gScene : register(t0); SamplerState gSmp : register(s0);
@@ -3204,6 +3223,24 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 				pipelines_["Rich"] = psoRich;
 			}
 		}
+
+		// ★追加: Anime PostProcess パイプライン
+		auto psAnime = CompileShaderFromFile(L"Resources/shaders/AnimePostProcess.hlsl", "main", "ps_5_0");
+		if (!psAnime) {
+			psAnime = psRich; // ファイルがない場合は Rich を代用
+		}
+		if (psAnime) {
+			pso.PS = { psAnime->GetBufferPointer(), psAnime->GetBufferSize() };
+			Microsoft::WRL::ComPtr<ID3D12PipelineState> psoAnime;
+			if (SUCCEEDED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoAnime)))) {
+				pipelines_["Anime"] = psoAnime;
+			}
+		}
+
+		// ★全初期化の最後に、現在の psoPP_ をデフォルトとして保存する
+		// これにより、SetPostEffect("") でいつでも初期状態（CRTなど）に戻せるようになる
+		pipelines_["Default"] = psoPP_;
+		pipelines_[""] = psoPP_;
 	}
 
 	// ★追加: 最終描画用テクスチャの作成
@@ -3317,25 +3354,109 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 				OutputDebugStringA("[Renderer] Distortion PSO created.\n");
 			}
 		}
+
+		// ★追加: GlassShatter PSOの作成
+		auto vsGlass = CompileShaderFromFile(L"Resources/shaders/GlassShatter.hlsl", "main", "vs_5_0");
+		auto psGlass = CompileShaderFromFile(L"Resources/shaders/GlassShatter.hlsl", "ps_main", "ps_5_0");
+		if (vsGlass && psGlass) {
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
+			psoDesc.pRootSignature = rootSigDistortion_.Get(); // 専用RootSig
+			psoDesc.VS = { vsGlass->GetBufferPointer(), vsGlass->GetBufferSize() };
+			psoDesc.PS = { psGlass->GetBufferPointer(), psGlass->GetBufferSize() };
+			psoDesc.SampleMask = UINT_MAX;
+			psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+			psoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE; // 破片は両面描画
+			psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+			psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+			psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO; // 深度は書かない
+			D3D12_INPUT_ELEMENT_DESC localSkinLayout[] = {
+				{"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+				{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+				{"NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+				{"WEIGHTS",  0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 36, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+				{"BONES",    0, DXGI_FORMAT_R32G32B32A32_UINT,  0, 52, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+			};
+			psoDesc.InputLayout = { localSkinLayout, _countof(localSkinLayout) };
+			psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+			psoDesc.NumRenderTargets = 1;
+			psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+			psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+			psoDesc.SampleDesc.Count = 1;
+
+			if (SUCCEEDED(dev_->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&pipelines_["GlassShatter"])))) {
+				OutputDebugStringA("[Renderer] GlassShatter PSO created.\n");
+			}
+		}
 	}
 
 	return true;
 }
 
+
+#include <atomic>
+
+namespace {
+	// std::system_errorを避けるため、OSリソース(mutex)を使わずアトミック変数で管理する
+	static std::atomic_flag sPPLock = ATOMIC_FLAG_INIT;
+	// 適用予約。ヒープ割り当てを避けるためconst char*で保持（静的文字列のみを想定）
+	static std::atomic<const char*> sNextEffectRequest{ nullptr }; 
+
+	// スピンロックによる簡易的な排他制御（ポストプロセス名は短いのでこれで十分）
+	struct SpinLock {
+		void lock() { while (sPPLock.test_and_set(std::memory_order_acquire)); }
+		void unlock() { sPPLock.clear(std::memory_order_release); }
+	};
+}
+
 void Renderer::SetPostEffect(const std::string& name) {
-	// 空文字の場合は無効化
-	if (name.empty()) {
+	// 文字列の内容をアトミックに伝えるため、既知の定数ポインタに変換
+	const char* req = nullptr;
+	if (name == "Anime") req = "Anime";
+	else if (name == "Rich") req = "Rich";
+	else if (name == "Default") req = "Default";
+	else if (name == "") req = "";
+	else return; // 未知の名前は無視（安全性のため）
+
+	sNextEffectRequest.store(req, std::memory_order_release);
+}
+
+void Renderer::ResetPostEffect() {
+	sNextEffectRequest.store("", std::memory_order_release);
+}
+
+// 内部用：実際にPSOを切り替える（BeginFrameから呼ばれる）
+void Renderer::ApplyPostEffectInternal_() {
+	const char* req = sNextEffectRequest.exchange(nullptr, std::memory_order_acq_rel);
+	if (!req) return; // 変更予約なし
+
+	std::string name = req;
+	
+	// 空文字または None の場合は完全に無効化する（ノイズ等のデフォルトPPも消す）
+	if (name.empty() || name == "None") {
 		ppEnabled_ = false;
 		return;
 	}
 
-	// パイプラインマップから検索
+	// 指定された名前のパイプラインを探す
 	auto it = pipelines_.find(name);
 	if (it != pipelines_.end()) {
-		psoPP_ = it->second; // パイプラインステートを切り替え
-		ppEnabled_ = true;   // 有効化
+		if (psoPP_ == it->second && ppEnabled_) return; 
+		psoPP_ = it->second;
+		ppEnabled_ = true;
+		return;
+	}
+
+	// 見つからない場合は「Default」に戻す
+	it = pipelines_.find("Default");
+	if (it != pipelines_.end()) {
+		if (psoPP_ == it->second && ppEnabled_) return;
+		psoPP_ = it->second;
+		ppEnabled_ = true;
+	} else {
+		ppEnabled_ = false;
 	}
 }
+
 
 // ★追加: 外部用のカスタムレンダーターゲット生成
 Renderer::CustomRenderTarget Renderer::CreateRenderTarget(uint32_t width, uint32_t height) {

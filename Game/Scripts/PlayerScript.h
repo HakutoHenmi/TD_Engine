@@ -31,12 +31,17 @@ private:
 
 	// ★追加: プレイヤータイプと銃関連
 	enum class PlayerType { Sword, Gun };
-	enum class GunType { AssaultRifle, Shotgun };
 	PlayerType playerType_ = PlayerType::Sword;
-	GunType gunType_ = GunType::AssaultRifle;
-
 	bool isAiming_ = false;
 	float skillCooldown_ = 0.0f;
+
+	// ★スキルバフ関連
+	bool isSkillActive_ = false;
+	float skillDuration_ = 0.0f;
+	const float SKILL_MAX_DURATION = 10.0f;
+	const float SKILL_COOLDOWN_TIME = 15.0f;
+	const float SKILL_SPEED_MULTIPLIER = 1.8f;
+	const float SKILL_DAMAGE_MULTIPLIER = 2.5f;
 	float gunShootTimer_ = 0.0f;
 	
 	bool prevPlayerSwitchKeyDown_ = false;
@@ -44,6 +49,7 @@ private:
 	
 	bool isCursorVisible_ = true;
 	bool prevCursorToggle_ = false;
+	bool prevDashKeyDown_ = false;
 
 	std::string gunName_ = "PlayerGun";
 
@@ -60,7 +66,8 @@ private:
 	int gunComboStep_ = 0;
 	float gunComboResetTimer_ = 0.0f;
 	float gunComboAnimTimer_ = 0.0f;
-	float gunCombo3Dir_ = 1.0f; // ★追加: 3段目のダッシュ方向 (-1.0: 左, 1.0: 右)
+	int gunSubStep_ = 0; // アニメーション中の発射状態を管理する用
+	float gunSubTimer_ = 0.0f; // 次の弾までの間隔
 
 	std::string swordName_ = "PlayerSword";
 
@@ -73,8 +80,9 @@ private:
 	void UpdateGunAttack(entt::entity entity, GameScene* scene, float dt);
 	void SwitchPlayerType(entt::entity entity, GameScene* scene);
 	void ExecuteSkill(entt::entity entity, GameScene* scene);
-	void SpawnBullet(entt::entity entity, GameScene* scene, float spreadYaw, float spreadPitch, float damage, float lifeTime = 5.0f);
+	void SpawnBullet(entt::entity entity, GameScene* scene, float spreadYaw, float spreadPitch, float damage, float lifeTime = 5.0f, bool enhanced = false, bool explode = false);
 	void ShootGun(entt::entity entity, GameScene* scene);
+	void SpawnCrystalBurst(const DirectX::XMFLOAT3& pos, int count, bool enhanced);
 
 	float experience_ = 0.0f;
 	int level_ = 1;
@@ -119,6 +127,54 @@ private:
 		float life;
 	};
 	std::deque<ShellCasing> shellCasings_;
+
+	// ★追加: クリスタル飛散エフェクト
+	struct CrystalParticle {
+		DirectX::XMFLOAT3 pos;
+		DirectX::XMFLOAT3 velocity;
+		float life;
+		float maxLife;
+		float size;
+		float rotSpeed;  // 回転速度
+		float rot;       // 現在の回転角
+		DirectX::XMFLOAT4 color;
+	};
+	std::deque<CrystalParticle> crystalParticles_;
+
+	// ★追加: 蒸気圧システム
+	float steamPressure_ = 100.0f;       // 現在の蒸気圧
+	float maxSteamPressure_ = 100.0f;    // 最大蒸気圧
+	bool isRecharging_ = false;          // 圧力リチャージ中か
+	float rechargeTimer_ = 0.0f;         // リチャージ残り時間
+	static constexpr float RECHARGE_TIME = 2.5f;        // リチャージにかかる時間
+	static constexpr float NORMAL_SHOT_COST = 15.0f;    // 通常射撃の圧力コスト
+	static constexpr float CHARGE_SHOT_COST = 45.0f;    // チャージショットの圧力コスト
+	static constexpr float CHARGE_TIME_MAX = 1.2f;      // 最大チャージ時間
+	static constexpr float CHARGE_TIME_MIN = 0.35f;     // チャージショット判定の最低時間
+	static constexpr float DASH_COST = 20.0f;           // スチーム・ブーストのコスト
+	static constexpr float DASH_POWER = 100.0f;         // スチーム・ブーストの推進力 (半分以下に調整)
+
+	// ★追加: チャージショット
+	bool isCharging_ = false;            // チャージ中か
+	float chargeTime_ = 0.0f;            // 現在のチャージ時間
+	float chargeVfxTimer_ = 0.0f;        // チャージ中の蒸気排出タイマー
+
+	// ★追加: 大剣の溜め攻撃
+	bool isSwordCharging_ = false;
+	float swordChargeTime_ = 0.0f;
+	float swordChargeVfxTimer_ = 0.0f;
+	const float SWORD_CHARGE_MAX = 1.2f;
+	const float SWORD_CHARGE_COST = 35.0f;
+
+	// ★追加: 反動後退
+	DirectX::XMFLOAT3 recoilVelocity_ = {0, 0, 0};
+
+	// ★追加: ダメージ演出
+	float damageEffectTimer_ = 0.0f;
+	const float DAMAGE_EFFECT_DURATION = 0.6f;
+
+	void ShootChargeShot(entt::entity entity, GameScene* scene);
+	void DrawPressureGauge(GameScene* scene);
 };
 
 } // namespace Game
