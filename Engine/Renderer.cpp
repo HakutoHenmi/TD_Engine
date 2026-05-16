@@ -1484,15 +1484,8 @@ float CalcShadow(float3 worldPos) {
     if (projCoords.x < 0.0f || projCoords.x > 1.0f || projCoords.y < 0.0f || projCoords.y > 1.0f || projCoords.z < 0.0f || projCoords.z > 1.0f)
         return 1.0f;
 
-    // PCF 3x3
-    float shadow = 0.0f;
-    float texelSize = 1.0f / 2048.0f;
-    for(int x = -1; x <= 1; ++x) {
-        for(int y = -1; y <= 1; ++y) {
-            shadow += gShadowMap.SampleCmpLevelZero(gShadowSmp, projCoords.xy + float2(x, y) * texelSize, projCoords.z).r;
-        }
-    }
-    return shadow / 9.0f;
+    // ★最適化: ハードウェアPCF(2x2)を利用し、テクスチャフェッチを9回から1回に激減させる
+    return gShadowMap.SampleCmpLevelZero(gShadowSmp, projCoords.xy, projCoords.z).r;
 }
 
 float4 main(float4 svpos:SV_POSITION, float3 worldPos:TEXCOORD0, float3 normal:TEXCOORD1, float2 uv:TEXCOORD2) : SV_TARGET {
@@ -1614,14 +1607,8 @@ float CalcShadow(float3 worldPos) {
     projCoords.y = -projCoords.y * 0.5f + 0.5f;
     if (projCoords.x < 0.0f || projCoords.x > 1.0f || projCoords.y < 0.0f || projCoords.y > 1.0f || projCoords.z < 0.0f || projCoords.z > 1.0f)
         return 1.0f;
-    float shadow = 0.0f;
-    float texelSize = 1.0f / 2048.0f;
-    for(int x = -1; x <= 1; ++x) {
-        for(int y = -1; y <= 1; ++y) {
-            shadow += gShadowMap.SampleCmpLevelZero(gShadowSmp, projCoords.xy + float2(x, y) * texelSize, projCoords.z).r;
-        }
-    }
-    return shadow / 9.0f;
+    // ★最適化: ハードウェアPCF(2x2)を利用し、テクスチャフェッチを9回から1回に激減させる
+    return gShadowMap.SampleCmpLevelZero(gShadowSmp, projCoords.xy, projCoords.z).r;
 }
 float4 main(float4 svpos:SV_POSITION, float3 worldPos:TEXCOORD0, float3 normal:TEXCOORD1, float2 uv:TEXCOORD2, float4 color:COLOR0) : SV_TARGET {
     float4 tex = gTex.Sample(gSmp, uv);
@@ -1928,10 +1915,39 @@ float4 main(VSIn v, uint instanceID : SV_InstanceID) : SV_POSITION {
 	// ★追加: SDF UI (PixelShaderUI) 用パイプライン
 	{
 		static const char* kVSUI = R"(
+cbuffer CBUI : register(b1) {
+    float2 uCenterPx; float2 uSizePx; float2 uViewportPx; float uLineWidth; float uGlow;
+    float4 uColor; float uShape; float uRound; float uInner; float uRotateRad;
+    float uProgress; float uFill; float2 _pad;
+};
 struct VSOut { float4 svpos : SV_POSITION; float2 uv : TEXCOORD0; };
 VSOut main(uint vid : SV_VertexID) {
-    float2 p = (vid == 0) ? float2(-1, -1) : ((vid == 1) ? float2(-1,  3) : float2( 3, -1));
-    VSOut o; o.svpos = float4(p, 0, 1); o.uv = float2((p.x + 1) * 0.5, 1.0 - (p.y + 1) * 0.5); return o;
+    float2 quadUV[6] = { float2(0,0), float2(1,0), float2(0,1), float2(0,1), float2(1,0), float2(1,1) };
+    float2 uv = quadUV[vid];
+    
+    // 図形のサイズに対して、非常に余裕を持った十分な大きさのQuadを生成する。
+    // （SDFの特性上、Quadが大きすぎてもPSで透過されるため見た目は変わらない）
+    // uSizePxは「幅高」または「半径」として使われるため、大きい方を取る。
+    float baseSize = max(uSizePx.x, uSizePx.y);
+    
+    // 回転、角丸、Glowなどどんな変形でもカバーできるように、
+    // サイズを2倍にしてさらに絶対的な余白(+50px)を追加する。
+    float padding = max(uLineWidth, uGlow) + max(uRound, 0.0) + 50.0;
+    float maxRadius = baseSize * 2.0 + padding;
+    
+    float2 boundsHalfSize = float2(maxRadius, maxRadius);
+    
+    // Quadのローカル座標 (-boundsHalfSize to +boundsHalfSize)
+    float2 p = uv * 2.0 - 1.0;
+    float2 localPos = p * boundsHalfSize;
+    
+    float2 screenPos = uCenterPx + localPos;
+    float2 ndc = float2(screenPos.x / uViewportPx.x * 2.0 - 1.0, 1.0 - screenPos.y / uViewportPx.y * 2.0);
+    
+    VSOut o;
+    o.svpos = float4(ndc, 0, 1);
+    o.uv = float2(screenPos.x / uViewportPx.x, screenPos.y / uViewportPx.y);
+    return o;
 })";
 		auto vsUI = CompileShader(kVSUI, "main", "vs_5_0");
 		auto psUI = CompileShaderFromFile(L"Resources/shaders/PixelShaderUI.hlsl", "mainPS", "ps_5_0");
@@ -2751,8 +2767,8 @@ void Renderer::FlushSDFUI() {
 		if (cbOff != UINT32_MAX) {
 			std::memcpy(upload_[fi].mapped + cbOff, &cb, sizeof(CBUI));
 			list_->SetGraphicsRootConstantBufferView(0, upload_[fi].buffer->GetGPUVirtualAddress() + cbOff);
-			// Fullscreen triangle (3 vertices)
-			list_->DrawInstanced(3, 1, 0, 0);
+			// Optimized Quad (6 vertices) with correct bounds
+			list_->DrawInstanced(6, 1, 0, 0);
 		}
 	}
 }
@@ -3831,7 +3847,7 @@ void Renderer::ApplyPostEffectInternal_() {
 		return;
 	}
 
-	// 指定された名前のパイプラインを探す
+	// 指定された名前のパイプラインを探す (Rich, Anime, Default等)
 	auto it = pipelines_.find(name);
 	if (it != pipelines_.end()) {
 		if (psoPP_ == it->second && ppEnabled_) return; 
@@ -3840,15 +3856,8 @@ void Renderer::ApplyPostEffectInternal_() {
 		return;
 	}
 
-	// 見つからない場合は「Default」に戻す
-	it = pipelines_.find("Default");
-	if (it != pipelines_.end()) {
-		if (psoPP_ == it->second && ppEnabled_) return;
-		psoPP_ = it->second;
-		ppEnabled_ = true;
-	} else {
-		ppEnabled_ = false;
-	}
+	// 見つからない場合はポストプロセスを有効化するだけ（psoPP_は変更しない）
+	ppEnabled_ = true;
 }
 
 

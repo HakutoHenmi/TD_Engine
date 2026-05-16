@@ -14,7 +14,7 @@ void SelectManagerScript::Start(entt::entity entity, GameScene* scene) {
 	// ステージリスト
 	stages_.clear();
 	stages_.push_back({"チュートリアル", "Resources/Scenes/TutorialScene.json", "Standard TD map"});
-	stages_.push_back({"1ステージ", "Resources/Scenes/tesuto.json", "Action oriented map"});
+	stages_.push_back({"1ステージ", "Resources/Scenes/tesuto_light.json", "Action oriented map"});
 	stages_.push_back({"Stage 3: Tower Defense", "Resources/Scenes/PhaseSystem.json", "Defend the core"});
 
 	// UIが存在するかチェック
@@ -38,7 +38,7 @@ void SelectManagerScript::Start(entt::entity entity, GameScene* scene) {
 	if (btn1 != entt::null && scene->GetRegistry().all_of<UITextComponent>(btn1)) {
 		scene->GetRegistry().get<UITextComponent>(btn1).text = "1ステージ";
 		if (scene->GetRegistry().all_of<VariableComponent>(btn1)) {
-			scene->GetRegistry().get<VariableComponent>(btn1).SetString("Path", "Resources/Scenes/tesuto.json");
+			scene->GetRegistry().get<VariableComponent>(btn1).SetString("Path", "Resources/Scenes/tesuto_light.json");
 		}
 	}
 }
@@ -123,7 +123,7 @@ void SelectManagerScript::CreateFallbackUI(GameScene* scene) {
 	};
 	std::vector<LocalStageInfo> defaultStages = {
 		{"チュートリアル", "Resources/Scenes/TutorialScene.json"},
-		{"1ステージ", "Resources/Scenes/tesuto.json"},
+		{"1ステージ", "Resources/Scenes/tesuto_light.json"},
 		{"Stage 3: Tower Defense", "Resources/Scenes/PhaseSystem.json"}
 	};
 

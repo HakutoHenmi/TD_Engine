@@ -167,8 +167,13 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float /*dt*/)
 
 			// ==== 物理エンジンに逆らわない地形追従 ====
 			// 自由落下で下っている(速度 <= 0.0f) かつ、地面より下に沈んだ場合のみ上に押し上げる
-			// Enemyの中心は y=1.0 と考えられるため、地面より少し上で止める
-			float h = scene->GetHeightAt(tc.translate.x, tc.translate.z, tc.translate.y, static_cast<uint32_t>(entity));
+			// 毎フレームの地形RayCastは重いため、確率で間引く
+			float h = groundHeight_;
+			if (rand() % 5 == 0) {
+				h = scene->GetHeightAt(tc.translate.x, tc.translate.z, tc.translate.y, static_cast<uint32_t>(entity));
+				if (h > -5000.0f) groundHeight_ = h;
+			}
+			
 			if (h > -5000.0f) {
 				float footY = tc.translate.y - 1.0f; // 脚元の高さ
 				// 重力で落下中、もしくはめり込んでいる場合

@@ -73,37 +73,29 @@ static bool IsAlreadyVisited(const std::vector<entt::entity>& visitedObjects, en
 static bool IsConnectedToBulletTankRecursive(GameScene* scene, entt::entity currentPipe, std::vector<entt::entity>& visitedObjects, float connectRange) {
 	visitedObjects.push_back(currentPipe);
 
-	// ★最適化: TagComponentを持つエンティティのみ走査
-	auto view = scene->GetRegistry().view<TagComponent, TransformComponent>();
-	for (auto other : view) {
+	// ★最適化: パイプとタンクのみを対象に走査 (高速タグ検索を利用)
+	auto checkEntities = [&](const std::vector<entt::entity>& entities, TagType expectedTag) -> bool {
+		for (auto other : entities) {
+			if (other == currentPipe) continue;
+			if (!scene->GetRegistry().valid(other)) continue;
+			if (!IsConnectedSphere(scene, currentPipe, other, connectRange)) continue;
 
-		if (other == currentPipe) {
-			continue;
-		}
-
-		if (!IsConnectedSphere(scene, currentPipe, other, connectRange)) {
-			continue;
-		}
-
-		// 隣に弾倉があれば到達成功
-		if (HasTag(scene, other, TagType::BulletTank)) {
-			return true;
-		}
-
-		// 隣がパイプならさらに先を調べる
-		if (HasTag(scene, other, TagType::Pipe)) {
-
-			if (IsAlreadyVisited(visitedObjects, other)) {
-				continue;
-			}
-
-			bool connected = IsConnectedToBulletTankRecursive(scene, other, visitedObjects, connectRange);
-
-			if (connected) {
+			if (expectedTag == TagType::BulletTank) {
 				return true;
 			}
+
+			if (expectedTag == TagType::Pipe) {
+				if (IsAlreadyVisited(visitedObjects, other)) continue;
+				if (IsConnectedToBulletTankRecursive(scene, other, visitedObjects, connectRange)) {
+					return true;
+				}
+			}
 		}
-	}
+		return false;
+	};
+
+	if (checkEntities(scene->GetEntitiesByTag(TagType::BulletTank), TagType::BulletTank)) return true;
+	if (checkEntities(scene->GetEntitiesByTag(TagType::Pipe), TagType::Pipe)) return true;
 
 	return false;
 }
@@ -172,37 +164,39 @@ void PipeScript::Update(entt::entity obj, GameScene* scene, float dt) {
 	currentConnections_.clear();
 	currentConnections_.reserve(8);
 
-	auto view = registry.view<TransformComponent>();
+	const TagType connectableTags[] = {
+		TagType::Pipe, TagType::BulletTank, TagType::Cannon, 
+		TagType::Canon, TagType::PipeCannon, TagType::Poison, TagType::Missile
+	};
 
-	for (entt::entity other : view) {
-		if (other == obj) {
-			continue;
-		}
+	for (TagType tag : connectableTags) {
+		const auto& entities = scene->GetEntitiesByTag(tag);
+		for (entt::entity other : entities) {
+			if (other == obj) {
+				continue;
+			}
 
-		if (!registry.valid(other)) {
-			continue;
-		}
+			if (!registry.valid(other)) {
+				continue;
+			}
 
-		if (!IsConnectableTag(scene, other)) {
-			continue;
-		}
+			if (!IsConnectedSphere(scene, obj, other, connectRange)) {
+				continue;
+			}
 
-		if (!IsConnectedSphere(scene, obj, other, connectRange)) {
-			continue;
-		}
+			bool shouldCreate = false;
 
-		bool shouldCreate = false;
-
-		if (HasTag(scene, other, TagType::Pipe)) {
-			if (static_cast<uint32_t>(obj) < static_cast<uint32_t>(other)) {
+			if (tag == TagType::Pipe) {
+				if (static_cast<uint32_t>(obj) < static_cast<uint32_t>(other)) {
+					shouldCreate = true;
+				}
+			} else {
 				shouldCreate = true;
 			}
-		} else {
-			shouldCreate = true;
-		}
 
-		if (shouldCreate) {
-			currentConnections_.push_back(other);
+			if (shouldCreate) {
+				currentConnections_.push_back(other);
+			}
 		}
 	}
 

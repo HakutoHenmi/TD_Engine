@@ -1189,6 +1189,35 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 
 	if (ImGui::BeginMenuBar()) {
 		if (ImGui::BeginMenu("File")) {
+			// ★追加: 地面だけ残した軽量シーンを作るボタン
+			if (ImGui::MenuItem("Create Light Scene (tesuto_light.json)", nullptr)) {
+				auto view = gameScene->GetRegistry().view<NameComponent>();
+				std::vector<entt::entity> toDelete;
+				for (auto e : view) {
+					const std::string& name = view.get<NameComponent>(e).name;
+					if (name.find("Route_") != std::string::npos ||
+						name.find("Mountain_") != std::string::npos ||
+						name.find("Hill_") != std::string::npos ||
+						name.find("garasu") != std::string::npos) {
+						toDelete.push_back(e);
+					}
+				}
+				for (auto e : toDelete) gameScene->GetRegistry().destroy(e);
+				
+				std::string newPath = currentScenePath;
+				size_t pos = newPath.find("tesuto.json");
+				if (pos != std::string::npos) {
+					newPath.replace(pos, 11, "tesuto_light.json");
+				} else if (newPath.empty()) {
+					newPath = "Resources/Scenes/tesuto_light.json";
+				} else {
+					newPath += "_light.json"; // 別のシーンの場合
+				}
+				SaveScene(gameScene, newPath);
+				EditorUI::Log("tesuto_light.json has been created and saved!");
+			}
+			ImGui::Separator();
+
 			if (ImGui::MenuItem("New Scene", "Ctrl+N")) {
 				gameScene->GetRegistry().clear();
 				gameScene->GetSelectedEntities().clear();

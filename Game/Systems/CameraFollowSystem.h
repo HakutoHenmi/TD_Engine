@@ -16,9 +16,10 @@ public:
 			auto& ct = view.get<CameraTargetComponent>(entity);
 			if (!ct.enabled) continue;
 
-			// ★追加: マウスホイールによるズーム
+			// ★追加: マウスホイールによるズーム（準備フェーズ中は無効）
+			bool isPrep = (Game::PhaseSystemScript::IsPhase() == Game::PhaseSystemScript::PreparationPhase);
 			auto* inputIns = ::Engine::Input::GetInstance();
-			if (inputIns && Game::PhaseSystemScript::IsPhase() != Game::PhaseSystemScript::PreparationPhase) {
+			if (inputIns && !isPrep) {
 				float wheel = inputIns->GetMouseWheelDelta();
 				if (std::abs(wheel) > 0.001f) {
 					ct.distance -= wheel * 2.0f; // 感度調整（1クリックで2m移動）
@@ -87,24 +88,36 @@ public:
 				if (pi.enabled) {
 					auto rot = ctx.camera->Rotation();
 					
+					// ★修正: 準備フェーズ中は右クリック中にInputから直接マウスデルタを取得
+					float yawInput = pi.cameraYaw;
+					float pitchInput = pi.cameraPitch;
+					if (isPrep && inputIns) {
+						bool rClick = inputIns->IsMouseDown(1); // 右ボタン
+						if (rClick) {
+							yawInput = inputIns->GetMouseDeltaX() * 0.003f;
+							pitchInput = inputIns->GetMouseDeltaY() * 0.003f;
+						} else {
+							yawInput = 0.0f;
+							pitchInput = 0.0f;
+						}
+					}
+
 					if (ct.lockedTarget != entt::null && registry.valid(ct.lockedTarget)) {
-						// ターゲットの方向を向く
 						auto& eTc = registry.get<TransformComponent>(ct.lockedTarget);
 						float dx = eTc.translate.x - targetPos.x;
 						float dz = eTc.translate.z - targetPos.z;
 						float targetYaw = std::atan2(dx, dz);
 						
-						// スムーズにターゲットへ向かせる
 						float diff = targetYaw - rot.y;
 						while (diff >  DirectX::XM_PI) diff -= DirectX::XM_2PI;
 						while (diff < -DirectX::XM_PI) diff += DirectX::XM_2PI;
 						
 						rot.y += diff * std::min(1.0f, 15.0f * ctx.dt);
 					} else {
-						rot.y += pi.cameraYaw;
+						rot.y += yawInput;
 					}
 
-					rot.x += pi.cameraPitch;
+					rot.x += pitchInput;
 
 					const float PITCH_LIMIT = 1.5f;
 					if (rot.x > PITCH_LIMIT) rot.x = PITCH_LIMIT;
@@ -116,9 +129,6 @@ public:
 
 			// ★調整: 『鳴潮』風のフレーミング（キャラクターを中央より少し下に配置）
 			float verticalFraming = 0.8f; // キャラクターが画面中央より少し下に見えるように調整
-			if (Game::PhaseSystemScript::IsPhase() == Game::PhaseSystemScript::PreparationPhase) {
-				verticalFraming -= 5.0f; // ★追加: 準備フェーズのカメラをさらに下げる（5mほど）
-			}
 			targetPos.y += verticalFraming;
 
 			// ★速度計算と動的スムージング

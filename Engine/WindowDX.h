@@ -61,6 +61,9 @@ public:
 	void ToggleFullscreen();
 	bool IsFullscreen() const { return isFullscreen_; }
 
+	float GetLastPresentMs() const { return lastPresentMs_; }
+	float GetLastWaitGPUMs() const { return lastWaitGPUMs_; }
+
 private:
 	bool InitWindow_(HINSTANCE hInst, int cmdShow, HWND& outHwnd);
 	bool InitDX_();
@@ -107,6 +110,9 @@ private:
 
 	// ★追加: FPS制御用の変数
 	std::chrono::steady_clock::time_point lastFrameTime_;
+	
+	float lastPresentMs_ = 0.0f;
+	float lastWaitGPUMs_ = 0.0f;
 };
 
 } // namespace Engine

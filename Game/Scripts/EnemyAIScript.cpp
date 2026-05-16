@@ -48,8 +48,7 @@ void EnemyAIScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		
 		DirectX::XMFLOAT3 targetPos = {0, 0, 0};
 		bool found = false;
-		// プレイヤーを高速タグ検索で探す
-		const auto& players = scene->GetEntitiesByTag("Player");
+		const auto& players = scene->GetEntitiesByTag(TagType::Player);
 		if (!players.empty()) {
 			entt::entity p = players[0];
 			if (registry.valid(p) && registry.all_of<TransformComponent>(p)) {

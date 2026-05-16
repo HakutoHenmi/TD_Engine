@@ -18,50 +18,52 @@ public:
 			auto& pi = registry.get<PlayerInputComponent>(entity);
 			if (!pi.enabled) continue;
 
-			DirectX::XMFLOAT2 moveDir = {0.0f, 0.0f};
-			if (GetAsyncKeyState('W') & 0x8000) moveDir.y += 1.0f;
-			if (GetAsyncKeyState('S') & 0x8000) moveDir.y -= 1.0f;
-			if (GetAsyncKeyState('A') & 0x8000) moveDir.x -= 1.0f;
-			if (GetAsyncKeyState('D') & 0x8000) moveDir.x += 1.0f;
-
-			float len = std::sqrt(moveDir.x * moveDir.x + moveDir.y * moveDir.y);
-			if (len > 0.001f) {
-				moveDir.x /= len;
-				moveDir.y /= len;
-			}
-			pi.moveDir = moveDir;
-
-			// ジャンプ入力
-			bool currentSpace = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
-			if (currentSpace && !prevSpace_)
-				pi.jumpRequested = true;
-			else
-				pi.jumpRequested = false;
-			prevSpace_ = currentSpace;
-
-			// 攻撃入力
-			pi.attackRequested = (GetAsyncKeyState('J') & 0x8000) != 0;
-
-			// ★追加: Shiftダッシュ入力
-			pi.sprintRequested = (GetAsyncKeyState(VK_LSHIFT) & 0x8000) != 0;
-			// 準備フェーズ中はShiftキーの影響を受けないようにする
-			if (PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase) {
-				pi.sprintRequested = false;
-			}
-
-			// ★変更: カメラ操作
-			// 準備フェーズの場合は右クリック押下時のみ視点移動可能にする
-			pi.cameraYaw = 0.0f;
-			pi.cameraPitch = 0.0f;
 			if (ctx.input) {
+				auto* input = ctx.input;
+				DirectX::XMFLOAT2 moveDir = {0.0f, 0.0f};
+				if (input->Down(DIK_W)) moveDir.y += 1.0f;
+				if (input->Down(DIK_S)) moveDir.y -= 1.0f;
+				if (input->Down(DIK_A)) moveDir.x -= 1.0f;
+				if (input->Down(DIK_D)) moveDir.x += 1.0f;
+
+				float len = std::sqrt(moveDir.x * moveDir.x + moveDir.y * moveDir.y);
+				if (len > 0.001f) {
+					moveDir.x /= len;
+					moveDir.y /= len;
+				}
+				pi.moveDir = moveDir;
+
+				// ジャンプ入力
+				bool currentSpace = input->Down(DIK_SPACE);
+				if (currentSpace && !prevSpace_)
+					pi.jumpRequested = true;
+				else
+					pi.jumpRequested = false;
+				prevSpace_ = currentSpace;
+
+				// 攻撃入力
+				pi.attackRequested = input->Down(DIK_J);
+
+				// ★追加: Shiftダッシュ入力
+				pi.sprintRequested = input->Down(DIK_LSHIFT);
+				// 準備フェーズ中はShiftキーの影響を受けないようにする
+				if (PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase) {
+					pi.sprintRequested = false;
+				}
+
+				// ★変更: カメラ操作
+				// 準備フェーズの場合は右クリック押下時のみ視点移動可能にする
+				pi.cameraYaw = 0.0f;
+				pi.cameraPitch = 0.0f;
+				
 				bool canMoveCamera = true;
 				if (PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase) {
-					canMoveCamera = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+					canMoveCamera = input->IsMouseDown(1); // 右ボタン
 				}
 				
 				if (canMoveCamera) {
-					pi.cameraYaw = ctx.input->GetMouseDeltaX() * 0.003f;
-					pi.cameraPitch = ctx.input->GetMouseDeltaY() * 0.003f;
+					pi.cameraYaw = input->GetMouseDeltaX() * 0.003f;
+					pi.cameraPitch = input->GetMouseDeltaY() * 0.003f;
 				}
 			}
 		}
