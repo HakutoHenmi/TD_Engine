@@ -7,7 +7,92 @@
   },
   "objects": [
     {
-      "id": 6291471,
+      "id": 2097163,
+      "parentId": 4294967295,
+      "name": "Sun",
+      "locked": true,
+      "translate": [0, 124.807, 0],
+      "rotate": [0.7854, 0.5236, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "DirectionalLight", "enabled": true, "color": [1,0.95,0.8], "intensity": 1.2}
+      ]
+    },
+    {
+      "id": 2097162,
+      "parentId": 4294967295,
+      "name": "Player",
+      "locked": true,
+      "translate": [0, 1, -20],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/cube/cube.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [0.2,0.5,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [2,2,2], "isTrigger": false},
+        {"type": "Rigidbody", "enabled": true, "velocity": [0,0,0], "useGravity": true, "isKinematic": true},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "PlayerScript", "param": ""}]},
+        {"type": "Health", "enabled": true, "hp": 890, "maxHp": 1000, "isDead": false},
+        {"type": "Tag", "enabled": true, "tag": "Player"},
+        {"type": "PlayerInput", "enabled": false},
+        {"type": "CharacterMovement", "enabled": true, "speed": 7, "jumpPower": 20, "gravity": 9.8},
+        {"type": "CameraTarget", "enabled": false, "distance": 10, "height": 3, "smoothSpeed": 5},
+        {"type": "GpuMeshCollider", "enabled": true, "meshPath": "Resources/Models/cube/cube.obj", "isTrigger": false}
+      ]
+    },
+    {
+      "id": 2097161,
+      "parentId": 4294967295,
+      "name": "Floor",
+      "locked": true,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [0.2, 0.2, 0.2],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/Stages/stage1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Toon", "color": [0.428571,0.324305,0.110866,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Untagged"},
+        {"type": "GpuMeshCollider", "enabled": true, "meshPath": "Resources/Models/Stages/stage1.obj", "isTrigger": false}
+      ]
+    },
+    {
+      "id": 2097160,
+      "parentId": 4294967295,
+      "name": "Fede",
+      "locked": true,
+      "translate": [2000, 1.1, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Script", "enabled": true, "scripts": [{"path": "PhaseTransition", "param": "{\"fadeDuration\":0.3499999940395355}"}]},
+        {"type": "RectTransform", "enabled": true, "pos": [2000,1.1], "size": [1978,1092], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/white1x1.png", "color": [0,0,0,0], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10}
+      ]
+    },
+    {
+      "id": 2097159,
+      "parentId": 4294967295,
+      "name": "Button",
+      "locked": false,
+      "translate": [400, 401.5, -1.5],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationManager", "param": "{\"buttons\":[{\"cost\":100,\"name\":\"TankButton\",\"posX\":0.0,\"posY\":0.0,\"prefabPath\":\"\",\"sizeX\":100.0,\"sizeY\":100.0,\"texturePath\":\"\"},{\"cost\":5,\"name\":\"PipeButton\",\"posX\":0.0,\"posY\":0.0,\"prefabPath\":\"\",\"sizeX\":100.0,\"sizeY\":100.0,\"texturePath\":\"\"},{\"cost\":150,\"name\":\"CannonButton\",\"posX\":0.0,\"posY\":0.0,\"prefabPath\":\"\",\"sizeX\":100.0,\"sizeY\":100.0,\"texturePath\":\"\"},{\"cost\":200,\"name\":\"MissikeButton\",\"posX\":0.0,\"posY\":0.0,\"prefabPath\":\"\",\"sizeX\":100.0,\"sizeY\":100.0,\"texturePath\":\"\"},{\"cost\":120,\"name\":\"PoisonTrapButton\",\"posX\":0.0,\"posY\":0.0,\"prefabPath\":\"\",\"sizeX\":100.0,\"sizeY\":100.0,\"texturePath\":\"\"},{\"cost\":250,\"name\":\"IceCannonButton\",\"posX\":0.0,\"posY\":0.0,\"prefabPath\":\"\",\"sizeX\":100.0,\"sizeY\":100.0,\"texturePath\":\"\"}]}"}]}
+      ]
+    },
+    {
+      "id": 2097158,
+      "parentId": 4294967295,
+      "name": "Spawner_W1_1",
+      "locked": false,
+      "translate": [-1, 4, 28],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Script", "enabled": true, "scripts": [{"path": "EnemySpawnerScript", "param": "{\"enemyScriptParams\":\"{\\\"moveType\\\":0,\\\"speed\\\":2.0}\",\"enemyScriptPath\":\"Warrior\",\"enemyType\":0,\"maxCount\":5,\"pattern\":0,\"patternRadius\":3.0,\"spawnDuration\":10.0,\"startWave\":0,\"waveCount\":1,\"waveDelay\":0.0}"}]}
+      ]
+    },
+    {
+      "id": 2097164,
       "parentId": 4294967295,
       "name": "PlayerSword",
       "locked": false,
@@ -41,143 +126,31 @@
       ]
     },
     {
-      "id": 6291470,
+      "id": 2097156,
       "parentId": 4294967295,
-      "name": "Sun",
-      "locked": true,
-      "translate": [0, 124.807, 0],
-      "rotate": [0.7854, 0.5236, 0],
-      "scale": [1, 1, 1],
-      "components": [
-        {"type": "DirectionalLight", "enabled": true, "color": [1,0.95,0.8], "intensity": 1.2}
-      ]
-    },
-    {
-      "id": 6291469,
-      "parentId": 4294967295,
-      "name": "Player",
-      "locked": true,
-      "translate": [0, 1, -20],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/cube/cube.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [0.2,0.5,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
-        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [2,2,2], "isTrigger": false},
-        {"type": "Rigidbody", "enabled": true, "velocity": [0,0,0], "useGravity": true, "isKinematic": true},
-        {"type": "Script", "enabled": true, "scripts": [{"path": "PlayerScript", "param": ""}]},
-        {"type": "Health", "enabled": true, "hp": 890, "maxHp": 1000, "isDead": false},
-        {"type": "Tag", "enabled": true, "tag": "Player"},
-        {"type": "PlayerInput", "enabled": false},
-        {"type": "CharacterMovement", "enabled": true, "speed": 7, "jumpPower": 20, "gravity": 9.8},
-        {"type": "CameraTarget", "enabled": false, "distance": 10, "height": 3, "smoothSpeed": 5},
-        {"type": "GpuMeshCollider", "enabled": true, "meshPath": "Resources/Models/cube/cube.obj", "isTrigger": false}
-      ]
-    },
-    {
-      "id": 6291468,
-      "parentId": 4294967295,
-      "name": "Floor",
-      "locked": true,
-      "translate": [0, 0, 0],
-      "rotate": [0, 0, 0],
-      "scale": [0.2, 0.2, 0.2],
-      "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/Stages/stage1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Toon", "color": [0.428571,0.324305,0.110866,1], "uvTiling": [1,1], "uvOffset": [0,0]},
-        {"type": "Tag", "enabled": true, "tag": "Untagged"},
-        {"type": "GpuMeshCollider", "enabled": true, "meshPath": "Resources/Models/Stages/stage1.obj", "isTrigger": false}
-      ]
-    },
-    {
-      "id": 6291467,
-      "parentId": 4294967295,
-      "name": "Fede",
-      "locked": true,
-      "translate": [2000, 1.1, 0],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "PhaseTransition", "param": "{\"fadeDuration\":0.3499999940395355}"}]},
-        {"type": "RectTransform", "enabled": true, "pos": [2000,1.1], "size": [1978,1092], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/white1x1.png", "color": [0,0,0,0], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10}
-      ]
-    },
-    {
-      "id": 6291466,
-      "parentId": 4294967295,
-      "name": "PisonTrapButton",
+      "name": "Spawner_W1_2",
       "locked": false,
-      "translate": [400, 401.5, -1.5],
+      "translate": [28, 4, 28],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":4}"}]},
-        {"type": "RectTransform", "enabled": true, "pos": [400,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/PisonTrapButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+        {"type": "Script", "enabled": true, "scripts": [{"path": "EnemySpawnerScript", "param": "{\"enemyScriptParams\":\"{\\\"moveType\\\":0,\\\"speed\\\":2.0}\",\"enemyScriptPath\":\"Warrior\",\"enemyType\":0,\"maxCount\":2,\"pattern\":0,\"patternRadius\":3.0,\"spawnDuration\":10.0,\"startWave\":0,\"waveCount\":1,\"waveDelay\":0.0}"}]}
       ]
     },
     {
-      "id": 6291465,
+      "id": 2097155,
       "parentId": 4294967295,
-      "name": "PipeButton",
+      "name": "Spawner_W1_3",
       "locked": false,
-      "translate": [-200, 400.5, -0.5],
+      "translate": [-28, 4, 24],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":1}"}]},
-        {"type": "RectTransform", "enabled": true, "pos": [-200,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/PipeButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+        {"type": "Script", "enabled": true, "scripts": [{"path": "EnemySpawnerScript", "param": "{\"enemyScriptParams\":\"{\\\"moveType\\\":0,\\\"speed\\\":2.0}\",\"enemyScriptPath\":\"Warrior\",\"enemyType\":0,\"maxCount\":2,\"pattern\":0,\"patternRadius\":3.0,\"spawnDuration\":10.0,\"startWave\":0,\"waveCount\":1,\"waveDelay\":0.0}"}]}
       ]
     },
     {
-      "id": 6291464,
-      "parentId": 4294967295,
-      "name": "TankButton",
-      "locked": false,
-      "translate": [-400, 400, 0],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":2}"}]},
-        {"type": "RectTransform", "enabled": true, "pos": [-400,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/TankButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
-      ]
-    },
-    {
-      "id": 6291463,
-      "parentId": 4294967295,
-      "name": "MissikeButton",
-      "locked": false,
-      "translate": [200, 401, -1],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":3}"}]},
-        {"type": "RectTransform", "enabled": true, "pos": [200,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/MissileButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
-      ]
-    },
-    {
-      "id": 6291462,
-      "parentId": 4294967295,
-      "name": "CannonButton",
-      "locked": false,
-      "translate": [0, 400.5, -0.5],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "InstallationButton", "param": "{\"buttonTypes\":0}"}]},
-        {"type": "RectTransform", "enabled": true, "pos": [0,400], "size": [200,200], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/CannonButton.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.6,0.6,0.6,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
-      ]
-    },
-    {
-      "id": 6291461,
+      "id": 2097154,
       "parentId": 4294967295,
       "name": "PhysicsSystem",
       "locked": true,
@@ -191,8 +164,8 @@
       ]
     },
     {
-      "id": 6291460,
-      "parentId": 6291459,
+      "id": 2097153,
+      "parentId": 2097152,
       "name": "PreparationCamera",
       "locked": false,
       "translate": [0, 10, 0],
@@ -208,7 +181,7 @@
       ]
     },
     {
-      "id": 6291459,
+      "id": 2097152,
       "parentId": 4294967295,
       "name": "Core",
       "locked": false,
@@ -220,42 +193,6 @@
         {"type": "Script", "enabled": true, "scripts": [{"path": "BaseScript", "param": "rotationSpeed=1;attackInterval=1;damage=10;attackRange=30;"}]},
         {"type": "Health", "enabled": true, "hp": 100, "maxHp": 100, "isDead": false},
         {"type": "Tag", "enabled": true, "tag": "Untagged"}
-      ]
-    },
-    {
-      "id": 6291458,
-      "parentId": 4294967295,
-      "name": "Spawner_W1_1",
-      "locked": false,
-      "translate": [-1, 4, 28],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "EnemySpawnerScript", "param": "{\"enemyScriptParams\":\"{\\\"moveType\\\":0,\\\"speed\\\":2.0}\",\"enemyScriptPath\":\"Warrior\",\"enemyType\":0,\"maxCount\":5,\"pattern\":0,\"patternRadius\":3.0,\"spawnDuration\":10.0,\"startWave\":0,\"waveCount\":1,\"waveDelay\":0.0}"}]}
-      ]
-    },
-    {
-      "id": 6291457,
-      "parentId": 4294967295,
-      "name": "Spawner_W1_2",
-      "locked": false,
-      "translate": [28, 4, 28],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "EnemySpawnerScript", "param": "{\"enemyScriptParams\":\"{\\\"moveType\\\":0,\\\"speed\\\":2.0}\",\"enemyScriptPath\":\"Warrior\",\"enemyType\":0,\"maxCount\":2,\"pattern\":0,\"patternRadius\":3.0,\"spawnDuration\":10.0,\"startWave\":0,\"waveCount\":1,\"waveDelay\":0.0}"}]}
-      ]
-    },
-    {
-      "id": 6291456,
-      "parentId": 4294967295,
-      "name": "Spawner_W1_3",
-      "locked": false,
-      "translate": [-28, 4, 24],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "EnemySpawnerScript", "param": "{\"enemyScriptParams\":\"{\\\"moveType\\\":0,\\\"speed\\\":2.0}\",\"enemyScriptPath\":\"Warrior\",\"enemyType\":0,\"maxCount\":2,\"pattern\":0,\"patternRadius\":3.0,\"spawnDuration\":10.0,\"startWave\":0,\"waveCount\":1,\"waveDelay\":0.0}"}]}
       ]
     }
   ]

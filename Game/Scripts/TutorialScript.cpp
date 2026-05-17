@@ -29,6 +29,28 @@ namespace {
 // 2x2のグリッドに値をスナップさせる（2の倍数に丸める）
 float SnapTo2x2Grid(float value) { return std::floor(value / 2.0f) * 2.0f; }
 
+bool IsPointerOverInstallationButton(GameScene* scene) {
+    if (!scene)
+        return false;
+
+    auto& registry = scene->GetRegistry();
+    auto view = registry.view<UIButtonComponent>();
+    for (auto entity : view) {
+        const auto& btn = view.get<UIButtonComponent>(entity);
+        if (!btn.enabled || !btn.isHovered)
+            continue;
+
+        if (registry.all_of<RectTransformComponent>(entity) && !registry.get<RectTransformComponent>(entity).enabled)
+            continue;
+
+        if (InstallationManager::IsManagedButton(entity)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 // 指定された始点から終点までのパイプの配置経路を2x2グリッドに沿って計算し、ポイントのリストを返す
 std::vector<Engine::Vector3> BuildPipePathPoints(const Engine::Vector3& start, const Engine::Vector3& end) {
     std::vector<Engine::Vector3> points;
@@ -277,6 +299,9 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
     const bool keySpace = input->Trigger(DIK_SPACE) || (currentRawSpace && !prevKeySpace);
     prevKeySpace = currentRawSpace;
 
+    bool placementSelectionChangedThisFrame = false;
+    const bool clickedInstallationButtonThisFrame = input->IsMouseTrigger(0) && IsPointerOverInstallationButton(scene);
+
     if ((tutorialStep_ == TutorialStep::FirstBattle1 || tutorialStep_ == TutorialStep::FirstBattle2 || tutorialStep_ == TutorialStep::FirstBattle3) && 
         phaseState_ == PhaseSystemScript::BattlePhase && PhaseSystemScript::GetRequestedPhase() == PhaseSystemScript::PreparationPhase) {
         EnterStep(TutorialStep::SkillTreeGuide1);
@@ -322,6 +347,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
             isPlacementMode_ = true;
             isPipeSet_ = false;
             hasPipeStartPoint_ = false;
+            placementSelectionChangedThisFrame = true;
         }
 
         if (input->IsMouseTrigger(1) && isPlacementMode_) {
@@ -334,7 +360,9 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
             }
         }
 
-        Installation(scene, selectedObjPath_);
+        if (!placementSelectionChangedThisFrame && !clickedInstallationButtonThisFrame) {
+            Installation(scene, selectedObjPath_);
+        }
         if (hasPlacedCannon_) {
             EnterStep(TutorialStep::InstallTankGuide1);
         }
@@ -355,6 +383,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
             isPlacementMode_ = true;
             isPipeSet_ = false;
             hasPipeStartPoint_ = false;
+            placementSelectionChangedThisFrame = true;
         }
 
         if (input->IsMouseTrigger(1) && isPlacementMode_) {
@@ -367,7 +396,9 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
             }
         }
 
-        Installation(scene, selectedObjPath_);
+        if (!placementSelectionChangedThisFrame && !clickedInstallationButtonThisFrame) {
+            Installation(scene, selectedObjPath_);
+        }
         if (hasPlacedTank_) {
             EnterStep(TutorialStep::InstallPipeGuide1);
         }
@@ -388,6 +419,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
             isPipeSet_ = true;
             isPlacementMode_ = true;
             hasPipeStartPoint_ = false;
+            placementSelectionChangedThisFrame = true;
         }
 
         if (input->IsMouseTrigger(1) && isPlacementMode_) {
@@ -400,7 +432,9 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
             }
         }
 
-        Installation(scene, selectedObjPath_);
+        if (!placementSelectionChangedThisFrame && !clickedInstallationButtonThisFrame) {
+            Installation(scene, selectedObjPath_);
+        }
         if (hasPlacedPipe_) {
             if (keySpace) {
                 EnterStep(TutorialStep::FirstBattle1);
