@@ -228,15 +228,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	// スクリプト動作確認用の白い線 (常に表示)
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
-#ifndef NDEBUG
-		renderer->DrawLine3D({0, 20, 0}, {5, 20, 0}, {1, 1, 1, 1}, true);
-		if (isPhase_ == PreparationPhase)
-			renderer->DrawLine3D({0, 21, 0}, {5, 21, 0}, {0, 1, 0, 1}, true);
-		if (isPlacementMode_)
-			renderer->DrawLine3D({0, 22, 0}, {5, 22, 0}, {0, 0, 1, 1}, true);
-		if (isSellMode_)
-			renderer->DrawLine3D({0, 23, 0}, {5, 23, 0}, {1, 0, 0, 1}, true); // 赤線でSellモード表示
-#endif
+	// デバッグ用の線は削除しました
 	}
 
 	// ★入力処理: キーボードとUI両方からの入力を受け付ける

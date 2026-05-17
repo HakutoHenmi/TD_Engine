@@ -71,7 +71,7 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 		}
 	}
 
-	if (renderer && (isEditorMode || isPrepOrBattle)) {
+	if (renderer && isEditorMode) {
 		for (size_t wi = 0; wi < enemySpawners_.size(); ++wi) {
 			// ゲームプレイ中は現在の（次に来る）ウェーブのものだけ表示する
 			if (!isEditorMode) {

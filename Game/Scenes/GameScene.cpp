@@ -1152,10 +1152,10 @@ void GameScene::Draw() {
 	profiler_.frameStats.drawCulledCount = culledCount;
 
 #ifdef USE_IMGUI
-	{
-	ScopedTimer _gizmo(profiler_.frameStats.drawGizmoMs);
-	DrawSelectionHighlight();
-	DrawLightGizmos();
+	if (!isPlaying_) {
+		ScopedTimer _gizmo(profiler_.frameStats.drawGizmoMs);
+		DrawSelectionHighlight();
+		DrawLightGizmos();
 	}
 #endif
 	{
