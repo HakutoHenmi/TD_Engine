@@ -159,9 +159,10 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 		// ★ 高速タグシステム経由でタグを設定
 		scene->SetTag(enemy, TagType::Enemy);
 
-		// ★追加: 敵HPUI（頭上HPバー）の付与 (パフォーマンステストのため一時的にコメントアウト を戻した)
+		// ★追加: 敵HPUI（頭上HPバー）の付与
+		// ※ユーザーからデバッグ線と誤認されるため、デフォルトでは非表示にしておく
 		auto& ui = scene->GetRegistry().emplace<WorldSpaceUIComponent>(enemy);
-		ui.showHealthBar = true;
+		ui.showHealthBar = false; // ★非表示に変更
 		ui.offset = { 0.0f, 2.2f, 0.0f }; // 2mのcubeの少し上
 		ui.barWidth = 80.0f;
 
