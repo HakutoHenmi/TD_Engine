@@ -156,6 +156,7 @@ void TutorialScript::EnterStep(TutorialStep step) {
     }
 
     if (step == TutorialStep::Preparation1 || step == TutorialStep::Preparation2 || step == TutorialStep::Preparation3 || 
+        step == TutorialStep::PlayerMoveGuide1 || step == TutorialStep::PlayerMoveGuide2 || step == TutorialStep::PlayerMoveGuide3 ||
         step == TutorialStep::InstallCannonGuide1 || step == TutorialStep::InstallCannonGuide2 || step == TutorialStep::InstallCannonGuide3 || 
         step == TutorialStep::InstallTankGuide1 || step == TutorialStep::InstallTankGuide2 || step == TutorialStep::InstallTankGuide3 || 
         step == TutorialStep::InstallPipeGuide1 || step == TutorialStep::InstallPipeGuide2 || step == TutorialStep::InstallPipeGuide3 || 
@@ -182,6 +183,11 @@ void TutorialScript::ShowStepGuide() {
     case TutorialStep::InstallCannonGuide3:
         EditorUI::Log("Tutorial: 大砲の設置説明。大砲を1つ設置してください。(3キー)");
         break;
+	case TutorialStep::PlayerMoveGuide1:
+	case TutorialStep::PlayerMoveGuide2:
+	case TutorialStep::PlayerMoveGuide3:
+		EditorUI::Log("Tutorial: プレイヤー操作説明です。");
+		break;
     case TutorialStep::InstallTankGuide1:
     case TutorialStep::InstallTankGuide2:
     case TutorialStep::InstallTankGuide3:
@@ -284,9 +290,23 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
         if (keySpace) EnterStep(TutorialStep::Preparation3);
         break;
     case TutorialStep::Preparation3:
-        if (keySpace) EnterStep(TutorialStep::InstallCannonGuide1);
+		if (keySpace)
+			EnterStep(TutorialStep::PlayerMoveGuide1);
         break;
+	case TutorialStep::PlayerMoveGuide1:
+		if (keySpace)
+			EnterStep(TutorialStep::PlayerMoveGuide2);
+		break;
 
+	case TutorialStep::PlayerMoveGuide2:
+		if (keySpace)
+			EnterStep(TutorialStep::PlayerMoveGuide3);
+		break;
+
+	case TutorialStep::PlayerMoveGuide3:
+		if (keySpace)
+			EnterStep(TutorialStep::InstallCannonGuide1);
+		break;
     case TutorialStep::InstallCannonGuide1:
         if (keySpace) EnterStep(TutorialStep::InstallCannonGuide2);
         break;
@@ -515,7 +535,20 @@ void TutorialScript::ShowGuideText(entt::entity entity, GameScene* scene) {
 		if (scene->GetRegistry().all_of<UITextComponent>(entity))
 			scene->GetRegistry().get<UITextComponent>(entity).text = "準備ができたら、防衛の準備を始めましょう。\nSPACE:次へ";
 		break;
+	case TutorialStep::PlayerMoveGuide1:
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "WASDでプレイヤーを移動できます,マウスで照準を動かせます。\nSPACE:次へ";
+		break;
 
+	case TutorialStep::PlayerMoveGuide2:
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "左クリックで攻撃できます。,Eキーでスキルを打てます。\nSPACE:次へ";
+		break;
+
+	case TutorialStep::PlayerMoveGuide3:
+		if (scene->GetRegistry().all_of<UITextComponent>(entity))
+			scene->GetRegistry().get<UITextComponent>(entity).text = "考え中\nSPACE:次へ";
+		break;
 	case TutorialStep::InstallCannonGuide1:
 		if (scene->GetRegistry().all_of<UITextComponent>(entity))
 			scene->GetRegistry().get<UITextComponent>(entity).text = "設置についてです。\n設置にはお金を使います\n今回は無償で行います\nSPACE:次へ";
