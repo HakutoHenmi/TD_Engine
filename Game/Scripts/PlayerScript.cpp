@@ -17,6 +17,11 @@
 namespace Game {
 
 void PlayerScript::Start(entt::entity entity, GameScene* scene) {
+	// ★追加: シーン開始時は必ずカーソルを表示する
+	isCursorVisible_ = true;
+	while (ShowCursor(TRUE) < 0);
+	prevCursorToggle_ = false;
+
 	// ★追加: プレイヤーを物理演算から切り離し、CharacterController方式（レイキャスト）で制御する
 	if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
 		scene->GetRegistry().get<RigidbodyComponent>(entity).isKinematic = true;
@@ -333,17 +338,36 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 	prevSkillKeyDown_ = currentSkillKeyDown;
 
+	bool isPrep = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase);
+	static bool s_wasPrep = true;
+
+	if (isPrep && !s_wasPrep) {
+		// 戦闘フェーズ等から準備フェーズに戻った時、自動でカーソルを表示する
+		isCursorVisible_ = true;
+		while (ShowCursor(TRUE) < 0);
+	}
+	s_wasPrep = isPrep;
+
 	// ★追加: カーソル表示切り替え (Left Altキー)
-	bool currentCursorToggle = (GetAsyncKeyState(VK_LMENU) & 0x8000) != 0;
-	if (currentCursorToggle && !prevCursorToggle_) {
-		isCursorVisible_ = !isCursorVisible_;
+	if (isPrep) {
+		bool currentCursorToggle = (GetAsyncKeyState(VK_LMENU) & 0x8000) != 0;
+		if (currentCursorToggle && !prevCursorToggle_) {
+			isCursorVisible_ = !isCursorVisible_;
+			if (isCursorVisible_) {
+				while (ShowCursor(TRUE) < 0);
+			} else {
+				while (ShowCursor(FALSE) >= 0);
+			}
+		}
+		prevCursorToggle_ = currentCursorToggle;
+	} else {
+		// 準備フェーズ以外は強制的に非表示
 		if (isCursorVisible_) {
-			while (ShowCursor(TRUE) < 0);
-		} else {
+			isCursorVisible_ = false;
 			while (ShowCursor(FALSE) >= 0);
 		}
+		prevCursorToggle_ = false;
 	}
-	prevCursorToggle_ = currentCursorToggle;
 
 	// ★追加: カーソル非表示時は画面中心に固定
 	if (!isCursorVisible_) {
@@ -357,7 +381,6 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			POINT current;
 			if (GetCursorPos(&current)) {
 				// 画面中心からずれている場合のみSetCursorPosを呼ぶ
-				// (毎フレーム呼ぶとWindows11のDWMによってWaitGPUが激増しFPSが低下するため)
 				if (current.x != center.x || current.y != center.y) {
 					SetCursorPos(center.x, center.y);
 				}
@@ -366,8 +389,6 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 	
 	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
-
-	bool isPrep = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase);
 
 	if (!isPrep) {
 		// ★追加: スチーム・ブースト（剣士モード専用の高速回避）

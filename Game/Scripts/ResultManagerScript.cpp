@@ -4,11 +4,15 @@
 #include "../../Engine/Input.h"
 #include "../../Engine/Renderer.h"
 #include "../../Engine/WindowDX.h"
+#include <Windows.h>
 
 namespace Game {
 
 void ResultManagerScript::Start(entt::entity entity, GameScene* scene) {
 	if (!scene) return;
+
+	// ★追加: リザルト画面ではUI操作のためにカーソルを強制表示
+	while (ShowCursor(TRUE) < 0);
 
 	// SceneParametersからデータを取得
 	// パラメータはVariableComponent経由でやり取りする
@@ -19,6 +23,11 @@ void ResultManagerScript::Start(entt::entity entity, GameScene* scene) {
 		score_ = static_cast<int>(vars.GetValue("score", 0.0f));
 		clearTime_ = vars.GetValue("clearTime", 0.0f);
 	}
+
+	// static変数からの引き継ぎを優先する（設定されている場合）
+	isWin_ = pendingIsWin;
+	originalScene_ = pendingOriginalScene;
+
 
 	// UIが存在するかチェック
 	auto toTitle = scene->FindObjectByName("ToTitleButton");
@@ -53,6 +62,12 @@ void ResultManagerScript::Update(entt::entity entity, GameScene* scene, float dt
 					Engine::SceneParameters p;
 					p.sceneName = "Title";
 					Engine::SceneManager::GetInstance()->RequestChange("Title", p);
+					return;
+				} else if (name == "ToRetryButton") {
+					Engine::SceneParameters p;
+					p.stagePath = "Resources/Scenes/tesuto_light.json";
+					p.sceneName = "Game";
+					Engine::SceneManager::GetInstance()->RequestChange("Game", p);
 					return;
 				}
 			}
@@ -122,8 +137,8 @@ void ResultManagerScript::CreateFallbackUI(GameScene* scene, bool isWin, int sco
 	auto toTitle = reg.create();
 	reg.emplace<NameComponent>(toTitle, "ToTitleButton");
 	auto& rectBtn = reg.emplace<RectTransformComponent>(toTitle);
-	rectBtn.pos = {0, 300};
-	rectBtn.size = {350, 80};
+	rectBtn.pos = {200, 300}; // 位置をずらす
+	rectBtn.size = {300, 80};
 	rectBtn.anchor = {0.5f, 0.5f};
 	rectBtn.pivot = {0.5f, 0.5f};
 	auto& uiBtnTit = reg.emplace<UIButtonComponent>(toTitle);
@@ -133,6 +148,22 @@ void ResultManagerScript::CreateFallbackUI(GameScene* scene, bool isWin, int sco
 	auto& imgTit = reg.emplace<UIImageComponent>(toTitle);
 	if (renderer) imgTit.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 	reg.emplace<UITextComponent>(toTitle).text = "RETURN TITLE";
+
+	// リトライボタン
+	auto toRetry = reg.create();
+	reg.emplace<NameComponent>(toRetry, "ToRetryButton");
+	auto& rectRetry = reg.emplace<RectTransformComponent>(toRetry);
+	rectRetry.pos = {-200, 300}; // 左側に配置
+	rectRetry.size = {300, 80};
+	rectRetry.anchor = {0.5f, 0.5f};
+	rectRetry.pivot = {0.5f, 0.5f};
+	auto& uiBtnRetry = reg.emplace<UIButtonComponent>(toRetry);
+	uiBtnRetry.normalColor = {0.35f, 0.35f, 0.35f, 1.0f};
+	uiBtnRetry.hoverColor = {0.55f, 0.55f, 0.55f, 1.0f};
+	uiBtnRetry.pressedColor = {0.2f, 0.2f, 0.2f, 1.0f};
+	auto& imgRetry = reg.emplace<UIImageComponent>(toRetry);
+	if (renderer) imgRetry.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+	reg.emplace<UITextComponent>(toRetry).text = "RETRY";
 }
 
 REGISTER_SCRIPT(ResultManagerScript)
