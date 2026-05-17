@@ -22,6 +22,8 @@
 #include "InstallationManager.h"
 
 #include "WaveManagement.h"
+#include "ResultManagerScript.h"
+#include "../../Engine/SceneManager.h"
 #include "../../Engine/ThirdParty/nlohmann/json.hpp"
 
 using json = nlohmann::json;
@@ -656,6 +658,57 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	else {
 		if (installationCostUI_ != entt::null && scene->GetRegistry().valid(installationCostUI_)) {
 			scene->GetRegistry().get<RectTransformComponent>(installationCostUI_).enabled = false;
+		}
+	}
+
+	// ★ ゲームオーバー / リザルトへの遷移チェック
+	if (isPhase_ == BattlePhase && scene->IsPlaying()) {
+		// コア破壊判定
+		bool isCoreDead = false;
+		
+		// 1. 名前で検索
+		auto coreByName = scene->FindObjectByName("Core");
+		if (scene->GetRegistry().valid(coreByName)) {
+			if (auto* hc = scene->GetRegistry().try_get<HealthComponent>(coreByName)) {
+				if (hc->hp <= 0.0f || hc->isDead) {
+					isCoreDead = true;
+				}
+			}
+		}
+
+		// 2. タグで検索 (保険)
+		if (!isCoreDead) {
+			const auto& cores = scene->GetEntitiesByTag(TagType::Core);
+			for (auto c : cores) {
+				if (scene->GetRegistry().valid(c)) {
+					if (auto* hc = scene->GetRegistry().try_get<HealthComponent>(c)) {
+						if (hc->hp <= 0.0f || hc->isDead) {
+							isCoreDead = true;
+							break;
+						}
+					}
+				}
+			}
+		}
+
+		if (isCoreDead) {
+			ResultManagerScript::pendingIsWin = false;
+			ResultManagerScript::pendingOriginalScene = "tesuto_light"; 
+			Engine::SceneParameters p;
+			p.sceneName = "Result";
+			Engine::SceneManager::GetInstance()->RequestChange("Result", p);
+			
+			isPhaseTransitioning_ = true;
+			isPhase_ = Transition;
+		} else if (WaveManagement::IsWaveEnded()) {
+			ResultManagerScript::pendingIsWin = true;
+			ResultManagerScript::pendingOriginalScene = "tesuto_light";
+			Engine::SceneParameters p;
+			p.sceneName = "Result";
+			Engine::SceneManager::GetInstance()->RequestChange("Result", p);
+			
+			isPhaseTransitioning_ = true;
+			isPhase_ = Transition;
 		}
 	}
 

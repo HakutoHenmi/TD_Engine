@@ -4,12 +4,16 @@
 #include "../../Engine/Input.h"
 #include "../../Engine/Renderer.h"
 #include "../../Engine/WindowDX.h"
+#include <Windows.h>
 
 namespace Game {
 
 void SelectManagerScript::Start(entt::entity entity, GameScene* scene) {
 	(void)entity;
 	if (!scene) return;
+
+	// ★追加: セレクト画面ではUI操作のためにカーソルを強制表示
+	while (ShowCursor(TRUE) < 0);
 
 	// ステージリスト
 	stages_.clear();

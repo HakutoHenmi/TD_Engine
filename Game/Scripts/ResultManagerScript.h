@@ -20,10 +20,15 @@ public:
 private:
 	bool uiInitialized_ = false;
 
-	// SceneParametersから渡される情報
+	// SceneParametersから渡される情報（あるいはstatic変数から）
 	bool isWin_ = false;
 	int score_ = 0;
 	float clearTime_ = 0.0f;
+	std::string originalScene_ = "tesuto_light";
+
+public:
+	static inline bool pendingIsWin = false;
+	static inline std::string pendingOriginalScene = "tesuto_light";
 };
 
 } // namespace Game
