@@ -131,7 +131,15 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 			auto& mr = scene->GetRegistry().emplace<MeshRendererComponent>(enemy);
 			mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
 			mr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-			mr.color = (enemyType == 42) ? DirectX::XMFLOAT4{1.0f, 0.2f, 0.2f, 1.0f} : DirectX::XMFLOAT4{1.0f, 0.4f, 0.2f, 1.0f};
+			DirectX::XMFLOAT4 enemyColor = { 1.0f, 0.4f, 0.2f, 1.0f };
+			if (enemyScriptPath == "Warrior") {
+				enemyColor = {0.2f, 0.2f, 1.0f, 1.0f}; // Blue
+			} else if (enemyScriptPath == "Guardian") {
+				enemyColor = {1.0f, 0.2f, 0.2f, 1.0f}; // Red
+			} else if (enemyScriptPath == "Gunner") {
+				enemyColor = { 0.2f, 1.0f, 0.2f, 1.0f }; // Green
+			}
+			mr.color = enemyColor;
 			mr.shaderName = "Default";
 			mr.enabled = true; // ★パフォーマンステストのため一時的に敵の描画を完全に無効化 を戻した
 		}
