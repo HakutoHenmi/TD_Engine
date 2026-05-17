@@ -100,8 +100,8 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	camera_.SetRotation(0.2f, 0, 0);
 	renderer_->SetAmbientColor({0.4f, 0.4f, 0.45f});
 	
-	// ★追加: ゲームシーンではデフォルトでRichポストプロセスを有効にして高品質な描画を行う
-	renderer_->SetPostEffect("Rich");
+	// ★追加: デフォルトで絵画風（Painterly）ポストプロセスを有効にする
+	renderer_->SetPostEffect("Painterly");
 	renderer_->SetPostProcessEnabled(true);
 	bool loaded = false;
 	// ★変更: シーン名に応じてロードするJSONパスを決定
@@ -367,7 +367,7 @@ void GameScene::Update() {
 	if (!renderer_) return;
 
 	// ★パフォーマンス検証: ポストプロセスを強制的に無効化
-	renderer_->SetPostProcessEnabled(false);
+	// renderer_->SetPostProcessEnabled(false);
 
 	// ★追加: プロファイラー フレーム開始
 	profiler_.BeginFrame(std::chrono::duration<float>(std::chrono::steady_clock::now() - std::chrono::steady_clock::now()).count());
@@ -429,10 +429,17 @@ void GameScene::Update() {
 			pauseMenuState_ = PauseMenuState::Main;
 			for (auto e : pauseMainEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = true;
 			for (auto e : pauseSettingsEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+			
+			// ★追加: ポーズ開始時は確実にマウスカーソルを表示する
+			while (ShowCursor(TRUE) < 0);
 		} else {
 			// ポーズ解除: 全メニュー非表示
 			for (auto e : pauseMainEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
 			for (auto e : pauseSettingsEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+			
+			// ★追加: ポーズ解除時は、自動的にPlayerScriptがカーソルを制御するため、
+			// ここで一度カーソルを非表示にして同期を取る（非戦闘時はPlayerScriptで再表示される）
+			while (ShowCursor(FALSE) >= 0);
 		}
 	}
 
@@ -1854,6 +1861,9 @@ void GameScene::UpdatePauseMenu() {
 				isPaused_ = false;
 				for (auto e : pauseMainEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
 				for (auto e : pauseSettingsEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+				
+				// ★追加: ボタンから解除した時も確実にカーソルを非表示にする
+				while (ShowCursor(FALSE) >= 0);
 			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnSettings_).isHovered) {
 				// 設定画面へ
 				pauseMenuState_ = PauseMenuState::Settings;
