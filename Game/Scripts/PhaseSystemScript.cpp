@@ -549,7 +549,6 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 	UpdatePhaseTransition();
 
-	// フェーズが切り替わった瞬間の検知
 	if (isPhase_ != preIsPhase_) {
 		auto& nav = scene->GetNavigationManager();
 
@@ -569,9 +568,16 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			// 敵のスポーン地点の生成
 			currentPhase_++;
 			WaveManagement::SetWave(currentPhase_ - 1);
+
+			// 戦闘中は絵画風エフェクトをオンにする
+			Engine::Renderer::GetInstance()->SetPostEffect("Painterly");
+
 		} else if (isPhase_ == PreparationPhase) {
 			// 準備フェーズに戻った場合はウェーブを待機状態（スポナー無し）にする
 			WaveManagement::SetWave(-1);
+
+			// 準備フェーズも絵画風にする（DOFピンボケ付き）
+			Engine::Renderer::GetInstance()->SetPostEffect("Painterly");
 		}
 
 		// 状態を同期

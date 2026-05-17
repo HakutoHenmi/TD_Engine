@@ -270,6 +270,8 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	// ★追加: ダメージ演出の更新
 	auto* renderer = scene->GetRenderer();
+	bool isPrep = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase);
+
 	if (damageEffectTimer_ > 0.0f) {
 		damageEffectTimer_ -= dt;
 		if (damageEffectTimer_ < 0.0f) damageEffectTimer_ = 0.0f;
@@ -288,14 +290,16 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			renderer->SetPostProcessEnabled(true);
 		}
 	} else {
-		// 演出終了時はパラメータをリセット
+		// 演出終了時はパラメータをリセットし、現在のフェーズに合わせたポストプロセスに戻す
 		if (renderer) {
 			auto params = renderer->GetPostProcessParams();
 			if (params.vignette > 0.0f || params.chromaShift > 0.0f) {
 				params.vignette = 0.0f;
 				params.chromaShift = 0.0f;
 				renderer->SetPostProcessParams(params);
-				// ★修正: 常時ブルーム等を表示するため、ポストプロセスの無効化は行わない
+				
+				// ダメージ終了の瞬間に元の絵画風ポストプロセスに戻す
+				renderer->SetPostEffect("Painterly");
 			}
 		}
 	}
@@ -303,17 +307,18 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	// ★追加: フェーズに応じて被写界深度(DOF)を切り替える
 	// 準備フェーズ(PreparationPhase)の時だけミニチュア風のピンボケ効果を有効化
 	if (renderer) {
-		// ゲームシーンでは常にRichポストプロセスを有効化する
-		renderer->SetPostEffect("Rich");
 		renderer->SetPostProcessEnabled(true);
 		
 		auto params = renderer->GetPostProcessParams();
-		bool isPrep = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase);
 		float targetDof = isPrep ? 0.3f : 0.0f; // ★Renderer.hに合わせた値
 		if (params.dofIntensity != targetDof) {
 			params.dofIntensity = targetDof;
 			renderer->SetPostProcessParams(params);
 		}
+		
+		// ★修正: 毎フレーム Rich で上書きするのではなく、ダメージを受けていない通常時は
+		// PhaseSystemScriptなどが設定したエフェクト（Painterly / Anime）を尊重するため、
+		// ここではSetPostEffectを呼ばないようにします。
 	}
 
 	// ★スキルバフ持続時間の管理
@@ -338,7 +343,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 	prevSkillKeyDown_ = currentSkillKeyDown;
 
-	bool isPrep = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase);
+	isPrep = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase);
 	static bool s_wasPrep = true;
 
 	if (isPrep && !s_wasPrep) {

@@ -3295,6 +3295,19 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 			}
 		}
 
+		// ★追加: Painterly PostProcess パイプライン
+		auto psPainterly = CompileShaderFromFile(L"Resources/shaders/PainterlyPost.hlsl", "main", "ps_5_0");
+		if (!psPainterly) {
+			psPainterly = psAnime;
+		}
+		if (psPainterly) {
+			pso.PS = { psPainterly->GetBufferPointer(), psPainterly->GetBufferSize() };
+			Microsoft::WRL::ComPtr<ID3D12PipelineState> psoPainterly;
+			if (SUCCEEDED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoPainterly)))) {
+				pipelines_["Painterly"] = psoPainterly;
+			}
+		}
+
 		// ★全初期化の最後に、現在の psoPP_ をデフォルトとして保存する
 		// これにより、SetPostEffect("") でいつでも初期状態（CRTなど）に戻せるようになる
 		pipelines_["Default"] = psoPP_;
@@ -3824,6 +3837,7 @@ void Renderer::SetPostEffect(const std::string& name) {
 	if (name == "Anime") req = "Anime";
 	else if (name == "Rich") req = "Rich";
 	else if (name == "Default") req = "Default";
+	else if (name == "Painterly") req = "Painterly";
 	else if (name == "") req = "";
 	else return; // 未知の名前は無視（安全性のため）
 
