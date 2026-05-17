@@ -71,7 +71,7 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 		}
 	}
 
-	if (renderer && isEditorMode) {
+	if (renderer && (isEditorMode || isPrepOrBattle)) {
 		for (size_t wi = 0; wi < enemySpawners_.size(); ++wi) {
 			// ゲームプレイ中は現在の（次に来る）ウェーブのものだけ表示する
 			if (!isEditorMode) {
@@ -113,21 +113,17 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 						float pitch = std::atan2(-d.y, std::sqrt(d.x * d.x + d.z * d.z));
 
 						Engine::Vector4 planeColor = {1.0f, 1.0f, 1.0f, 1.0f};
-						Engine::Vector4 lineColor = { 1.0f, 0.5f, 0.0f, 1.0f };
 						
 						if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(spawnerEntity)) {
 							for (auto& entry : sc->scripts) {
 								if (entry.scriptPath == "EnemySpawnerScript" && entry.instance) {
 									auto* spawner = static_cast<EnemySpawnerScript*>(entry.instance.get());
 									if (spawner->enemyScriptPath == "Warrior") {
-										planeColor = {1.0f, 0.0f, 0.0f, 1.0f}; // 赤
-										lineColor = {1.0f, 0.0f, 0.0f, 1.0f};
+										whiteTexHandle = renderer->LoadTexture2D("Resources/Textures/EnemyLogo/Warriar.png");
 									} else if (spawner->enemyScriptPath == "Guardian") {
-										planeColor = {1.0f, 1.0f, 0.0f, 1.0f}; // 黄色
-										lineColor = {1.0f, 1.0f, 0.0f, 1.0f};
+										whiteTexHandle = renderer->LoadTexture2D("Resources/Textures/EnemyLogo/Guardian.png");
 									} else if (spawner->enemyScriptPath == "Gunner") {
-										planeColor = {0.0f, 0.0f, 1.0f, 1.0f}; // 青
-										lineColor = {0.0f, 0.0f, 1.0f, 1.0f};
+										whiteTexHandle = renderer->LoadTexture2D("Resources/Textures/EnemyLogo/Gunner.png");
 									}
 								}
 							}
@@ -138,34 +134,11 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 						planeTr.rotate = { pitch, yaw, 0.0f };
 						planeTr.scale = { tc->scale.x, tc->scale.y, tc->scale.z }; // 必要に応じてスケール反映
 						planeTr.scale = {2, 2, 2};
-						renderer->DrawMesh(planeMeshHandle, whiteTexHandle, planeTr, planeColor, "Default");
+						renderer->DrawMesh(planeMeshHandle, whiteTexHandle, planeTr, planeColor, "Toon");
 
-						float s = 0.5f;
-						Engine::Vector4 c = lineColor;
-						// 底面
-						renderer->DrawLine3D({p.x - s, p.y - s, p.z - s}, {p.x + s, p.y - s, p.z - s}, c, true);
-						renderer->DrawLine3D({p.x + s, p.y - s, p.z - s}, {p.x + s, p.y - s, p.z + s}, c, true);
-						renderer->DrawLine3D({p.x + s, p.y - s, p.z + s}, {p.x - s, p.y - s, p.z + s}, c, true);
-						renderer->DrawLine3D({p.x - s, p.y - s, p.z + s}, {p.x - s, p.y - s, p.z - s}, c, true);
-						// 上面
-						renderer->DrawLine3D({p.x - s, p.y + s, p.z - s}, {p.x + s, p.y + s, p.z - s}, c, true);
-						renderer->DrawLine3D({p.x + s, p.y + s, p.z - s}, {p.x + s, p.y + s, p.z + s}, c, true);
-						renderer->DrawLine3D({p.x + s, p.y + s, p.z + s}, {p.x - s, p.y + s, p.z + s}, c, true);
-						renderer->DrawLine3D({p.x - s, p.y + s, p.z + s}, {p.x - s, p.y + s, p.z - s}, c, true);
-						// 側面
-						renderer->DrawLine3D({p.x - s, p.y - s, p.z - s}, {p.x - s, p.y + s, p.z - s}, c, true);
-						renderer->DrawLine3D({p.x + s, p.y - s, p.z - s}, {p.x + s, p.y + s, p.z - s}, c, true);
-						renderer->DrawLine3D({p.x + s, p.y - s, p.z + s}, {p.x + s, p.y + s, p.z + s}, c, true);
-						renderer->DrawLine3D({p.x - s, p.y - s, p.z + s}, {p.x - s, p.y + s, p.z + s}, c, true);
 
-						// EnemySpawnerScript の詳細なプレビューも描画する
-						if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(spawnerEntity)) {
-							for (auto& entry : sc->scripts) {
-								if (entry.scriptPath == "EnemySpawnerScript" && entry.instance) {
-									static_cast<EnemySpawnerScript*>(entry.instance.get())->DrawSpawnPreview({p.x, p.y, p.z});
-								}
-							}
-						}
+
+
 					}
 				}
 			}
