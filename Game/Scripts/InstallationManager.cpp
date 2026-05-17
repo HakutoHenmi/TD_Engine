@@ -27,32 +27,32 @@ InstallationManager::InstallationManager() {
 	// ★ここでパスを直接設定してください（ImGuiでの入力によるクラッシュを回避）
 	prefabPaths_[0] = "Resources/Prefabs/BulletTank.prefab";
 	texPaths_[0] = "Resources/Textures/Button/TankButton.png";
-	buttons_[0].name = "Tank";
+	buttons_[0].name = "TankButton";
 	buttons_[0].cost = 100;
 
 	prefabPaths_[1] = "Resources/Prefabs/Pipe.prefab";
 	texPaths_[1] = "Resources/Textures/Button/PipeButton.png";
-	buttons_[1].name = "Pipe";
+	buttons_[1].name = "PipeButton";
 	buttons_[1].cost = 5;
 
 	prefabPaths_[2] = "Resources/Prefabs/Canon.prefab";
 	texPaths_[2] = "Resources/Textures/Button/CannonButton.png";
-	buttons_[2].name = "Canon";
+	buttons_[2].name = "CannonButton";
 	buttons_[2].cost = 150;
 
 	prefabPaths_[3] = "Resources/Prefabs/Missile.prefab";
 	texPaths_[3] = "Resources/Textures/Button/MissileButton.png";
-	buttons_[3].name = "Missile";
+	buttons_[3].name = "MissikeButton";
 	buttons_[3].cost = 200;
 
 	prefabPaths_[4] = "Resources/Prefabs/Poison.prefab";
 	texPaths_[4] = "Resources/Textures/Button/PisonTrapButton.png";
-	buttons_[4].name = "Poison";
+	buttons_[4].name = "PoisonTrapButton";
 	buttons_[4].cost = 120;
 
 	prefabPaths_[5] = "Resources/Prefabs/IceCanon.prefab";
 	texPaths_[5] = "Resources/Textures/Button/IceCannonButton.png";
-	buttons_[5].name = "IceCanon";
+	buttons_[5].name = "IceCannonButton";
 	buttons_[5].cost = 250;
 }
 
@@ -101,8 +101,6 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 
 	for (int i = 0; i < 6; ++i) {
 		auto& btn = buttons_[i];
-		int page = i / 3;
-		int localIdx = i % 3;
 
 		// パスの同期（コードで設定した変数から反映）
 		btn.texturePath = texPaths_[i];
@@ -113,10 +111,10 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 			if (!registry.valid(btn.entity)) continue;
 		}
 
-		// サイズと位置の自動設定
-		btn.size = { 250.0f, 250.0f };
-		btn.pos.x = 760.0f + (-100.0f + localIdx * btn.size.x);
-		btn.pos.y = 800.0f;
+		// サイズと位置の自動設定（6ボタンを画面下部に綺麗に横並びにする）
+		btn.size = { 180.0f, 180.0f };
+		btn.pos.x = (i - 2.5f) * 210.0f;
+		btn.pos.y = 400.0f;
 
 		// 状態の更新
 		if (registry.all_of<UIButtonComponent>(btn.entity)) {
@@ -139,13 +137,12 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 			auto& rect = registry.get<RectTransformComponent>(btn.entity);
 			rect.pos = btn.pos;
 			rect.size = btn.size;
-			rect.anchor = { 0.0f, 0.0f };
-			rect.pivot = { 0.0f, 0.0f };
+			rect.anchor = { 0.5f, 0.5f };
+			rect.pivot = { 0.5f, 0.5f };
 		}
 
-		// ページとフェーズに応じた表示・非表示の管理
-		bool isCurrentPage = (page == currentPage_);
-		bool enabled = isCurrentPage && ((!scene->IsPlaying()) || (currentPhase == PhaseSystemScript::PreparationPhase));
+		// フェーズに応じた表示・非表示の管理（ページ制限を廃止）
+		bool enabled = ((!scene->IsPlaying()) || (currentPhase == PhaseSystemScript::PreparationPhase));
 
 		if (registry.all_of<UIImageComponent>(btn.entity))
 			registry.get<UIImageComponent>(btn.entity).enabled = enabled;
