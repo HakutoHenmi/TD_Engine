@@ -290,8 +290,8 @@ struct CharacterMovementComponent : public Component {
 
 // ★追加: カメラ追従対象 (属性)
 struct CameraTargetComponent : public Component {
-	float distance = 10.0f;
-	float height = 3.0f;
+	float distance = 15.0f; // 初期距離を10.0fから15.0fに少し遠ざけ、上に上げる
+	float height = 4.5f;    // 初期高さを3.0fから4.5fに少し上げて、上からの俯瞰を強める
 	float smoothSpeed = 5.0f;
 	entt::entity lockedTarget = entt::null; // ★追加: ターゲットロック用
 	CameraTargetComponent() { type = ComponentType::CameraTarget; }

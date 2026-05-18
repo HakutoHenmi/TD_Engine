@@ -20,7 +20,7 @@ public:
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
 
 private:
-	float speed_ = 7.0f;
+	float speed_ = 7.0f; // ★復元: 5.0f -> 7.0f (快適な機動力へ)
 	float jumpPower_ = 8.0f;
 
 	// 攻撃関連

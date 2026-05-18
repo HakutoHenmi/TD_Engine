@@ -142,7 +142,7 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 	}
 
 	auto& sHb = scene->GetRegistry().get_or_emplace<HitboxComponent>(sword);
-	sHb.damage = 110.0f;
+	sHb.damage = 35.0f; // ★弱体化: 110.0f -> 35.0f (ワンパン防止)
 	sHb.tag = TagType::Sword;
 	sHb.size = { 6.0f, 4.0f, 2.5f };
 	sHb.center = { 0.0f, 0.0f, 1.2f };
@@ -479,9 +479,46 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		// ★追加: 物理・反動移動の更新 (全モード共通)
 		float recoilLenSq = recoilVelocity_.x * recoilVelocity_.x + recoilVelocity_.y * recoilVelocity_.y + recoilVelocity_.z * recoilVelocity_.z;
 		if (recoilLenSq > 0.001f) {
-			pTc.translate.x += recoilVelocity_.x * dt;
+			float moveX = recoilVelocity_.x * dt;
+			float moveZ = recoilVelocity_.z * dt;
+			float moveDist = std::sqrt(moveX * moveX + moveZ * moveZ);
+
+			if (moveDist > 0.001f) {
+				Engine::Vector3 rayOrig = {pTc.translate.x, pTc.translate.y + 0.5f, pTc.translate.z};
+				Engine::Vector3 rayDir = {moveX / moveDist, 0.0f, moveZ / moveDist};
+				
+				// 1フレームの移動距離 + キャラクター半径マージン (0.5m)
+				float checkDist = moveDist + 0.5f;
+				float hitDist = 0.0f;
+				
+				// ダッシュ経路上に見えない壁（コライダー）があるか検出
+				if (scene->RayCast(rayOrig, rayDir, checkDist, static_cast<uint32_t>(entity), hitDist)) {
+					// コライダーの手前で安全に停止させる
+					float safeDist = std::max(0.0f, hitDist - 0.5f);
+					pTc.translate.x += rayDir.x * safeDist;
+					pTc.translate.z += rayDir.z * safeDist;
+					
+					// 反動速度を完全にゼロにして停止
+					recoilVelocity_.x = 0.0f;
+					recoilVelocity_.z = 0.0f;
+				} else {
+					// 障害物がなければ通常通り移動
+					pTc.translate.x += moveX;
+					pTc.translate.z += moveZ;
+				}
+			}
+
+			// ★フェイルセーフ: 地面が存在しない虚無ゾーンへの進入を防ぐ
+			float nextGround = scene->GetHeightAt(pTc.translate.x, pTc.translate.z, pTc.translate.y + 1.0f);
+			if (nextGround <= -5000.0f) {
+				// 移動を取り消して元の位置で留まらせる
+				pTc.translate.x -= moveX;
+				pTc.translate.z -= moveZ;
+				recoilVelocity_.x = 0.0f;
+				recoilVelocity_.z = 0.0f;
+			}
+
 			pTc.translate.y += recoilVelocity_.y * dt; // ★高さ移動
-			pTc.translate.z += recoilVelocity_.z * dt;
 
 			// 減衰 (XZのみ): 慣性を持たせるため少し緩める (0.02 -> 0.4)
 			float damping = std::pow(0.4f, dt);
@@ -774,7 +811,7 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 						aTc.translate = iTc.translate;
 						auto& aHb = scene->GetRegistry().emplace<HitboxComponent>(aoe);
 						aHb.isActive = true;
-						aHb.damage = 250.0f; // 溜め攻撃の超ダメージ
+						aHb.damage = 80.0f; // ★弱体化: 250.0f -> 80.0f (範囲強攻撃としてのバランス調整)
 						aHb.size = { 18.0f, 5.0f, 18.0f };
 						aHb.tag = TagType::Sword;
 						scene->DestroyObject((uint32_t)aoe);
@@ -997,7 +1034,7 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 }
 
 void PlayerScript::ShootChargeShot(entt::entity entity, GameScene* scene) {
-	float baseDamage = 45.0f;
+	float baseDamage = 45.0f; // ★復元: 22.0f -> 45.0f
 	float chargeMul = chargeTime_ / CHARGE_TIME_MAX;
 	float damage = baseDamage * (0.5f + chargeMul * 0.5f);
 	if (isSkillActive_) damage *= SKILL_DAMAGE_MULTIPLIER;
@@ -1205,7 +1242,7 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 }
 
 void PlayerScript::ShootGun(entt::entity entity, GameScene* scene) {
-	float baseDamage = 15.0f;
+	float baseDamage = 15.0f; // ★復元: 8.0f -> 15.0f
 	float damage = isSkillActive_ ? baseDamage * SKILL_DAMAGE_MULTIPLIER : baseDamage;
 	SpawnBullet(entity, scene, 0.0f, 0.0f, damage, 2.0f, isSkillActive_, false);
 
@@ -1465,7 +1502,7 @@ void PlayerScript::ExecuteSkill(entt::entity entity, GameScene* scene) {
 
 		auto& hb = scene->GetRegistry().emplace<HitboxComponent>(wave);
 		hb.isActive = true;
-		hb.damage = 150.0f; // 大ダメージ
+		hb.damage = 60.0f; // ★弱体化: 150.0f -> 60.0f (次元斬スキル用)
 		hb.tag = TagType::PlayerSword; // ★プレイヤーの剣攻撃として判定
 		hb.size = { 12.0f, 1.0f, 2.0f };
 
