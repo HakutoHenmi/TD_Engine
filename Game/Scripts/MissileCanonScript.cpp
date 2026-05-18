@@ -111,7 +111,23 @@ static void CollectConnectedCanons(
 	}
 }
 
-void MissileCanonScript::Start(entt::entity /*entity*/, GameScene* /*scene*/) { attackTimer_ = 0.0f; }
+void MissileCanonScript::Start(entt::entity entity, GameScene* scene) {
+	attackTimer_ = 0.0f;
+	auto& registry = scene->GetRegistry();
+	
+	if (!registry.all_of<HealthComponent>(entity)) {
+		auto& hc = registry.emplace<HealthComponent>(entity);
+		hc.hp = 100.0f;
+		hc.maxHp = 100.0f;
+	}
+	if (!registry.all_of<HurtboxComponent>(entity)) {
+		auto& hurtbox = registry.emplace<HurtboxComponent>(entity);
+		hurtbox.size = {2.0f, 2.0f, 2.0f};
+	}
+	if (!registry.all_of<WorldSpaceUIComponent>(entity)) {
+		registry.emplace<WorldSpaceUIComponent>(entity);
+	}
+}
 
 void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (!scene) {

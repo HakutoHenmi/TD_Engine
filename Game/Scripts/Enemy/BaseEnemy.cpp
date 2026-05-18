@@ -281,15 +281,10 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float dt) {
 					rb.velocity.y = 0.0f;      // 重力を打ち消して接地面で止める
 				}
 			}
-		}
-		 else {
-			// 飛行タイプ（y軸はふわふわさせる）
+		} else if (type_ == Fly) {
+			// 飛行タイプ
 			rb.velocity.x = vx;
 			rb.velocity.z = vz;
-
-			//float floatHeight = 5.0f; // 地面から5m上を飛ぶ
-			//float targetY = groundHeight_ + floatHeight + std::sin(scene->GetContext(). * 2.0f) * 0.5f;
-			//tc.translate.y += (targetY - tc.translate.y) * 2.0f * dt;
 		}
 
 		// 4. 進んでいる方向を向く
@@ -352,14 +347,21 @@ void BaseEnemy::SearchTarget(entt::entity entity, GameScene* scene) {
 		}
 	}
 
-	// 防衛設備（Defender）を探す(プレイヤーより近ければターゲットを上書き)
-	const auto& defenders = scene->GetEntitiesByTag(TagType::Defender);
-	for (auto d : defenders) {
-		auto& t = registry.get<TransformComponent>(d);
-		float distSq = (t.translate.x - myTc.translate.x) * (t.translate.x - myTc.translate.x) + (t.translate.z - myTc.translate.z) * (t.translate.z - myTc.translate.z);
-		if (distSq < minDistanceSq) {
-			minDistanceSq = distSq;
-			bestTarget = d;
+	// 防衛設備（DefenderやCanonなど）を探す(プレイヤーより近ければターゲットを上書き)
+	TagType towerTags[] = { TagType::Defender, TagType::Canon, TagType::Cannon, TagType::IceCanon, TagType::PipeCannon };
+	for (int i = 0; i < 5; ++i) {
+		const auto& towers = scene->GetEntitiesByTag(towerTags[i]);
+		for (auto d : towers) {
+			if (!registry.valid(d) || !registry.all_of<TransformComponent>(d)) continue;
+			
+			auto& t = registry.get<TransformComponent>(d);
+			float distSq = (t.translate.x - myTc.translate.x) * (t.translate.x - myTc.translate.x) + 
+			               (t.translate.z - myTc.translate.z) * (t.translate.z - myTc.translate.z);
+			
+			if (distSq < minDistanceSq) {
+				minDistanceSq = distSq;
+				bestTarget = d;
+			}
 		}
 	}
 
