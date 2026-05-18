@@ -22,11 +22,20 @@ void BulletScript::Start(entt::entity entity, GameScene* scene) {
 
 	if (hasTargetValue > 0.5f) {
 		float targetEntityValue = GetVar(entity, scene, "TargetEntity", -1.0f);
-
 		if (targetEntityValue >= 0.0f) {
+			// 旧方式
 			uint32_t targetEntityId = static_cast<uint32_t>(targetEntityValue);
 			target_ = static_cast<entt::entity>(targetEntityId);
 			hasTarget_ = true;
+		} else {
+			// 新方式 (High/Low分割による精度欠落回避)
+			float high = GetVar(entity, scene, "TargetHigh", -1.0f);
+			float low = GetVar(entity, scene, "TargetLow", -1.0f);
+			if (high >= 0.0f && low >= 0.0f) {
+				uint32_t targetId = (static_cast<uint32_t>(high) << 16) | static_cast<uint32_t>(low);
+				target_ = static_cast<entt::entity>(targetId);
+				hasTarget_ = true;
+			}
 		}
 	}
 }
