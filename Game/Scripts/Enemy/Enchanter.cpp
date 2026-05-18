@@ -52,6 +52,14 @@ void Enchanter::Update(entt::entity entity, GameScene* scene, float dt) {
 					// 回復した合図として少しだけ光らせる
 					hc.hitFlashTimer = 0.2f;
 				}
+
+				// 2. 移動速度アップ処理 (1.5倍の速度を3.5秒間持続させる)
+				if (!registry.all_of<VariableComponent>(target)) {
+					registry.emplace<VariableComponent>(target);
+				}
+				auto& vc = registry.get<VariableComponent>(target);
+				vc.SetValue("SpeedBuffMultiplier", 1.5f);
+				vc.SetValue("SpeedBuffTimer", 3.5f); // バフをかける間隔(3.0秒)より少し長めにして途切れないようにする
 			}
 		}
 	}
