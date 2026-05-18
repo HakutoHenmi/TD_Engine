@@ -259,10 +259,19 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float dt) {
 	// 3. 物理コンポーネントがあるかチェック
 	if (registry.all_of<RigidbodyComponent>(entity)) {
 		auto& rb = registry.get<RigidbodyComponent>(entity);
-
+		// ★追加: バフによる移動速度の計算
+		float currentSpeed = speed_;
+		if (registry.all_of<VariableComponent>(entity)) {
+			auto& vc = registry.get<VariableComponent>(entity);
+			float buffTimer = vc.GetValue("SpeedBuffTimer", 0.0f);
+			if (buffTimer > 0.0f) {
+				currentSpeed = speed_ * vc.GetValue("SpeedBuffMultiplier", 1.0f);
+				vc.SetValue("SpeedBuffTimer", buffTimer - dt); // タイマーを減らす
+			}
+		}
 		// 移動速度を計算
-		float vx = dirX * speed_;
-		float vz = dirZ * speed_;
+		float vx = dirX * currentSpeed;
+		float vz = dirZ * currentSpeed;
 
 		if (type_ == Walk) {
 			// 地面を歩くタイプ
