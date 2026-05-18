@@ -12,6 +12,7 @@ namespace Game {
 		hp_ = 100.0f;
 		maxHp_ = 100.0f;
 		attackCooltime_ = kCooltime;	
+		SetCategory(entity, scene, Tank);
 	}
 
 	void Game::Warrior::ExecuteAttack(entt::entity entity, GameScene* scene, float /*dt*/) {

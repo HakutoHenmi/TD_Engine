@@ -120,10 +120,12 @@ void BaseEnemy::OnEditorUI() {
 		type_ = static_cast<MoveType>(typeNum);
 	}
 	ImGui::DragFloat("Drop EXP", &expDrop_, 1.0f, 0.0f, 10000.0f);
+	ImGui::DragFloat("Caution Range", &cautionRange_, 1.0f, 0.0f, 200.0f);
+	ImGui::DragFloat("Max Wait Time", &maxWaitTime_, 0.1f, 0.0f, 10.0f);
 #endif
 }
 
-void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float /*dt*/) {
+void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float dt) {
 	auto& registry = scene->GetRegistry();
 	auto& tc = registry.get<TransformComponent>(entity);
 
@@ -150,6 +152,108 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float /*dt*/)
 
 		// 2. 自分の足元の「進むべき方向」をマネージャーに聞く
 		nav.GetDirection(tc.translate.x, tc.translate.z, dirX, dirZ);
+	}
+
+	// ★追加：アタッカーがタワー(Defender等)に近づいた時の待機処理
+	// ターゲットがタワーでなくても、進路上にタワーがあれば警戒する
+	if (category_ == Attacker) {
+		entt::entity nearestTower = entt::null;
+		float minTowerDistSq = 9999999.0f;
+		DirectX::XMFLOAT3 towerPos = {};
+		float nearestTowerAttackRange = 50.0f; // デフォルトの射程
+
+		TagType towerTags[] = { TagType::Defender, TagType::Canon, TagType::Cannon, TagType::IceCanon, TagType::PipeCannon };
+		for (int i = 0; i < 5; ++i) {
+			const auto& towers = scene->GetEntitiesByTag(towerTags[i]);
+			for (auto t : towers) {
+				if (!registry.valid(t) || !registry.all_of<TransformComponent>(t)) continue;
+				
+				float tAttackRange = cautionRange_; // デフォルトの警戒範囲
+				float rawAttackRange = 50.0f;       // デフォルトの射程
+				if (registry.all_of<VariableComponent>(t)) {
+					float ar = registry.get<VariableComponent>(t).GetValue("AttackRange", 0.0f);
+					if (ar > 0.0f) {
+						rawAttackRange = ar;
+						tAttackRange = ar + 25.0f; // 射程 + 25m を警戒範囲とする
+					}
+				}
+
+				auto& tTc = registry.get<TransformComponent>(t);
+				float dx = tTc.translate.x - tc.translate.x;
+				float dz = tTc.translate.z - tc.translate.z;
+				float distSq = dx * dx + dz * dz;
+				
+				// タワーの警戒範囲内であれば候補とする
+				if (distSq < tAttackRange * tAttackRange) {
+					if (distSq < minTowerDistSq) {
+						minTowerDistSq = distSq;
+						nearestTower = t;
+						towerPos = tTc.translate;
+						nearestTowerAttackRange = rawAttackRange;
+					}
+				}
+			}
+		}
+
+		// 警戒範囲内にタワーがあった場合
+		if (registry.valid(nearestTower)) {
+			float dist = std::sqrt(minTowerDistSq);
+			if (dist > attackRange_) {
+				// 自分よりタワーに近いタンクがいるかチェック
+				bool isTankAhead = false;
+				bool isTankComing = false;
+
+				const auto& enemies = scene->GetEntitiesByTag(TagType::Enemy);
+				for (auto e : enemies) {
+					if (e == entity) continue;
+					if (registry.all_of<VariableComponent>(e)) {
+						auto& vc = registry.get<VariableComponent>(e);
+						if (vc.GetValue("EnemyCategory") == (float)Tank) {
+							auto& tankTc = registry.get<TransformComponent>(e);
+							float tankDx = towerPos.x - tankTc.translate.x;
+							float tankDz = towerPos.z - tankTc.translate.z;
+							float tankDist = std::sqrt(tankDx * tankDx + tankDz * tankDz);
+							
+							// タンクが自分よりタワーに十分に近ければOK (例: 射程内に入っている、あるいは15m以上前にいる)
+							if (tankDist < nearestTowerAttackRange || tankDist < dist - 15.0f) {
+								isTankAhead = true;
+								break;
+							}
+							
+							// タンクがこのタワー周辺（警戒範囲より少し外まで）にいるなら諦めずに待つ
+							if (tankDist < nearestTowerAttackRange + 55.0f) {
+								isTankComing = true;
+							}
+						}
+					}
+				}
+
+				// タンクが前にいない場合、指定秒数だけ待機する
+				if (!isTankAhead) {
+					if (isTankComing) {
+						currentWaitTime_ = 0.0f; // タンクが来る予定なら待機時間をリセットし続ける
+						dirX = 0.0f;
+						dirZ = 0.0f;
+					} else {
+						if (currentWaitTime_ < maxWaitTime_) {
+							currentWaitTime_ += dt;
+							dirX = 0.0f;
+							dirZ = 0.0f;
+						}
+						// maxWaitTime_ を超えたら諦めて進む
+					}
+				} else {
+					// タンクが前に出たら待機時間をリセット（別のタワーに備える）
+					currentWaitTime_ = 0.0f;
+				}
+			} else {
+				// 攻撃範囲に入ったら待機時間をリセット
+				currentWaitTime_ = 0.0f;
+			}
+		} else {
+			// 警戒範囲内にタワーがなければリセット
+			currentWaitTime_ = 0.0f;
+		}
 	}
 
 	// 3. 物理コンポーネントがあるかチェック
@@ -182,16 +286,11 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float /*dt*/)
 					rb.velocity.y = 0.0f;      // 重力を打ち消して接地面で止める
 				}
 			}
+		} else if (type_ == Fly) {
+			// 飛行タイプ
+			rb.velocity.x = vx;
+			rb.velocity.z = vz;
 		}
-		// else {
-		//	// 飛行タイプ（y軸はふわふわさせる）
-		//	rb.velocity.x = vx;
-		//	rb.velocity.z = vz;
-
-		//	float floatHeight = 5.0f; // 地面から5m上を飛ぶ
-		//	float targetY = groundHeight_ + floatHeight + std::sin(scene->GetContext().playTime * 2.0f) * 0.5f;
-		//	tc.translate.y += (targetY - tc.translate.y) * 2.0f * dt;
-		//}
 
 		// 4. 進んでいる方向を向く
 		if (std::abs(vx) > 0.1f || std::abs(vz) > 0.1f) {
@@ -210,6 +309,8 @@ std::string BaseEnemy::SerializeParameters() {
 	j["moveType"] = (int)type_;
 	j["speed"] = speed_;
 	j["expDrop"] = expDrop_;
+	j["cautionRange"] = cautionRange_;
+	j["maxWaitTime"] = maxWaitTime_;
 	return j.dump();
 }
 
@@ -224,6 +325,10 @@ void BaseEnemy::DeserializeParameters(const std::string& data) {
 			speed_ = j["speed"].get<float>();
 		if (j.contains("expDrop"))
 			expDrop_ = j["expDrop"].get<float>();
+		if (j.contains("cautionRange"))
+			cautionRange_ = j["cautionRange"].get<float>();
+		if (j.contains("maxWaitTime"))
+			maxWaitTime_ = j["maxWaitTime"].get<float>();
 	} catch (...) {
 	}
 }
@@ -247,14 +352,21 @@ void BaseEnemy::SearchTarget(entt::entity entity, GameScene* scene) {
 		}
 	}
 
-	// 防衛設備（Defender）を探す(プレイヤーより近ければターゲットを上書き)
-	const auto& defenders = scene->GetEntitiesByTag(TagType::Defender);
-	for (auto d : defenders) {
-		auto& t = registry.get<TransformComponent>(d);
-		float distSq = (t.translate.x - myTc.translate.x) * (t.translate.x - myTc.translate.x) + (t.translate.z - myTc.translate.z) * (t.translate.z - myTc.translate.z);
-		if (distSq < minDistanceSq) {
-			minDistanceSq = distSq;
-			bestTarget = d;
+	// 防衛設備（DefenderやCanonなど）を探す(プレイヤーより近ければターゲットを上書き)
+	TagType towerTags[] = { TagType::Defender, TagType::Canon, TagType::Cannon, TagType::IceCanon, TagType::PipeCannon };
+	for (int i = 0; i < 5; ++i) {
+		const auto& towers = scene->GetEntitiesByTag(towerTags[i]);
+		for (auto d : towers) {
+			if (!registry.valid(d) || !registry.all_of<TransformComponent>(d)) continue;
+			
+			auto& t = registry.get<TransformComponent>(d);
+			float distSq = (t.translate.x - myTc.translate.x) * (t.translate.x - myTc.translate.x) + 
+			               (t.translate.z - myTc.translate.z) * (t.translate.z - myTc.translate.z);
+			
+			if (distSq < minDistanceSq) {
+				minDistanceSq = distSq;
+				bestTarget = d;
+			}
 		}
 	}
 
@@ -272,6 +384,15 @@ void BaseEnemy::SearchTarget(entt::entity entity, GameScene* scene) {
 	}
 
 	currentTarget_ = bestTarget;
+}
+
+void BaseEnemy::SetCategory(entt::entity entity, GameScene* scene, EnemyCategory category) {
+	category_ = category;
+	auto& registry = scene->GetRegistry();
+	if (!registry.all_of<VariableComponent>(entity)) {
+		registry.emplace<VariableComponent>(entity);
+	}
+	registry.get<VariableComponent>(entity).SetValue("EnemyCategory", (float)category_);
 }
 
 } // namespace Game
