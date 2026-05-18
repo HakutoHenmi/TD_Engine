@@ -23,6 +23,8 @@ int WaveManagement::currentWave_ = -1;
 void WaveManagement::Start(entt::entity entity, GameScene* scene) {
 	if (!scene) return;
 
+	instance_ = this;
+
 	// ↓これを追加してシーンの参照を正しく持たせる
 	cachedScene_ = scene;
 
@@ -235,8 +237,9 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 }
 
 void WaveManagement::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
-
-	
+	if (instance_ == this) {
+		instance_ = nullptr;
+	}
 }
 
 void WaveManagement::SpawnSpanner(int currentWave, GameScene* scene) {

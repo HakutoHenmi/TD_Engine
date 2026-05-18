@@ -23,7 +23,15 @@ public:
 		isEnded_ = false;
 		currentWave_ = -1;
 		managerEntity_ = static_cast<entt::entity>(entt::null);
+		instance_ = nullptr;
 	}
+	static bool IsLastWave() {
+		if (currentWave_ < 0) return false;
+		if (!instance_) return false;
+		if (instance_->enemySpawners_.empty()) return false;
+		return currentWave_ >= static_cast<int>(instance_->enemySpawners_.size()) - 1;
+	}
+	static void EndGame() { isEnded_ = true; }
 
 	int GetTotalMaxEnemies(GameScene* scene);
 	int GetTotalRemainingEnemies(GameScene* scene);
@@ -31,6 +39,7 @@ public:
 private:
 	static int currentWave_;
 	static inline entt::entity managerEntity_ = static_cast<entt::entity>(entt::null);
+	static inline WaveManagement* instance_ = nullptr;
 	int previousWave_ = -1;
 
 	static inline bool isEnded_ = false;

@@ -694,6 +694,9 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			ResultManagerScript::pendingOriginalScene = "tesuto_light"; 
 			Engine::SceneParameters p;
 			p.sceneName = "Result";
+			p.isWin = false;
+			p.score = 300;
+			p.clearTime = scene->GetPlayTime();
 			Engine::SceneManager::GetInstance()->RequestChange("Result", p);
 			
 			isPhaseTransitioning_ = true;
@@ -703,6 +706,9 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			ResultManagerScript::pendingOriginalScene = "tesuto_light";
 			Engine::SceneParameters p;
 			p.sceneName = "Result";
+			p.isWin = true;
+			p.score = 1500;
+			p.clearTime = scene->GetPlayTime();
 			Engine::SceneManager::GetInstance()->RequestChange("Result", p);
 			
 			isPhaseTransitioning_ = true;

@@ -66,6 +66,7 @@ public:
 
 	// ★追加: シーン名の取得
 	const std::string& GetSceneName() const { return sceneName_; }
+	float GetPlayTime() const { return playTime_; }
 
 	// ★追加: 名前でオブジェクトを検索するヘルパー
 	entt::entity FindObjectByName(const std::string& name);
