@@ -282,15 +282,15 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float dt) {
 				}
 			}
 		}
-		// else {
-		//	// 飛行タイプ（y軸はふわふわさせる）
-		//	rb.velocity.x = vx;
-		//	rb.velocity.z = vz;
+		 else {
+			// 飛行タイプ（y軸はふわふわさせる）
+			rb.velocity.x = vx;
+			rb.velocity.z = vz;
 
-		//	float floatHeight = 5.0f; // 地面から5m上を飛ぶ
-		//	float targetY = groundHeight_ + floatHeight + std::sin(scene->GetContext().playTime * 2.0f) * 0.5f;
-		//	tc.translate.y += (targetY - tc.translate.y) * 2.0f * dt;
-		//}
+			//float floatHeight = 5.0f; // 地面から5m上を飛ぶ
+			//float targetY = groundHeight_ + floatHeight + std::sin(scene->GetContext(). * 2.0f) * 0.5f;
+			//tc.translate.y += (targetY - tc.translate.y) * 2.0f * dt;
+		}
 
 		// 4. 進んでいる方向を向く
 		if (std::abs(vx) > 0.1f || std::abs(vz) > 0.1f) {

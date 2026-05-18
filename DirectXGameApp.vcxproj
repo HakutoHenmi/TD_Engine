@@ -226,6 +226,7 @@ exit /b 0
     <ClCompile Include="Game\Scripts\TutorialScript.cpp" />
     <ClCompile Include="Game\Scripts\IceBulletScript.cpp" />
     <ClCompile Include="Game\Scripts\IceCanon.cpp" />
+    <ClCompile Include="Game\Scripts\Enemy\SkyGunner.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scripts\Enemy\Enemies.h" />
@@ -287,6 +288,7 @@ exit /b 0
     <ClInclude Include="Game\Scripts\TutorialScript.h" />
     <ClInclude Include="Game\Scripts\IceBulletScript.h" />
     <ClInclude Include="Game\Scripts\IceCanon.h" />
+    <ClInclude Include="Game\Scripts\Enemy\SkyGunner.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\level_data.csv" />
