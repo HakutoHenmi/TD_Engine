@@ -141,7 +141,7 @@ private:
 	};
 	std::deque<CrystalParticle> crystalParticles_;
 
-	// ★追加: 蒸気圧システム
+	// ★追加: 蒸気圧システム (射撃用)
 	float steamPressure_ = 100.0f;       // 現在の蒸気圧
 	float maxSteamPressure_ = 100.0f;    // 最大蒸気圧
 	bool isRecharging_ = false;          // 圧力リチャージ中か
@@ -149,6 +149,15 @@ private:
 	static constexpr float RECHARGE_TIME = 2.5f;        // リチャージにかかる時間
 	static constexpr float NORMAL_SHOT_COST = 15.0f;    // 通常射撃の圧力コスト
 	static constexpr float CHARGE_SHOT_COST = 45.0f;    // チャージショットの圧力コスト
+
+	// ★追加: 飛行システム (別圧力計)
+	float flightPressure_ = 100.0f;
+	float maxFlightPressure_ = 100.0f;
+	bool isFlying_ = false;
+	const float FLIGHT_COST_PER_SEC = 25.0f; // ★毎秒25.0消費 (4秒飛べる)
+	const float MAX_FLIGHT_HEIGHT = 15.0f;   // 最大飛行高度
+	bool prevRightClickDown_ = false;
+	entt::entity lockedEnemy_ = entt::null;
 	static constexpr float CHARGE_TIME_MAX = 1.2f;      // 最大チャージ時間
 	static constexpr float CHARGE_TIME_MIN = 0.35f;     // チャージショット判定の最低時間
 	static constexpr float DASH_COST = 20.0f;           // スチーム・ブーストのコスト

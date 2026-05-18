@@ -526,7 +526,12 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			recoilVelocity_.z *= damping;
 
 			// ★重力と着地判定 (地形の高さを考慮)
-			recoilVelocity_.y -= 55.0f * dt; // 重力
+			if (!isFlying_) {
+				recoilVelocity_.y -= 55.0f * dt; // 重力
+			} else {
+				// 飛行中はY軸（上下）の勢いも素早く減衰させてピタッとホバリングさせる
+				recoilVelocity_.y *= std::pow(0.001f, dt);
+			}
 			
 			float groundY = scene->GetHeightAt(pTc.translate.x, pTc.translate.z, pTc.translate.y + 1.0f);
 			float landingY = groundY + 1.0f; // キャラクター中心の接地高さ
@@ -541,6 +546,76 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 				recoilVelocity_.y = 0.0f;
 			}
 		}
+
+		// ★追加: 飛行システム
+		bool isGrounded = (pTc.translate.y <= scene->GetHeightAt(pTc.translate.x, pTc.translate.z, pTc.translate.y + 1.0f) + 1.1f);
+		if (isGrounded && !isFlying_) {
+			flightPressure_ = maxFlightPressure_;
+		}
+
+		bool currentRightClickDown = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+		if (playerType_ == PlayerType::Gun && !isPrep) {
+			if (currentRightClickDown && !prevRightClickDown_) {
+				if (isFlying_) {
+					isFlying_ = false;
+				} else if (flightPressure_ >= maxFlightPressure_) {
+					isFlying_ = true;
+					recoilVelocity_.y = 20.0f; // ★飛び上がる初速
+				}
+			}
+
+			if (isFlying_) {
+				flightPressure_ -= FLIGHT_COST_PER_SEC * dt;
+				if (flightPressure_ <= 0.0f) {
+					flightPressure_ = 0.0f;
+					isFlying_ = false;
+				} else {
+					float groundY = scene->GetHeightAt(pTc.translate.x, pTc.translate.z, pTc.translate.y + 1.0f);
+					if (currentRightClickDown) {
+						// チャージ中（押している間）は上昇
+						recoilVelocity_.y += 60.0f * dt; // 上昇推力
+						if (pTc.translate.y - groundY > MAX_FLIGHT_HEIGHT) {
+							if (recoilVelocity_.y > 0.0f) recoilVelocity_.y *= 0.5f; 
+						}
+					}
+					// 離している間は上部の recoilVelocity_.y の減衰処理により自動的にホバリング（静止）する
+
+					// 飛行中のスチームエフェクト
+					static float flightVfxTimer = 0.0f;
+					flightVfxTimer += dt;
+					if (flightVfxTimer > 0.05f) {
+						flightVfxTimer = 0.0f;
+						entt::entity boostVfx = scene->CreateEntity("FlightSteam");
+						auto& bTc = scene->GetRegistry().get<TransformComponent>(boostVfx);
+						bTc.translate = { pTc.translate.x, pTc.translate.y + 0.5f, pTc.translate.z };
+						scene->SetTag(boostVfx, TagType::VFX);
+						auto& bVc = scene->GetRegistry().emplace<VariableComponent>(boostVfx);
+						bVc.SetValue("NormalY", -1.0f);
+						bVc.SetValue("Radius", 1.5f);
+						bVc.SetValue("Duration", 0.3f);
+						bVc.SetValue("ScatterSpeed", 8.0f);
+						bVc.SetValue("Count", 5.0f);
+						auto& bSc = scene->GetRegistry().emplace<ScriptComponent>(boostVfx);
+						bSc.scripts.push_back({ "SpaceShatterScript", "", nullptr });
+					}
+				}
+			}
+		} else {
+			isFlying_ = false;
+		}
+		prevRightClickDown_ = currentRightClickDown;
+
+		// ★CharacterMovementSystem側の重力蓄積をリセットする
+		if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
+			auto& rb = scene->GetRegistry().get<RigidbodyComponent>(entity);
+			if (isFlying_) {
+				rb.useGravity = false;
+				rb.velocity.y = 0.0f; // ★システム側の落下速度を強制ゼロにして完全な静止を実現
+			} else {
+				rb.useGravity = true;
+			}
+		}
+
 	}
 
 	if (isPrep) {
@@ -580,7 +655,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 		// ★追加: 圧力ゲージの描画 (リチャージ中、銃モード、消費中、スキル中、または戦闘フェーズなら表示)
 		bool isBattle = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::BattlePhase);
-		bool shouldShowGauge = (playerType_ == PlayerType::Gun) || isRecharging_ || (steamPressure_ < maxSteamPressure_) || isSkillActive_ || isBattle;
+		bool shouldShowGauge = (playerType_ == PlayerType::Gun) || isRecharging_ || (steamPressure_ < maxSteamPressure_) || isSkillActive_ || isBattle || isFlying_ || (flightPressure_ < maxFlightPressure_);
 		if (shouldShowGauge) {
 			DrawPressureGauge(scene);
 		}
@@ -613,8 +688,20 @@ void PlayerScript::UpdateMovement(entt::entity entity, GameScene* scene, float /
 	if (isSkillActive_ && playerType_ == PlayerType::Gun) {
 		speedMul *= SKILL_SPEED_MULTIPLIER;
 	}
-	input.moveDir.x *= speedMul;
-	input.moveDir.y *= speedMul;
+
+	// ★飛行中は移動速度が大幅にアップ
+	if (isFlying_ && playerType_ == PlayerType::Gun) {
+		speedMul *= 3.0f; // ★3倍に（ベース速度に対して適用されるため非常に速くなります）
+	}
+	
+	// ★入力ベクトルの大きさが1.0に制限されるため、移動速度そのものを変更する
+	if (scene->GetRegistry().all_of<CharacterMovementComponent>(entity)) {
+		auto& cm = scene->GetRegistry().get<CharacterMovementComponent>(entity);
+		static float baseSpeed = 0.0f;
+		if (baseSpeed == 0.0f) baseSpeed = cm.speed;
+		
+		cm.speed = baseSpeed * speedMul;
+	}
 }
 
 void PlayerScript::UpdateAttack(entt::entity entity, GameScene* scene, float dt) {
@@ -897,7 +984,7 @@ void PlayerScript::UpdateGun(entt::entity /*entity*/, GameScene* scene, float /*
 }
 
 void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float dt) {
-	isAiming_ = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+	isAiming_ = false; // 右クリックは飛行用になったためエイムは廃止
 	bool currentAttackKeyDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
 
 	// ★リチャージ中は射撃不可（スキル発動中のみオーバークロックで許可）
@@ -908,20 +995,55 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 
 	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
 
-	// ★ロック中は敵の方を向く
-	if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) {
-		auto& ct = scene->GetRegistry().get<CameraTargetComponent>(entity);
-		if (ct.lockedTarget != entt::null && scene->GetRegistry().valid(ct.lockedTarget)) {
-			bool isActionActive = isCharging_ || currentAttackKeyDown || gunShootTimer_ > 0.0f;
-			if (isActionActive) {
-				auto& eTc = scene->GetRegistry().get<TransformComponent>(ct.lockedTarget);
-				float dx = eTc.translate.x - pTc.translate.x;
-				float dz = eTc.translate.z - pTc.translate.z;
-				float targetYaw = std::atan2(dx, dz);
-				float diff = targetYaw - pTc.rotate.y;
-				while (diff >  DirectX::XM_PI) diff -= DirectX::XM_2PI;
-				while (diff < -DirectX::XM_PI) diff += DirectX::XM_2PI;
-				pTc.rotate.y += diff * std::min(1.0f, 30.0f * dt);
+	// ★ロックオンの更新 (飛行中)
+	if (isFlying_) {
+		float minDist = 1000.0f;
+		entt::entity bestEnemy = entt::null;
+		auto enemies = scene->GetRegistry().view<TagComponent, TransformComponent, HealthComponent>();
+		for (auto e : enemies) {
+			if (enemies.get<TagComponent>(e).tag == TagType::Enemy && !enemies.get<HealthComponent>(e).isDead) {
+				const auto& eTc = enemies.get<TransformComponent>(e).translate;
+				float dx = eTc.x - pTc.translate.x;
+				float dy = eTc.y - pTc.translate.y;
+				float dz = eTc.z - pTc.translate.z;
+				float distSq = dx*dx + dy*dy + dz*dz;
+				if (distSq < minDist * minDist) {
+					minDist = std::sqrt(distSq);
+					bestEnemy = e;
+				}
+			}
+		}
+		lockedEnemy_ = bestEnemy;
+
+		// 飛行中は常に敵の方向を向く
+		if (lockedEnemy_ != entt::null && scene->GetRegistry().valid(lockedEnemy_)) {
+			auto& eTc = scene->GetRegistry().get<TransformComponent>(lockedEnemy_);
+			float dx = eTc.translate.x - pTc.translate.x;
+			float dz = eTc.translate.z - pTc.translate.z;
+			float targetYaw = std::atan2(dx, dz);
+			float diff = targetYaw - pTc.rotate.y;
+			while (diff >  DirectX::XM_PI) diff -= DirectX::XM_2PI;
+			while (diff < -DirectX::XM_PI) diff += DirectX::XM_2PI;
+			pTc.rotate.y += diff * std::min(1.0f, 30.0f * dt);
+		}
+	} else {
+		lockedEnemy_ = entt::null;
+		
+		// 地上ではカメラ方向または移動方向を向く
+		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) {
+			auto& ct = scene->GetRegistry().get<CameraTargetComponent>(entity);
+			if (ct.lockedTarget != entt::null && scene->GetRegistry().valid(ct.lockedTarget)) {
+				bool isActionActive = isCharging_ || currentAttackKeyDown || gunShootTimer_ > 0.0f;
+				if (isActionActive) {
+					auto& eTc = scene->GetRegistry().get<TransformComponent>(ct.lockedTarget);
+					float dx = eTc.translate.x - pTc.translate.x;
+					float dz = eTc.translate.z - pTc.translate.z;
+					float targetYaw = std::atan2(dx, dz);
+					float diff = targetYaw - pTc.rotate.y;
+					while (diff >  DirectX::XM_PI) diff -= DirectX::XM_2PI;
+					while (diff < -DirectX::XM_PI) diff += DirectX::XM_2PI;
+					pTc.rotate.y += diff * std::min(1.0f, 30.0f * dt);
+				}
 			}
 		}
 	}
@@ -1001,10 +1123,13 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 		isCharging_ = false;
 
 		// スキル発動中（オーバークロック）はコストを無視して撃てる
-		if (chargeTime_ >= CHARGE_TIME_MIN && (isSkillActive_ || steamPressure_ >= CHARGE_SHOT_COST * 0.5f)) {
+		float cCost = CHARGE_SHOT_COST * (isFlying_ ? 0.5f : 1.0f); // ★飛行中はコスト半減
+		float nCost = NORMAL_SHOT_COST * (isFlying_ ? 0.5f : 1.0f); // ★飛行中はコスト半減
+
+		if (chargeTime_ >= CHARGE_TIME_MIN && (isSkillActive_ || steamPressure_ >= cCost * 0.5f)) {
 			// ★チャージショット発射！
 			ShootChargeShot(entity, scene);
-			if (!isSkillActive_) steamPressure_ -= CHARGE_SHOT_COST;
+			if (!isSkillActive_) steamPressure_ -= cCost;
 
 			// 反動後退
 			float forwardX = std::sin(pTc.rotate.y);
@@ -1013,12 +1138,12 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 			recoilVelocity_.x = -forwardX * recoilPower;
 			recoilVelocity_.z = -forwardZ * recoilPower;
 
-			gunShootTimer_ = 0.5f;
+			gunShootTimer_ = isFlying_ ? 0.25f : 0.5f; // ★飛行中は連射レート2倍
 		} else if (isSkillActive_ || steamPressure_ > 0.0f) {
 			// 通常射撃（短押し）- 残量に関わらず撃てる
 			ShootGun(entity, scene);
-			if (!isSkillActive_) steamPressure_ -= NORMAL_SHOT_COST;
-			gunShootTimer_ = 0.3f;
+			if (!isSkillActive_) steamPressure_ -= nCost;
+			gunShootTimer_ = isFlying_ ? 0.12f : 0.3f; // ★飛行中は連射レート2.5倍
 		}
 
 		chargeTime_ = 0.0f;
@@ -1239,6 +1364,45 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 		float b = std::sin(rechargeTimer_ * 10.0f) * 0.5f + 0.5f;
 		renderer->DrawString("RECHARGING", gaugeX - 55, gaugeY + R + 15, 0.4f, {1.0f, 0.2f, 0.1f, 0.5f + b * 0.5f});
 	}
+
+	// ===== 10. 飛行圧力計 (Gunモードのみ) =====
+	if (playerType_ == PlayerType::Gun) {
+		float flightGaugeX = gaugeX + 150.0f; // メイン圧力計の右側
+		float flightGaugeY = gaugeY + 30.0f;  // 少し下
+		float fR = 55.0f; // 少し小さめ
+		float fRatio = std::clamp(flightPressure_ / maxFlightPressure_, 0.0f, 1.0f);
+		
+		// 背景
+		renderer->DrawSDFUI({ {flightGaugeX, flightGaugeY}, {fR + 4, fR + 4}, 0, 0, {0.1f, 0.2f, 0.3f, 1.0f}, 1, 0, 0, 1 });
+		renderer->DrawSDFUI({ {flightGaugeX, flightGaugeY}, {fR - 2, fR - 2}, 0, 0, {0.85f, 0.9f, 0.95f, 1.0f}, 1, 0, 0, 1 });
+		
+		// 針の微細な振動（飛行中のみ）
+		float fAngle = startAngle + fRatio * totalAngle;
+		if (isFlying_) {
+			float time = (float)GetTickCount64() * 0.001f;
+			fAngle += std::sin(time * 80.0f) * 0.02f;
+		}
+
+		float fLen = fR * 0.85f;
+		Engine::Renderer::SdfUIDesc fNeedle;
+		fNeedle.centerPx = { flightGaugeX + std::cos(fAngle) * (fLen * 0.5f), flightGaugeY + std::sin(fAngle) * (fLen * 0.5f) };
+		fNeedle.sizePx = { fLen, 2.5f };
+		fNeedle.shape = 0;
+		fNeedle.rotateRad = -fAngle;
+		fNeedle.color = {0.1f, 0.2f, 0.5f, 1.0f};
+		fNeedle.fill = 1.0f;
+		renderer->DrawSDFUI(fNeedle);
+
+		// センターピン
+		renderer->DrawSDFUI({ {flightGaugeX, flightGaugeY}, {8, 8}, 0, 0, {0.1f, 0.2f, 0.3f, 1.0f}, 1, 0, 0, 1 });
+
+		// ラベル
+		const char* fTitle[] = { (const char*)u8"飛", (const char*)u8"行" };
+		for (int i = 0; i < 2; ++i) {
+			float tw = renderer->MeasureTextWidth(fTitle[i], 0.25f);
+			renderer->DrawString(fTitle[i], flightGaugeX - tw * 0.5f, flightGaugeY + fR * 0.2f + i * 12.0f, 0.25f, {0.1f, 0.2f, 0.3f, 0.8f});
+		}
+	}
 }
 
 void PlayerScript::ShootGun(entt::entity entity, GameScene* scene) {
@@ -1304,8 +1468,8 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 	bTc.rotate.y += spreadYaw;
 	bTc.rotate.x += spreadPitch;
 	
-	// ★追加: ターゲットロック中のオートエイム
-	if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) {
+	// ★追加: ターゲットロック中のオートエイム（地上の場合）
+	if (!isFlying_ && scene->GetRegistry().all_of<CameraTargetComponent>(entity)) {
 		auto& ct = scene->GetRegistry().get<CameraTargetComponent>(entity);
 		if (ct.lockedTarget != entt::null && scene->GetRegistry().valid(ct.lockedTarget)) {
 			auto& eTc = scene->GetRegistry().get<TransformComponent>(ct.lockedTarget);
@@ -1322,6 +1486,19 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 			bTc.rotate.z = 0.0f;
 		}
 	}
+
+	// ★追加: 飛行中は追尾弾になる
+	if (isFlying_ && lockedEnemy_ != entt::null && scene->GetRegistry().valid(lockedEnemy_)) {
+		auto& bVc = scene->GetRegistry().get_or_emplace<VariableComponent>(bullet);
+		bVc.SetValue("HasTarget", 1.0f);
+		
+		uint32_t targetId = static_cast<uint32_t>(lockedEnemy_);
+		bVc.SetValue("TargetHigh", static_cast<float>(targetId >> 16));
+		bVc.SetValue("TargetLow", static_cast<float>(targetId & 0xFFFF));
+		
+		bVc.SetValue("Speed", enhanced ? 120.0f : 80.0f);
+	}
+
 
 	float cosX = std::cos(bTc.rotate.x);
 	float moveX = std::sin(bTc.rotate.y) * cosX;
@@ -1371,7 +1548,8 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 	auto& sc = scene->GetRegistry().emplace<ScriptComponent>(bullet);
 	sc.scripts.push_back({"BulletScript", "", nullptr});
 
-	auto& vc = scene->GetRegistry().emplace<VariableComponent>(bullet);
+	// ★修正: 先ほど get_or_emplace されている可能性があるため、ここも get_or_emplace に変更する
+	auto& vc = scene->GetRegistry().get_or_emplace<VariableComponent>(bullet);
 	vc.SetValue("MaxLifeTime", lifeTime);
 	if (explode) {
 		vc.SetValue("Enhanced", 1.0f);
