@@ -69,7 +69,11 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 		if (!hasEnemy) {
             auto& sc = registry.get<ScriptComponent>(spawnerEntity);
 			sc.enabled = false;
-            PhaseSystemScript::SetPreparation(PhaseSystemScript::PreparationPhase);
+			if (WaveManagement::IsLastWave()) {
+				WaveManagement::EndGame();
+			} else {
+				PhaseSystemScript::SetPreparation(PhaseSystemScript::PreparationPhase);
+			}
 		}
 		return;
 	}
