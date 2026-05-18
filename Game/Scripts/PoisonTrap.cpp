@@ -27,21 +27,8 @@ static bool HasTag(entt::registry& registry, entt::entity entity, TagType tagNam
 }
 
 static bool IsConnectedSphere(entt::registry& registry, entt::entity a, entt::entity b, float connectRange) {
-	if (!registry.valid(a)) {
-		return false;
-	}
-
-	if (!registry.valid(b)) {
-		return false;
-	}
-
-	if (!registry.all_of<TransformComponent>(a)) {
-		return false;
-	}
-
-	if (!registry.all_of<TransformComponent>(b)) {
-		return false;
-	}
+	if (!registry.valid(a) || !registry.valid(b)) return false;
+	if (!registry.all_of<TransformComponent>(a) || !registry.all_of<TransformComponent>(b)) return false;
 
 	const TransformComponent& transformA = registry.get<TransformComponent>(a);
 	const TransformComponent& transformB = registry.get<TransformComponent>(b);
@@ -50,17 +37,18 @@ static bool IsConnectedSphere(entt::registry& registry, entt::entity a, entt::en
 	float diffY = transformB.translate.y - transformA.translate.y;
 	float diffZ = transformB.translate.z - transformA.translate.z;
 
-	float distance3D = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
+	float connectRangeSq = connectRange * connectRange;
+	float dist3DSq = diffX * diffX + diffY * diffY + diffZ * diffZ;
 
-	if (distance3D <= connectRange) {
+	if (dist3DSq <= connectRangeSq) {
 		return true;
 	}
 
-	float distanceXZ = std::sqrt(diffX * diffX + diffZ * diffZ);
+	float distXZSq = diffX * diffX + diffZ * diffZ;
 	float heightDifference = std::abs(diffY);
 
 	if (heightDifference >= 0.1f) {
-		if (distanceXZ <= connectRange) {
+		if (distXZSq <= connectRangeSq) {
 			return true;
 		}
 	}
@@ -112,7 +100,7 @@ void PoisonTrap::Update(entt::entity entity, GameScene* scene, float dt) {
 	// 接続チェック
 	connectionCheckTimer_ -= dt;
 	if (connectionCheckTimer_ <= 0.0f) {
-		connectionCheckTimer_ = 0.5f;
+		connectionCheckTimer_ = 2.0f; // ★最適化: チェック間隔を0.5秒から2.0秒に延長してCPUスパイクを劇的削減
 		UpdateConnection(entity, scene);
 	}
 

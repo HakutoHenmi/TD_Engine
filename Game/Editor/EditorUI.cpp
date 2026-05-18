@@ -912,7 +912,15 @@ void EditorUI::SaveScene(GameScene* scene, const std::string& path) {
 	std::string absPath = GetUnifiedProjectPath(targetPath);
 	OutputDebugStringA(("[EditorUI] Saving scene to: " + absPath + "\n").c_str());
 	
-	std::string content = SaveToMemory(scene);
+	// ★ 安全性向上: 再生中(PLAY中)にセーブした場合は、現在の動的ゴミオブジェクトを含む状態ではなく、プレイ開始時のクリーンなスナップショットを保存する
+	std::string content;
+	if (scene->IsPlaying() && !scene->GetSceneSnapshot().empty()) {
+		content = scene->GetSceneSnapshot();
+		OutputDebugStringA("[EditorUI] WARNING: Game is playing. Saving snapshot instead of active gameplay state to prevent zombie entities!\n");
+	} else {
+		content = SaveToMemory(scene);
+	}
+	
 	if (content.empty()) { LogError("Save failed: empty content"); return; }
 
 	std::ofstream f(Engine::PathUtils::FromUTF8(absPath), std::ios::out | std::ios::trunc);

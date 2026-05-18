@@ -121,7 +121,14 @@ static bool IsConnectableTag(GameScene* scene, entt::entity entity) {
 
 void PipeScript::Start(entt::entity obj, GameScene* scene) {
 	(void)obj;
-	(void)scene;
+	if (scene && scene->GetRenderer()) {
+		auto* renderer = scene->GetRenderer();
+		cylinderModelHandle_ = renderer->LoadObjMesh("Resources/Models/Cylinder/cylinder.obj");
+		cylinderTextureHandle_ = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+	}
+
+	// タイマーをランダムに分散させて全パイプの同時更新スパイクを防ぐ
+	connectionCheckTimer_ = static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * connectionCheckInterval_;
 }
 
 void PipeScript::Update(entt::entity obj, GameScene* scene, float dt) {
@@ -140,143 +147,88 @@ void PipeScript::Update(entt::entity obj, GameScene* scene, float dt) {
 
 	connectionCheckTimer_ += dt;
 
-	if (connectionCheckTimer_ < connectionCheckInterval_) {
-		return;
-	}
+	if (connectionCheckTimer_ >= connectionCheckInterval_) {
+		connectionCheckTimer_ = 0.0f;
 
-	connectionCheckTimer_ = 0.0f;
+		if (registry.valid(obj) && registry.all_of<TransformComponent>(obj)) {
+			const float connectRange = 2.5f;
 
-	auto* renderer = scene->GetRenderer();
-	if (!renderer) {
-		return;
-	}
+			currentConnections_.clear();
+			currentConnections_.reserve(8);
 
-	if (!registry.valid(obj)) {
-		return;
-	}
+			const TagType connectableTags[] = {
+				TagType::Pipe, TagType::BulletTank, TagType::Cannon, 
+				TagType::Canon, TagType::PipeCannon, TagType::Poison, TagType::Missile
+			};
 
-	if (!registry.all_of<TransformComponent>(obj)) {
-		return;
-	}
+			for (TagType tag : connectableTags) {
+				const auto& entities = scene->GetEntitiesByTag(tag);
+				for (entt::entity other : entities) {
+					if (other == obj) {
+						continue;
+					}
 
-	const float connectRange = 2.5f;
+					if (!registry.valid(other)) {
+						continue;
+					}
 
-	currentConnections_.clear();
-	currentConnections_.reserve(8);
+					if (!IsConnectedSphere(scene, obj, other, connectRange)) {
+						continue;
+					}
 
-	const TagType connectableTags[] = {
-		TagType::Pipe, TagType::BulletTank, TagType::Cannon, 
-		TagType::Canon, TagType::PipeCannon, TagType::Poison, TagType::Missile
-	};
+					bool shouldCreate = false;
 
-	for (TagType tag : connectableTags) {
-		const auto& entities = scene->GetEntitiesByTag(tag);
-		for (entt::entity other : entities) {
-			if (other == obj) {
-				continue;
-			}
+					if (tag == TagType::Pipe) {
+						if (static_cast<uint32_t>(obj) < static_cast<uint32_t>(other)) {
+							shouldCreate = true;
+						}
+					} else {
+						shouldCreate = true;
+					}
 
-			if (!registry.valid(other)) {
-				continue;
-			}
-
-			if (!IsConnectedSphere(scene, obj, other, connectRange)) {
-				continue;
-			}
-
-			bool shouldCreate = false;
-
-			if (tag == TagType::Pipe) {
-				if (static_cast<uint32_t>(obj) < static_cast<uint32_t>(other)) {
-					shouldCreate = true;
+					if (shouldCreate) {
+						currentConnections_.push_back(other);
+					}
 				}
-			} else {
-				shouldCreate = true;
-			}
-
-			if (shouldCreate) {
-				currentConnections_.push_back(other);
 			}
 		}
 	}
+}
 
-	for (auto it = connectionCylinders_.begin(); it != connectionCylinders_.end();) {
-		entt::entity target = it->first;
-		entt::entity cylinder = it->second;
+void PipeScript::Draw(entt::entity obj, GameScene* scene) {
+	if (!scene) return;
+	auto* renderer = scene->GetRenderer();
+	if (!renderer) return;
 
-		bool found = false;
+	entt::registry& registry = scene->GetRegistry();
 
-		for (size_t i = 0; i < currentConnections_.size(); ++i) {
-			if (currentConnections_[i] == target) {
-				found = true;
-				break;
-			}
-		}
-
-		if (!found || !registry.valid(target)) {
-			if (registry.valid(cylinder)) {
-				scene->DestroyObject(static_cast<uint32_t>(cylinder));
-			}
-
-			it = connectionCylinders_.erase(it);
-		} else {
-			++it;
-		}
+	if (!registry.valid(obj) || !registry.all_of<TransformComponent>(obj)) {
+		return;
 	}
 
 	TransformComponent& objTc = registry.get<TransformComponent>(obj);
 
+	// パイプのMeshRendererカラーを取得
+	Engine::Vector4 color = {0.75f, 0.75f, 0.75f, 1.0f};
+	if (registry.all_of<MeshRendererComponent>(obj)) {
+		const MeshRendererComponent& pipeMesh = registry.get<MeshRendererComponent>(obj);
+		color = {pipeMesh.color.x, pipeMesh.color.y, pipeMesh.color.z, pipeMesh.color.w};
+	}
+
+	// 接続されている全てのパイプ/施設へのシリンダーを描画（ポーズ中も呼ばれる）
 	for (size_t i = 0; i < currentConnections_.size(); ++i) {
 		entt::entity target = currentConnections_[i];
 
-		if (connectionCylinders_.find(target) == connectionCylinders_.end()) {
-			entt::entity cylinder = scene->CreateEntity("PipeConnection");
-
-			MeshRendererComponent& mesh = registry.emplace<MeshRendererComponent>(cylinder);
-			mesh.modelPath = "Resources/Models/Cylinder/cylinder.obj";
-			mesh.modelHandle = renderer->LoadObjMesh(mesh.modelPath);
-			mesh.texturePath = "Resources/Textures/white1x1.png";
-			mesh.textureHandle = renderer->LoadTexture2D(mesh.texturePath);
-			mesh.shaderName = "Toon";
-
-			if (registry.all_of<MeshRendererComponent>(obj)) {
-				MeshRendererComponent& pipeMesh = registry.get<MeshRendererComponent>(obj);
-				mesh.color = pipeMesh.color;
-			} else {
-				mesh.color = {0.75f, 0.75f, 0.75f, 1.0f};
-			}
-
-			scene->SetTag(cylinder, TagType::Default);
-			connectionCylinders_[target] = cylinder;
-		}
-
-		entt::entity cylinder = connectionCylinders_[target];
-
-		if (!registry.valid(cylinder)) {
+		if (!registry.valid(target) || !registry.all_of<TransformComponent>(target)) {
 			continue;
 		}
 
-		if (!registry.valid(target)) {
-			continue;
-		}
-
-		if (!registry.all_of<TransformComponent>(cylinder)) {
-			continue;
-		}
-
-		if (!registry.all_of<TransformComponent>(target)) {
-			continue;
-		}
-
-		TransformComponent& cylTc = registry.get<TransformComponent>(cylinder);
 		TransformComponent& tgtTc = registry.get<TransformComponent>(target);
 
 		Engine::Vector3 startPos = {objTc.translate.x, objTc.translate.y, objTc.translate.z};
-
 		Engine::Vector3 endPos = {tgtTc.translate.x, tgtTc.translate.y, tgtTc.translate.z};
 
 		Engine::Vector3 diff = endPos - startPos;
-
 		float distSq = diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
 
 		if (distSq <= 0.0001f) {
@@ -286,31 +238,28 @@ void PipeScript::Update(entt::entity obj, GameScene* scene, float dt) {
 		float dist = std::sqrt(distSq);
 		Engine::Vector3 dir = diff * (1.0f / dist);
 
-		float cyLen = (dist - 0.2f) / 3.0f;
-
+		float cyLen = (dist - 0.2f) / 3.0f; // ★シリンダーモデルは高さが3なので3で割る
 		if (cyLen < 0.01f) {
 			cyLen = 0.01f;
 		}
 
 		Engine::Vector3 center = startPos + diff * 0.5f;
-
-		cylTc.translate = {center.x, center.y, center.z};
-		cylTc.scale = {0.35f, cyLen, 0.35f};
-
 		Engine::Vector3 euler = Engine::LookRotation(dir);
-		cylTc.rotate = {euler.x - 3.14159265f * 0.5f, euler.y, euler.z};
+
+		// Z軸方向のシリンダーモデルとしてスケールと回転を適用
+		Engine::Matrix4x4 world = Engine::Matrix4x4::MakeAffineMatrix(
+			{0.25f, 0.25f, cyLen},
+			{euler.x, euler.y, euler.z},
+			{center.x, center.y, center.z}
+		);
+
+		renderer->DrawMeshInstanced(cylinderModelHandle_, cylinderTextureHandle_, world, color, "Toon");
 	}
 }
 
 void PipeScript::OnDestroy(entt::entity obj, GameScene* scene) {
 	(void)obj;
-	auto& registry = scene->GetRegistry();
-	for (auto& pair : connectionCylinders_) {
-		if (registry.valid(pair.second)) {
-			registry.destroy(pair.second);
-		}
-	}
-	connectionCylinders_.clear();
+	(void)scene;
 }
 
 REGISTER_SCRIPT(PipeScript);

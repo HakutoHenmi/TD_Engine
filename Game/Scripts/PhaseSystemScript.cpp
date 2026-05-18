@@ -103,60 +103,34 @@ std::vector<Engine::Vector3> BuildPipePathPoints(const Engine::Vector3& start, c
 	return points;
 }
 
+// 高さキャッシュ用（配置フェーズ中は地形が頻繁に変わらないためキャッシュして毎フレームのRayCastを省く）
+static std::unordered_map<int64_t, float> s_heightCache;
+static void ClearHeightCache() { s_heightCache.clear(); }
+
 bool TryGetPlacementSurfaceYAt(GameScene* scene, float x, float z, float& outY) {
 	if (!scene)
 		return false;
 
-	auto* renderer = scene->GetRenderer();
-	if (!renderer)
-		return false;
+	// グリッド座標にスナップしてキーを作成（小数点以下2桁程度で丸める）
+	int64_t ix = static_cast<int64_t>(std::round(x * 100.0f));
+	int64_t iz = static_cast<int64_t>(std::round(z * 100.0f));
+	int64_t key = (ix << 32) | (iz & 0xFFFFFFFF);
 
-	auto& registry = scene->GetRegistry();
-	DirectX::XMVECTOR rayOrig = DirectX::XMVectorSet(x, 1000.0f, z, 1.0f);
-	DirectX::XMVECTOR rayDir = DirectX::XMVectorSet(0.0f, -1.0f, 0.0f, 0.0f);
-
-	float bestDist = FLT_MAX;
-	bool hit = false;
-
-	registry.view<NameComponent, TransformComponent>().each([&](entt::entity entity, const NameComponent& nc, const TransformComponent& tc) {
-		const bool isWallTag = registry.all_of<TagComponent>(entity) && registry.get<TagComponent>(entity).tag == TagType::Wall;
-		const bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || (nc.name.find("Floor") != std::string::npos) || (nc.name.find("Ground") != std::string::npos) ||
-							   (nc.name.find("Stage") != std::string::npos) || (nc.name.find("Plane") != std::string::npos);
-		if (!isTerrain && !isWallTag)
-			return;
-
-		Engine::Model* model = nullptr;
-		if (registry.all_of<GpuMeshColliderComponent>(entity)) {
-			auto& gmc = registry.get<GpuMeshColliderComponent>(entity);
-			if (gmc.meshHandle != 0) {
-				model = renderer->GetModel(gmc.meshHandle);
-			}
-		}
-
-		if (!model && registry.all_of<MeshRendererComponent>(entity)) {
-			auto& mr = registry.get<MeshRendererComponent>(entity);
-			if (mr.modelHandle != 0) {
-				model = renderer->GetModel(mr.modelHandle);
-			}
-		}
-
-		if (!model)
-			return;
-
-		float d;
-		Engine::Vector3 hp;
-		if (model->RayCast(rayOrig, rayDir, tc.ToMatrix(), d, hp) && d < bestDist) {
-			bestDist = d;
-			outY = hp.y;
-			hit = true;
-		}
-	});
-
-	if (!hit) {
-		outY = 0.0f;
+	auto it = s_heightCache.find(key);
+	if (it != s_heightCache.end()) {
+		outY = it->second;
+		return true;
 	}
 
-	return hit;
+	float y = scene->GetHeightAt(x, z, 1000.0f);
+	if (y > -9999.0f) {
+		outY = y;
+		s_heightCache[key] = y;
+		return true;
+	}
+	
+	outY = 0.0f;
+	return false;
 }
 } // namespace
 
@@ -578,6 +552,41 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 			// 準備フェーズも絵画風にする（DOFピンボケ付き）
 			Engine::Renderer::GetInstance()->SetPostEffect("Painterly");
+
+			// ★ カメラをコアの上に戻して見下ろす視点にする
+			auto core = scene->FindObjectByName("Core");
+			auto prepCam = scene->FindObjectByName("PreparationCamera");
+			if (scene->GetRegistry().valid(core) && scene->GetRegistry().valid(prepCam)) {
+				// コアの座標を取得
+				auto& coreTc = scene->GetRegistry().get<TransformComponent>(core);
+				
+				// PreparationCameraの座標をコアに移動
+				if (scene->GetRegistry().all_of<TransformComponent>(prepCam)) {
+					auto& camTc = scene->GetRegistry().get<TransformComponent>(prepCam);
+					camTc.translate = coreTc.translate; // コアと同じ位置へ（CameraFollowSystemがここをターゲットにする）
+				}
+				
+				// 視点の角度（見下ろし）をリセット
+				if (scene->GetRegistry().all_of<PlayerInputComponent>(prepCam)) {
+					auto& camPi = scene->GetRegistry().get<PlayerInputComponent>(prepCam);
+					camPi.cameraPitch = 0.5f; // 下を向く（X軸回転）
+					camPi.cameraYaw = 0.0f;
+					
+					// 直接カメラの回転も変更して即座に反映
+					auto& camera = scene->GetCamera();
+					auto rot = camera.Rotation();
+					rot.x = 0.5f;
+					rot.y = 0.0f;
+					camera.SetRotation(rot);
+				}
+				
+				// ズーム距離の初期化
+				if (scene->GetRegistry().all_of<CameraTargetComponent>(prepCam)) {
+					auto& ct = scene->GetRegistry().get<CameraTargetComponent>(prepCam);
+					ct.distance = 25.0f; // 少し引いた視点
+					ct.height = 10.0f;   // 少し高めの視点
+				}
+			}
 		}
 
 		// 状態を同期
@@ -769,12 +778,35 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 	snappedHitPoint.x = SnapTo2x2Grid(snappedHitPoint.x);
 	snappedHitPoint.z = SnapTo2x2Grid(snappedHitPoint.z);
 
-	if (isPipeSet_) {
-		snappedHitPoint.x = SnapTo2x2Grid(snappedHitPoint.x);
-		snappedHitPoint.z = SnapTo2x2Grid(snappedHitPoint.z);
+	float surfaceY = 0.0f;
+	if (TryGetPlacementSurfaceYAt(scene, snappedHitPoint.x, snappedHitPoint.z, surfaceY)) {
+		snappedHitPoint.y = surfaceY;
+	}
 
+	if (isPipeSet_) {
 		if (!hasPipeStartPoint_) {
-			const bool canPlaceStart = (!IsPlacementBlocked(scene, snappedHitPoint) && (CoinCount >= selectedObjCost_));
+			bool isBlockedByOtherThanPipe = false;
+			constexpr float kBlockHalfExtent = 2.0f;
+			auto& registry = scene->GetRegistry();
+			for (auto entity : registry.view<TransformComponent>()) {
+				if (!registry.any_of<MeshRendererComponent, BoxColliderComponent, GpuMeshColliderComponent>(entity)) continue;
+				if (registry.all_of<TagComponent>(entity) && registry.get<TagComponent>(entity).tag == TagType::Pipe) continue;
+				if (registry.all_of<NameComponent>(entity)) {
+					const auto& nc = registry.get<NameComponent>(entity);
+					if ((nc.name.find("Terrain") != std::string::npos) || (nc.name.find("Floor") != std::string::npos) || (nc.name.find("Ground") != std::string::npos) ||
+						(nc.name.find("Stage") != std::string::npos) || (nc.name.find("Plane") != std::string::npos)) continue;
+				}
+				if (registry.all_of<TagComponent>(entity) && registry.get<TagComponent>(entity).tag == TagType::Wall) continue;
+
+				const auto& tc = registry.get<TransformComponent>(entity);
+				const float dx = tc.translate.x - snappedHitPoint.x;
+				const float dz = tc.translate.z - snappedHitPoint.z;
+				if (std::abs(dx) < kBlockHalfExtent && std::abs(dz) < kBlockHalfExtent) {
+					isBlockedByOtherThanPipe = true;
+					break;
+				}
+			}
+			const bool canPlaceStart = (!isBlockedByOtherThanPipe && (CoinCount >= selectedObjCost_));
 			DrawPlacementPreview(scene, snappedHitPoint, objPath, canPlaceStart);
 
 			if (input->IsMouseTrigger(0) && canPlaceStart) {
@@ -782,60 +814,143 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 				pipeStartY_ = snappedHitPoint.y;
 				pipeStartZ_ = snappedHitPoint.z;
 				hasPipeStartPoint_ = true;
+				SpawnPlacedObject(scene, snappedHitPoint, objPath);
+				CoinCount -= selectedObjCost_;
 			}
 			currentInstallationCost_ = selectedObjCost_;
 			return;
 		}
 
+		// 始点が決まっている状態（ドラッグ中、または2クリック目の移動中）
 		Engine::Vector3 startPoint{pipeStartX_, pipeStartY_, pipeStartZ_};
 		auto pathPoints = BuildPipePathPoints(startPoint, snappedHitPoint);
-     for (auto& p : pathPoints) {
-			float surfaceY = p.y;
-			if (TryGetPlacementSurfaceYAt(scene, p.x, p.z, surfaceY)) {
-				p.y = surfaceY;
+		std::vector<Engine::Vector3> validPreviewPoints;
+		auto& registry = scene->GetRegistry();
+
+		// ★最適化: 文字列検索を完全に排除し、TagComponentを利用して高速に障害物を抽出する
+		std::vector<Engine::Vector3> obstaclePositions;
+		obstaclePositions.reserve(128);
+		for (auto entity : registry.view<TransformComponent, TagComponent>()) {
+			auto tag = registry.get<TagComponent>(entity).tag;
+			
+			// 障害物とみなさないタグはスキップ
+			// 壁、パイプ、プレイヤー、敵、弾、エフェクトなどは障害物としない
+			if (tag == TagType::Wall || tag == TagType::Pipe || tag == TagType::Player || 
+				tag == TagType::Enemy || tag == TagType::Bullet || tag == TagType::VFX || 
+				tag == TagType::HitDistortion_VFX || tag == TagType::Experience || 
+				tag == TagType::ExperienceOrb || tag == TagType::Untagged) {
+				continue;
 			}
-		}
-		bool canPlaceAll = !pathPoints.empty();
-		if (CoinCount < pathPoints.size() * selectedObjCost_) {
-			canPlaceAll = false;
+
+			// それ以外のタグ（Canon, BulletTank, Missile, Poisonなど）は障害物として登録
+			const auto& t = registry.get<TransformComponent>(entity).translate;
+			obstaclePositions.push_back({t.x, t.y, t.z});
 		}
 
-		for (const auto& p : pathPoints) {
-			bool canPlacePoint = !IsPlacementBlocked(scene, p);
-			if (CoinCount < pathPoints.size() * selectedObjCost_) {
-				canPlacePoint = false; // お金が足りない場合は赤く（配置不可として）描画
+		for (size_t i = 1; i < pathPoints.size(); ++i) {
+			auto p = pathPoints[i];
+			float sY = p.y;
+			if (TryGetPlacementSurfaceYAt(scene, p.x, p.z, sY)) {
+				p.y = sY;
 			}
-			DrawPlacementPreview(scene, p, objPath, canPlacePoint);
-			if (!canPlacePoint && CoinCount >= pathPoints.size() * selectedObjCost_) {
-				canPlaceAll = false;
-			}
-		}
-		currentInstallationCost_ = static_cast<int>(pathPoints.size()) * selectedObjCost_;
+			bool isBlocked = false;
+			constexpr float kBlockHalfExtent = 1.0f;
 
-		// パイプ間の接続ラインを描画
-		auto* pipeRenderer = scene->GetRenderer();
-		if (pipeRenderer && pathPoints.size() >= 2) {
-			for (size_t i = 0; i + 1 < pathPoints.size(); ++i) {
-				Engine::Vector3 p1 = {pathPoints[i].x, pathPoints[i].y + 0.5f, pathPoints[i].z};
-				Engine::Vector3 p2 = {pathPoints[i+1].x, pathPoints[i+1].y + 0.5f, pathPoints[i+1].z};
-				Engine::Vector4 lineColor = canPlaceAll ? Engine::Vector4{0.6f, 1.0f, 0.6f, 1.0f} : Engine::Vector4{1.0f, 0.3f, 0.3f, 1.0f};
-				pipeRenderer->DrawLine3D(p1, p2, lineColor, true);
-			}
-		}
-
-		if (input->IsMouseTrigger(0)) {
-			if (canPlaceAll) {
-				if (CoinCount >= pathPoints.size() * selectedObjCost_) {
-					CoinCount -= static_cast<int>(pathPoints.size()) * selectedObjCost_;
-					for (const auto& p : pathPoints) {
-						SpawnPlacedObject(scene, p, objPath);
-					}
-					isPlacementMode_ = false;
-					isPipeSet_ = false;
+			for (const auto& obsPos : obstaclePositions) {
+				const float dx = obsPos.x - p.x;
+				const float dz = obsPos.z - p.z;
+				if (std::abs(dx) < kBlockHalfExtent && std::abs(dz) < kBlockHalfExtent) {
+					isBlocked = true;
+					break;
 				}
 			}
-			hasPipeStartPoint_ = false;
+
+			if (isBlocked) {
+				break; // 障害物にぶつかったら以降は繋がない
+			}
+			validPreviewPoints.push_back(p);
 		}
+
+		// 配置するパイプのうち、すでに存在しないものの数をカウントしてコスト計算
+		// ★最適化: unordered_setを使ってO(1)で超高速検索できるようにする
+		std::unordered_set<int64_t> existingPipeGrid;
+		existingPipeGrid.reserve(1024);
+		for (auto entity : registry.view<TransformComponent, TagComponent>()) {
+			if (registry.get<TagComponent>(entity).tag == TagType::Pipe) {
+				const auto& t = registry.get<TransformComponent>(entity).translate;
+				int64_t ix = static_cast<int64_t>(std::round(t.x));
+				int64_t iz = static_cast<int64_t>(std::round(t.z));
+				existingPipeGrid.insert((ix << 32) | (iz & 0xFFFFFFFF));
+			}
+		}
+
+		int actualNewPipes = 0;
+		for (const auto& p : validPreviewPoints) {
+			int64_t px = static_cast<int64_t>(std::round(p.x));
+			int64_t pz = static_cast<int64_t>(std::round(p.z));
+			bool alreadyHasPipe = (existingPipeGrid.count((px << 32) | (pz & 0xFFFFFFFF)) > 0);
+			if (!alreadyHasPipe) {
+				actualNewPipes++;
+			}
+		}
+
+		int requiredCost = actualNewPipes * selectedObjCost_;
+		bool canPlaceAll = (CoinCount >= requiredCost);
+		currentInstallationCost_ = requiredCost;
+
+		// プレビュー描画（大量プレビュー時は重いグリッドや十字ハイライトを最後の1回だけ描画する）
+		// ★最適化: 600個などの大量プレビュー時、半透明メッシュが600個重なるとGPUのオーバードローで激重になるため描画を間引く
+		size_t maxPreviewMeshes = 50;
+		size_t step = 1;
+		if (validPreviewPoints.size() > maxPreviewMeshes) {
+			step = validPreviewPoints.size() / maxPreviewMeshes;
+		}
+
+		for (size_t i = 0; i < validPreviewPoints.size(); ++i) {
+			bool drawExtras = (i == validPreviewPoints.size() - 1);
+			
+			// 始点、終点、および間引かれた間隔のポイントのみメッシュを描画
+			if (i == 0 || drawExtras || (i % step == 0)) {
+				DrawPlacementPreview(scene, validPreviewPoints[i], objPath, canPlaceAll, drawExtras);
+			}
+		}
+		
+		// 接続ラインの描画
+		auto* pipeRenderer = scene->GetRenderer();
+		if (pipeRenderer && !validPreviewPoints.empty()) {
+			Engine::Vector3 pPrev = {startPoint.x, startPoint.y + 0.5f, startPoint.z};
+			for (size_t i = 0; i < validPreviewPoints.size(); ++i) {
+				Engine::Vector3 pCurr = {validPreviewPoints[i].x, validPreviewPoints[i].y + 0.5f, validPreviewPoints[i].z};
+				Engine::Vector4 lineColor = canPlaceAll ? Engine::Vector4{0.6f, 1.0f, 0.6f, 1.0f} : Engine::Vector4{1.0f, 0.3f, 0.3f, 1.0f};
+				pipeRenderer->DrawLine3D(pPrev, pCurr, lineColor, true);
+				pPrev = pCurr;
+			}
+		}
+
+		// 設置処理
+		if (input->IsMouseDown(0)) {
+			if (canPlaceAll && !validPreviewPoints.empty()) {
+				CoinCount -= requiredCost;
+				for (const auto& p : validPreviewPoints) {
+					int64_t px = static_cast<int64_t>(std::round(p.x));
+					int64_t pz = static_cast<int64_t>(std::round(p.z));
+					bool alreadyHasPipe = (existingPipeGrid.count((px << 32) | (pz & 0xFFFFFFFF)) > 0);
+					if (!alreadyHasPipe) {
+						SpawnPlacedObject(scene, p, objPath);
+					}
+				}
+				// ドラッグ中は常に最新の末端を次の始点にする
+				pipeStartX_ = validPreviewPoints.back().x;
+				pipeStartY_ = validPreviewPoints.back().y;
+				pipeStartZ_ = validPreviewPoints.back().z;
+			}
+			
+			// もし「クリック」によって設置したなら、そこで一区切りつける（2クリック操作への対応）
+			if (input->IsMouseTrigger(0)) {
+				hasPipeStartPoint_ = false;
+			}
+		}
+		
 		return;
 	}
 
@@ -843,10 +958,9 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 
 	DrawPlacementPreview(scene, snappedHitPoint, objPath, canPlace);
 
-	if (input->IsMouseTrigger(0) && canPlace) {
+	if (input->IsMouseDown(0) && canPlace) {
 		SpawnPlacedObject(scene, snappedHitPoint, objPath);
 		CoinCount -= selectedObjCost_;
-		isPlacementMode_ = false;
 	}
 	currentInstallationCost_ = selectedObjCost_;
 }
@@ -885,71 +999,76 @@ bool PhaseSystemScript::TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3&
 	DirectX::XMVECTOR rayOrig, rayDir;
 	EditorUI::ScreenToWorldRay(localX, localY, tW, tH, view, proj, rayOrig, rayDir);
 
-	auto* renderer = scene->GetRenderer();
-	if (!renderer)
-		return false;
+	DirectX::XMFLOAT3 orig, dir;
+	DirectX::XMStoreFloat3(&orig, rayOrig);
+	DirectX::XMStoreFloat3(&dir, rayDir);
 
-	float bestDist = FLT_MAX;
-	bool hitTerrain = false;
-
-	auto& registry = scene->GetRegistry();
-	registry.view<NameComponent, TransformComponent>().each([&](entt::entity entity, const NameComponent& nc, const TransformComponent& tc) {
-     const bool isWallTag = registry.all_of<TagComponent>(entity) && registry.get<TagComponent>(entity).tag == TagType::Wall;
-		bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || (nc.name.find("Floor") != std::string::npos) || (nc.name.find("Ground") != std::string::npos) ||
-		                 (nc.name.find("Stage") != std::string::npos) || (nc.name.find("Plane") != std::string::npos);
-     if (!isTerrain && !isWallTag)
-			return;
-
-		Engine::Model* model = nullptr;
-		// GpuMeshCollider か MeshRenderer からモデルを取得
-		if (registry.all_of<GpuMeshColliderComponent>(entity)) {
-			auto& gmc = registry.get<GpuMeshColliderComponent>(entity);
-			if (gmc.meshHandle != 0) {
-				model = renderer->GetModel(gmc.meshHandle);
-			}
-		}
-
-		if (!model && registry.all_of<MeshRendererComponent>(entity)) {
-			auto& mr = registry.get<MeshRendererComponent>(entity);
-			if (mr.modelHandle != 0) {
-				model = renderer->GetModel(mr.modelHandle);
-			}
-		}
-
-		if (!model)
-			return;
-
-		float d;
-		Engine::Vector3 hp;
-		if (model->RayCast(rayOrig, rayDir, tc.ToMatrix(), d, hp) && d < bestDist) {
-			bestDist = d;
-			outHitPoint = hp;
-			hitTerrain = true;
-		}
-	});
-
-	// --- フォールバック: 仮想的な y=0 平面との交差判定 ---
-	if (!hitTerrain) {
-		DirectX::XMFLOAT3 orig, dir;
-		DirectX::XMStoreFloat3(&orig, rayOrig);
-		DirectX::XMStoreFloat3(&dir, rayDir);
-
-		if (std::abs(dir.y) > 0.0001f) {
-			float t = -orig.y / dir.y;
-			if (t > 0) {
-				outHitPoint = {orig.x + dir.x * t, 0.0f, orig.z + dir.z * t};
-				hitTerrain = true;
-			}
+	// ★ Y=0 の仮想平面との交差判定（地形の凹凸や壁を無視して確実にマスを取得）
+	if (std::abs(dir.y) > 0.0001f) {
+		float t = -orig.y / dir.y;
+		if (t > 0) {
+			outHitPoint = {orig.x + dir.x * t, 0.0f, orig.z + dir.z * t};
+			return true;
 		}
 	}
 
-	return hitTerrain;
+	return false;
 }
 
-void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vector3& hitPoint, const std::string& objPath, bool canPlace) {
+void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vector3& hitPoint, const std::string& objPath, bool canPlace, bool drawExtras) {
 	auto* renderer = scene->GetRenderer();
 	if (!renderer)
 		return;
+
+	// ★ 床のマス目ハイライトとグリッドの描画
+	float hs = 1.0f; // 2x2マスなので半径1.0f
+	
+	// ハイライト用の半透明パネル（メッシュ）を描画
+	static uint32_t highlightPlaneHandle = 0;
+	if (highlightPlaneHandle == 0) {
+		highlightPlaneHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+	}
+	Engine::Transform highlightTr;
+	highlightTr.translate = {hitPoint.x, hitPoint.y + 0.025f, hitPoint.z};
+	highlightTr.scale = {1.0f, 0.01f, 1.0f}; // 2x2 flat plane
+	Engine::Vector4 planeColor = canPlace ? Engine::Vector4{0.0f, 1.0f, 0.0f, 0.4f} : Engine::Vector4{1.0f, 0.0f, 0.0f, 0.4f};
+	
+	// ダミーのテクスチャハンドルがあればそれを使う（なければプレビューの使い回しでもOKですが、まだロードされてないので白テクスチャを後で使う）
+	// ここではとりあえず 0 を渡しておき、あとで previewTextureHandle_ がロードされたら描画します
+
+	// 外枠の線を少し太く（多重に）描画して強調
+	Engine::Vector4 highlightLineColor = canPlace ? Engine::Vector4{0.0f, 1.0f, 0.0f, 1.0f} : Engine::Vector4{1.0f, 0.0f, 0.0f, 1.0f};
+	for (int k = -1; k <= 1; ++k) {
+		float o = k * 0.03f;
+		Engine::Vector3 cv[4] = {
+			{hitPoint.x - hs - o, hitPoint.y + 0.05f, hitPoint.z - hs - o},
+			{hitPoint.x + hs + o, hitPoint.y + 0.05f, hitPoint.z - hs - o},
+			{hitPoint.x + hs + o, hitPoint.y + 0.05f, hitPoint.z + hs + o},
+			{hitPoint.x - hs - o, hitPoint.y + 0.05f, hitPoint.z + hs + o}
+		};
+		renderer->DrawLine3D(cv[0], cv[1], highlightLineColor, true);
+		renderer->DrawLine3D(cv[1], cv[2], highlightLineColor, true);
+		renderer->DrawLine3D(cv[2], cv[3], highlightLineColor, true);
+		renderer->DrawLine3D(cv[3], cv[0], highlightLineColor, true);
+	}
+
+	// 広範囲のグリッド線も描画する（アルファ値を高くして見やすく）
+	if (drawExtras) {
+		const int gridLines = 15;
+		Engine::Vector4 gridColor = {1.0f, 1.0f, 1.0f, 0.6f};
+		for (int i = -gridLines; i <= gridLines; ++i) {
+			float offset = i * 2.0f;
+			// X方向の線
+			Engine::Vector3 p1 = {hitPoint.x - gridLines * 2.0f, hitPoint.y + 0.02f, hitPoint.z + offset};
+			Engine::Vector3 p2 = {hitPoint.x + gridLines * 2.0f, hitPoint.y + 0.02f, hitPoint.z + offset};
+			renderer->DrawLine3D(p1, p2, gridColor, true);
+			// Z方向の線
+			p1 = {hitPoint.x + offset, hitPoint.y + 0.02f, hitPoint.z - gridLines * 2.0f};
+			p2 = {hitPoint.x + offset, hitPoint.y + 0.02f, hitPoint.z + gridLines * 2.0f};
+			renderer->DrawLine3D(p1, p2, gridColor, true);
+		}
+	}
+
 
 	std::string previewModelP = objPath; // Changed name to avoid shadowing class member
 	std::string previewTexturePath = "Resources/Textures/white1x1.png";
@@ -966,21 +1085,34 @@ void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vec
 		previewTextureHandle_ = renderer->LoadTexture2D(previewTexturePath);
 	}
 
+	// さきほどのハイライトメッシュを描画
+	renderer->DrawMesh(highlightPlaneHandle, previewTextureHandle_, highlightTr, planeColor, "Toon");
+
 	Engine::Transform tr;
-	tr.translate = {hitPoint.x, hitPoint.y + 0.5f, hitPoint.z};
-	tr.scale = {1.0f, 1.0f, 1.0f};
+	if (objPath.find("Pipe") != std::string::npos) {
+		tr.translate = {hitPoint.x, hitPoint.y + 0.4f, hitPoint.z};
+		tr.rotate = {-1.570796f, 0.0f, 0.0f};
+		tr.scale = {0.35f, 0.35f, 0.8f};
+	} else {
+		tr.translate = {hitPoint.x, hitPoint.y + 0.5f, hitPoint.z};
+		tr.scale = {1.0f, 1.0f, 1.0f};
+	}
 	const Engine::Vector4 previewColor = canPlace ? Engine::Vector4{0.6f, 1.0f, 0.6f, 0.6f} : Engine::Vector4{1.0f, 0.3f, 0.3f, 0.6f};
 	renderer->DrawMesh(previewModelHandle_, previewTextureHandle_, tr, previewColor, "Toon");
 
 	// パイプ設置時のみ、既存のタンク・大砲・ミサイル・ポイズンの接続エリア（緑の平面十字）を描画する
-	if (objPath.find("Pipe") != std::string::npos) {
+	if (objPath.find("Pipe") != std::string::npos && drawExtras) {
 		static uint32_t crossPlaneHandle = 0;
 		if (crossPlaneHandle == 0) {
 			crossPlaneHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
 		}
 		auto& registry = scene->GetRegistry();
-		registry.view<NameComponent, TransformComponent>().each([&](entt::entity, const NameComponent& nc, const TransformComponent& tc) {
-			if (nc.name.find("Canon") != std::string::npos || nc.name.find("Cannon") != std::string::npos || nc.name.find("Tank") != std::string::npos || nc.name.find("Missile") != std::string::npos || nc.name.find("Poison") != std::string::npos) {
+		for (auto entity : registry.view<TransformComponent, TagComponent>()) {
+			auto tag = registry.get<TagComponent>(entity).tag;
+			// 接続可能な施設（タンク、大砲、ミサイル、ポイズンなど）の場合のみ十字を描画
+			if (tag == TagType::Canon || tag == TagType::Cannon || tag == TagType::BulletTank || 
+				tag == TagType::Missile || tag == TagType::Poison || tag == TagType::PipeCannon) {
+				const auto& tc = registry.get<TransformComponent>(entity);
 				Engine::Transform planeTr;
 				planeTr.scale = {1.0f, 0.05f, 1.0f};
 				Engine::Vector4 colorPlane = {0.0f, 1.0f, 0.0f, 0.4f};
@@ -998,7 +1130,7 @@ void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vec
 				planeTr.translate = {tc.translate.x, tc.translate.y + 0.05f, tc.translate.z - 2.0f};
 				renderer->DrawMesh(crossPlaneHandle, previewTextureHandle_, planeTr, colorPlane, "Toon");
 			}
-		});
+		}
 	}
 
 	// 大砲の場合は攻撃範囲も描画する
@@ -1104,6 +1236,9 @@ void PhaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector
 	auto* renderer = scene->GetRenderer();
 	if (!renderer)
 		return;
+
+	// 何かオブジェクトを設置した場合は地形が変わった可能性があるため高さキャッシュをクリアする
+	ClearHeightCache();
 
 	auto& registry = scene->GetRegistry();
 
