@@ -29,7 +29,7 @@ void NavigationManager::UpdateCostMap(Game::GameScene* scene) {
 		if (registry.all_of<Game::TagComponent>(entity)) {
 			const auto& tag = tagView.get<Game::TagComponent>(entity).tag;
 			// チェックしたタグがWall, Canon, Pipeなら
-			if (tag == Game::TagType::Wall || tag == Game::TagType::Cannon || tag == Game::TagType::Pipe) {
+			if (tag == Game::TagType::Wall || tag == Game::TagType::Cannon) {
 				if (registry.all_of<Game::TransformComponent>(entity)) {
 					auto& tc = tcView.get<Game::TransformComponent>(entity);
 

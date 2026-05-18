@@ -125,7 +125,23 @@ static void CollectConnectedCanons(
 	}
 }
 
-void Canon::Start(entt::entity /*entity*/, GameScene* /*scene*/) { attackTimer_ = 0.0f; }
+void Canon::Start(entt::entity entity, GameScene* scene) {
+	attackTimer_ = 0.0f;
+	auto& registry = scene->GetRegistry();
+	
+	if (!registry.all_of<HealthComponent>(entity)) {
+		auto& hc = registry.emplace<HealthComponent>(entity);
+		hc.hp = 100.0f;
+		hc.maxHp = 100.0f;
+	}
+	if (!registry.all_of<HurtboxComponent>(entity)) {
+		auto& hurtbox = registry.emplace<HurtboxComponent>(entity);
+		hurtbox.size = {2.0f, 2.0f, 2.0f};
+	}
+	if (!registry.all_of<WorldSpaceUIComponent>(entity)) {
+		registry.emplace<WorldSpaceUIComponent>(entity);
+	}
+}
 
 void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (!scene) {
@@ -179,6 +195,7 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	currentAttackInterval_ = currentAttackInterval;
 	float currentRange = attackRange_ * skillRangeRate;
 	float currentDamage = damage_ * skillPowerRate;
+	SetVar(entity, scene, "AttackRange", currentRange);
 	// Debug(isConnectedToTank_); // ★削除: Update 内での ImGui 呼び出しは例外の原因となる可能性があるため
 
 	if (attackTimer_ > 0.0f) {
