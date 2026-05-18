@@ -93,10 +93,9 @@ void BaseScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	}
 
-	TransformComponent& targetTransform = registry.get<TransformComponent>(target);
+TransformComponent& targetTransform = registry.get<TransformComponent>(target);
 
 	float toX = targetTransform.translate.x - baseTransform.translate.x;
-	float toY = targetTransform.translate.y - baseTransform.translate.y;
 	float toZ = targetTransform.translate.z - baseTransform.translate.z;
 
 	if (std::fabs(toX) < 0.0001f && std::fabs(toZ) < 0.0001f) {
@@ -104,11 +103,8 @@ void BaseScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 
 	float desiredYaw = std::atan2(toX, toZ);
-	float distanceXZ = std::sqrt(toX * toX + toZ * toZ);
-	float desiredPitch = std::atan2(toY, distanceXZ);
 
 	baseTransform.rotate.y = desiredYaw;
-	baseTransform.rotate.x = -desiredPitch;
 
 	if (attackTimer_ > 0.0f) {
 		return;
