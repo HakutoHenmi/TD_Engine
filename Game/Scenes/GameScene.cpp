@@ -1064,6 +1064,11 @@ void GameScene::Draw() {
 			shouldCull = false; // エフェクト系は常に描画
 		} else if (registry_.try_get<TagComponent>(entity) && registry_.get<TagComponent>(entity).tag == TagType::VFX) {
 			shouldCull = false;
+		} else if (auto* nc = registry_.try_get<NameComponent>(entity)) {
+			// ★追加: 巨大なステージ・地形・スカイボックスなどはカリング対象外にし、視点角度による突然の消失を防ぐ
+			if (nc->name == "Ground" || nc->name == "Terrain" || nc->name == "SkyBox" || nc->name == "Skybox" || nc->name == "Stage") {
+				shouldCull = false;
+			}
 		}
 
 		if (shouldCull && !IsEntityVisibleInFrustum(frustum, renderer_, registry_, entity, mr.modelHandle, world)) {

@@ -323,7 +323,7 @@ void Renderer::BeginFrame(const float clearColorRGBA[4]) {
 
 	drawCalls_.clear(); // ★追加: ドローコールをクリア
 	
-	cbFrame_.time += 0.016f; // 固定値だが、本来はDeltaTimeを使うべき
+	cbFrame_.time = std::fmod(cbFrame_.time + 0.016f, 3600.0f); // 固定値だが、本来はDeltaTimeを使うべき
 
 	// インスタンス描画用のキューをクリア
 	instancedDrawCalls_.clear();                    
@@ -341,7 +341,7 @@ void Renderer::BeginFrame(const float clearColorRGBA[4]) {
 
 	framePPEnabled_ = ppEnabled_ && ppSceneColor_;
 
-	cbFrame_.time += 1.0f / 60.0f;
+	cbFrame_.time = std::fmod(cbFrame_.time + 1.0f / 60.0f, 3600.0f);
 
 	{
 		const uint32_t off = upload_[fi].Allocate(sizeof(CBFrame), 256);
@@ -916,7 +916,7 @@ void Renderer::EndFrame() {
 	list_->SetDescriptorHeaps(1, heaps);
 
 	if (framePPEnabled_) {
-		ppParams_.time += 1.0f / 60.0f;
+		ppParams_.time = std::fmod(ppParams_.time + 1.0f / 60.0f, 3600.0f);
 #ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable : 4324)

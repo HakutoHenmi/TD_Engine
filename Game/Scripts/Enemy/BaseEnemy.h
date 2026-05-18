@@ -65,7 +65,7 @@ protected: // メンバ変数
 	float hp_ = 0.0f;
 	float maxHp_ = 0.0f;
 	float expDrop_ = 10.0f;
-	float speed_ = 2.0f;
+	float speed_ = 2.8f; // ★強化: 2.0f -> 2.8f (敵の進軍速度を若干上昇)
 	float searchRange_ = 15.0f;
 	float loseTargetRange_ = 25.0f;
 	float attackRange_ = 2.0f; // 攻撃を始める距離

@@ -16,6 +16,14 @@ public:
 			auto& ct = view.get<CameraTargetComponent>(entity);
 			if (!ct.enabled) continue;
 
+			// ★追加: 初期位置とマウスホイール最低値のズレを完全に解消（JSONロード値の自動補正）
+			if (ct.distance < 15.0f) {
+				ct.distance = 15.0f;
+			}
+			if (ct.height < 4.5f) {
+				ct.height = 4.5f;
+			}
+
 			// ★追加: マウスホイールによるズーム（準備フェーズ中は無効）
 			bool isPrep = (Game::PhaseSystemScript::IsPhase() == Game::PhaseSystemScript::PreparationPhase);
 			auto* inputIns = ::Engine::Input::GetInstance();
@@ -23,7 +31,8 @@ public:
 				float wheel = inputIns->GetMouseWheelDelta();
 				if (std::abs(wheel) > 0.001f) {
 					ct.distance -= wheel * 2.0f; // 感度調整（1クリックで2m移動）
-					ct.distance = std::clamp(ct.distance, 2.0f, 30.0f); // 範囲制限
+					// 下限値を初期距離の15.0fとし、これ以上ズームインしてカメラが下がらないように制限
+					ct.distance = std::clamp(ct.distance, 15.0f, 35.0f); // 範囲制限
 				}
 			}
 
