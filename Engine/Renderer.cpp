@@ -1628,6 +1628,10 @@ float4 main(float4 svpos:SV_POSITION, float3 worldPos:TEXCOORD0, float3 normal:T
 	if (!vsInst || !psInst || !CreatePSO("Instanced", vsInst.Get(), psInst.Get()))
 		return false;
 
+	// 透明オブジェクト用 (AlphaBlend) PSO
+	if (!CreatePSO_Transparent("Transparent", vsInst.Get(), psInst.Get(), false))
+		return false;
+
 	// パーティクル インスタンス描画 (インラインコンパイルで環境非依存にする)
 	static const char* kVSParticleInstanced = R"(
 struct InstanceData { row_major float4x4 world; float4 color; float4 uvScaleOffset; };
