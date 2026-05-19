@@ -15,6 +15,8 @@
 using json = nlohmann::json;
 
 namespace Game {
+
+#pragma region json読み込み処理
 void SkillTree::LoadFromJson(const std::string& path) {
 	std::ifstream file(path);
 	if (!file.is_open()) {
@@ -67,6 +69,9 @@ void SkillTree::LoadFromJson(const std::string& path) {
 		// パース失敗時は何もしない
 	}
 }
+
+#pragma endregion
+
 void SkillTree::SetUIContext(Engine::Renderer* renderer, float screenW, float screenH, float mouseX, float mouseY) {
 	renderer_ = renderer;
 	screenW_ = screenW;
@@ -89,11 +94,14 @@ void SkillTree::Start(entt::entity entity, GameScene* scene) {
 
 	// 初期化（テクスチャ）
 	if (!initialized_) {
-		texBg_ = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
+		texBg_ = renderer_->LoadTexture2D("Resources/Textures/SkillBack.png");
 		texNodeLocked_ = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
 		texNodeUnlocked_ = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
 		texLine_ = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
-
+		texPrevArrow_ = renderer_->LoadTexture2D("Resources/Textures/left.png");
+		texNextArrow_ = renderer_->LoadTexture2D("Resources/Textures/Right.png");
+		texSkillPoint_ = renderer_->LoadTexture2D("Resources/Textures/SkillPoints.png");
+		texPanel_ = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
 		scene->GetEventSystem().Subscribe("GainSkillPoint", [this](float pts) { skillPoints_ += static_cast<int>(pts); });
 
 		initialized_ = true;
@@ -199,6 +207,62 @@ void SkillTree::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	auto& pageComp = registry.get<UITextComponent>(pageTitleE);
 	auto& pageRect = registry.get<RectTransformComponent>(pageTitleE);
+
+	if (pendingUnlockId_ != -1) {
+		float centerX = screenW_ * 0.5f;
+		float centerY = screenH_ * 0.5f;
+
+		entt::entity yesE = getOrCreateTextEntity(yesTextEntity_);
+		entt::entity noE = getOrCreateTextEntity(noTextEntity_);
+
+		UITextComponent& yesComp = registry.get<UITextComponent>(yesE);
+		RectTransformComponent& yesRect = registry.get<RectTransformComponent>(yesE);
+
+		UITextComponent& noComp = registry.get<UITextComponent>(noE);
+		RectTransformComponent& noRect = registry.get<RectTransformComponent>(noE);
+		entt::entity messageE = getOrCreateTextEntity(messageTextEntity_);
+
+		UITextComponent& messageComp = registry.get<UITextComponent>(messageE);
+		RectTransformComponent& messageRect = registry.get<RectTransformComponent>(messageE);
+
+		const SkillNode& node = nodes_[pendingUnlockId_];
+
+		std::string message = node.name + " を解放しますか？";
+
+		std::vector<int> neededIndices;
+		GetPrerequisites(pendingUnlockId_, neededIndices);
+
+		if (neededIndices.size() > 1) {
+			message = node.name + " と必要スキルを解放しますか？";
+		}
+
+		messageComp.text = message;
+		messageComp.fontSize = 28.0f;
+		messageComp.color = {1, 1, 1, 1};
+		messageRect.pos = {centerX - 170.0f, centerY - 45.0f};
+		yesComp.text = "YES";
+		yesComp.fontSize = 18.0f;
+		yesComp.color = {1, 1, 1, 1};
+		yesRect.pos = {centerX - 75.0f, centerY + 28.0f};
+
+		noComp.text = "NO";
+		noComp.fontSize = 18.0f;
+		noComp.color = {1, 1, 1, 1};
+		noRect.pos = {centerX + 50.0f, centerY + 28.0f};
+
+		DrawConfirmationDialog(renderer_, screenW_, screenH_);
+	} else {
+		if (registry.valid(yesTextEntity_)) {
+			registry.get<UITextComponent>(yesTextEntity_).text = "";
+		}
+
+		if (registry.valid(noTextEntity_)) {
+			registry.get<UITextComponent>(noTextEntity_).text = "";
+		}
+		if (registry.valid(messageTextEntity_)) {
+			registry.get<UITextComponent>(messageTextEntity_).text = "";
+		}
+	}
 
 	// タイトル決定
 	std::string pageTitle = "";
@@ -555,7 +619,7 @@ void SkillTree::DrawBackground(Engine::Renderer* renderer, float screenW, float 
 	bg.y = kPanelMargin;
 	bg.w = screenW - kPanelMargin * 2.0f;
 	bg.h = screenH - kPanelMargin * 2.0f;
-	bg.color = {0.05f, 0.05f, 0.15f, 0.85f};
+	bg.color = {0.55f, 0.40f, 0.22f, 0.9f};
 	renderer->DrawSprite(texBg_, bg);
 }
 
@@ -704,8 +768,8 @@ void SkillTree::DrawSkillPointsText(Engine::Renderer* renderer, float screenW, f
 		dot.y = baseY;
 		dot.w = dotSize;
 		dot.h = dotSize;
-		dot.color = {0.9f, 0.8f, 0.1f, 1.0f};
-		renderer->DrawSprite(texBg_, dot);
+		dot.color = {1.0f, 1.0f, 1.0f, 1.0f};
+		renderer->DrawSprite(texSkillPoint_, dot);
 	}
 }
 
@@ -727,7 +791,7 @@ void SkillTree::DrawDescriptionPanel(Engine::Renderer* renderer, float screenW, 
 	bg.w = panelWidth;
 	bg.h = panelHeight;
 	bg.color = {0.05f, 0.05f, 0.15f, 0.9f};
-	renderer->DrawSprite(texBg_, bg);
+	renderer->DrawSprite(texPanel_, bg);
 
 	Engine::Renderer::SpriteDesc border;
 	border.x = panelX;
@@ -739,7 +803,7 @@ void SkillTree::DrawDescriptionPanel(Engine::Renderer* renderer, float screenW, 
 	} else {
 		border.color = {0.3f, 0.6f, 1.0f, 1.0f};
 	}
-	renderer->DrawSprite(texBg_, border);
+	renderer->DrawSprite(texPanel_, border);
 
 	if (node.textureHandle != 0) {
 		Engine::Renderer::SpriteDesc icon;
@@ -762,7 +826,7 @@ void SkillTree::DrawConfirmationDialog(Engine::Renderer* renderer, float screenW
 		return;
 	}
 
-	const SkillNode& node = nodes_[pendingUnlockId_];
+	// const SkillNode& node = nodes_[pendingUnlockId_];
 
 	float dialogWidth = 400.0f;
 	float dialogHeight = 160.0f;
@@ -775,7 +839,7 @@ void SkillTree::DrawConfirmationDialog(Engine::Renderer* renderer, float screenW
 	bg.w = dialogWidth;
 	bg.h = dialogHeight;
 	bg.color = {0.1f, 0.1f, 0.2f, 1.0f};
-	renderer->DrawSprite(texBg_, bg);
+	renderer->DrawSprite(texPanel_, bg);
 
 	Engine::Renderer::SpriteDesc border;
 	border.x = centerX - dialogWidth * 0.5f;
@@ -783,25 +847,25 @@ void SkillTree::DrawConfirmationDialog(Engine::Renderer* renderer, float screenW
 	border.w = dialogWidth;
 	border.h = 2.0f;
 	border.color = {1.0f, 0.8f, 0.2f, 1.0f};
-	renderer->DrawSprite(texBg_, border);
+	renderer->DrawSprite(texPanel_, border);
 
 #ifdef USE_IMGUI
-	ImDrawList* drawList = ImGui::GetBackgroundDrawList();
+	/*ImDrawList* drawList = ImGui::GetBackgroundDrawList();
 	if (drawList) {
-		std::string message = "Unlock '" + node.name + "'?";
+	    std::string message = "Unlock '" + node.name + "'?";
 
-		std::vector<int> neededIndices;
-		GetPrerequisites(pendingUnlockId_, neededIndices);
-		if (neededIndices.size() > 1) {
-			message = "Unlock '" + node.name + "' and its prerequisites?";
-		}
+	    std::vector<int> neededIndices;
+	    GetPrerequisites(pendingUnlockId_, neededIndices);
+	    if (neededIndices.size() > 1) {
+	        message = "Unlock '" + node.name + "' and its prerequisites?";
+	    }
 
-		ImVec2 textSize = ImGui::CalcTextSize(message.c_str());
-		drawList->AddText(ImGui::GetFont(), 20.0f, ImVec2(centerX - textSize.x * 0.5f, centerY - 40.0f), IM_COL32(255, 255, 255, 255), message.c_str());
+	    ImVec2 textSize = ImGui::CalcTextSize(message.c_str());
+	    drawList->AddText(ImGui::GetFont(), 20.0f, ImVec2(centerX - textSize.x * 0.5f, centerY - 40.0f), IM_COL32(255, 255, 255, 255), message.c_str());
 
-		drawList->AddText(ImGui::GetFont(), 18.0f, ImVec2(centerX - 85.0f, centerY + 28.0f), IM_COL32(255, 255, 255, 255), "YES");
-		drawList->AddText(ImGui::GetFont(), 18.0f, ImVec2(centerX + 45.0f, centerY + 28.0f), IM_COL32(255, 255, 255, 255), "NO");
-	}
+	    drawList->AddText(ImGui::GetFont(), 18.0f, ImVec2(centerX - 85.0f, centerY + 28.0f), IM_COL32(255, 255, 255, 255), "YES");
+	    drawList->AddText(ImGui::GetFont(), 18.0f, ImVec2(centerX + 45.0f, centerY + 28.0f), IM_COL32(255, 255, 255, 255), "NO");
+	}*/
 #endif
 
 	Engine::Renderer::SpriteDesc yesButton;
@@ -810,7 +874,7 @@ void SkillTree::DrawConfirmationDialog(Engine::Renderer* renderer, float screenW
 	yesButton.w = 100.0f;
 	yesButton.h = 40.0f;
 	yesButton.color = {0.2f, 0.7f, 0.3f, 0.8f};
-	renderer->DrawSprite(texBg_, yesButton);
+	renderer->DrawSprite(texPanel_, yesButton);
 
 	Engine::Renderer::SpriteDesc noButton;
 	noButton.x = centerX + 10.0f;
@@ -818,7 +882,7 @@ void SkillTree::DrawConfirmationDialog(Engine::Renderer* renderer, float screenW
 	noButton.w = 100.0f;
 	noButton.h = 40.0f;
 	noButton.color = {0.8f, 0.2f, 0.2f, 0.8f};
-	renderer->DrawSprite(texBg_, noButton);
+	renderer->DrawSprite(texPanel_, noButton);
 }
 void SkillTree::UpdatePageButtonRect(float screenW, float screenH) {
 	float padding = 20.0f;
@@ -910,12 +974,13 @@ void SkillTree::DrawPageButtons(Engine::Renderer* renderer, float screenW, float
 	prev.h = prevButtonBottom_ - prevButtonTop_;
 
 	if (currentPageId_ <= 0) {
-		prev.color = {0.3f, 0.3f, 0.3f, 0.8f};
+		prev.color = {0.25f, 0.25f, 0.25f, 0.5f};
 	} else {
-		prev.color = {0.8f, 0.8f, 0.2f, 0.9f};
+		prev.color = {4.0f, 1.8f, 1.2f, 1.0f};
 	}
-	//前ページ戻る
-	renderer->DrawSprite(texBg_, prev);
+	// 前ページ戻る
+
+	renderer->DrawSprite(texPrevArrow_, prev);
 
 	Engine::Renderer::SpriteDesc next;
 	next.x = nextButtonLeft_;
@@ -924,22 +989,22 @@ void SkillTree::DrawPageButtons(Engine::Renderer* renderer, float screenW, float
 	next.h = nextButtonBottom_ - nextButtonTop_;
 
 	if (currentPageId_ >= pageCount_ - 1) {
-		next.color = {0.3f, 0.3f, 0.3f, 0.8f};
+		next.color = {0.25f, 0.25f, 0.25f, 0.5f};
 	} else {
-		next.color = {0.8f, 0.8f, 0.2f, 0.9f};
+		next.color = {4.0f, 3.5f, 2.5f, 1.0f};
 	}
 	// 次ページ進む
-	renderer->DrawSprite(texBg_, next);
+	renderer->DrawSprite(texNextArrow_, next);
 
 #ifdef USE_IMGUI
-	ImDrawList* drawList = ImGui::GetBackgroundDrawList();
-	if (drawList) {
-		drawList->AddText(ImVec2(prevButtonLeft_ + 35.0f, prevButtonTop_ + 20.0f), IM_COL32(255, 255, 255, 255), "<");
-		drawList->AddText(ImVec2(nextButtonLeft_ + 35.0f, nextButtonTop_ + 20.0f), IM_COL32(255, 255, 255, 255), ">");
+	// ImDrawList* drawList = ImGui::GetBackgroundDrawList();
+	// if (drawList) {
+	//	drawList->AddText(ImVec2(prevButtonLeft_ + 35.0f, prevButtonTop_ + 20.0f), IM_COL32(255, 255, 255, 255), "<");
+	//	drawList->AddText(ImVec2(nextButtonLeft_ + 35.0f, nextButtonTop_ + 20.0f), IM_COL32(255, 255, 255, 255), ">");
 
-		std::string pageText = "Page " + std::to_string(currentPageId_ + 1) + " / " + std::to_string(pageCount_);
-		drawList->AddText(ImVec2(screenW * 0.5f - 50.0f, screenH - 80.0f), IM_COL32(255, 255, 255, 255), pageText.c_str());
-	}
+	//	std::string pageText = "Page " + std::to_string(currentPageId_ + 1) + " / " + std::to_string(pageCount_);
+	//	drawList->AddText(ImVec2(screenW * 0.5f - 50.0f, screenH - 80.0f), IM_COL32(255, 255, 255, 255), pageText.c_str());
+	//}
 #endif
 }
 

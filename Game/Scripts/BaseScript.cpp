@@ -72,8 +72,9 @@ void BaseScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	const auto& enemies = scene->GetEntitiesByTag(TagType::Enemy);
 	for (auto other : enemies) {
-		if (!registry.valid(other) || !registry.all_of<TransformComponent>(other)) continue;
-		
+		if (!registry.valid(other) || !registry.all_of<TransformComponent>(other))
+			continue;
+
 		auto& enemyTransform = registry.get<TransformComponent>(other);
 
 		float differenceX = enemyTransform.translate.x - baseTransform.translate.x;
@@ -93,7 +94,7 @@ void BaseScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	}
 
-TransformComponent& targetTransform = registry.get<TransformComponent>(target);
+	TransformComponent& targetTransform = registry.get<TransformComponent>(target);
 
 	float toX = targetTransform.translate.x - baseTransform.translate.x;
 	float toZ = targetTransform.translate.z - baseTransform.translate.z;

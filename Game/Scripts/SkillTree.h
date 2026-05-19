@@ -92,11 +92,20 @@ private:
 
 	std::vector<SkillNode> nodes_;
 
+
+	// テクスチャハンドル（リソース管理は別途行うことを想定）
 	uint32_t texBg_ = 0;
 	uint32_t texNodeLocked_ = 0;
 	uint32_t texNodeUnlocked_ = 0;
 	uint32_t texLine_ = 0;
-
+	uint32_t texPrevArrow_ = 0;
+	uint32_t texNextArrow_ = 0;
+	uint32_t texSkillPoint_ = 0;
+	uint32_t texPanel_ = 0;
+	entt::entity yesTextEntity_ = entt::null;
+	entt::entity noTextEntity_ = entt::null;
+	entt::entity confirmMessageEntity_ = entt::null;
+	entt::entity messageTextEntity_ = entt::null;
 	Engine::Renderer* renderer_ = nullptr;
 	float screenW_ = 0.0f;
 	float screenH_ = 0.0f;
