@@ -30,6 +30,7 @@ private:
     // 散らばるモード（銃撃エフェクト用）
     bool scatterMode_ = false;
     bool isSpecial_ = false;      // 特殊射撃フラグ
+    bool isFlight_ = false;       // 飛行エフェクトフラグ
     float scatterDelay_ = 0.05f;
     float scatterSpeed_ = 10.0f;
 

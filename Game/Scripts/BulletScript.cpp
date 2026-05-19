@@ -84,6 +84,31 @@ void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		float moveY = -std::sin(bulletTransform.rotate.x) * speed_ * dt;
 		float moveZ = std::cos(bulletTransform.rotate.y) * cosX * speed_ * dt;
 
+		// ★追加: レイキャストによる地形・オブジェクトとの衝突判定
+		Engine::Vector3 rayOrig = {bulletTransform.translate.x, bulletTransform.translate.y, bulletTransform.translate.z};
+		Engine::Vector3 rayDir = {moveX, moveY, moveZ};
+		float moveLen = std::sqrt(moveX*moveX + moveY*moveY + moveZ*moveZ);
+		
+		if (moveLen > 0.0001f) {
+			rayDir.x /= moveLen; rayDir.y /= moveLen; rayDir.z /= moveLen;
+			float hitDist = 0.0f;
+			if (scene->RayCast(rayOrig, rayDir, moveLen, static_cast<uint32_t>(entity), hitDist)) {
+				// 何かに当たった
+				bulletTransform.translate.x += rayDir.x * hitDist;
+				bulletTransform.translate.y += rayDir.y * hitDist;
+				bulletTransform.translate.z += rayDir.z * hitDist;
+
+				if (registry.all_of<VariableComponent>(entity)) {
+					auto& vc = registry.get<VariableComponent>(entity);
+					if (vc.GetValue("Enhanced", 0.0f) > 0.5f) {
+						scene->GetEventSystem().Emit("EnhancedBulletHit", static_cast<float>(static_cast<uint32_t>(entity)));
+					}
+				}
+				scene->DestroyObject(static_cast<uint32_t>(entity));
+				return;
+			}
+		}
+
 		bulletTransform.translate.x += moveX;
 		bulletTransform.translate.y += moveY;
 		bulletTransform.translate.z += moveZ;
@@ -106,9 +131,30 @@ void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	directionY /= length;
 	directionZ /= length;
 
-	bulletTransform.translate.x += directionX * speed_ * dt;
-	bulletTransform.translate.y += directionY * speed_ * dt;
-	bulletTransform.translate.z += directionZ * speed_ * dt;
+	float moveAmount = speed_ * dt;
+
+	// ★追加: 追尾中もレイキャストで壁や床にぶつかったら爆発させる
+	Engine::Vector3 rayOrig = {bulletTransform.translate.x, bulletTransform.translate.y, bulletTransform.translate.z};
+	Engine::Vector3 rayDir = {directionX, directionY, directionZ};
+	float hitDist = 0.0f;
+	if (scene->RayCast(rayOrig, rayDir, moveAmount, static_cast<uint32_t>(entity), hitDist)) {
+		bulletTransform.translate.x += rayDir.x * hitDist;
+		bulletTransform.translate.y += rayDir.y * hitDist;
+		bulletTransform.translate.z += rayDir.z * hitDist;
+
+		if (registry.all_of<VariableComponent>(entity)) {
+			auto& vc = registry.get<VariableComponent>(entity);
+			if (vc.GetValue("Enhanced", 0.0f) > 0.5f) {
+				scene->GetEventSystem().Emit("EnhancedBulletHit", static_cast<float>(static_cast<uint32_t>(entity)));
+			}
+		}
+		scene->DestroyObject(static_cast<uint32_t>(entity));
+		return;
+	}
+
+	bulletTransform.translate.x += directionX * moveAmount;
+	bulletTransform.translate.y += directionY * moveAmount;
+	bulletTransform.translate.z += directionZ * moveAmount;
 
 	float yaw = std::atan2(directionX, directionZ);
 	float horizontalLength = std::sqrt(directionX * directionX + directionZ * directionZ);

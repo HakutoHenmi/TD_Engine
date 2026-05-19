@@ -30,6 +30,7 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		auto& cm = scene->GetRegistry().get<CharacterMovementComponent>(entity);
 		cm.heightOffset = 1.0f; // 2m立方体キャラの中心がy=1.0になるように
 		cm.jumpPower = jumpPower_; // ★追加: ヘッダで定義されているジャンプ力(8.0f)を反映し、ジャンプを弱くする
+		cm.speed = 8.5f; // ★追加: プレイヤーの基本移動速度を上げる（デフォルトは5.0f）
 	}
 
 	// プレイヤー自身のコライダーサイズを「見た目（2m立方体）」に合わせる
@@ -155,6 +156,7 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		gun = scene->GetRegistry().create();
 		scene->GetRegistry().emplace<NameComponent>(gun).name = gunName_;
 	}
+	scene->SetTag(gun, TagType::Player); // ★追加: RayCastの地形判定から除外するためプレイヤー属性を付与
 
 	auto& gTc = scene->GetRegistry().get_or_emplace<TransformComponent>(gun);
 	gTc.scale = { 0.1f, 0.1f, 0.8f };
@@ -520,8 +522,8 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 			pTc.translate.y += recoilVelocity_.y * dt; // ★高さ移動
 
-			// 減衰 (XZのみ): 慣性を持たせるため少し緩める (0.02 -> 0.4)
-			float damping = std::pow(0.4f, dt);
+			// 減衰 (XZのみ): 慣性を持たせるため少し緩める (0.4 -> 0.7)
+			float damping = std::pow(0.7f, dt);
 			recoilVelocity_.x *= damping;
 			recoilVelocity_.z *= damping;
 
@@ -550,7 +552,10 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		// ★追加: 飛行システム
 		bool isGrounded = (pTc.translate.y <= scene->GetHeightAt(pTc.translate.x, pTc.translate.z, pTc.translate.y + 1.0f) + 1.1f);
 		if (isGrounded && !isFlying_) {
-			flightPressure_ = maxFlightPressure_;
+			flightPressure_ += maxFlightPressure_ * 3.0f * dt; // 0.33秒で全回復する速度で徐々に回復
+			if (flightPressure_ > maxFlightPressure_) {
+				flightPressure_ = maxFlightPressure_;
+			}
 		}
 
 		bool currentRightClickDown = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
@@ -587,14 +592,15 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 						flightVfxTimer = 0.0f;
 						entt::entity boostVfx = scene->CreateEntity("FlightSteam");
 						auto& bTc = scene->GetRegistry().get<TransformComponent>(boostVfx);
-						bTc.translate = { pTc.translate.x, pTc.translate.y + 0.5f, pTc.translate.z };
+						bTc.translate = { pTc.translate.x, pTc.translate.y, pTc.translate.z };
 						scene->SetTag(boostVfx, TagType::VFX);
 						auto& bVc = scene->GetRegistry().emplace<VariableComponent>(boostVfx);
 						bVc.SetValue("NormalY", -1.0f);
-						bVc.SetValue("Radius", 1.5f);
+						bVc.SetValue("Radius", 2.0f);
 						bVc.SetValue("Duration", 0.3f);
-						bVc.SetValue("ScatterSpeed", 8.0f);
-						bVc.SetValue("Count", 5.0f);
+						bVc.SetValue("ScatterSpeed", 12.0f);
+						bVc.SetValue("Count", 25.0f);
+						bVc.SetValue("IsFlight", 1.0f);
 						auto& bSc = scene->GetRegistry().emplace<ScriptComponent>(boostVfx);
 						bSc.scripts.push_back({ "SpaceShatterScript", "", nullptr });
 					}
@@ -664,6 +670,218 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))  scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = true;
 	}
 
+	// ==== ★修正: DrawUIで描画していた各種ゲーム内UI・エフェクトをここでキューに積む ====
+	// ※App.cpp の描画順序により、IScript::DrawUI は Renderer::EndFrame の後（ImGuiフェーズ）に呼ばれるため、
+	// Renderer にキューを積む処理（SDFUI, DrawString, DrawLine3Dなど）は Update 内で行う必要があります。
+	{
+		auto* uiRenderer = Engine::Renderer::GetInstance();
+		if (uiRenderer) {
+			// ---- 経験値バー ----
+			float progress = nextExperience_ > 0.0f ? (experience_ / nextExperience_) : 0.0f;
+			progress = std::clamp(progress, 0.0f, 1.0f);
+
+			// 背景 (黒半透明)
+			Engine::Renderer::SdfUIDesc bgDesc{};
+			bgDesc.centerPx = {170.0f, 32.0f};
+			bgDesc.sizePx = {300.0f, 24.0f};
+			bgDesc.lineWidth = 0.0f;
+			bgDesc.glow = 0.0f;
+			bgDesc.color = {0.1f, 0.1f, 0.1f, 0.8f};
+			bgDesc.shape = 0;
+			bgDesc.round = 4.0f;
+			bgDesc.progress = 1.0f;
+			bgDesc.fill = 1.0f;
+			uiRenderer->DrawSDFUI(bgDesc);
+
+			// 経験値バー本体 (青系)
+			Engine::Renderer::SdfUIDesc barDesc{};
+			barDesc.centerPx = {170.0f, 32.0f};
+			barDesc.sizePx = {300.0f, 24.0f};
+			barDesc.lineWidth = 0.0f;
+			barDesc.glow = 2.0f;
+			barDesc.color = {0.2f, 0.6f, 1.0f, 1.0f};
+			barDesc.shape = 0;
+			barDesc.round = 4.0f;
+			barDesc.progress = progress;
+			barDesc.fill = 1.0f;
+			if (progress > 0.0f) {
+				uiRenderer->DrawSDFUI(barDesc);
+			}
+
+			// 外枠 (白)
+			Engine::Renderer::SdfUIDesc outlineDesc{};
+			outlineDesc.centerPx = {170.0f, 32.0f};
+			outlineDesc.sizePx = {300.0f, 24.0f};
+			outlineDesc.lineWidth = 2.0f;
+			outlineDesc.glow = 0.0f;
+			outlineDesc.color = {1.0f, 1.0f, 1.0f, 1.0f};
+			outlineDesc.shape = 0;
+			outlineDesc.round = 4.0f;
+			outlineDesc.progress = 1.0f;
+			outlineDesc.fill = 0.0f;
+			uiRenderer->DrawSDFUI(outlineDesc);
+
+			// テキスト (Lvと経験値)
+			char textBuf[64];
+			snprintf(textBuf, sizeof(textBuf), "Lv.%d   EXP: %.1f / %.1f", level_, experience_, nextExperience_);
+			uiRenderer->DrawString(textBuf, 32.0f, 26.0f, 0.5f, {0,0,0,1});
+			uiRenderer->DrawString(textBuf, 30.0f, 24.0f, 0.5f, {1,1,1,1});
+
+			// ==== ★追加: ロックオンレティクル & 銃レティクル ====
+			if (playerType_ == PlayerType::Gun) {
+				DrawReticle(entity, scene);
+			} else if (scene && scene->GetRegistry().all_of<CameraTargetComponent>(entity)) {
+				auto& ct = scene->GetRegistry().get<CameraTargetComponent>(entity);
+				if (ct.lockedTarget != entt::null && scene->GetRegistry().valid(ct.lockedTarget)) {
+					auto& eTc = scene->GetRegistry().get<TransformComponent>(ct.lockedTarget);
+					DirectX::XMFLOAT3 targetWorldPos = eTc.translate;
+					targetWorldPos.y += 1.5f; // 敵の頭上
+
+					auto* camera = &scene->GetCamera();
+					if (camera) {
+						float sx = 0.0f, sy = 0.0f;
+						if (UISystem::WorldToScreen(targetWorldPos, *camera, sx, sy)) {
+							// ダイヤモンド型のターゲットマーカー（4つの短い線）
+							float reticleSize = 20.0f;
+							Engine::Vector4 reticleColor = {1.0f, 0.3f, 0.3f, 1.0f}; // 赤
+
+							// 外枠 (円形)
+							Engine::Renderer::SdfUIDesc rd{};
+							rd.shape = 1; // Circle
+							rd.centerPx = {sx, sy};
+							rd.sizePx = {reticleSize * 2.0f, reticleSize * 2.0f};
+							rd.lineWidth = 2.0f;
+							rd.glow = 3.0f;
+							rd.color = reticleColor;
+							rd.progress = 1.0f;
+							rd.fill = 0.0f;
+							rd.round = 0.0f;
+							uiRenderer->DrawSDFUI(rd);
+
+							// 内側のドット
+							Engine::Renderer::SdfUIDesc dotDesc{};
+							dotDesc.shape = 1;
+							dotDesc.centerPx = {sx, sy};
+							dotDesc.sizePx = {4.0f, 4.0f};
+							dotDesc.lineWidth = 0.0f;
+							dotDesc.glow = 2.0f;
+							dotDesc.color = reticleColor;
+							dotDesc.progress = 1.0f;
+							dotDesc.fill = 1.0f;
+							uiRenderer->DrawSDFUI(dotDesc);
+
+						}
+					}
+				}
+			}
+
+			// ==== ★追加: マズルフラッシュ描画 (3Dライン) ====
+			for (auto& mf : muzzleFlashes_) {
+				mf.life -= dt;
+				if (mf.life > 0.0f) {
+					float alpha = mf.life / mf.maxLife;
+					float size = 0.3f + (1.0f - alpha) * 0.5f;
+					// 十字のフラッシュ
+					uiRenderer->DrawLine3D(
+						{mf.pos.x - size, mf.pos.y, mf.pos.z},
+						{mf.pos.x + size, mf.pos.y, mf.pos.z},
+						{1.0f, 0.9f, 0.3f, alpha});
+					uiRenderer->DrawLine3D(
+						{mf.pos.x, mf.pos.y - size, mf.pos.z},
+						{mf.pos.x, mf.pos.y + size, mf.pos.z},
+						{1.0f, 0.9f, 0.3f, alpha});
+					uiRenderer->DrawLine3D(
+						{mf.pos.x, mf.pos.y, mf.pos.z - size},
+						{mf.pos.x, mf.pos.y, mf.pos.z + size},
+						{1.0f, 0.9f, 0.3f, alpha});
+				}
+			}
+			while (!muzzleFlashes_.empty() && muzzleFlashes_.front().life <= 0) muzzleFlashes_.pop_front();
+
+			// ==== ★追加: クリスタル飛散エフェクト描画 ====
+			// (ユーザー要望により、古い青い線のクリスタルは描画しない)
+			/*
+			for (auto& cp : crystalParticles_) {
+				cp.life -= dt;
+				cp.pos.x += cp.velocity.x * dt;
+				cp.pos.y += cp.velocity.y * dt;
+				cp.pos.z += cp.velocity.z * dt;
+				cp.velocity.y -= 8.0f * dt;
+				cp.rot += cp.rotSpeed * dt;
+				if (cp.life > 0.0f) {
+					float alpha = (cp.life / cp.maxLife);
+					float s = cp.size;
+					float c = std::cos(cp.rot);
+					float sn = std::sin(cp.rot);
+					Engine::Vector3 top    = {cp.pos.x + sn * s, cp.pos.y + c * s, cp.pos.z};
+					Engine::Vector3 right  = {cp.pos.x + c * s, cp.pos.y - sn * s, cp.pos.z + s * 0.3f};
+					Engine::Vector3 bottom = {cp.pos.x - sn * s, cp.pos.y - c * s, cp.pos.z};
+					Engine::Vector3 left   = {cp.pos.x - c * s, cp.pos.y + sn * s, cp.pos.z - s * 0.3f};
+					Engine::Vector4 col = {cp.color.x, cp.color.y, cp.color.z, alpha * cp.color.w};
+					uiRenderer->DrawLine3D(top, right, col, true);
+					uiRenderer->DrawLine3D(right, bottom, col, true);
+					uiRenderer->DrawLine3D(bottom, left, col, true);
+					uiRenderer->DrawLine3D(left, top, col, true);
+					Engine::Vector4 colInner = {cp.color.x * 1.2f, cp.color.y * 1.2f, cp.color.z * 1.2f, alpha * 0.6f};
+					uiRenderer->DrawLine3D(top, bottom, colInner, true);
+					uiRenderer->DrawLine3D(left, right, colInner, true);
+				}
+			}
+			while (!crystalParticles_.empty() && crystalParticles_.front().life <= 0) crystalParticles_.pop_front();
+			*/
+
+			// ==== ★追加: 薬莢描画 (3Dラインで小さな金色の線) ====
+			for (auto& sc : shellCasings_) {
+				sc.life -= dt;
+				sc.velocity.y -= 15.0f * dt; // 重力
+				sc.pos.x += sc.velocity.x * dt;
+				sc.pos.y += sc.velocity.y * dt;
+				sc.pos.z += sc.velocity.z * dt;
+
+				if (sc.life > 0.0f) {
+					float alpha = sc.life / 0.6f;
+					Engine::Vector4 shellColor = {0.9f, 0.7f, 0.2f, alpha};
+					uiRenderer->DrawLine3D(
+						{sc.pos.x, sc.pos.y, sc.pos.z},
+						{sc.pos.x, sc.pos.y + 0.08f, sc.pos.z},
+						shellColor);
+				}
+			}
+			while (!shellCasings_.empty() && shellCasings_.front().life <= 0) shellCasings_.pop_front();
+
+			// ==== ★追加: スキルバフ中のUI表示 ====
+			if (isSkillActive_ && playerType_ == PlayerType::Gun) {
+				float remaining = skillDuration_;
+				float ratio = remaining / SKILL_MAX_DURATION;
+				Engine::Renderer::SdfUIDesc skillBg{};
+				skillBg.centerPx = {640.0f, 680.0f};
+				skillBg.sizePx = {200.0f, 16.0f};
+				skillBg.lineWidth = 0.0f;
+				skillBg.glow = 0.0f;
+				skillBg.color = {0.05f, 0.05f, 0.1f, 0.7f};
+				skillBg.shape = 0;
+				skillBg.round = 4.0f;
+				skillBg.progress = 1.0f;
+				skillBg.fill = 1.0f;
+				uiRenderer->DrawSDFUI(skillBg);
+				Engine::Renderer::SdfUIDesc skillBar{};
+				skillBar.centerPx = {640.0f, 680.0f};
+				skillBar.sizePx = {200.0f, 16.0f};
+				skillBar.lineWidth = 0.0f;
+				skillBar.glow = 3.0f;
+				skillBar.color = {0.3f, 0.9f, 1.0f, 1.0f};
+				skillBar.shape = 0;
+				skillBar.round = 4.0f;
+				skillBar.progress = ratio;
+				skillBar.fill = 1.0f;
+				uiRenderer->DrawSDFUI(skillBar);
+				char skillText[64];
+				snprintf(skillText, sizeof(skillText), "CRYSTAL ENHANCE  %.1fs", remaining);
+				uiRenderer->DrawString(skillText, 560.0f, 674.0f, 0.4f, {0.3f, 0.9f, 1.0f, 1.0f});
+			}
+		}
+	}
+
 	// Update 内での ImGui 呼び出しは例外の原因となる可能性があるため、OnEditorUI に移動しました。
 }
 
@@ -694,6 +912,15 @@ void PlayerScript::UpdateMovement(entt::entity entity, GameScene* scene, float /
 		speedMul *= 3.0f; // ★3倍に（ベース速度に対して適用されるため非常に速くなります）
 	}
 	
+	// ★追加: TPS視点として、Gunモード時は常にカメラの向きを向く
+	if (playerType_ == PlayerType::Gun) {
+		auto* camera = &scene->GetCamera();
+		if (camera) {
+			auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
+			pTc.rotate.y = camera->GetRotation().y;
+		}
+	}
+
 	// ★入力ベクトルの大きさが1.0に制限されるため、移動速度そのものを変更する
 	if (scene->GetRegistry().all_of<CharacterMovementComponent>(entity)) {
 		auto& cm = scene->GetRegistry().get<CharacterMovementComponent>(entity);
@@ -1126,7 +1353,7 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 		float cCost = CHARGE_SHOT_COST * (isFlying_ ? 0.5f : 1.0f); // ★飛行中はコスト半減
 		float nCost = NORMAL_SHOT_COST * (isFlying_ ? 0.5f : 1.0f); // ★飛行中はコスト半減
 
-		if (chargeTime_ >= CHARGE_TIME_MIN && (isSkillActive_ || steamPressure_ >= cCost * 0.5f)) {
+		if (chargeTime_ >= CHARGE_TIME_MIN && (isSkillActive_ || steamPressure_ > 0.0f)) {
 			// ★チャージショット発射！
 			ShootChargeShot(entity, scene);
 			if (!isSkillActive_) steamPressure_ -= cCost;
@@ -1405,6 +1632,247 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 	}
 }
 
+void PlayerScript::DrawReticle(entt::entity playerEntity, GameScene* scene) {
+	auto* renderer = Engine::Renderer::GetInstance();
+	if (!renderer) return;
+
+	// ===== 1. 表示位置の決定 =====
+	float cx = (float)Engine::WindowDX::kW * 0.5f;
+	float cy = (float)Engine::WindowDX::kH * 0.5f;
+	bool hasTarget = false;
+	Engine::Vector4 reticleColor = {0.85f, 0.75f, 0.4f, 0.8f}; // 基本は真鍮ゴールド（不透明度80%）
+
+	if (scene->GetRegistry().all_of<CameraTargetComponent>(playerEntity)) {
+		auto& ct = scene->GetRegistry().get<CameraTargetComponent>(playerEntity);
+		entt::entity target = isFlying_ ? lockedEnemy_ : ct.lockedTarget;
+		if (target != entt::null && scene->GetRegistry().valid(target)) {
+			auto& eTc = scene->GetRegistry().get<TransformComponent>(target);
+			DirectX::XMFLOAT3 targetWorldPos = eTc.translate;
+			targetWorldPos.y += 1.0f; // 敵の胸あたり
+
+			auto* camera = &scene->GetCamera();
+			if (camera) {
+				float sx = 0.0f, sy = 0.0f;
+				if (UISystem::WorldToScreen(targetWorldPos, *camera, sx, sy)) {
+					cx = sx;
+					cy = sy;
+					hasTarget = true;
+					reticleColor = {0.95f, 0.55f, 0.15f, 0.95f}; // ロックオン時は少し朱色っぽく輝かせる
+				}
+			}
+		}
+	}
+
+	// ===== 2. アニメーションとダイナミック状態の計算 =====
+	float baseR = 24.0f;
+
+	// 反動による一時的な拡大 (射撃後クールダウン)
+	float recoilOffset = 0.0f;
+	if (gunShootTimer_ > 0.0f) {
+		recoilOffset = (gunShootTimer_ / (isFlying_ ? 0.25f : 0.3f)) * 26.0f;
+	}
+	float currentR = baseR + recoilOffset;
+
+	// プルプルした振動（ジッター）の計算
+	float jitterX = 0.0f;
+	float jitterY = 0.0f;
+	{
+		float jitterIntensity = 0.0f;
+		
+		if (isRecharging_) {
+			jitterIntensity = 3.5f; // オーバーヒート時は激しくガタガタ
+		} else if (isCharging_) {
+			float cRatio = std::clamp<float>(chargeTime_ / CHARGE_TIME_MAX, 0.0f, 1.0f);
+			jitterIntensity = 1.0f + cRatio * 5.0f;
+		} else if (gunShootTimer_ > 0.0f) {
+			jitterIntensity = (gunShootTimer_ / 0.3f) * 4.0f;
+		}
+
+		if (jitterIntensity > 0.0f) {
+			jitterX = (float(rand() % 100) / 100.0f - 0.5f) * jitterIntensity;
+			jitterY = (float(rand() % 100) / 100.0f - 0.5f) * jitterIntensity;
+		}
+	}
+
+	float rx = cx + jitterX;
+	float ry = cy + jitterY;
+
+	// ===== 3. リチャージ（オーバーヒート）時の警告表示 =====
+	if (isRecharging_) {
+		float b = std::sin((float)GetTickCount64() * 0.015f) * 0.5f + 0.5f;
+		Engine::Vector4 warnColor = {1.0f, 0.2f, 0.1f, 0.4f + b * 0.6f};
+		
+		renderer->DrawString("OVERHEAT", rx - 38.0f, ry - currentR - 22.0f, 0.35f, warnColor);
+		renderer->DrawString("RECHARGING", rx - 48.0f, ry + currentR + 10.0f, 0.35f, warnColor);
+
+		reticleColor = {1.0f, 0.15f, 0.1f, 0.75f};
+	}
+
+	// ===== 4. スチームパンク風SDFUIレティクル描画 =====
+
+	// (A) 真鍮の外環（極細ベゼル）
+	{
+		Engine::Renderer::SdfUIDesc desc{};
+		desc.centerPx = {rx, ry};
+		desc.sizePx = {currentR + 3.0f, currentR + 3.0f};
+		desc.lineWidth = 2.5f; // ★太さを設定
+		desc.glow = 1.0f;
+		desc.color = reticleColor;
+		desc.shape = 1; // ★Circle
+		desc.round = 0.0f;
+		desc.inner = 0.0f;
+		desc.rotateRad = 0.0f;
+		desc.progress = -1.0f; // プログレスバー機能無効
+		desc.fill = 0.0f;      // ★Outline(スカスカ)
+		renderer->DrawSDFUI(desc);
+	}
+
+	{
+		Engine::Renderer::SdfUIDesc desc{};
+		desc.centerPx = {rx, ry};
+		desc.sizePx = {currentR - 1.0f, currentR - 1.0f};
+		desc.lineWidth = 1.5f; // ★太さを設定
+		desc.glow = 0.5f;
+		desc.color = {reticleColor.x, reticleColor.y, reticleColor.z, reticleColor.w * 0.9f};
+		desc.shape = 1; // ★Circle
+		desc.round = 0.0f;
+		desc.inner = 0.0f;
+		desc.rotateRad = 0.0f;
+		desc.progress = -1.0f; // プログレスバー機能無効
+		desc.fill = 0.0f;      // ★Outline
+		renderer->DrawSDFUI(desc);
+	}
+
+	// (B) 4点のリベット（極小ドット）
+	for (int i = 0; i < 4; ++i) {
+		float angle = DirectX::XM_PIDIV2 * (float)i;
+		float dotR = currentR + 1.0f;
+		float dx = rx + std::cos(angle) * dotR;
+		float dy = ry + std::sin(angle) * dotR;
+
+		Engine::Renderer::SdfUIDesc desc{};
+		desc.centerPx = {dx, dy};
+		desc.sizePx = {3.0f, 3.0f};
+		desc.lineWidth = 0.0f;
+		desc.glow = 1.0f;
+		desc.color = reticleColor;
+		desc.shape = 1; // Circle
+		desc.round = 0.0f;
+		desc.inner = 0.0f;
+		desc.rotateRad = 0.0f;
+		desc.progress = -1.0f; // プログレスバー機能無効
+		desc.fill = 1.0f;      // 塗りつぶし
+		renderer->DrawSDFUI(desc);
+	}
+
+	// (C) チャージメーター（円周に沿う進捗ゲージ）
+	if (isCharging_) {
+		float cRatio = std::clamp<float>(chargeTime_ / CHARGE_TIME_MAX, 0.0f, 1.0f);
+		Engine::Vector4 chargeColor = {1.0f, 0.45f + cRatio * 0.55f, 0.1f, 0.9f}; // オレンジから黄色に変化
+		
+		Engine::Renderer::SdfUIDesc desc{};
+		desc.centerPx = {rx, ry};
+		desc.sizePx = {currentR + 6.0f, currentR + 6.0f};
+		desc.lineWidth = 3.0f; // ★太さを設定
+		desc.glow = 3.0f;
+		desc.color = chargeColor;
+		desc.shape = 1; // ★Circle
+		desc.round = 0.0f;
+		desc.inner = 0.0f;
+		desc.rotateRad = 0.0f;
+		desc.progress = cRatio; // チャージ進捗を適用！
+		desc.fill = 0.0f;      // ★Outline
+		renderer->DrawSDFUI(desc);
+	}
+
+	// (D) 内側の精密十字線（中央から少し離れた4本の短い線）
+	float crossLen = 8.0f;
+	float crossOffset = 5.0f + recoilOffset * 0.2f;
+	float crossThickness = 2.5f;
+	
+	// 上
+	{
+		Engine::Renderer::SdfUIDesc desc{};
+		desc.centerPx = {rx, ry - crossOffset - crossLen * 0.5f};
+		desc.sizePx = {crossThickness, crossLen};
+		desc.lineWidth = 1.0f;
+		desc.glow = 0.0f;
+		desc.color = reticleColor;
+		desc.shape = 0; // Square
+		desc.round = 0.0f;
+		desc.inner = 0.0f;
+		desc.rotateRad = 0.0f;
+		desc.progress = -1.0f; // プログレスバー機能無効
+		desc.fill = 1.0f;      // 塗りつぶし
+		renderer->DrawSDFUI(desc);
+	}
+	// 下
+	{
+		Engine::Renderer::SdfUIDesc desc{};
+		desc.centerPx = {rx, ry + crossOffset + crossLen * 0.5f};
+		desc.sizePx = {crossThickness, crossLen};
+		desc.lineWidth = 1.0f;
+		desc.glow = 0.0f;
+		desc.color = reticleColor;
+		desc.shape = 0; // Square
+		desc.round = 0.0f;
+		desc.inner = 0.0f;
+		desc.rotateRad = 0.0f;
+		desc.progress = -1.0f; // プログレスバー機能無効
+		desc.fill = 1.0f;      // 塗りつぶし
+		renderer->DrawSDFUI(desc);
+	}
+	// 左
+	{
+		Engine::Renderer::SdfUIDesc desc{};
+		desc.centerPx = {rx - crossOffset - crossLen * 0.5f, ry};
+		desc.sizePx = {crossLen, crossThickness};
+		desc.lineWidth = 1.0f;
+		desc.glow = 0.0f;
+		desc.color = reticleColor;
+		desc.shape = 0; // Square
+		desc.round = 0.0f;
+		desc.inner = 0.0f;
+		desc.rotateRad = 0.0f;
+		desc.progress = -1.0f; // プログレスバー機能無効
+		desc.fill = 1.0f;      // 塗りつぶし
+		renderer->DrawSDFUI(desc);
+	}
+	// 右
+	{
+		Engine::Renderer::SdfUIDesc desc{};
+		desc.centerPx = {rx + crossOffset + crossLen * 0.5f, ry};
+		desc.sizePx = {crossLen, crossThickness};
+		desc.lineWidth = 1.0f;
+		desc.glow = 0.0f;
+		desc.color = reticleColor;
+		desc.shape = 0; // Square
+		desc.round = 0.0f;
+		desc.inner = 0.0f;
+		desc.rotateRad = 0.0f;
+		desc.progress = -1.0f; // プログレスバー機能無効
+		desc.fill = 1.0f;      // 塗りつぶし
+		renderer->DrawSDFUI(desc);
+	}
+
+	// (E) センタードット
+	{
+		Engine::Renderer::SdfUIDesc desc{};
+		desc.centerPx = {rx, ry};
+		desc.sizePx = {4.0f, 4.0f};
+		desc.lineWidth = 1.0f;
+		desc.glow = 2.0f;
+		desc.color = reticleColor;
+		desc.shape = 1; // Circle
+		desc.round = 0.0f;
+		desc.inner = 0.0f;
+		desc.rotateRad = 0.0f;
+		desc.progress = -1.0f; // プログレスバー機能無効
+		desc.fill = 1.0f;      // 塗りつぶし
+		renderer->DrawSDFUI(desc);
+	}
+}
+
 void PlayerScript::ShootGun(entt::entity entity, GameScene* scene) {
 	float baseDamage = 15.0f; // ★復元: 8.0f -> 15.0f
 	float damage = isSkillActive_ ? baseDamage * SKILL_DAMAGE_MULTIPLIER : baseDamage;
@@ -1416,7 +1884,16 @@ void PlayerScript::ShootGun(entt::entity entity, GameScene* scene) {
 	DirectX::XMFLOAT3 muzzlePos = pTc.translate;
 	muzzlePos.y += 1.0f;
 	float fwdX = std::sin(pTc.rotate.y);
+	float fwdY = 0.0f;
 	float fwdZ = std::cos(pTc.rotate.y);
+
+	auto* camera = &scene->GetCamera();
+	if (camera && playerType_ == PlayerType::Gun) {
+		Engine::Vector3 camRot = camera->GetRotation();
+		fwdX = std::sin(camRot.y) * std::cos(camRot.x);
+		fwdY = -std::sin(camRot.x);
+		fwdZ = std::cos(camRot.y) * std::cos(camRot.x);
+	}
 
 	if (gun != entt::null) {
 		Engine::Matrix4x4 gunWorld = scene->GetWorldMatrix((int)gun);
@@ -1424,13 +1901,9 @@ void PlayerScript::ShootGun(entt::entity entity, GameScene* scene) {
 		// 銃のモデルの先端（ローカルZ前方）を計算
 		DirectX::XMVECTOR tip = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(0, 0, 0.6f, 1), m);
 		DirectX::XMStoreFloat3(&muzzlePos, tip);
-		
-		// 向きも銃の向きに合わせる
-		DirectX::XMVECTOR forward = DirectX::XMVector3Normalize(DirectX::XMVector3TransformNormal(DirectX::XMVectorSet(0, 0, 1, 0), m));
-		fwdX = DirectX::XMVectorGetX(forward);
-		fwdZ = DirectX::XMVectorGetZ(forward);
 	} else {
 		muzzlePos.x += fwdX * 1.5f;
+		muzzlePos.y += fwdY * 1.5f;
 		muzzlePos.z += fwdZ * 1.5f;
 	}
 
@@ -1441,7 +1914,7 @@ void PlayerScript::ShootGun(entt::entity entity, GameScene* scene) {
 
 	auto& mvc = scene->GetRegistry().emplace<VariableComponent>(muzzleVfx);
 	mvc.SetValue("NormalX", fwdX);
-	mvc.SetValue("NormalY", 0.0f);
+	mvc.SetValue("NormalY", fwdY);
 	mvc.SetValue("NormalZ", fwdZ);
 	mvc.SetValue("Radius", 3.0f);             // 拡大
 	mvc.SetValue("Duration", 0.5f);           // 素早く消える
@@ -1487,12 +1960,23 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 		}
 	}
 
-	// ★追加: 飛行中は追尾弾になる
+	// ★追加・変更: ロックオン中または飛行中のロック対象に対して追尾弾にする
+	entt::entity homingTarget = entt::null;
+	if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) {
+		auto& ct = scene->GetRegistry().get<CameraTargetComponent>(entity);
+		if (ct.lockedTarget != entt::null && scene->GetRegistry().valid(ct.lockedTarget)) {
+			homingTarget = ct.lockedTarget;
+		}
+	}
 	if (isFlying_ && lockedEnemy_ != entt::null && scene->GetRegistry().valid(lockedEnemy_)) {
+		homingTarget = lockedEnemy_;
+	}
+
+	if (homingTarget != entt::null) {
 		auto& bVc = scene->GetRegistry().get_or_emplace<VariableComponent>(bullet);
 		bVc.SetValue("HasTarget", 1.0f);
 		
-		uint32_t targetId = static_cast<uint32_t>(lockedEnemy_);
+		uint32_t targetId = static_cast<uint32_t>(homingTarget);
 		bVc.SetValue("TargetHigh", static_cast<float>(targetId >> 16));
 		bVc.SetValue("TargetLow", static_cast<float>(targetId & 0xFFFF));
 		
@@ -1512,8 +1996,58 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 		DirectX::XMMATRIX m = DirectX::XMLoadFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&gunWorld));
 		DirectX::XMVECTOR tip = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(0, 0, 0.6f, 1), m);
 		DirectX::XMStoreFloat3(&bTc.translate, tip);
+	} else {
+		bTc.translate.x += moveX * 2.0f;
+		bTc.translate.y += moveY * 2.0f;
+		bTc.translate.z += moveZ * 2.0f;
+	}
+
+	// ★変更: レティクル（カメラの中心）へ正確に弾を飛ばすためのレイキャスト判定
+	auto* camera = &scene->GetCamera();
+	if (camera && playerType_ == PlayerType::Gun && !isFlying_) {
+		Engine::Vector3 camRot = camera->GetRotation();
+		Engine::Vector3 camPos = camera->GetPosition();
 		
-		// 弾の向きを銃の向き（プラス拡散分）に合わせる
+		// カメラの前方ベクトルを計算
+		float cy = std::cos(camRot.y);
+		float sy = std::sin(camRot.y);
+		float cp = std::cos(camRot.x);
+		float sp = std::sin(camRot.x);
+		Engine::Vector3 camFwd = { sy * cp, -sp, cy * cp };
+
+		// レイキャストで目標地点を特定 (最大200m)
+		float hitDist = 0.0f;
+		Engine::Vector3 targetPoint;
+		// ※自分自身をRayCastから除外
+		if (scene->RayCast(camPos, camFwd, 200.0f, static_cast<uint32_t>(entity), hitDist)) {
+			targetPoint.x = camPos.x + camFwd.x * hitDist;
+			targetPoint.y = camPos.y + camFwd.y * hitDist;
+			targetPoint.z = camPos.z + camFwd.z * hitDist;
+		} else {
+			// 何も当たらなければ200m先をターゲットとする
+			targetPoint.x = camPos.x + camFwd.x * 200.0f;
+			targetPoint.y = camPos.y + camFwd.y * 200.0f;
+			targetPoint.z = camPos.z + camFwd.z * 200.0f;
+		}
+
+		// 銃口からターゲットへの方向ベクトルを計算
+		float dx = targetPoint.x - bTc.translate.x;
+		float dy = targetPoint.y - bTc.translate.y;
+		float dz = targetPoint.z - bTc.translate.z;
+		
+		float distXZ = std::sqrt(dx*dx + dz*dz);
+		float yaw = std::atan2(dx, dz);
+		float pitch = std::atan2(-dy, distXZ);
+
+		bTc.rotate.y = yaw + spreadYaw;
+		bTc.rotate.x = pitch + spreadPitch;
+		
+		moveX = std::sin(bTc.rotate.y) * std::cos(bTc.rotate.x);
+		moveY = -std::sin(bTc.rotate.x);
+		moveZ = std::cos(bTc.rotate.y) * std::cos(bTc.rotate.x);
+	} else if (gun != entt::null) {
+		Engine::Matrix4x4 gunWorld = scene->GetWorldMatrix((int)gun);
+		DirectX::XMMATRIX m = DirectX::XMLoadFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&gunWorld));
 		DirectX::XMVECTOR forward = DirectX::XMVector3Normalize(DirectX::XMVector3TransformNormal(DirectX::XMVectorSet(0, 0, 1, 0), m));
 		moveX = DirectX::XMVectorGetX(forward);
 		moveY = DirectX::XMVectorGetY(forward);
@@ -1523,10 +2057,6 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 		float fPitch = -std::asin(std::max(-1.0f, std::min(1.0f, moveY)));
 		bTc.rotate.y = fYaw + spreadYaw;
 		bTc.rotate.x = fPitch + spreadPitch;
-	} else {
-		bTc.translate.x += moveX * 2.0f;
-		bTc.translate.y += moveY * 2.0f;
-		bTc.translate.z += moveZ * 2.0f;
 	}
 
 	bTc.scale = { 0.2f, 0.2f, 0.6f };
@@ -1716,246 +2246,10 @@ void PlayerScript::OnEditorUI() {
 #endif
 }
 
-void PlayerScript::DrawUI(entt::entity entity, GameScene* scene) {
-	auto* renderer = Engine::Renderer::GetInstance();
-	if (!renderer) return;
-
-	// ---- 経験値バー ----
-	float progress = nextExperience_ > 0.0f ? (experience_ / nextExperience_) : 0.0f;
-	progress = std::clamp(progress, 0.0f, 1.0f);
-
-	// 背景 (黒半透明)
-	Engine::Renderer::SdfUIDesc bgDesc{};
-	bgDesc.centerPx = {170.0f, 32.0f};
-	bgDesc.sizePx = {300.0f, 24.0f};
-	bgDesc.lineWidth = 0.0f;
-	bgDesc.glow = 0.0f;
-	bgDesc.color = {0.1f, 0.1f, 0.1f, 0.8f};
-	bgDesc.shape = 0;
-	bgDesc.round = 4.0f;
-	bgDesc.progress = 1.0f;
-	bgDesc.fill = 1.0f;
-	renderer->DrawSDFUI(bgDesc);
-
-	// 経験値バー本体 (青系)
-	Engine::Renderer::SdfUIDesc barDesc{};
-	barDesc.centerPx = {170.0f, 32.0f};
-	barDesc.sizePx = {300.0f, 24.0f};
-	barDesc.lineWidth = 0.0f;
-	barDesc.glow = 2.0f;
-	barDesc.color = {0.2f, 0.6f, 1.0f, 1.0f};
-	barDesc.shape = 0;
-	barDesc.round = 4.0f;
-	barDesc.progress = progress;
-	barDesc.fill = 1.0f;
-	if (progress > 0.0f) {
-		renderer->DrawSDFUI(barDesc);
-	}
-
-	// 外枠 (白)
-	Engine::Renderer::SdfUIDesc outlineDesc{};
-	outlineDesc.centerPx = {170.0f, 32.0f};
-	outlineDesc.sizePx = {300.0f, 24.0f};
-	outlineDesc.lineWidth = 2.0f;
-	outlineDesc.glow = 0.0f;
-	outlineDesc.color = {1.0f, 1.0f, 1.0f, 1.0f};
-	outlineDesc.shape = 0;
-	outlineDesc.round = 4.0f;
-	outlineDesc.progress = 1.0f;
-	outlineDesc.fill = 0.0f;
-	renderer->DrawSDFUI(outlineDesc);
-
-	// テキスト (Lvと経験値)
-	char textBuf[64];
-	snprintf(textBuf, sizeof(textBuf), "Lv.%d   EXP: %.1f / %.1f", level_, experience_, nextExperience_);
-	renderer->DrawString(textBuf, 32.0f, 26.0f, 0.5f, {0,0,0,1});
-	renderer->DrawString(textBuf, 30.0f, 24.0f, 0.5f, {1,1,1,1});
-
-	// ==== ★追加: ロックオンレティクル ====
-	if (scene && scene->GetRegistry().all_of<CameraTargetComponent>(entity)) {
-		auto& ct = scene->GetRegistry().get<CameraTargetComponent>(entity);
-		if (ct.lockedTarget != entt::null && scene->GetRegistry().valid(ct.lockedTarget)) {
-			auto& eTc = scene->GetRegistry().get<TransformComponent>(ct.lockedTarget);
-			DirectX::XMFLOAT3 targetWorldPos = eTc.translate;
-			targetWorldPos.y += 1.5f; // 敵の頭上
-
-			auto* camera = &scene->GetCamera();
-			if (camera) {
-				float sx = 0.0f, sy = 0.0f;
-				if (UISystem::WorldToScreen(targetWorldPos, *camera, sx, sy)) {
-					// ダイヤモンド型のターゲットマーカー（4つの短い線）
-					float reticleSize = 20.0f;
-					Engine::Vector4 reticleColor = {1.0f, 0.3f, 0.3f, 1.0f}; // 赤
-
-					// 外枚 (ダイヤモンド型 – 4本の線)
-					Engine::Renderer::SdfUIDesc rd{};
-					rd.shape = 1; // Circle
-					rd.centerPx = {sx, sy};
-					rd.sizePx = {reticleSize * 2.0f, reticleSize * 2.0f};
-					rd.lineWidth = 2.0f;
-					rd.glow = 3.0f;
-					rd.color = reticleColor;
-					rd.progress = 1.0f;
-					rd.fill = 0.0f;
-					rd.round = 0.0f;
-					renderer->DrawSDFUI(rd);
-
-					// 内側のドット
-					Engine::Renderer::SdfUIDesc dotDesc{};
-					dotDesc.shape = 1;
-					dotDesc.centerPx = {sx, sy};
-					dotDesc.sizePx = {4.0f, 4.0f};
-					dotDesc.lineWidth = 0.0f;
-					dotDesc.glow = 2.0f;
-					dotDesc.color = reticleColor;
-					dotDesc.progress = 1.0f;
-					dotDesc.fill = 1.0f;
-					renderer->DrawSDFUI(dotDesc);
-
-					// ターゲット名表示
-					if (scene->GetRegistry().all_of<NameComponent>(ct.lockedTarget)) {
-						auto& name = scene->GetRegistry().get<NameComponent>(ct.lockedTarget).name;
-						renderer->DrawString(name, sx - 30.0f, sy - reticleSize - 18.0f, 0.4f, reticleColor);
-					}
-				}
-			}
-		}
-	}
-
-	// ==== ★追加: マズルフラッシュ描画 (3Dライン) ====
-	float dt = 1.0f / 60.0f; // 簡易dt
-	for (auto& mf : muzzleFlashes_) {
-		mf.life -= dt;
-		if (mf.life > 0.0f) {
-			float alpha = mf.life / mf.maxLife;
-			float size = 0.3f + (1.0f - alpha) * 0.5f;
-			// 十字のフラッシュ
-			renderer->DrawLine3D(
-				{mf.pos.x - size, mf.pos.y, mf.pos.z},
-				{mf.pos.x + size, mf.pos.y, mf.pos.z},
-				{1.0f, 0.9f, 0.3f, alpha});
-			renderer->DrawLine3D(
-				{mf.pos.x, mf.pos.y - size, mf.pos.z},
-				{mf.pos.x, mf.pos.y + size, mf.pos.z},
-				{1.0f, 0.9f, 0.3f, alpha});
-			renderer->DrawLine3D(
-				{mf.pos.x, mf.pos.y, mf.pos.z - size},
-				{mf.pos.x, mf.pos.y, mf.pos.z + size},
-				{1.0f, 0.9f, 0.3f, alpha});
-		}
-	}
-	while (!muzzleFlashes_.empty() && muzzleFlashes_.front().life <= 0) muzzleFlashes_.pop_front();
-
-	// ==== ★追加: クリスタル飛散エフェクト描画 ====
-	// (ユーザー要望により、古い青い線のクリスタルは描画しない)
-	/*
-	for (auto& cp : crystalParticles_) {
-		cp.life -= dt;
-		cp.pos.x += cp.velocity.x * dt;
-		cp.pos.y += cp.velocity.y * dt;
-		cp.pos.z += cp.velocity.z * dt;
-		cp.velocity.y -= 8.0f * dt;
-		cp.rot += cp.rotSpeed * dt;
-		if (cp.life > 0.0f) {
-			float alpha = (cp.life / cp.maxLife);
-			float s = cp.size;
-			float c = std::cos(cp.rot);
-			float sn = std::sin(cp.rot);
-			Engine::Vector3 top    = {cp.pos.x + sn * s, cp.pos.y + c * s, cp.pos.z};
-			Engine::Vector3 right  = {cp.pos.x + c * s, cp.pos.y - sn * s, cp.pos.z + s * 0.3f};
-			Engine::Vector3 bottom = {cp.pos.x - sn * s, cp.pos.y - c * s, cp.pos.z};
-			Engine::Vector3 left   = {cp.pos.x - c * s, cp.pos.y + sn * s, cp.pos.z - s * 0.3f};
-			Engine::Vector4 col = {cp.color.x, cp.color.y, cp.color.z, alpha * cp.color.w};
-			renderer->DrawLine3D(top, right, col, true);
-			renderer->DrawLine3D(right, bottom, col, true);
-			renderer->DrawLine3D(bottom, left, col, true);
-			renderer->DrawLine3D(left, top, col, true);
-			Engine::Vector4 colInner = {cp.color.x * 1.2f, cp.color.y * 1.2f, cp.color.z * 1.2f, alpha * 0.6f};
-			renderer->DrawLine3D(top, bottom, colInner, true);
-			renderer->DrawLine3D(left, right, colInner, true);
-		}
-	}
-	while (!crystalParticles_.empty() && crystalParticles_.front().life <= 0) crystalParticles_.pop_front();
-	*/
-
-	// ==== ★追加: 残像描画 (3Dラインでシルエット) ====
-	// (ユーザー要望により、ワイヤーフレームの残像は描画しない)
-	/*
-	for (auto& ai : afterImages_) {
-		ai.life -= dt;
-		if (ai.life > 0.0f) {
-			float alpha = (ai.life / ai.maxLife) * 0.5f;
-			Engine::Vector4 ghostColor = {0.3f, 0.7f, 1.0f, alpha};
-			
-			float hw = ai.scale.x * 0.5f;
-			float hh = ai.scale.y * 0.5f;
-			// 人型のシルエット（矩形の輪郭）
-			Engine::Vector3 p0 = {ai.pos.x - hw, ai.pos.y,           ai.pos.z};
-			Engine::Vector3 p1 = {ai.pos.x + hw, ai.pos.y,           ai.pos.z};
-			Engine::Vector3 p2 = {ai.pos.x + hw, ai.pos.y + hh*2.0f, ai.pos.z};
-			Engine::Vector3 p3 = {ai.pos.x - hw, ai.pos.y + hh*2.0f, ai.pos.z};
-			renderer->DrawLine3D(p0, p1, ghostColor);
-			renderer->DrawLine3D(p1, p2, ghostColor);
-			renderer->DrawLine3D(p2, p3, ghostColor);
-			renderer->DrawLine3D(p3, p0, ghostColor);
-			// 対角線（X印っぽい残像）
-			renderer->DrawLine3D(p0, p2, ghostColor);
-			renderer->DrawLine3D(p1, p3, ghostColor);
-		}
-	}
-	while (!afterImages_.empty() && afterImages_.front().life <= 0) afterImages_.pop_front();
-	*/
-
-	// ==== ★追加: 薬莢描画 (3Dラインで小さな金色の線) ====
-	for (auto& sc : shellCasings_) {
-		sc.life -= dt;
-		sc.velocity.y -= 15.0f * dt; // 重力
-		sc.pos.x += sc.velocity.x * dt;
-		sc.pos.y += sc.velocity.y * dt;
-		sc.pos.z += sc.velocity.z * dt;
-
-		if (sc.life > 0.0f) {
-			float alpha = sc.life / 0.6f;
-			Engine::Vector4 shellColor = {0.9f, 0.7f, 0.2f, alpha};
-			renderer->DrawLine3D(
-				{sc.pos.x, sc.pos.y, sc.pos.z},
-				{sc.pos.x, sc.pos.y + 0.08f, sc.pos.z},
-				shellColor);
-		}
-	}
-	while (!shellCasings_.empty() && shellCasings_.front().life <= 0) shellCasings_.pop_front();
-
-
-	// ==== ★追加: スキルバフ中のUI表示 ====
-	if (isSkillActive_ && playerType_ == PlayerType::Gun) {
-		float remaining = skillDuration_;
-		float ratio = remaining / SKILL_MAX_DURATION;
-		Engine::Renderer::SdfUIDesc skillBg{};
-		skillBg.centerPx = {640.0f, 680.0f};
-		skillBg.sizePx = {200.0f, 16.0f};
-		skillBg.lineWidth = 0.0f;
-		skillBg.glow = 0.0f;
-		skillBg.color = {0.05f, 0.05f, 0.1f, 0.7f};
-		skillBg.shape = 0;
-		skillBg.round = 4.0f;
-		skillBg.progress = 1.0f;
-		skillBg.fill = 1.0f;
-		renderer->DrawSDFUI(skillBg);
-		Engine::Renderer::SdfUIDesc skillBar{};
-		skillBar.centerPx = {640.0f, 680.0f};
-		skillBar.sizePx = {200.0f, 16.0f};
-		skillBar.lineWidth = 0.0f;
-		skillBar.glow = 3.0f;
-		skillBar.color = {0.3f, 0.9f, 1.0f, 1.0f};
-		skillBar.shape = 0;
-		skillBar.round = 4.0f;
-		skillBar.progress = ratio;
-		skillBar.fill = 1.0f;
-		renderer->DrawSDFUI(skillBar);
-		char skillText[64];
-		snprintf(skillText, sizeof(skillText), "CRYSTAL ENHANCE  %.1fs", remaining);
-		renderer->DrawString(skillText, 560.0f, 674.0f, 0.4f, {0.3f, 0.9f, 1.0f, 1.0f});
-	}
+void PlayerScript::DrawUI(entt::entity /*entity*/, GameScene* /*scene*/) {
+	// ※注意: DrawUI は Renderer::EndFrame の後（ImGuiフェーズ）に呼び出されるため、
+	// ここで renderer->DrawSDFUI や DrawString などを呼んでも次のフレームの先頭でクリアされてしまい描画されません。
+	// ゲーム内のUI描画（SDFやテキストなど）は Update 内で行うように移動しました。
 }
 
 void PlayerScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}

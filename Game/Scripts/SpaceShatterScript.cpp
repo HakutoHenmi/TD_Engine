@@ -41,6 +41,7 @@ void SpaceShatterScript::Start(entt::entity entity, GameScene* scene) {
 
         scatterMode_ = vc.GetValue("ScatterMode", 0.0f) > 0.5f;
         isSpecial_ = vc.GetValue("IsSpecial", 0.0f) > 0.5f;
+        isFlight_ = vc.GetValue("IsFlight", 0.0f) > 0.5f;
         scatterDelay_ = vc.GetValue("ScatterDelay", 0.05f);
         scatterSpeed_ = vc.GetValue("ScatterSpeed", 10.0f);
     }
@@ -75,8 +76,10 @@ void SpaceShatterScript::Start(entt::entity entity, GameScene* scene) {
         normal.x * planeRight_.y - normal.y * planeRight_.x
     };
 
-    GenerateShards(scene);
-    GenerateSmokeParticles(scene, isSpecial_ ? 15 : 10);
+    if (!isFlight_) {
+        GenerateShards(scene);
+    }
+    GenerateSmokeParticles(scene, isFlight_ ? shardCount_ : (isSpecial_ ? 15 : 10));
 }
 
 void SpaceShatterScript::GenerateShards(GameScene* scene) {
@@ -250,7 +253,7 @@ void SpaceShatterScript::Draw(entt::entity /*entity*/, GameScene* scene) {
     }
 
     // 3. マズルフラッシュの閃光 (Shader-based Mesh)
-    if (!scatterMode_ && lifeT > 0.8f) {
+    if (!scatterMode_ && !isFlight_ && lifeT > 0.8f) {
         float flashT = (lifeT - 0.8f) / 0.2f; // 1.0 -> 0.0 (非常に短時間)
         float s = 1.8f * (0.8f + flashT * 0.4f); // 銃口付近の小さな光
         
@@ -303,7 +306,11 @@ void SpaceShatterScript::GenerateSmokeParticles(GameScene* scene, int count) {
         sp.rot = {0,0,0};
 
         if (!scatterMode_) {
-            sp.color = isSteam ? DirectX::XMFLOAT4{1.0f, 1.0f, 1.1f, 1.0f} : DirectX::XMFLOAT4{0.4f, 0.35f, 0.3f, 1.0f};
+            if (isFlight_) {
+                sp.color = isSteam ? DirectX::XMFLOAT4{1.0f, 0.95f, 0.85f, 1.0f} : DirectX::XMFLOAT4{0.9f, 0.8f, 0.7f, 1.0f};
+            } else {
+                sp.color = isSteam ? DirectX::XMFLOAT4{1.0f, 1.0f, 1.1f, 1.0f} : DirectX::XMFLOAT4{0.4f, 0.35f, 0.3f, 1.0f};
+            }
         } else {
             sp.color = isSteam ? DirectX::XMFLOAT4{0.8f, 0.8f, 0.9f, 1.0f} : DirectX::XMFLOAT4{0.1f, 0.1f, 0.1f, 1.0f};
         }
