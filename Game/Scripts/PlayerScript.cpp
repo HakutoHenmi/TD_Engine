@@ -8,6 +8,7 @@
 #include "MirrorShatterScript.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
+#include "ExplosionAttackArea.h"
 #include "../Systems/UISystem.h"
 #include <cmath>
 #include <iostream>
@@ -30,6 +31,7 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		auto& cm = scene->GetRegistry().get<CharacterMovementComponent>(entity);
 		cm.heightOffset = 1.0f; // 2m立方体キャラの中心がy=1.0になるように
 		cm.jumpPower = jumpPower_; // ★追加: ヘッダで定義されているジャンプ力(8.0f)を反映し、ジャンプを弱くする
+		cm.gravity = 28.0f; // ★キレのあるアクション用重力 (原神風)
 		cm.speed = 8.5f; // ★追加: プレイヤーの基本移動速度を上げる（デフォルトは5.0f）
 	}
 
@@ -231,6 +233,26 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 				}
 				auto& sc = scene->GetRegistry().emplace<ScriptComponent>(shatterVfx);
 				sc.scripts.push_back({"MirrorShatterScript", "", nullptr});
+
+				// ★追加: 爆発攻撃範囲オブジェクトを生成して周囲の敵にダメージを与える
+				entt::entity explosionAttackArea = scene->CreateEntity("ExplosionAttackArea");
+				if (scene->GetRegistry().all_of<BoxColliderComponent>(explosionAttackArea)) scene->GetRegistry().remove<BoxColliderComponent>(explosionAttackArea);
+				if (scene->GetRegistry().all_of<HurtboxComponent>(explosionAttackArea)) scene->GetRegistry().remove<HurtboxComponent>(explosionAttackArea);
+				if (scene->GetRegistry().all_of<RigidbodyComponent>(explosionAttackArea)) scene->GetRegistry().remove<RigidbodyComponent>(explosionAttackArea);
+
+				auto& expTc = scene->GetRegistry().get<TransformComponent>(explosionAttackArea);
+				expTc.translate = hitPos;
+				float expRad = 8.5f; // 爆発半径
+				expTc.scale = { expRad, expRad, expRad };
+
+				auto& expSc = scene->GetRegistry().emplace<ScriptComponent>(explosionAttackArea);
+				expSc.scripts.push_back({"ExplosionAttackArea", "", std::make_shared<ExplosionAttackArea>(), false});
+
+				auto& expVc = scene->GetRegistry().emplace<VariableComponent>(explosionAttackArea);
+				// 直撃より少ないが大きくダメージ (通常時32、スキル時80)
+				float expDmg = isSkillActive_ ? 80.0f : 32.0f;
+				expVc.SetValue("Damage", expDmg);
+				expVc.SetValue("ExplosionRadius", expRad);
 			}
 		});
 		// ★追加: プレイヤー被ダメージイベント
@@ -478,6 +500,14 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		}
 		prevDashKeyDown_ = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
 
+		// ★追加: ジャンプ開始時は反動のY速度をリセットしてジャンプが小さくなるのを防ぐ
+		if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
+			auto& rb = scene->GetRegistry().get<RigidbodyComponent>(entity);
+			if (rb.velocity.y > 0.01f) {
+				recoilVelocity_.y = 0.0f;
+			}
+		}
+
 		// ★追加: 物理・反動移動の更新 (全モード共通)
 		float recoilLenSq = recoilVelocity_.x * recoilVelocity_.x + recoilVelocity_.y * recoilVelocity_.y + recoilVelocity_.z * recoilVelocity_.z;
 		if (recoilLenSq > 0.001f) {
@@ -522,8 +552,14 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 			pTc.translate.y += recoilVelocity_.y * dt; // ★高さ移動
 
-			// 減衰 (XZのみ): 慣性を持たせるため少し緩める (0.4 -> 0.7)
-			float damping = std::pow(0.7f, dt);
+			float groundY = scene->GetHeightAt(pTc.translate.x, pTc.translate.z, pTc.translate.y + 1.0f);
+			float landingY = groundY + 1.0f; // キャラクター中心の接地高さ
+
+			// 減衰 (XZのみ): 空中ダッシュと地上ダッシュの距離を揃える
+			// 不自然な接地摩擦（バグ）が消えたため、本来の空気抵抗による減衰をしっかりと引き締める
+			bool isCurrentlyInAir = (pTc.translate.y > landingY + 0.1f);
+			float dampingVal = isCurrentlyInAir ? 0.0001f : 0.001f; 
+			float damping = std::pow(dampingVal, dt);
 			recoilVelocity_.x *= damping;
 			recoilVelocity_.z *= damping;
 
@@ -535,14 +571,15 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 				recoilVelocity_.y *= std::pow(0.001f, dt);
 			}
 			
-			float groundY = scene->GetHeightAt(pTc.translate.x, pTc.translate.z, pTc.translate.y + 1.0f);
-			float landingY = groundY + 1.0f; // キャラクター中心の接地高さ
-
 			if (pTc.translate.y < landingY) {
-				// 落下速度が一定以上（空中からの着地）の時だけ摩擦をかける
-				if (recoilVelocity_.y < -1.0f) {
-					recoilVelocity_.x *= 0.75f;
-					recoilVelocity_.z *= 0.75f;
+				// 落下移動する前の高さを計算し、前フレームで明らかに空中にいたかを判定
+				float prevY = pTc.translate.y - recoilVelocity_.y * dt;
+				bool wasInAir = (prevY > landingY + 0.2f);
+
+				// 空中からの着地（落下速度があり、かつ前フレームで空中だった）の時だけ摩擦をかける
+				if (wasInAir && recoilVelocity_.y < -1.0f) {
+					recoilVelocity_.x *= 0.65f; // 着地時の減速を少し強めにして距離の差をさらに縮める
+					recoilVelocity_.z *= 0.65f;
 				}
 				pTc.translate.y = landingY;
 				recoilVelocity_.y = 0.0f;
@@ -668,6 +705,13 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) scene->GetRegistry().get<CameraTargetComponent>(entity).enabled = true;
 		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))  scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = true;
+	}
+
+	// ★追加: 大剣の空中溜め攻撃時の浮遊判定のため、状態フラグを VariableComponent に設定する
+	{
+		auto& vc = scene->GetRegistry().get_or_emplace<VariableComponent>(entity);
+		vc.SetValue("IsSwordCharging", isSwordCharging_ ? 1.0f : 0.0f);
+		vc.SetValue("IsSwordAttacking", (isAttacking_ && playerType_ == PlayerType::Sword) ? 1.0f : 0.0f);
 	}
 
 	// ==== ★修正: DrawUIで描画していた各種ゲーム内UI・エフェクトをここでキューに積む ====

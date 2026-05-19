@@ -13,6 +13,15 @@ void HitDistortionScript::Start(entt::entity entity, GameScene* scene) {
     if (registry.all_of<TransformComponent>(entity)) {
         auto& tc = registry.get<TransformComponent>(entity);
         tc.scale = {startScale_, startScale_, startScale_};
+
+        // ★追加: 爆発エフェクトより奥になるよう、カメラの向いている方向（Z奥）へ少しずらす
+        auto camRot = scene->GetCamera().Rotation();
+        float cx = std::sin(camRot.y) * std::cos(camRot.x);
+        float cy = -std::sin(camRot.x);
+        float cz = std::cos(camRot.y) * std::cos(camRot.x);
+        tc.translate.x += cx * 2.0f;
+        tc.translate.y += cy * 2.0f;
+        tc.translate.z += cz * 2.0f;
     }
 }
 
@@ -29,7 +38,9 @@ void HitDistortionScript::Update(entt::entity entity, GameScene* scene, float dt
 
         // ★追加: ビルボード処理 (常にカメラの方を向く)
         auto camRot = scene->GetCamera().Rotation();
-        tc.rotate = camRot; // カメラと同じ回転を与える（面を向ける）
+        tc.rotate.x = camRot.x;
+        tc.rotate.y = camRot.y + 3.14159265f; // カメラに向けるため180度反転
+        tc.rotate.z = camRot.z;
     }
 
     if (registry.all_of<MeshRendererComponent>(entity)) {
