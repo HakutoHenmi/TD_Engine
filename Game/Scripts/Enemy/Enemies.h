@@ -4,3 +4,4 @@
 #include "Gunner.h"
 #include "SkyGunner.h"
 #include "Enchanter.h"
+#include "Boss.h"

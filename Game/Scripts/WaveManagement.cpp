@@ -58,7 +58,6 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 	cachedScene_ = scene;
 	managerEntity_ = entity;
 
-	#if defined(USE_IMGUI) && !defined(NDEBUG) 
 	auto* renderer = Engine::Renderer::GetInstance();
 	bool isEditorMode = false;
 	bool isPrepOrBattle = false;
@@ -99,11 +98,13 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 
 						// ビルボード付きのplaneを描画
 						static uint32_t planeMeshHandle = 0;
-						static uint32_t whiteTexHandle = 0;
+						static uint32_t defaultTexHandle = 0;
 						if (planeMeshHandle == 0) {
 							planeMeshHandle = renderer->LoadObjMesh("Resources/Models/plane.obj");
-							whiteTexHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+							defaultTexHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 						}
+
+						uint32_t spawnerTexHandle = defaultTexHandle;
 
 						Engine::Camera& cam = scene->GetCamera();
 						auto cp = cam.Position();
@@ -118,14 +119,22 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 						
 						if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(spawnerEntity)) {
 							for (auto& entry : sc->scripts) {
-								if (entry.scriptPath == "EnemySpawnerScript" && entry.instance) {
-									auto* spawner = static_cast<EnemySpawnerScript*>(entry.instance.get());
-									if (spawner->enemyScriptPath == "Warrior") {
-										whiteTexHandle = renderer->LoadTexture2D("Resources/Textures/EnemyLogo/Warriar.png");
-									} else if (spawner->enemyScriptPath == "Guardian") {
-										whiteTexHandle = renderer->LoadTexture2D("Resources/Textures/EnemyLogo/Guardian.png");
-									} else if (spawner->enemyScriptPath == "Gunner") {
-										whiteTexHandle = renderer->LoadTexture2D("Resources/Textures/EnemyLogo/Gunner.png");
+								if (entry.scriptPath == "EnemySpawnerScript") {
+									if (!entry.instance) {
+										entry.instance = ScriptEngine::GetInstance()->CreateScript(entry.scriptPath);
+										if (entry.instance) {
+											entry.instance->DeserializeParameters(entry.parameterData);
+										}
+									}
+									if (entry.instance) {
+										auto* spawner = static_cast<EnemySpawnerScript*>(entry.instance.get());
+										if (spawner->enemyScriptPath == "Warrior") {
+											spawnerTexHandle = renderer->LoadTexture2D("Resources/Textures/EnemyLogo/Warriar.png");
+										} else if (spawner->enemyScriptPath == "Guardian") {
+											spawnerTexHandle = renderer->LoadTexture2D("Resources/Textures/EnemyLogo/Guardian.png");
+										} else if (spawner->enemyScriptPath == "Gunner") {
+											spawnerTexHandle = renderer->LoadTexture2D("Resources/Textures/EnemyLogo/Gunner.png");
+										}
 									}
 								}
 							}
@@ -136,17 +145,12 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 						planeTr.rotate = { pitch, yaw, 0.0f };
 						planeTr.scale = { tc->scale.x, tc->scale.y, tc->scale.z }; // 必要に応じてスケール反映
 						planeTr.scale = {2, 2, 2};
-						renderer->DrawMesh(planeMeshHandle, whiteTexHandle, planeTr, planeColor, "Toon");
-
-
-
-
+						renderer->DrawMesh(planeMeshHandle, spawnerTexHandle, planeTr, planeColor, "Toon");
 					}
 				}
 			}
 		}
 	}
-	#endif
 
 	if (currentWave_ != previousWave_) {
 		if (scene->IsPlaying()) {
