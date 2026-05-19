@@ -5,12 +5,14 @@
 #include "EnemySpawnerScript.h"
 #include "../../Engine/Renderer.h"
 #include "../../Engine/SceneManager.h"
+#include "../../Engine/WindowDX.h"
 #include "../../Engine/ThirdParty/nlohmann/json.hpp"
 #ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
 #endif
 #include <cmath>
 #include <iostream>
+#include <algorithm>
 
 #include "PhaseSystemScript.h"
 
@@ -107,16 +109,12 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 						uint32_t spawnerTexHandle = defaultTexHandle;
 
 						Engine::Camera& cam = scene->GetCamera();
-						auto cp = cam.Position();
-						Engine::Vector3 camPos = { cp.x, cp.y, cp.z };
-						Engine::Vector3 d = { camPos.x - p.x, camPos.y - p.y, camPos.z - p.z };
-						float len = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
-						if (len > 1e-6f) { d.x /= len; d.y /= len; d.z /= len; } else { d = {0,0,1}; }
-						float yaw = std::atan2(d.x, d.z);
-						float pitch = std::atan2(-d.y, std::sqrt(d.x * d.x + d.z * d.z));
+						DirectX::XMFLOAT3 camRot = cam.Rotation();
+						float yaw = camRot.y + 3.1415926535f;
+						float pitch = -camRot.x;
 
 						Engine::Vector4 planeColor = {1.0f, 1.0f, 1.0f, 1.0f};
-						
+
 						if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(spawnerEntity)) {
 							for (auto& entry : sc->scripts) {
 								if (entry.scriptPath == "EnemySpawnerScript") {
@@ -140,12 +138,68 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 							}
 						}
 
+						DirectX::XMFLOAT3 pFloat3 = { p.x, p.y, p.z };
+						DirectX::XMMATRIX view = cam.View();
+
+						// 距離に応じた縮尺の計算 (元のスポナーの座標 pFloat3 とカメラの距離)
+						DirectX::XMFLOAT3 camPos = cam.Position();
+						float dx = camPos.x - pFloat3.x;
+						float dy = camPos.y - pFloat3.y;
+						float dz = camPos.z - pFloat3.z;
+						float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+
+						// 3Dアイコンは常にスポナーの位置に描画する (画面に寄せる処理は廃止)
 						Engine::Transform planeTr;
-						planeTr.translate = { p.x, p.y, p.z };
+						planeTr.translate = { pFloat3.x, pFloat3.y, pFloat3.z };
 						planeTr.rotate = { pitch, yaw, 0.0f };
-						planeTr.scale = { tc->scale.x, tc->scale.y, tc->scale.z }; // 必要に応じてスケール反映
-						planeTr.scale = {2, 2, 2};
+						planeTr.scale = { tc->scale.x * 2.0f, tc->scale.y * 2.0f, tc->scale.z * 2.0f };
 						renderer->DrawMesh(planeMeshHandle, spawnerTexHandle, planeTr, planeColor, "Toon");
+
+						// 2D Sprite表示 (距離が30m以上のとき画面端に50x50で表示)
+						if (distance >= 30.0f) {
+							// カメラの前方ベクトルを求める (ビュー行列の逆行列の3行目)
+							DirectX::XMMATRIX invView = DirectX::XMMatrixInverse(nullptr, view);
+							DirectX::XMVECTOR camForwardVec = invView.r[2];
+
+							DirectX::XMFLOAT3 camForward;
+							DirectX::XMStoreFloat3(&camForward, camForwardVec);
+
+							// カメラからスポナーへのベクトル
+							float sdx = pFloat3.x - camPos.x;
+							float sdz = pFloat3.z - camPos.z;
+
+							// 水平面(X-Z)における角度を計算
+							float camAngle = std::atan2(camForward.z, camForward.x);
+							float spawnerAngle = std::atan2(sdz, sdx);
+
+							float angleDiff = spawnerAngle - camAngle;
+							// 角度差を [-PI, PI] にクランプ
+							const float PI_VAL = 3.1415926535f;
+							while (angleDiff < -PI_VAL) angleDiff += 2.0f * PI_VAL;
+							while (angleDiff > PI_VAL) angleDiff -= 2.0f * PI_VAL;
+
+							// 画面幅の 10% から 90% の範囲に角度をマッピングする
+							float margin = (float)Engine::WindowDX::kW * 0.1f;
+							float startX = margin;
+							float endX = (float)Engine::WindowDX::kW - margin;
+							float barWidth = endX - startX;
+
+							// 左右の逆転を修正するため、マッピング方向を反転
+							float t = (PI_VAL - angleDiff) / (2.0f * PI_VAL);
+							float targetX = startX + t * barWidth;
+							float targetY = 50.0f; // 画面上部固定
+
+							// 2D Spriteとして描画 (50x50)
+							Engine::Renderer::SpriteDesc spriteDesc;
+							spriteDesc.x = targetX - 25.0f;
+							spriteDesc.y = targetY - 25.0f;
+							spriteDesc.w = 50.0f;
+							spriteDesc.h = 50.0f;
+							spriteDesc.color = {1.0f, 1.0f, 1.0f, 1.0f};
+							spriteDesc.rotationRad = 0.0f;
+							spriteDesc.layer = 100; // 最前面
+							renderer->DrawSprite(spawnerTexHandle, spriteDesc);
+						}
 					}
 				}
 			}
