@@ -129,11 +129,11 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 									if (entry.instance) {
 										auto* spawner = static_cast<EnemySpawnerScript*>(entry.instance.get());
 										if (spawner->enemyScriptPath == "Warrior") {
-											spawnerTexHandle = renderer->LoadTexture2D("Resources/Textures/EnemyLogo/Warriar.png");
+											spawnerTexHandle = renderer->LoadTexture2D("Resources/Textures/EnemyLogo/Warriar.png", false);
 										} else if (spawner->enemyScriptPath == "Guardian") {
-											spawnerTexHandle = renderer->LoadTexture2D("Resources/Textures/EnemyLogo/Guardian.png");
+											spawnerTexHandle = renderer->LoadTexture2D("Resources/Textures/EnemyLogo/Guardian.png", false);
 										} else if (spawner->enemyScriptPath == "Gunner") {
-											spawnerTexHandle = renderer->LoadTexture2D("Resources/Textures/EnemyLogo/Gunner.png");
+											spawnerTexHandle = renderer->LoadTexture2D("Resources/Textures/EnemyLogo/Gunner.png", false);
 										}
 									}
 								}
