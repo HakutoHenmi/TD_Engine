@@ -12,6 +12,7 @@
 #endif
 #include <cmath>
 #include <iostream>
+#include <algorithm>
 
 #include "PhaseSystemScript.h"
 
@@ -108,13 +109,9 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 						uint32_t spawnerTexHandle = defaultTexHandle;
 
 						Engine::Camera& cam = scene->GetCamera();
-						auto cp = cam.Position();
-						Engine::Vector3 camPos = { cp.x, cp.y, cp.z };
-						Engine::Vector3 d = { camPos.x - p.x, camPos.y - p.y, camPos.z - p.z };
-						float len = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
-						if (len > 1e-6f) { d.x /= len; d.y /= len; d.z /= len; } else { d = {0,0,1}; }
-						float yaw = std::atan2(d.x, d.z);
-						float pitch = std::atan2(-d.y, std::sqrt(d.x * d.x + d.z * d.z));
+						DirectX::XMFLOAT3 camRot = cam.Rotation();
+						float yaw = camRot.y + 3.1415926535f;
+						float pitch = -camRot.x;
 
 						Engine::Vector4 planeColor = {1.0f, 1.0f, 1.0f, 1.0f};
 
@@ -141,72 +138,68 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 							}
 						}
 
-						// スクリーン投影座標を計算
 						DirectX::XMFLOAT3 pFloat3 = { p.x, p.y, p.z };
 						DirectX::XMMATRIX view = cam.View();
-						DirectX::XMMATRIX proj = cam.Proj();
-						DirectX::XMMATRIX world = DirectX::XMMatrixIdentity();
-						DirectX::XMVECTOR worldPos = DirectX::XMLoadFloat3(&pFloat3);
-						DirectX::XMVECTOR screenPos = DirectX::XMVector3Project(worldPos, 0, 0, (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH, 0.0f, 1.0f, proj, view, world);
 
-						DirectX::XMFLOAT3 screenPosFl;
-						DirectX::XMStoreFloat3(&screenPosFl, screenPos);
+						// 距離に応じた縮尺の計算 (元のスポナーの座標 pFloat3 とカメラの距離)
+						DirectX::XMFLOAT3 camPos = cam.Position();
+						float dx = camPos.x - pFloat3.x;
+						float dy = camPos.y - pFloat3.y;
+						float dz = camPos.z - pFloat3.z;
+						float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
 
-						// スクリーン座標が有効な範囲かチェック
-						DirectX::XMMATRIX vp = view * proj;
-						DirectX::XMVECTOR clipPos = DirectX::XMVector3TransformCoord(worldPos, vp);
-						float cz = DirectX::XMVectorGetZ(clipPos);
-						bool isOnScreen = (cz >= 0.0f && cz <= 1.0f && screenPosFl.x >= 0.0f && screenPosFl.x < (float)Engine::WindowDX::kW && screenPosFl.y >= 0.0f && screenPosFl.y < (float)Engine::WindowDX::kH);
-
-						float scale = 2.0f;  // デフォルトスケール
-
-						// スクリーン外の場合、アイコンを小さくして画面の端に配置
-						if (!isOnScreen) {
-							scale = 0.5f;  // 縮小スケール
-
-							// スクリーン座標を画面の端にクランプ
-							float margin = 50.0f;  // 画面端からのマージン
-							float clampedX = screenPosFl.x;
-							float clampedY = screenPosFl.y;
-
-							// X座標のクランプ
-							if (clampedX < margin) {
-								clampedX = margin;
-							} else if (clampedX > (float)Engine::WindowDX::kW - margin) {
-								clampedX = (float)Engine::WindowDX::kW - margin;
-							}
-
-							// Y座標のクランプ
-							if (clampedY < margin) {
-								clampedY = margin;
-							} else if (clampedY > (float)Engine::WindowDX::kH - margin) {
-								clampedY = (float)Engine::WindowDX::kH - margin;
-							}
-
-							// スクリーン座標をワールド座標に逆投影するための計算
-							DirectX::XMMATRIX invProj = DirectX::XMMatrixInverse(nullptr, proj);
-							DirectX::XMMATRIX invView = DirectX::XMMatrixInverse(nullptr, view);
-
-							// NDC座標に変換
-							float ndcX = (clampedX / (float)Engine::WindowDX::kW) * 2.0f - 1.0f;
-							float ndcY = 1.0f - (clampedY / (float)Engine::WindowDX::kH) * 2.0f;
-
-							DirectX::XMVECTOR ndcPos = DirectX::XMVectorSet(ndcX, ndcY, cz, 1.0f);
-							DirectX::XMVECTOR projPos = DirectX::XMVector3Transform(ndcPos, invProj);
-							DirectX::XMVECTOR worldEdgePos = DirectX::XMVector3Transform(projPos, invView);
-
-							DirectX::XMFLOAT3 edgePosFloat;
-							DirectX::XMStoreFloat3(&edgePosFloat, worldEdgePos);
-							p.x = edgePosFloat.x;
-							p.y = edgePosFloat.y;
-							p.z = edgePosFloat.z;
-						}
-
+						// 3Dアイコンは常にスポナーの位置に描画する (画面に寄せる処理は廃止)
 						Engine::Transform planeTr;
-						planeTr.translate = { p.x, p.y, p.z };
+						planeTr.translate = { pFloat3.x, pFloat3.y, pFloat3.z };
 						planeTr.rotate = { pitch, yaw, 0.0f };
-						planeTr.scale = { tc->scale.x * scale, tc->scale.y * scale, tc->scale.z * scale };
+						planeTr.scale = { tc->scale.x * 2.0f, tc->scale.y * 2.0f, tc->scale.z * 2.0f };
 						renderer->DrawMesh(planeMeshHandle, spawnerTexHandle, planeTr, planeColor, "Toon");
+
+						// 2D Sprite表示 (距離が30m以上のとき画面端に50x50で表示)
+						if (distance >= 30.0f) {
+							// カメラの前方ベクトルを求める (ビュー行列の逆行列の3行目)
+							DirectX::XMMATRIX invView = DirectX::XMMatrixInverse(nullptr, view);
+							DirectX::XMVECTOR camForwardVec = invView.r[2];
+
+							DirectX::XMFLOAT3 camForward;
+							DirectX::XMStoreFloat3(&camForward, camForwardVec);
+
+							// カメラからスポナーへのベクトル
+							float sdx = pFloat3.x - camPos.x;
+							float sdz = pFloat3.z - camPos.z;
+
+							// 水平面(X-Z)における角度を計算
+							float camAngle = std::atan2(camForward.z, camForward.x);
+							float spawnerAngle = std::atan2(sdz, sdx);
+
+							float angleDiff = spawnerAngle - camAngle;
+							// 角度差を [-PI, PI] にクランプ
+							const float PI_VAL = 3.1415926535f;
+							while (angleDiff < -PI_VAL) angleDiff += 2.0f * PI_VAL;
+							while (angleDiff > PI_VAL) angleDiff -= 2.0f * PI_VAL;
+
+							// 画面幅の 10% から 90% の範囲に角度をマッピングする
+							float margin = (float)Engine::WindowDX::kW * 0.1f;
+							float startX = margin;
+							float endX = (float)Engine::WindowDX::kW - margin;
+							float barWidth = endX - startX;
+
+							// angleDiff が -PI で左端、PI で右端
+							float t = (angleDiff + PI_VAL) / (2.0f * PI_VAL);
+							float targetX = startX + t * barWidth;
+							float targetY = 50.0f; // 画面上部固定
+
+							// 2D Spriteとして描画 (50x50)
+							Engine::Renderer::SpriteDesc spriteDesc;
+							spriteDesc.x = targetX - 25.0f;
+							spriteDesc.y = targetY - 25.0f;
+							spriteDesc.w = 50.0f;
+							spriteDesc.h = 50.0f;
+							spriteDesc.color = {1.0f, 1.0f, 1.0f, 1.0f};
+							spriteDesc.rotationRad = 0.0f;
+							spriteDesc.layer = 100; // 最前面
+							renderer->DrawSprite(spawnerTexHandle, spriteDesc);
+						}
 					}
 				}
 			}
