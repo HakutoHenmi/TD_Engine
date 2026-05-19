@@ -5,8 +5,104 @@
 #include "ScriptUtils.h"
 
 #include <cmath>
-
+#include <unordered_set>
+#include <vector>
 namespace Game {
+static bool IsConnectedSphere(entt::registry& registry, entt::entity a, entt::entity b, float connectRange) {
+	if (!registry.valid(a) || !registry.valid(b)) {
+		return false;
+	}
+
+	if (!registry.all_of<TransformComponent>(a) || !registry.all_of<TransformComponent>(b)) {
+		return false;
+	}
+
+	const TransformComponent& transformA = registry.get<TransformComponent>(a);
+	const TransformComponent& transformB = registry.get<TransformComponent>(b);
+
+	float diffX = transformB.translate.x - transformA.translate.x;
+	float diffY = transformB.translate.y - transformA.translate.y;
+	float diffZ = transformB.translate.z - transformA.translate.z;
+
+	float connectRangeSq = connectRange * connectRange;
+	float dist3DSq = diffX * diffX + diffY * diffY + diffZ * diffZ;
+
+	if (dist3DSq <= connectRangeSq) {
+		return true;
+	}
+
+	float distXZSq = diffX * diffX + diffZ * diffZ;
+	float heightDifference = std::abs(diffY);
+
+	if (heightDifference >= 0.1f) {
+		if (distXZSq <= connectRangeSq) {
+			return true;
+		}
+	}
+
+	return false;
+}
+static void CollectConnectedBulletTanks(
+    entt::registry& registry, entt::entity currentPipe, std::unordered_set<entt::entity>& visitedPipes, std::unordered_set<entt::entity>& foundTanks, const std::vector<entt::entity>& allPipes,
+    const std::vector<entt::entity>& allTanks, float connectRange) {
+
+	visitedPipes.insert(currentPipe);
+
+	for (entt::entity tank : allTanks) {
+		if (IsConnectedSphere(registry, currentPipe, tank, connectRange)) {
+			foundTanks.insert(tank);
+		}
+	}
+
+	for (entt::entity otherPipe : allPipes) {
+		if (otherPipe == currentPipe) {
+			continue;
+		}
+
+		if (visitedPipes.count(otherPipe) > 0) {
+			continue;
+		}
+
+		if (!IsConnectedSphere(registry, currentPipe, otherPipe, connectRange)) {
+			continue;
+		}
+
+		CollectConnectedBulletTanks(registry, otherPipe, visitedPipes, foundTanks, allPipes, allTanks, connectRange);
+	}
+}
+void IceCanon::UpdateConnection(entt::entity entity, GameScene* scene) {
+	if (!scene) {
+		return;
+	}
+
+	entt::registry& registry = scene->GetRegistry();
+	float connectRange = 3.0f;
+
+	const std::vector<entt::entity>& allPipes = scene->GetEntitiesByTag(TagType::Pipe);
+	const std::vector<entt::entity>& allTanks = scene->GetEntitiesByTag(TagType::BulletTank);
+
+	std::unordered_set<entt::entity> foundTanks;
+	std::unordered_set<entt::entity> visitedPipesForTanks;
+
+	for (entt::entity pipe : allPipes) {
+		if (!IsConnectedSphere(registry, entity, pipe, connectRange)) {
+			continue;
+		}
+
+		CollectConnectedBulletTanks(registry, pipe, visitedPipesForTanks, foundTanks, allPipes, allTanks, connectRange);
+	}
+
+	connectedTankCount_ = static_cast<int>(foundTanks.size());
+
+	if (connectedTankCount_ > 0) {
+		isConnectedToTank_ = true;
+	} else {
+		isConnectedToTank_ = false;
+	}
+}
+
+
+
 
 void IceCanon::Start(entt::entity entity, GameScene* scene) {
 	attackTimer_ = 0.0f;
@@ -36,7 +132,15 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (!registry.valid(entity)) {
 		return;
 	}
+	connectionCheckTimer_ -= dt;
+	if (connectionCheckTimer_ <= 0.0f) {
+		connectionCheckTimer_ = 2.0f;
+		UpdateConnection(entity, scene);
+	}
 
+	if (!isConnectedToTank_) {
+		return;
+	}
 	if (!registry.all_of<TransformComponent>(entity)) {
 		return;
 	}
@@ -48,10 +152,51 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	}
 
-	// ===== ターゲット探す =====
+	entt::entity gm = entt::null;
+	auto viewScript = registry.view<ScriptComponent>();
+
+	for (entt::entity e : viewScript) {
+		const ScriptComponent& sc = viewScript.get<ScriptComponent>(e);
+
+		for (const auto& instance : sc.scripts) {
+			if (instance.scriptPath == "PhaseSystemScript" || instance.scriptPath == "TutorialScript") {
+				gm = e;
+				break;
+			}
+		}
+
+		if (gm != entt::null) {
+			break;
+		}
+	}
+
+	float attackPowerRate = 1.0f;
+	float attackRangeRate = 1.0f;
+	float attackSpeedRate = 1.0f;
+	float stopTimeRate = 1.0f;
+	float bulletCountRate = 1.0f;
+
+	if (gm != entt::null) {
+		attackPowerRate = GetVar(gm, scene, "AttackPowerRateIceCanon", 1.0f);
+		attackRangeRate = GetVar(gm, scene, "AttackRangeRateIceCanon", 1.0f);
+		attackSpeedRate = GetVar(gm, scene, "AttackSpeedRateIceCanon", 1.0f);
+		stopTimeRate = GetVar(gm, scene, "StopTimeRateIceCanon", 1.0f);
+		bulletCountRate = GetVar(gm, scene, "BulletCountRateIceCanon", 1.0f);
+	}
+
+	float currentDamage = damage_ * attackPowerRate;
+	float currentAttackRange = attackRange_ * attackRangeRate;
+	float currentAttackInterval = attackInterval_ / attackSpeedRate;
+	float currentStopTime = stopTime_ * stopTimeRate;
+	int bulletCount = static_cast<int>(6.0f * bulletCountRate);
+
+	if (bulletCount < 1) {
+		bulletCount = 1;
+	}
+
 	entt::entity target = entt::null;
-	float bestDistance = attackRange_;
-	SetVar(entity, scene, "AttackRange", attackRange_);
+	float bestDistance = currentAttackRange;
+	SetVar(entity, scene, "AttackRange", currentAttackRange);
 
 	const std::vector<entt::entity>& enemies = scene->GetEntitiesByTag(TagType::Enemy);
 
@@ -60,6 +205,10 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 			continue;
 		}
 
+
+		if (!isConnectedToTank_) {
+			return;
+		}
 		if (!registry.all_of<TransformComponent>(other)) {
 			continue;
 		}
@@ -90,12 +239,7 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 	float yaw = std::atan2(toX, toZ);
 	canonTransform.rotate.y = yaw;
 
-	// ===== 弾ばらまき =====
-	int bulletCount = 6;
-	
-
 	for (int i = 0; i < bulletCount; i++) {
-
 		entt::entity bullet = registry.create();
 
 		TagComponent& bulletTag = registry.emplace<TagComponent>(bullet);
@@ -120,32 +264,28 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 
 		bulletTransform.scale = {0.3f, 0.3f, 0.3f};
 
-		// ===== 見た目 =====
-		auto* renderer = scene->GetRenderer();
+		Engine::Renderer* renderer = scene->GetRenderer();
 		if (renderer) {
 			MeshRendererComponent& mesh = registry.emplace<MeshRendererComponent>(bullet);
 			mesh.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
 			mesh.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 		}
 
-		// ===== ダメージ =====
 		HitboxComponent& hitbox = registry.emplace<HitboxComponent>(bullet);
 		hitbox.isActive = true;
-		hitbox.damage = damage_;
+		hitbox.damage = currentDamage;
 		hitbox.tag = TagType::Bullet;
 		hitbox.size = {0.5f, 0.5f, 0.5f};
 
-		// ===== スクリプト =====
 		ScriptComponent& sc = registry.emplace<ScriptComponent>(bullet);
 		sc.scripts.push_back({"IceBulletScript", "", nullptr});
 
-		// ===== 追加情報 =====
 		SetVar(bullet, scene, "HasTarget", 1.0f);
 		SetVar(bullet, scene, "TargetEntity", (float)(uint32_t)target);
-		SetVar(bullet, scene, "StopTime", stopTime_);
+		SetVar(bullet, scene, "StopTime", currentStopTime);
 	}
 
-	attackTimer_ = attackInterval_;
+	attackTimer_ = currentAttackInterval;
 }
 
 void IceCanon::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}

@@ -232,6 +232,162 @@
       "gridY": 3.0,
       "description": "設定中",
       "pageId": 2
-    }
+    },
+{
+  "id": 300,
+  "name": "Base3",
+  "cost": 0,
+  "parentId": -1,
+  "unlocked": true,
+  "gridX": 1.0,
+  "gridY": 0.0,
+  "description": "アイスキャノンの基本性能",
+  "pageId": 3
+},
+{
+  "id": 301,
+  "name": "Attack",
+  "cost": 1,
+  "parentId": 300,
+  "unlocked": false,
+  "gridX": 0.0,
+  "gridY": 0.0,
+  "description": "アイスキャノンの攻撃力が1.5倍になります。",
+  "pageId": 3
+},
+{
+  "id": 302,
+  "name": "AttackSpeed",
+  "cost": 1,
+  "parentId": 300,
+  "unlocked": false,
+  "gridX": 2.0,
+  "gridY": 0.0,
+  "description": "アイスキャノンの爆発範囲が1.5倍になります。",
+  "pageId": 3
+},
+{
+  "id": 303,
+  "name": "AllUp",
+  "cost": 1,
+  "parentId": 300,
+  "unlocked": false,
+  "gridX": 1.0,
+  "gridY": 1.0,
+  "description": "アイスキャノンの全性能がアップします。",
+  "pageId": 3
+},
+{
+  "id": 304,
+  "name": "None",
+  "cost": 1,
+  "parentId": 301,
+  "unlocked": false,
+  "gridX": 0.0,
+  "gridY": 1.0,
+  "description": "設定中",
+  "pageId": 3
+},
+{
+  "id": 305,
+  "name": "None",
+  "cost": 1,
+  "parentId": 302,
+  "unlocked": false,
+  "gridX": 2.0,
+  "gridY": 1.0,
+  "description": "設定中",
+  "pageId": 3
+},
+{
+  "id": 306,
+  "name": "None",
+  "cost": 1,
+  "parentId": 303,
+  "unlocked": false,
+  "gridX": 1.0,
+  "gridY": 3.0,
+  "description": "設定中",
+  "pageId": 3
+},
+
+{
+  "id": 400,
+  "name": "Base3",
+  "cost": 0,
+  "parentId": -1,
+  "unlocked": true,
+  "gridX": 1.0,
+  "gridY": 0.0,
+  "description": "プレイヤーの基本性能",
+  "pageId": 4
+},
+{
+  "id": 401,
+  "name": "Attack",
+  "cost": 1,
+  "parentId": 400,
+  "unlocked": false,
+  "gridX": 0.0,
+  "gridY": 0.0,
+  "description": "プレイヤーの攻撃力が1.5倍になります。",
+  "pageId": 4
+},
+{
+  "id": 402,
+  "name": "AttackSpeed",
+  "cost": 1,
+  "parentId": 400,
+  "unlocked": false,
+  "gridX": 2.0,
+  "gridY": 0.0,
+  "description": "プレイヤーの爆発範囲が1.5倍になります。",
+  "pageId": 4
+},
+{
+  "id": 403,
+  "name": "AllUp",
+  "cost": 1,
+  "parentId": 400,
+  "unlocked": false,
+  "gridX": 1.0,
+  "gridY": 1.0,
+  "description": "プレイヤーの全性能がアップします。",
+  "pageId": 4
+},
+{
+  "id": 404,
+  "name": "None",
+  "cost": 1,
+  "parentId": 401,
+  "unlocked": false,
+  "gridX": 0.0,
+  "gridY": 1.0,
+  "description": "設定中",
+  "pageId": 4
+},
+{
+  "id": 405,
+  "name": "None",
+  "cost": 1,
+  "parentId": 402,
+  "unlocked": false,
+  "gridX": 2.0,
+  "gridY": 1.0,
+  "description": "設定中",
+  "pageId": 4
+},
+{
+  "id": 406,
+  "name": "None",
+  "cost": 1,
+  "parentId": 403,
+  "unlocked": false,
+  "gridX": 1.0,
+  "gridY": 3.0,
+  "description": "設定中",
+  "pageId": 4
+}
+
   ]
 }

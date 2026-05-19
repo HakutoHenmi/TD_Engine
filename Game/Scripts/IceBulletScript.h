@@ -20,7 +20,7 @@ public:
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
 
 private:
-	float speed_ = 10.0f;
+	float speed_ = 20.0f;
 	float lifeTime_ = 0.0f;
 	float maxLifeTime_ = 6.0f;
 	float upTime_ = 0.4f;

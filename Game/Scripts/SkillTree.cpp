@@ -273,6 +273,10 @@ void SkillTree::Update(entt::entity entity, GameScene* scene, float dt) {
 		pageTitle = "Poison Skill";
 	} else if (currentPageId_ == 2) {
 		pageTitle = "Missile Skill";
+	} else if (currentPageId_ == 3) {
+		pageTitle = "IceCanon Skill";
+	} else if (currentPageId_ == 4) {
+		pageTitle = "Player Skill";
 	}
 
 	// UI反映
@@ -449,6 +453,40 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 
 	if (IsSkillUnlocked(203)) {
 	}
+	// IceCanon
+	float attackPowerRateIceCanon = 1.0f;
+	float attackRangeRateIceCanon = 1.0f;
+	float attackSpeedRateIceCanon = 1.0f;
+	float stopTimeRateIceCanon = 1.0f;
+	float bulletCountRateIceCanon = 1.0f;
+
+	// page4
+	if (IsSkillUnlocked(301)) {
+		attackPowerRateIceCanon *= 1.50f;
+	}
+
+	if (IsSkillUnlocked(302)) {
+		attackRangeRateIceCanon *= 1.50f;
+	}
+
+	if (IsSkillUnlocked(303)) {
+		stopTimeRateIceCanon *= 1.50f;
+	}
+
+	if (IsSkillUnlocked(304)) {
+		bulletCountRateIceCanon *= 1.50f;
+	}
+
+	if (IsSkillUnlocked(305)) {
+		attackSpeedRateIceCanon *= 1.20f;
+	}
+
+	if (IsSkillUnlocked(306)) {
+		attackPowerRateIceCanon *= 1.50f;
+		attackRangeRateIceCanon *= 1.50f;
+		stopTimeRateIceCanon *= 1.50f;
+	}
+	//page4
 	// canon
 	SetVar(entity, scene, "AttackPowerRateCanon", attackPowerRateCanon);
 	SetVar(entity, scene, "AttackSpeedRateCanon", attackSpeedRateCanon);
@@ -460,6 +498,12 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 	// misile
 	SetVar(entity, scene, "AttackPowerRateMisile", attackPowerRateMisile);
 	SetVar(entity, scene, "AttackAreaRateMisile", attackAreaRateMisile);
+	// iceCanon
+	SetVar(entity, scene, "AttackPowerRateIceCanon", attackPowerRateIceCanon);
+	SetVar(entity, scene, "AttackRangeRateIceCanon", attackRangeRateIceCanon);
+	SetVar(entity, scene, "AttackSpeedRateIceCanon", attackSpeedRateIceCanon);
+	SetVar(entity, scene, "StopTimeRateIceCanon", stopTimeRateIceCanon);
+	SetVar(entity, scene, "BulletCountRateIceCanon", bulletCountRateIceCanon);
 }
 
 void SkillTree::HandleInput(float screenW, float screenH, float mouseX, float mouseY) {
@@ -619,7 +663,7 @@ void SkillTree::DrawBackground(Engine::Renderer* renderer, float screenW, float 
 	bg.y = kPanelMargin;
 	bg.w = screenW - kPanelMargin * 2.0f;
 	bg.h = screenH - kPanelMargin * 2.0f;
-	bg.color = {0.55f, 0.40f, 0.22f, 0.9f};
+	bg.color = {0.55f, 0.40f, 0.22f, 1.0f};
 	renderer->DrawSprite(texBg_, bg);
 }
 

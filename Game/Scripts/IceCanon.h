@@ -20,6 +20,11 @@ private:
 
 	float damage_ = 2.0f;
 	float stopTime_ = 1.0f;
+	void UpdateConnection(entt::entity entity, GameScene* scene);
+
+	bool isConnectedToTank_ = false;
+	int connectedTankCount_ = 0;
+	float connectionCheckTimer_ = 0.0f;
 };
 
 } // namespace Game
