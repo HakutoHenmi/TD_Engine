@@ -11,18 +11,17 @@ class PipeScript : public IScript {
 public:
 	void Start(entt::entity entity, GameScene* scene) override;
 	void Update(entt::entity entity, GameScene* scene, float dt) override;
+	void Draw(entt::entity entity, GameScene* scene) override;
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
 
 private:
 	float rotationSpeed_ = 1.0f; // パイプの回転速度（ラジアン/秒）
-	std::unordered_map<entt::entity, entt::entity> connectionCylinders_;
-
-private:
-
+	uint32_t cylinderModelHandle_ = 0;
+	uint32_t cylinderTextureHandle_ = 0;
 
 private:
 	float connectionCheckTimer_ = 0.0f;
-	float connectionCheckInterval_ = 0.5f;
+	float connectionCheckInterval_ = 2.0f; // ★最適化: 接続チェック間隔を2.0秒に延長してCPUスパイクを劇的削減
 
 	std::vector<entt::entity> currentConnections_;
 };

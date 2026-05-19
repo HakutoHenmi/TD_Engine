@@ -673,7 +673,38 @@ void TutorialScript::Installation(GameScene* scene, const std::string& objPath) 
 
         if (!hasPipeStartPoint_) {
             const bool withinFacility = (GetFacilityInRange(scene, snappedHitPoint.x, snappedHitPoint.z) != entt::null);
-            const bool canPlaceStart = !IsPlacementBlocked(scene, snappedHitPoint) && withinFacility;
+            
+            // ★重複排除＆利便性向上: スタート地点の座標は、すでにパイプがあるマスであっても選択できるようにする
+            // ただし、大砲やタンクなどの他の施設がある場合はブロックする
+            bool isBlockedByOtherThanPipe = false;
+            constexpr float kBlockHalfExtent = 2.0f;
+            auto& registry = scene->GetRegistry();
+            for (auto entity : registry.view<TransformComponent>()) {
+                if (!registry.any_of<MeshRendererComponent, BoxColliderComponent, GpuMeshColliderComponent>(entity)) continue;
+                if (registry.all_of<TagComponent>(entity) && registry.get<TagComponent>(entity).tag == TagType::Pipe) {
+                    continue; // パイプはスタート地点の重ね合わせを許可
+                }
+                if (registry.all_of<NameComponent>(entity)) {
+                    const auto& nc = registry.get<NameComponent>(entity);
+                    if ((nc.name.find("Terrain") != std::string::npos) || (nc.name.find("Floor") != std::string::npos) || (nc.name.find("Ground") != std::string::npos) ||
+                        (nc.name.find("Stage") != std::string::npos) || (nc.name.find("Plane") != std::string::npos)) {
+                        continue; // 地形もスルー
+                    }
+                }
+                if (registry.all_of<TagComponent>(entity) && registry.get<TagComponent>(entity).tag == TagType::Wall) {
+                    continue; // 壁もスルー
+                }
+
+                const auto& tc = registry.get<TransformComponent>(entity);
+                const float dx = tc.translate.x - snappedHitPoint.x;
+                const float dz = tc.translate.z - snappedHitPoint.z;
+                if (std::abs(dx) < kBlockHalfExtent && std::abs(dz) < kBlockHalfExtent) {
+                    isBlockedByOtherThanPipe = true;
+                    break;
+                }
+            }
+
+            const bool canPlaceStart = !isBlockedByOtherThanPipe && withinFacility;
             DrawPlacementPreview(scene, snappedHitPoint, objPath, canPlaceStart);
 
             if (input->IsMouseTrigger(0) && canPlaceStart) {
@@ -710,7 +741,7 @@ void TutorialScript::Installation(GameScene* scene, const std::string& objPath) 
         if (pipeRenderer && pathPoints.size() >= 2) {
             for (size_t i = 0; i + 1 < pathPoints.size(); ++i) {
                 Engine::Vector3 p1 = {pathPoints[i].x, pathPoints[i].y + 0.5f, pathPoints[i].z};
-                Engine::Vector3 p2 = {pathPoints[i+1].x, pathPoints[i+1].y + 0.5f, pathPoints[i+1].z};
+				Engine::Vector3 p2 = {pathPoints[i+1].x, pathPoints[i+1].y + 0.5f, pathPoints[i+1].z};
                 Engine::Vector4 lineColor = canPlaceAll ? Engine::Vector4{0.6f, 1.0f, 0.6f, 1.0f} : Engine::Vector4{1.0f, 0.3f, 0.3f, 1.0f};
                 pipeRenderer->DrawLine3D(p1, p2, lineColor, true);
             }
@@ -718,7 +749,33 @@ void TutorialScript::Installation(GameScene* scene, const std::string& objPath) 
 
         if (input->IsMouseTrigger(0)) {
             if (canPlaceAll) {
+                // ★重複配置の排除最適化★
+                // 実際に新しく配置するポイント（すでに同座標にパイプがある場所は除外）をフィルタリング
+                std::vector<Engine::Vector3> actualPlacePoints;
+                actualPlacePoints.reserve(pathPoints.size());
+
+                auto& registry = scene->GetRegistry();
                 for (const auto& p : pathPoints) {
+                    bool alreadyExists = false;
+                    constexpr float kBlockHalfExtent = 1.0f; // 完全重なりを検知するための狭い範囲
+                    for (auto entity : registry.view<TransformComponent>()) {
+                        if (!registry.any_of<MeshRendererComponent>(entity)) continue;
+                        if (registry.all_of<TagComponent>(entity) && registry.get<TagComponent>(entity).tag == TagType::Pipe) {
+                            const auto& tc = registry.get<TransformComponent>(entity);
+                            const float dx = tc.translate.x - p.x;
+                            const float dz = tc.translate.z - p.z;
+							if (std::abs(dx) < kBlockHalfExtent && std::abs(dz) < kBlockHalfExtent) {
+                                alreadyExists = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!alreadyExists) {
+                        actualPlacePoints.push_back(p);
+                    }
+                }
+
+                for (const auto& p : actualPlacePoints) {
                     SpawnPlacedObject(scene, p, objPath);
                 }
                 isPlacementMode_ = false;

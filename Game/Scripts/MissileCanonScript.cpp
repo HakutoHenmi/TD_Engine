@@ -14,21 +14,8 @@
 namespace Game {
 
 static bool IsConnectedSphere(entt::registry& registry, entt::entity entityA, entt::entity entityB, float connectRange) {
-	if (!registry.valid(entityA)) {
-		return false;
-	}
-
-	if (!registry.valid(entityB)) {
-		return false;
-	}
-
-	if (!registry.all_of<TransformComponent>(entityA)) {
-		return false;
-	}
-
-	if (!registry.all_of<TransformComponent>(entityB)) {
-		return false;
-	}
+	if (!registry.valid(entityA) || !registry.valid(entityB)) return false;
+	if (!registry.all_of<TransformComponent>(entityA) || !registry.all_of<TransformComponent>(entityB)) return false;
 
 	const TransformComponent& transformA = registry.get<TransformComponent>(entityA);
 	const TransformComponent& transformB = registry.get<TransformComponent>(entityB);
@@ -37,17 +24,18 @@ static bool IsConnectedSphere(entt::registry& registry, entt::entity entityA, en
 	float diffY = transformB.translate.y - transformA.translate.y;
 	float diffZ = transformB.translate.z - transformA.translate.z;
 
-	float distance3D = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
+	float connectRangeSq = connectRange * connectRange;
+	float dist3DSq = diffX * diffX + diffY * diffY + diffZ * diffZ;
 
-	if (distance3D <= connectRange) {
+	if (dist3DSq <= connectRangeSq) {
 		return true;
 	}
 
-	float distanceXZ = std::sqrt(diffX * diffX + diffZ * diffZ);
+	float distXZSq = diffX * diffX + diffZ * diffZ;
 	float heightDifference = std::abs(diffY);
 
 	if (heightDifference >= 0.1f) {
-		if (distanceXZ <= connectRange) {
+		if (distXZSq <= connectRangeSq) {
 			return true;
 		}
 	}
@@ -142,7 +130,7 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 
 	connectionCheckTimer_ -= dt;
 	if (connectionCheckTimer_ <= 0.0f) {
-		connectionCheckTimer_ = 0.5f;
+		connectionCheckTimer_ = 2.0f; // ★最適化: チェック間隔を0.5秒から2.0秒に延長してCPUスパイクを劇的削減
 		UpdateConnection(entity, scene);
 	}
 

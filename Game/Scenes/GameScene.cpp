@@ -709,9 +709,32 @@ entt::entity GameScene::CreateEntity(const std::string& name) {
 // ★追加: IDでオブジェクトを検索し、破棄フラグを立てる
 void GameScene::DestroyObject(uint32_t id) {
 	std::lock_guard<std::recursive_mutex> lock(spawnMutex_);
-	// IDをそのままentt::entityとして扱う（ダウンキャスト）
-	pendingDestroys_.push_back(static_cast<entt::entity>(id));
-	// staticTerrainDirty_ = true; // キャッシュ無効化はGetHeightAt内でのvalid判定に任せる
+	auto entity = static_cast<entt::entity>(id);
+	if (!registry_.valid(entity)) return;
+
+	std::vector<entt::entity> toDestroy;
+	toDestroy.push_back(entity);
+
+	// 子Entityを再帰的に探索するためのキュー
+	std::vector<entt::entity> queue;
+	queue.push_back(entity);
+
+	size_t head = 0;
+	while (head < queue.size()) {
+		entt::entity parent = queue[head++];
+		auto view = registry_.view<HierarchyComponent>();
+		for (auto child : view) {
+			if (view.get<HierarchyComponent>(child).parentId == parent) {
+				toDestroy.push_back(child);
+				queue.push_back(child);
+			}
+		}
+	}
+
+	// 収集したすべての親子エンティティを安全に破棄待ちリストに登録
+	for (auto e : toDestroy) {
+		pendingDestroys_.push_back(e);
+	}
 }
 
 
@@ -1231,6 +1254,37 @@ void GameScene::DrawUI() {
 #ifndef NDEBUG
 	profiler_.DrawImGui();
 #endif
+
+	// ★追加: リリース版・プレイ時でも常時画面右上に表示されるシンプルで美しいFPSカウンター
+	{
+		ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration | 
+		                               ImGuiWindowFlags_AlwaysAutoResize | 
+		                               ImGuiWindowFlags_NoSavedSettings | 
+		                               ImGuiWindowFlags_NoFocusOnAppearing | 
+		                               ImGuiWindowFlags_NoNav |
+		                               ImGuiWindowFlags_NoMove;
+		
+		const float PAD = 10.0f;
+		const ImGuiViewport* viewport = ImGui::GetMainViewport();
+		ImVec2 workPos = viewport->WorkPos;
+		ImVec2 workSize = viewport->WorkSize;
+		ImVec2 windowPos;
+		windowPos.x = workPos.x + workSize.x - PAD;
+		windowPos.y = workPos.y + PAD;
+		ImGui::SetNextWindowPos(windowPos, ImGuiCond_Always, ImVec2(1.0f, 0.0f));
+		ImGui::SetNextWindowBgAlpha(0.4f); // スタイリッシュな半透明背景
+
+		if (ImGui::Begin("##FPS_Overlay", nullptr, windowFlags)) {
+			float fps = ImGui::GetIO().Framerate;
+			ImVec4 fpsColor = fps >= 55.0f ? ImVec4(0.2f, 1.0f, 0.4f, 1.0f) :
+			                  fps >= 30.0f ? ImVec4(1.0f, 0.9f, 0.2f, 1.0f) :
+			                                 ImVec4(1.0f, 0.2f, 0.2f, 1.0f);
+			ImGui::Text("FPS: ");
+			ImGui::SameLine();
+			ImGui::TextColored(fpsColor, "%.1f", fps);
+		}
+		ImGui::End();
+	}
 }
 
 extern bool gizmoDragging;
