@@ -5,6 +5,7 @@
 #include "EnemySpawnerScript.h"
 #include "../../Engine/Renderer.h"
 #include "../../Engine/SceneManager.h"
+#include "../../Engine/WindowDX.h"
 #include "../../Engine/ThirdParty/nlohmann/json.hpp"
 #ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
@@ -116,7 +117,7 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 						float pitch = std::atan2(-d.y, std::sqrt(d.x * d.x + d.z * d.z));
 
 						Engine::Vector4 planeColor = {1.0f, 1.0f, 1.0f, 1.0f};
-						
+
 						if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(spawnerEntity)) {
 							for (auto& entry : sc->scripts) {
 								if (entry.scriptPath == "EnemySpawnerScript") {
@@ -140,11 +141,71 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 							}
 						}
 
+						// スクリーン投影座標を計算
+						DirectX::XMFLOAT3 pFloat3 = { p.x, p.y, p.z };
+						DirectX::XMMATRIX view = cam.View();
+						DirectX::XMMATRIX proj = cam.Proj();
+						DirectX::XMMATRIX world = DirectX::XMMatrixIdentity();
+						DirectX::XMVECTOR worldPos = DirectX::XMLoadFloat3(&pFloat3);
+						DirectX::XMVECTOR screenPos = DirectX::XMVector3Project(worldPos, 0, 0, (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH, 0.0f, 1.0f, proj, view, world);
+
+						DirectX::XMFLOAT3 screenPosFl;
+						DirectX::XMStoreFloat3(&screenPosFl, screenPos);
+
+						// スクリーン座標が有効な範囲かチェック
+						DirectX::XMMATRIX vp = view * proj;
+						DirectX::XMVECTOR clipPos = DirectX::XMVector3TransformCoord(worldPos, vp);
+						float cz = DirectX::XMVectorGetZ(clipPos);
+						bool isOnScreen = (cz >= 0.0f && cz <= 1.0f && screenPosFl.x >= 0.0f && screenPosFl.x < (float)Engine::WindowDX::kW && screenPosFl.y >= 0.0f && screenPosFl.y < (float)Engine::WindowDX::kH);
+
+						float scale = 2.0f;  // デフォルトスケール
+
+						// スクリーン外の場合、アイコンを小さくして画面の端に配置
+						if (!isOnScreen) {
+							scale = 0.5f;  // 縮小スケール
+
+							// スクリーン座標を画面の端にクランプ
+							float margin = 50.0f;  // 画面端からのマージン
+							float clampedX = screenPosFl.x;
+							float clampedY = screenPosFl.y;
+
+							// X座標のクランプ
+							if (clampedX < margin) {
+								clampedX = margin;
+							} else if (clampedX > (float)Engine::WindowDX::kW - margin) {
+								clampedX = (float)Engine::WindowDX::kW - margin;
+							}
+
+							// Y座標のクランプ
+							if (clampedY < margin) {
+								clampedY = margin;
+							} else if (clampedY > (float)Engine::WindowDX::kH - margin) {
+								clampedY = (float)Engine::WindowDX::kH - margin;
+							}
+
+							// スクリーン座標をワールド座標に逆投影するための計算
+							DirectX::XMMATRIX invProj = DirectX::XMMatrixInverse(nullptr, proj);
+							DirectX::XMMATRIX invView = DirectX::XMMatrixInverse(nullptr, view);
+
+							// NDC座標に変換
+							float ndcX = (clampedX / (float)Engine::WindowDX::kW) * 2.0f - 1.0f;
+							float ndcY = 1.0f - (clampedY / (float)Engine::WindowDX::kH) * 2.0f;
+
+							DirectX::XMVECTOR ndcPos = DirectX::XMVectorSet(ndcX, ndcY, cz, 1.0f);
+							DirectX::XMVECTOR projPos = DirectX::XMVector3Transform(ndcPos, invProj);
+							DirectX::XMVECTOR worldEdgePos = DirectX::XMVector3Transform(projPos, invView);
+
+							DirectX::XMFLOAT3 edgePosFloat;
+							DirectX::XMStoreFloat3(&edgePosFloat, worldEdgePos);
+							p.x = edgePosFloat.x;
+							p.y = edgePosFloat.y;
+							p.z = edgePosFloat.z;
+						}
+
 						Engine::Transform planeTr;
 						planeTr.translate = { p.x, p.y, p.z };
 						planeTr.rotate = { pitch, yaw, 0.0f };
-						planeTr.scale = { tc->scale.x, tc->scale.y, tc->scale.z }; // 必要に応じてスケール反映
-						planeTr.scale = {2, 2, 2};
+						planeTr.scale = { tc->scale.x * scale, tc->scale.y * scale, tc->scale.z * scale };
 						renderer->DrawMesh(planeMeshHandle, spawnerTexHandle, planeTr, planeColor, "Toon");
 					}
 				}
