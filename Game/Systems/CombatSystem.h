@@ -143,7 +143,7 @@ public:
 									auto& mrc_hit = registry.emplace<MeshRendererComponent>(hitDistortion);
 									mrc_hit.shaderName = "Distortion";
 									mrc_hit.texturePath = "Resources/Textures/normal.png";
-									mrc_hit.modelPath = "Resources/Models/Plane/cube.obj";
+									mrc_hit.modelPath = "Resources/Models/plane.obj";
 									
 									if (ctx.renderer) {
 										mrc_hit.modelHandle = ctx.renderer->LoadObjMesh(mrc_hit.modelPath);

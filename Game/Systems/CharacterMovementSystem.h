@@ -64,6 +64,25 @@ public:
 			float targetVelX = moveX * currentSpeed;
 			float targetVelZ = moveZ * currentSpeed;
 
+			// ★追加: 空中での大剣溜め・攻撃中は、正面に自動推進（スチームブースト前進）させる
+			if (!cm.isGrounded && registry.all_of<VariableComponent>(entity)) {
+				auto& vc = registry.get<VariableComponent>(entity);
+				bool isCharging = vc.GetValue("IsSwordCharging", 0.0f) > 0.5f;
+				bool isAttacking = vc.GetValue("IsSwordAttacking", 0.0f) > 0.5f;
+
+				if (isCharging || isAttacking) {
+					// キャラクターの向いている正面方向 (rotate.y) を基準に前進
+					float frontX = std::sin(tc.rotate.y);
+					float frontZ = std::cos(tc.rotate.y);
+
+					// 溜め中は少し前進 (速度7.5f)、攻撃スイング中は大噴射 (速度20.0f)
+					float forwardBoost = isAttacking ? 20.0f : 7.5f;
+
+					targetVelX = frontX * forwardBoost;
+					targetVelZ = frontZ * forwardBoost;
+				}
+			}
+
 			// 目標速度に向かって補間（加速度・摩擦・方向転換を兼ねる）
 			// 数値が小さいほど滑りやすく、大きいほどキビキビ動く
 			float responsiveness = 18.0f; 
@@ -145,7 +164,19 @@ public:
 			} else {
 				// 自由落下
 				if (rb.useGravity) {
-					rb.velocity.y -= cm.gravity * ctx.dt;
+					float gravityScale = 1.0f;
+					if (registry.all_of<VariableComponent>(entity)) {
+						auto& vc = registry.get<VariableComponent>(entity);
+						if (vc.GetValue("IsSwordCharging", 0.0f) > 0.5f || vc.GetValue("IsSwordAttacking", 0.0f) > 0.5f) {
+							gravityScale = 0.05f; // 大剣の空中溜め・攻撃中は重力を5%に抑えて超・滞空させる
+							// Y軸の落下速度も急速に減衰させて、空中でふわっと静止させる
+							rb.velocity.y *= std::pow(0.001f, ctx.dt); 
+						}
+					}
+
+					// ★キレのあるジャンプ: 落下時は重力を1.8倍にし、原神のようにキビキビと着地させる
+					float gravityMultiplier = (rb.velocity.y < 0.0f) ? 1.8f : 1.0f;
+					rb.velocity.y -= cm.gravity * gravityMultiplier * gravityScale * ctx.dt;
 				} else {
 					rb.velocity.y = 0.0f;
 				}

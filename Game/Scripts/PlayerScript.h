@@ -21,7 +21,7 @@ public:
 
 private:
 	float speed_ = 7.0f; // ★復元: 5.0f -> 7.0f (快適な機動力へ)
-	float jumpPower_ = 8.0f;
+	float jumpPower_ = 15.0f;
 
 	// 攻撃関連
 	enum class AttackPhase { WindUp, Swing, Recovery };
@@ -161,7 +161,7 @@ private:
 	static constexpr float CHARGE_TIME_MAX = 1.2f;      // 最大チャージ時間
 	static constexpr float CHARGE_TIME_MIN = 0.35f;     // チャージショット判定の最低時間
 	static constexpr float DASH_COST = 20.0f;           // スチーム・ブーストのコスト
-	static constexpr float DASH_POWER = 100.0f;         // スチーム・ブーストの推進力 (半分以下に調整)
+	static constexpr float DASH_POWER = 155.0f;         // スチーム・ブーストの推進力 (さらにもう少しだけ伸ばす調整)
 
 	// ★追加: チャージショット
 	bool isCharging_ = false;            // チャージ中か
