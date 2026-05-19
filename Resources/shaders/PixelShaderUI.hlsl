@@ -115,7 +115,7 @@ float4 mainPS(PSIn i) : SV_TARGET
         d = sdCircle(p, uSizePx.x);
     } else { // 2: Crescent
         d = sdCrescent(p, uSizePx.x, uInner);
-        innerMask = innerMaskByInnerCircle(p, uInner);
+        innerMask *= innerMaskByInnerCircle(p, uInner);
     }
 
     // 左から右へのプログレス(クリッピング)処理

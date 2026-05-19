@@ -184,6 +184,7 @@ private:
 
 	void ShootChargeShot(entt::entity entity, GameScene* scene);
 	void DrawPressureGauge(GameScene* scene);
+	void DrawReticle(entt::entity playerEntity, GameScene* scene);
 };
 
 } // namespace Game

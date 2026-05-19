@@ -2765,8 +2765,11 @@ void Renderer::FlushSDFUI() {
 	list_->SetDescriptorHeaps(1, heaps);
 	list_->SetPipelineState(psoUI_.Get());
 	list_->SetGraphicsRootSignature(rootSigUI_.Get());
+	
+	// ★念のため、画面中央のレティクルなどが狭められたシザーでクリップされないよう、一時的に全画面のシザー矩形を適用する
+	D3D12_RECT fullScissor = { 0, 0, static_cast<LONG>(W), static_cast<LONG>(H) };
 	list_->RSSetViewports(1, &viewport_);
-	list_->RSSetScissorRects(1, &scissor_);
+	list_->RSSetScissorRects(1, &fullScissor);
 	list_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	for (const auto& dc : sdfUIDrawCalls_) {

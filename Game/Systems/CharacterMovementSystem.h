@@ -59,10 +59,30 @@ public:
 				}
 			}
 			float currentSpeed = cm.speed * (cm.isSprinting ? cm.sprintMultiplier : 1.0f);
-			float desiredX = moveX * currentSpeed * ctx.dt;
-			float desiredZ = moveZ * currentSpeed * ctx.dt;
+			
+			// ★変更: 慣性（加速度と摩擦）の導入により、地面での滑り具合を改善
+			float targetVelX = moveX * currentSpeed;
+			float targetVelZ = moveZ * currentSpeed;
 
-			if (ctx.scene && (std::abs(moveX) > 0.001f || std::abs(moveZ) > 0.001f)) {
+			// 目標速度に向かって補間（加速度・摩擦・方向転換を兼ねる）
+			// 数値が小さいほど滑りやすく、大きいほどキビキビ動く
+			float responsiveness = 18.0f; 
+			float lerpFactor = responsiveness * ctx.dt;
+			if (lerpFactor > 1.0f) lerpFactor = 1.0f;
+
+			rb.velocity.x += (targetVelX - rb.velocity.x) * lerpFactor;
+			rb.velocity.z += (targetVelZ - rb.velocity.z) * lerpFactor;
+
+			// 微小な速度はゼロに丸める（ピタッと止まるようにする）
+			if (std::abs(moveX) < 0.001f && std::abs(moveZ) < 0.001f) {
+				if (std::abs(rb.velocity.x) < 0.1f) rb.velocity.x = 0.0f;
+				if (std::abs(rb.velocity.z) < 0.1f) rb.velocity.z = 0.0f;
+			}
+
+			float desiredX = rb.velocity.x * ctx.dt;
+			float desiredZ = rb.velocity.z * ctx.dt;
+
+			if (ctx.scene && (std::abs(desiredX) > 0.0001f || std::abs(desiredZ) > 0.0001f)) {
 				// --- 強力な段差制限による壁判定 ---
 				float futureX = tc.translate.x + desiredX;
 				float futureZ = tc.translate.z + desiredZ;
@@ -74,6 +94,7 @@ public:
 					    futureZ < boundsMinZ_ + margin || futureZ > boundsMaxZ_ - margin) {
 						desiredX = 0;
 						desiredZ = 0;
+						rb.velocity.x = 0; rb.velocity.z = 0; // 速度もリセット
 					}
 				}
 
@@ -86,18 +107,26 @@ public:
 					if (futureGround <= -5000.0f) {
 						desiredX = 0;
 						desiredZ = 0;
+						rb.velocity.x = 0; rb.velocity.z = 0;
 					} else if (futureGround > currentFeetY + 0.4f) {
 						// 移動先が 0.4m 以上高いなら壁とみなして移動をブロック
 						desiredX = 0;
 						desiredZ = 0;
+						rb.velocity.x = 0; rb.velocity.z = 0;
 					} else {
 						// 膝くらいの高さから進行方向にレイを飛ばす (通常の壁判定も併用)
 						Engine::Vector3 rayOrig = {tc.translate.x, tc.translate.y + 0.5f, tc.translate.z}; 
-						Engine::Vector3 rayDir = {moveX, 0, moveZ};
-						float hitDist = 0;
-						if (ctx.scene->RayCast(rayOrig, rayDir, 0.6f, static_cast<uint32_t>(entity), hitDist)) {
-							desiredX = 0;
-							desiredZ = 0;
+						
+						// ★変更: レイの方向を入力(moveX/Z)ではなく、実際の移動速度(desiredX/Z)に合わせる
+						float len = std::sqrt(desiredX * desiredX + desiredZ * desiredZ);
+						if (len > 0.0001f) {
+							Engine::Vector3 rayDir = {desiredX / len, 0, desiredZ / len};
+							float hitDist = 0;
+							if (ctx.scene->RayCast(rayOrig, rayDir, 0.6f, static_cast<uint32_t>(entity), hitDist)) {
+								desiredX = 0;
+								desiredZ = 0;
+								rb.velocity.x = 0; rb.velocity.z = 0;
+							}
 						}
 					}
 				}
