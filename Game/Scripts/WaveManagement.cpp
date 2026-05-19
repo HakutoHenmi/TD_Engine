@@ -184,8 +184,8 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 							float endX = (float)Engine::WindowDX::kW - margin;
 							float barWidth = endX - startX;
 
-							// angleDiff が -PI で左端、PI で右端
-							float t = (angleDiff + PI_VAL) / (2.0f * PI_VAL);
+							// 左右の逆転を修正するため、マッピング方向を反転
+							float t = (PI_VAL - angleDiff) / (2.0f * PI_VAL);
 							float targetX = startX + t * barWidth;
 							float targetY = 50.0f; // 画面上部固定
 
