@@ -24,36 +24,42 @@ InstallationManager::InstallationManager() {
 	instance_ = this;
 	currentPage_ = 0;
 
+	// 削除機能用ボタンの設定
+	prefabPaths_[0] = "";
+	texPaths_[0] = "Resources/Textures/Button/DeleteButton.png";
+	buttons_[0].name = "DeleteButton";
+	buttons_[0].cost = 0;
+
 	// ★ここでパスを直接設定してください（ImGuiでの入力によるクラッシュを回避）
-	prefabPaths_[0] = "Resources/Prefabs/BulletTank.prefab";
-	texPaths_[0] = "Resources/Textures/Button/TankButton.png";
-	buttons_[0].name = "TankButton";
-	buttons_[0].cost = 100;
+	prefabPaths_[1] = "Resources/Prefabs/BulletTank.prefab";
+	texPaths_[1] = "Resources/Textures/Button/TankButton.png";
+	buttons_[1].name = "TankButton";
+	buttons_[1].cost = 100;
 
-	prefabPaths_[1] = "Resources/Prefabs/Pipe.prefab";
-	texPaths_[1] = "Resources/Textures/Button/PipeButton.png";
-	buttons_[1].name = "PipeButton";
-	buttons_[1].cost = 5;
+	prefabPaths_[2] = "Resources/Prefabs/Pipe.prefab";
+	texPaths_[2] = "Resources/Textures/Button/PipeButton.png";
+	buttons_[2].name = "PipeButton";
+	buttons_[2].cost = 5;
 
-	prefabPaths_[2] = "Resources/Prefabs/Canon.prefab";
-	texPaths_[2] = "Resources/Textures/Button/CannonButton.png";
-	buttons_[2].name = "CannonButton";
-	buttons_[2].cost = 150;
+	prefabPaths_[3] = "Resources/Prefabs/Canon.prefab";
+	texPaths_[3] = "Resources/Textures/Button/CannonButton.png";
+	buttons_[3].name = "CannonButton";
+	buttons_[3].cost = 150;
 
-	prefabPaths_[3] = "Resources/Prefabs/Missile.prefab";
-	texPaths_[3] = "Resources/Textures/Button/MissileButton.png";
-	buttons_[3].name = "MissikeButton";
-	buttons_[3].cost = 200;
+	prefabPaths_[4] = "Resources/Prefabs/Missile.prefab";
+	texPaths_[4] = "Resources/Textures/Button/MissileButton.png";
+	buttons_[4].name = "MissikeButton";
+	buttons_[4].cost = 200;
 
-	prefabPaths_[4] = "Resources/Prefabs/Poison.prefab";
-	texPaths_[4] = "Resources/Textures/Button/PisonTrapButton.png";
-	buttons_[4].name = "PoisonTrapButton";
-	buttons_[4].cost = 120;
+	prefabPaths_[5] = "Resources/Prefabs/Poison.prefab";
+	texPaths_[5] = "Resources/Textures/Button/PisonTrapButton.png";
+	buttons_[5].name = "PoisonTrapButton";
+	buttons_[5].cost = 120;
 
-	prefabPaths_[5] = "Resources/Prefabs/IceCanon.prefab";
-	texPaths_[5] = "Resources/Textures/Button/IceCannonButton.png";
-	buttons_[5].name = "IceCannonButton";
-	buttons_[5].cost = 250;
+	prefabPaths_[6] = "Resources/Prefabs/IceCanon.prefab";
+	texPaths_[6] = "Resources/Textures/Button/IceCannonButton.png";
+	buttons_[6].name = "IceCannonButton";
+	buttons_[6].cost = 250;
 }
 
 void InstallationManager::Start(entt::entity /*entity*/, GameScene* scene) {
@@ -62,7 +68,7 @@ void InstallationManager::Start(entt::entity /*entity*/, GameScene* scene) {
 	if (!scene) return;
 
 	auto& registry = scene->GetRegistry();
-	for (int i = 0; i < 6; ++i) {
+	for (int i = 0; i < 7; ++i) {
 		auto& btn = buttons_[i];
 		if (btn.name.empty()) {
 			btn.name = "Button_" + std::to_string(i);
@@ -99,7 +105,7 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 	auto& registry = scene->GetRegistry();
 	auto currentPhase = PhaseSystemScript::IsPhase();
 
-	for (int i = 0; i < 6; ++i) {
+	for (int i = 0; i < 7; ++i) {
 		auto& btn = buttons_[i];
 
 		// パスの同期（コードで設定した変数から反映）
@@ -111,9 +117,9 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 			if (!registry.valid(btn.entity)) continue;
 		}
 
-		// サイズと位置の自動設定（6ボタンを画面下部に綺麗に横並びにする）
+		// サイズと位置の自動設定（7ボタンを画面下部に綺麗に横並びにする）
 		btn.size = { 180.0f, 180.0f };
-		btn.pos.x = (i - 2.5f) * 210.0f;
+		btn.pos.x = (i - 3.0f) * 210.0f;
 		btn.pos.y = 400.0f;
 
 		// 状態の更新
@@ -167,10 +173,10 @@ void InstallationManager::OnEditorUI() {
 #if defined(USE_IMGUI) && !defined(NDEBUG)
 	ImGui::SeparatorText("Installation Manager");
 	
-	ImGui::Text("Fixed 6 Buttons Mode");
+	ImGui::Text("Fixed 7 Buttons Mode");
 	ImGui::Separator();
 
-	for (int i = 0; i < 6; ++i) {
+	for (int i = 0; i < 7; ++i) {
 		ImGui::PushID(static_cast<int>(i));
 		std::string label = buttons_[i].name + " (##" + std::to_string(i) + ")";
 		if (ImGui::TreeNode(label.c_str())) {
@@ -207,7 +213,7 @@ void InstallationManager::OnEditorUI() {
 std::string InstallationManager::SerializeParameters() {
 	json j;
 	json btns = json::array();
-	for (int i = 0; i < 6; ++i) {
+	for (int i = 0; i < 7; ++i) {
 		const auto& btn = buttons_[i];
 		json b;
 		b["name"] = btn.name;
@@ -229,9 +235,10 @@ void InstallationManager::DeserializeParameters(const std::string& data) {
 	try {
 		json j = json::parse(data);
 		if (j.contains("buttons") && j["buttons"].is_array()) {
-			int idx = 0;
+			int totalSerialized = static_cast<int>(j["buttons"].size());
+			int idx = (totalSerialized == 6) ? 1 : 0; // Old format has 6 elements, map to 1-6. New has 7, map to 0-6.
 			for (const auto& b : j["buttons"]) {
-				if (idx >= 6) break;
+				if (idx >= 7) break;
 				auto& btn = buttons_[idx++];
 				btn.name = b.value("name", "");
 				btn.texturePath = b.value("texturePath", "");
@@ -250,7 +257,7 @@ void InstallationManager::DeserializeParameters(const std::string& data) {
 
 bool InstallationManager::IsButtonPressed(const std::string& prefabPath) {
 	if (!instance_) return false;
-	for (int i = 0; i < 6; ++i) {
+	for (int i = 0; i < 7; ++i) {
 		if (instance_->buttons_[i].prefabPath == prefabPath) return instance_->buttons_[i].isPressed;
 	}
 	return false;
@@ -258,7 +265,7 @@ bool InstallationManager::IsButtonPressed(const std::string& prefabPath) {
 
 int InstallationManager::GetCost(const std::string& prefabPath) {
 	if (!instance_) return 0;
-	for (int i = 0; i < 6; ++i) {
+	for (int i = 0; i < 7; ++i) {
 		if (instance_->buttons_[i].prefabPath == prefabPath) return instance_->buttons_[i].cost;
 	}
 	return 0;
@@ -266,7 +273,7 @@ int InstallationManager::GetCost(const std::string& prefabPath) {
 
 bool InstallationManager::IsButtonPressedByName(const std::string& name) {
 	if (!instance_) return false;
-	for (int i = 0; i < 6; ++i) {
+	for (int i = 0; i < 7; ++i) {
 		if (instance_->buttons_[i].name == name) return instance_->buttons_[i].isPressed;
 	}
 	return false;
@@ -274,7 +281,7 @@ bool InstallationManager::IsButtonPressedByName(const std::string& name) {
 
 bool InstallationManager::IsManagedButton(entt::entity entity) {
 	if (!instance_) return false;
-	for (int i = 0; i < 6; ++i) {
+	for (int i = 0; i < 7; ++i) {
 		if (instance_->buttons_[i].entity == entity) return true;
 	}
 	return false;

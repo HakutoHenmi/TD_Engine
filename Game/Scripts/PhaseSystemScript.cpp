@@ -277,6 +277,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			if (selectedObjCost_ == 0) selectedObjCost_ = tankCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
+			isSellMode_ = false;
 			hasPipeStartPoint_ = false;
 			placementSelectionChangedThisFrame = true;
 		}
@@ -287,6 +288,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			if (selectedObjCost_ == 0) selectedObjCost_ = pipeCost_;
 			isPipeSet_ = true;
 			isPlacementMode_ = true;
+			isSellMode_ = false;
 			hasPipeStartPoint_ = false;
 			placementSelectionChangedThisFrame = true;
 		}
@@ -297,6 +299,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			if (selectedObjCost_ == 0) selectedObjCost_ = canonCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
+			isSellMode_ = false;
 			hasPipeStartPoint_ = false;
 			placementSelectionChangedThisFrame = true;
 		}
@@ -307,6 +310,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			if (selectedObjCost_ == 0) selectedObjCost_ = missileCost_;
 			isPlacementMode_ = true;
 			isPipeSet_ = false;
+			isSellMode_ = false;
 			hasPipeStartPoint_ = false;
 			placementSelectionChangedThisFrame = true;
 		}
@@ -333,8 +337,8 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			placementSelectionChangedThisFrame = true;
 		}
 
-		// Xキーで削除(売却)モードへの切り替え
-		if (keyX) {
+		// Xキーまたは「削除機能ボタン」クリックで削除(売却)モードへの切り替え
+		if (keyX || InstallationManager::IsButtonPressedByName("DeleteButton")) {
 			isSellMode_ = true;
 			isPlacementMode_ = false;
 			isPipeSet_ = false;
