@@ -2536,7 +2536,7 @@ Renderer::MeshHandle Renderer::LoadObjMesh(const std::string& objFilePath) {
 	// 完了を待機 (テクスチャ転送を確実にするため)
 	WaitGPU();
 
-	if (model->GetData().material.textureFilePath.size() > 0) {
+	if (model->HasTexture()) {
 		uint32_t idx = AllocateSrvIndex();
 		model->CreateSrv(dev_, srvHeap_, window_->SRV_CPU_Heap(), srvInc_, idx);
 	}

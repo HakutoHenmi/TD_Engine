@@ -298,10 +298,35 @@ bool Model::Load(ID3D12Device* device, ID3D12GraphicsCommandList* cmd, const std
 
 		// パスが見つかった場合のみ設定する
 		if (str.length > 0) {
-			std::filesystem::path fullPath(PathUtils::FromUTF8(objPath));
-			std::filesystem::path dir = fullPath.parent_path();
-			std::filesystem::path texPath = dir / str.C_Str();
-			data_.material.textureFilePath = PathUtils::ToUTF8(texPath.wstring());
+			if (str.data[0] == '*') {
+				// ★GLTF 埋め込みテクスチャの場合 (*0, *1 など)
+				int index = std::atoi(&str.data[1]);
+				if (index >= 0 && index < (int)scene->mNumTextures) {
+					aiTexture* aiTex = scene->mTextures[index];
+					if (aiTex->mHeight == 0) {
+						// 圧縮テクスチャデータ (PNG, JPG等)
+						DirectX::ScratchImage mip;
+						if (SUCCEEDED(DirectX::LoadFromWICMemory(aiTex->pcData, aiTex->mWidth, DirectX::WIC_FLAGS_FORCE_SRGB, nullptr, mip))) {
+							tex_ = CreateTextureResource(device, mip.GetMetadata());
+							upload_ = UploadTextureData(tex_.Get(), mip, device, cmd);
+							srvDesc_.Format = mip.GetMetadata().format;
+							srvDesc_.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+							srvDesc_.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+							srvDesc_.Texture2D.MipLevels = (UINT)mip.GetMetadata().mipLevels;
+							srvDesc_.Texture2D.MostDetailedMip = 0;
+							srvDesc_.Texture2D.PlaneSlice = 0;
+							srvDesc_.Texture2D.ResourceMinLODClamp = 0.0f;
+							hasTexture_ = true;
+						}
+					}
+				}
+			} else {
+				// 外部テクスチャファイルの場合
+				std::filesystem::path fullPath(PathUtils::FromUTF8(objPath));
+				std::filesystem::path dir = fullPath.parent_path();
+				std::filesystem::path texPath = dir / str.C_Str();
+				data_.material.textureFilePath = PathUtils::ToUTF8(texPath.wstring());
+			}
 		}
 	}
 	// ★★★ 修正終わり ★★★
@@ -631,8 +656,49 @@ bool Model::RayCast(const DirectX::XMVECTOR& rayOrig, const DirectX::XMVECTOR& r
 	return false;
 }
 
-void Model::UpdateSkeleton(const Node& /*node*/, const Matrix4x4& /*parentMatrix*/, const Animation& /*animation*/, float /*time*/, std::vector<Matrix4x4>& /*skeletonParams*/) {
-	// (未使用) 互換性のためのダミー実装
+void Model::UpdateSkeleton(const Node& node, const Matrix4x4& parentTransform, const Animation& animation, float time, std::vector<Matrix4x4>& outPalette) {
+	std::string nodeName = node.name;
+	Matrix4x4 nodeTransform = node.transform;
+
+	// ★修正: time は 60fps 基準のフレーム数なので、秒に変換してから ticks に変換する
+	float timeInSeconds = time / 60.0f;
+	float timeInTicks = timeInSeconds * animation.ticksPerSecond;
+
+	auto it = animation.nodeAnimations.find(nodeName);
+	if (it != animation.nodeAnimations.end()) {
+		const NodeAnimation& nodeAnim = it->second;
+		Vector3 translation = CalculateTranslation(nodeAnim.translations, timeInTicks);
+		DirectX::XMFLOAT4 rotation = CalculateRotation(nodeAnim.rotations, timeInTicks);
+		Vector3 scale = CalculateScale(nodeAnim.scales, timeInTicks);
+
+		DirectX::XMMATRIX S = DirectX::XMMatrixScaling(scale.x, scale.y, scale.z);
+		DirectX::XMMATRIX R = DirectX::XMMatrixRotationQuaternion(DirectX::XMLoadFloat4(&rotation));
+		DirectX::XMMATRIX T = DirectX::XMMatrixTranslation(translation.x, translation.y, translation.z);
+		DirectX::XMStoreFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&nodeTransform), S * R * T);
+	}
+
+	DirectX::XMMATRIX globalTransform = DirectX::XMMatrixMultiply(
+		DirectX::XMLoadFloat4x4(reinterpret_cast<const DirectX::XMFLOAT4X4*>(&nodeTransform)),
+		DirectX::XMLoadFloat4x4(reinterpret_cast<const DirectX::XMFLOAT4X4*>(&parentTransform))
+	);
+
+	Matrix4x4 globalTransformM4;
+	DirectX::XMStoreFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&globalTransformM4), globalTransform);
+
+	auto boneIt = data_.boneMapping.find(nodeName);
+	if (boneIt != data_.boneMapping.end()) {
+		int boneIdx = boneIt->second;
+		if (boneIdx >= 0 && boneIdx < (int)outPalette.size()) {
+			const Bone& bone = data_.bones[boneIdx];
+			DirectX::XMMATRIX offset = DirectX::XMLoadFloat4x4(reinterpret_cast<const DirectX::XMFLOAT4X4*>(&bone.offsetMatrix));
+			DirectX::XMMATRIX finalBoneMat = DirectX::XMMatrixMultiply(offset, globalTransform);
+			DirectX::XMStoreFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&outPalette[boneIdx]), finalBoneMat);
+		}
+	}
+
+	for (const auto& child : node.children) {
+		UpdateSkeleton(child, globalTransformM4, animation, time, outPalette);
+	}
 }
 
 } // namespace Engine

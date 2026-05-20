@@ -267,6 +267,7 @@ struct PlayerInputComponent : public Component {
 	bool jumpRequested = false;
 	bool attackRequested = false;
 	bool sprintRequested = false; // ★追加: Shiftダッシュ
+	bool lockRotation = false;    // ★追加: 移動方向への自動回転をロックする（射撃中など）
 
 	// ★追加: マウス操作によるカメラの旋回量（intent）
 	float cameraYaw = 0.0f;

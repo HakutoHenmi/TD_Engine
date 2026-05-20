@@ -127,6 +127,7 @@ public:
 	const D3D12_VERTEX_BUFFER_VIEW& GetVBV() const { return vbv_; }
 	const D3D12_INDEX_BUFFER_VIEW& GetIBV() const { return ibv_; } // 追加
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvGpu() const { return srvGpu_; }
+	bool HasTexture() const { return hasTexture_; }
 
 	// ★追加: GPU用BVH・メッシュバッファ
 	D3D12_GPU_VIRTUAL_ADDRESS GetBvhNodeBufferAddr() const { return vbBvhNodes_ ? vbBvhNodes_->GetGPUVirtualAddress() : 0; }

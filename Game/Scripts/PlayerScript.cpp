@@ -23,31 +23,55 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 	while (ShowCursor(TRUE) < 0);
 	prevCursorToggle_ = false;
 
+	// ★追加: プレイヤーの3Dモデルを GLTF/GLB (sotai3.glb) に置き換え
+	auto* pRenderer = scene->GetRenderer();
+	if (pRenderer) {
+		auto& mr = scene->GetRegistry().get_or_emplace<MeshRendererComponent>(entity);
+		mr.modelHandle = pRenderer->LoadObjMesh("Resources/Models/3Dmodel/player/sotai3.glb");
+		mr.textureHandle = 0; // ★修正: 0を指定してGLTF内包テクスチャを使用する
+		mr.shaderName = "ToonSkinning"; // スキニング対応トゥーンシェーダー
+		mr.color = {1.0f, 1.0f, 1.0f, 1.0f}; // ★修正: Player.prefabの青色設定をリセットし、本来のテクスチャカラーを表示する
+		mr.enabled = true;
+	}
+
+	// ★追加: アニメーターコンポーネントをアタッチ
+	auto& anim = scene->GetRegistry().get_or_emplace<AnimatorComponent>(entity);
+	anim.currentAnimation = "[保留アクション]";
+	anim.time = 0.0f;
+	anim.speed = 1.0f;
+	anim.isPlaying = true;
+	anim.loop = true;
+	anim.enabled = true;
+
 	// ★追加: プレイヤーを物理演算から切り離し、CharacterController方式（レイキャスト）で制御する
 	if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
 		scene->GetRegistry().get<RigidbodyComponent>(entity).isKinematic = true;
 	}
 	if (scene->GetRegistry().all_of<CharacterMovementComponent>(entity)) {
 		auto& cm = scene->GetRegistry().get<CharacterMovementComponent>(entity);
-		cm.heightOffset = 1.0f; // 2m立方体キャラの中心がy=1.0になるように
+		cm.heightOffset = 0.0f; // ★修正: 1.0fから0.0fへ変更。モデルの原点（足元）を地面に合わせるため
 		cm.jumpPower = jumpPower_; // ★追加: ヘッダで定義されているジャンプ力(8.0f)を反映し、ジャンプを弱くする
 		cm.gravity = 28.0f; // ★キレのあるアクション用重力 (原神風)
 		cm.speed = 8.5f; // ★追加: プレイヤーの基本移動速度を上げる（デフォルトは5.0f）
 	}
-
+	
 	// プレイヤー自身のコライダーサイズを「見た目（2m立方体）」に合わせる
 	if (scene->GetRegistry().all_of<BoxColliderComponent>(entity)) {
-		scene->GetRegistry().get<BoxColliderComponent>(entity).size = { 2.0f, 2.0f, 2.0f };
+		auto& bc = scene->GetRegistry().get<BoxColliderComponent>(entity);
+		bc.size = { 2.0f, 2.0f, 2.0f };
+		bc.center = { 0.0f, 1.0f, 0.0f }; // ★追加: 足元原点に対応するため上へずらす
 	}
 	
 	// 食らい判定（Hurtbox）がなければ追加し、サイズとタグを設定する
 	if (!scene->GetRegistry().all_of<HurtboxComponent>(entity)) {
 		auto& hb = scene->GetRegistry().emplace<HurtboxComponent>(entity);
 		hb.size = { 2.0f, 2.0f, 2.0f };
+		hb.center = { 0.0f, 1.0f, 0.0f }; // ★追加: 足元原点対応
 		hb.tag = TagType::Player;
 	} else {
 		auto& hb = scene->GetRegistry().get<HurtboxComponent>(entity);
 		hb.size = { 2.0f, 2.0f, 2.0f };
+		hb.center = { 0.0f, 1.0f, 0.0f }; // ★追加: 足元原点対応
 		hb.tag = TagType::Player;
 	}
 
@@ -93,28 +117,28 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		float bsz = 3.2f;
 		if (index == 1) { // 横薙ぎ
 			clip.totalDuration = 0.7f;
-			clip.keyframes.push_back({0.00f, { 1.5f, 1.2f, -0.5f }, { 0.0f, 2.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
-			clip.keyframes.push_back({0.25f, { 1.8f, 1.0f, 0.0f }, { 0.0f, 1.8f, 0.0f }, { 0.45f, 0.40f, bsz + 0.5f }});
-			clip.keyframes.push_back({0.45f, { 0.0f, 1.0f, 2.5f }, { 0.0f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 1.2f }});
-			clip.keyframes.push_back({0.70f, {-2.2f, 0.8f, -0.8f }, { 0.0f, -2.2f, 0.0f }, { 0.45f, 0.40f, bsz }});
+			clip.keyframes.push_back({0.00f, { 1.5f, 2.2f, -0.5f }, { 0.0f, 2.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
+			clip.keyframes.push_back({0.25f, { 1.8f, 2.0f, 0.0f }, { 0.0f, 1.8f, 0.0f }, { 0.45f, 0.40f, bsz + 0.5f }});
+			clip.keyframes.push_back({0.45f, { 0.0f, 2.0f, 2.5f }, { 0.0f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 1.2f }});
+			clip.keyframes.push_back({0.70f, {-2.2f, 1.8f, -0.8f }, { 0.0f, -2.2f, 0.0f }, { 0.45f, 0.40f, bsz }});
 		} else if (index == 2) { // 振り下ろし
 			clip.totalDuration = 0.8f;
-			clip.keyframes.push_back({0.00f, { 0.0f, 3.5f, -1.0f }, { -1.5f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
-			clip.keyframes.push_back({0.30f, { 0.0f, 3.8f, -0.5f }, { -1.8f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
-			clip.keyframes.push_back({0.50f, { 0.0f, 0.5f, 3.5f }, { 0.5f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 1.5f }});
-			clip.keyframes.push_back({0.80f, { 0.0f, 0.2f, 2.8f }, { 0.8f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
+			clip.keyframes.push_back({0.00f, { 0.0f, 4.5f, -1.0f }, { -1.5f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
+			clip.keyframes.push_back({0.30f, { 0.0f, 4.8f, -0.5f }, { -1.8f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
+			clip.keyframes.push_back({0.50f, { 0.0f, 1.5f, 3.5f }, { 0.5f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 1.5f }});
+			clip.keyframes.push_back({0.80f, { 0.0f, 1.2f, 2.8f }, { 0.8f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
 		} else { // 飛翔大回転（前方に飛ばして戻す）
 			clip.totalDuration = 1.2f;
 			// 0.0s: 始動
-			clip.keyframes.push_back({0.00f, { 0.0f, 1.2f, 0.5f }, { 0.0f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
+			clip.keyframes.push_back({0.00f, { 0.0f, 2.2f, 0.5f }, { 0.0f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
 			// 0.3s: 前方に射出開始 + 回転
-			clip.keyframes.push_back({0.30f, { 0.0f, 1.2f, 4.5f }, { 0.0f, 6.28f, 0.0f }, { 0.45f, 0.40f, bsz + 0.5f }});
+			clip.keyframes.push_back({0.30f, { 0.0f, 2.2f, 4.5f }, { 0.0f, 6.28f, 0.0f }, { 0.45f, 0.40f, bsz + 0.5f }});
 			// 0.6s: 最遠地点で激しく回転 (Boomerang Peak)
-			clip.keyframes.push_back({0.60f, { 0.0f, 1.2f, 7.5f }, { 0.0f, 12.56f, 0.0f }, { 0.45f, 0.40f, bsz + 1.0f }});
+			clip.keyframes.push_back({0.60f, { 0.0f, 2.2f, 7.5f }, { 0.0f, 12.56f, 0.0f }, { 0.45f, 0.40f, bsz + 1.0f }});
 			// 0.9s: 帰還開始
-			clip.keyframes.push_back({0.90f, { 0.0f, 1.2f, 3.5f }, { 0.0f, 18.84f, 0.0f }, { 0.45f, 0.40f, bsz + 0.5f }});
+			clip.keyframes.push_back({0.90f, { 0.0f, 2.2f, 3.5f }, { 0.0f, 18.84f, 0.0f }, { 0.45f, 0.40f, bsz + 0.5f }});
 			// 1.2s: キャッチ
-			clip.keyframes.push_back({1.20f, { -1.0f, 0.8f, -0.5f }, { 0.0f, 20.41f, 0.0f }, { 0.45f, 0.40f, bsz }});
+			clip.keyframes.push_back({1.20f, { -1.0f, 1.8f, -0.5f }, { 0.0f, 20.41f, 0.0f }, { 0.45f, 0.40f, bsz }});
 		}
 		sMotion.clips[name] = clip;
 	};
@@ -131,15 +155,15 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		float bsz = 3.2f;
 
 		// 0.0s: 溜め・溜め開放（身構える）
-		clip.keyframes.push_back({0.00f, { 0.0f, 0.5f, 0.0f }, { -0.5f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
+		clip.keyframes.push_back({0.00f, { 0.0f, 1.5f, 0.0f }, { -0.5f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
 		// 0.2s: 跳躍開始（少し上へ、少し前へ）
-		clip.keyframes.push_back({0.20f, { 0.0f, 2.5f, 1.5f }, { -1.5f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 0.5f }});
+		clip.keyframes.push_back({0.20f, { 0.0f, 3.5f, 1.5f }, { -1.5f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 0.5f }});
 		// 0.45s: 空中ピーク（最大限に振りかぶる）
-		clip.keyframes.push_back({0.45f, { 0.0f, 5.0f, 3.5f }, { -2.8f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 1.0f }});
+		clip.keyframes.push_back({0.45f, { 0.0f, 6.0f, 3.5f }, { -2.8f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 1.0f }});
 		// 0.7s: 叩きつけ（最速で地面へ、前方に大きくリーチ）
-		clip.keyframes.push_back({0.70f, { 0.0f, 0.2f, 5.5f }, { 0.8f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 1.8f }});
+		clip.keyframes.push_back({0.70f, { 0.0f, 1.2f, 5.5f }, { 0.8f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 1.8f }});
 		// 1.1s: 着地硬直
-		clip.keyframes.push_back({1.10f, { 0.0f, 0.1f, 4.0f }, { 1.2f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
+		clip.keyframes.push_back({1.10f, { 0.0f, 1.1f, 4.0f }, { 1.2f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
 		
 		motion->clips[clip.name] = clip;
 	}
@@ -148,7 +172,7 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 	sHb.damage = 35.0f; // ★弱体化: 110.0f -> 35.0f (ワンパン防止)
 	sHb.tag = TagType::Sword;
 	sHb.size = { 6.0f, 4.0f, 2.5f };
-	sHb.center = { 0.0f, 0.0f, 1.2f };
+	sHb.center = { 0.0f, 1.2f, 1.2f }; // ★Y軸+1.2に変更
 	sHb.enabled = true;
 	if (!isAttacking_) sHb.isActive = false;
 
@@ -664,6 +688,16 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (isPrep) {
 		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) scene->GetRegistry().get<CameraTargetComponent>(entity).enabled = false;
 		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))  scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = false;
+
+		// ★追加: 準備フェーズ中は物理的な滑りや慣性を完全に殺し、一切歩かない（動かない）ようにする
+		if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
+			auto& rb = scene->GetRegistry().get<RigidbodyComponent>(entity);
+			rb.velocity.x = 0.0f;
+			rb.velocity.z = 0.0f;
+		}
+		recoilVelocity_.x = 0.0f;
+		recoilVelocity_.z = 0.0f;
+
 		UpdateSword(entity, scene, dt);
 		UpdateGun(entity, scene, dt);
 	} else {
@@ -712,6 +746,90 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		auto& vc = scene->GetRegistry().get_or_emplace<VariableComponent>(entity);
 		vc.SetValue("IsSwordCharging", isSwordCharging_ ? 1.0f : 0.0f);
 		vc.SetValue("IsSwordAttacking", (isAttacking_ && playerType_ == PlayerType::Sword) ? 1.0f : 0.0f);
+	}
+
+	// ★追加: プレイヤーのアニメーション制御
+	if (scene->GetRegistry().all_of<AnimatorComponent>(entity)) {
+		auto& anim = scene->GetRegistry().get<AnimatorComponent>(entity);
+		std::string nextAnim = "[保留アクション]";
+		bool loop = true;
+		float speed = 1.0f;
+
+		// 地上にいるか空中にいるか
+		bool isGrounded = true;
+		if (scene->GetRegistry().all_of<CharacterMovementComponent>(entity)) {
+			isGrounded = scene->GetRegistry().get<CharacterMovementComponent>(entity).isGrounded;
+		}
+
+		// 動いているか
+		bool isMoving = false;
+		if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
+			const auto& vel = scene->GetRegistry().get<RigidbodyComponent>(entity).velocity;
+			if (vel.x * vel.x + vel.z * vel.z > 0.05f) {
+				isMoving = true;
+			}
+		}
+
+		// アニメーション選択優先度:
+		// 1. 攻撃モーション (剣)
+		if (playerType_ == PlayerType::Sword && isAttacking_) {
+			loop = false;
+			speed = 2.5f; // ★攻撃モーションを早めてキビキビと反応させる
+			if (comboCount_ == 1) {
+				nextAnim = "凪払い";
+			} else if (comboCount_ == 2) {
+				nextAnim = "振り下ろし";
+			} else if (comboCount_ == 3) {
+				nextAnim = "回転飛ばし切り";
+			} else { // comboCount_ == 0
+				nextAnim = "振り下ろし";
+			}
+		}
+		// 2. 地上での射撃モーション (銃) - ★地上にいる時のみ射撃を最優先
+		else if (isGrounded && playerType_ == PlayerType::Gun && (isAiming_ || gunShootTimer_ > 0.0f || isCharging_)) {
+			nextAnim = "射撃構え";
+			loop = true;
+			speed = 1.0f;
+		}
+		// 3. 飛行状態 (空中射撃時はこちらが優先され、射撃モーションは入らない)
+		else if (isFlying_) {
+			nextAnim = "圧力ダッシュ";
+			loop = false; // ★飛行中は最後のフレーム（手を後ろにやったポーズ）で止める
+			speed = 1.0f;
+		}
+		// 4. ダッシュ / 圧力ブースト
+		else if (recoilVelocity_.x * recoilVelocity_.x + recoilVelocity_.z * recoilVelocity_.z > 50.0f) {
+			nextAnim = "圧力ダッシュ";
+			loop = false; // ★ダッシュ時も同じく止める
+			speed = 1.0f;
+		}
+		// 5. ジャンプ (空中) - 空中射撃時もこちらが優先される
+		else if (!isGrounded) {
+			nextAnim = "ジャンプ";
+			loop = true;
+			speed = 1.0f;
+		}
+		// 6. 移動 (歩き)
+		else if (isMoving) {
+			nextAnim = "歩く.004";
+			loop = true;
+			speed = 1.2f;
+		}
+		// 7. 待機 (アイドル)
+		else {
+			nextAnim = "[保留アクション]";
+			loop = true;
+			speed = 1.0f;
+		}
+
+		// アニメーション切り替え時の時間リセット
+		if (anim.currentAnimation != nextAnim) {
+			anim.currentAnimation = nextAnim;
+			anim.time = 0.0f;
+		}
+		anim.loop = loop;
+		anim.speed = speed;
+		anim.isPlaying = true;
 	}
 
 	// ==== ★修正: DrawUIで描画していた各種ゲーム内UI・エフェクトをここでキューに積む ====
@@ -956,13 +1074,16 @@ void PlayerScript::UpdateMovement(entt::entity entity, GameScene* scene, float /
 		speedMul *= 3.0f; // ★3倍に（ベース速度に対して適用されるため非常に速くなります）
 	}
 	
-	// ★追加: TPS視点として、Gunモード時は常にカメラの向きを向く
-	if (playerType_ == PlayerType::Gun) {
+	// ★追加: TPS視点として、Gunモード時かつエイム・射撃・チャージ中のみカメラの向きを向かせる（地上限定）
+	if (playerType_ == PlayerType::Gun && !isFlying_ && (isAiming_ || gunShootTimer_ > 0.0f || isCharging_)) {
 		auto* camera = &scene->GetCamera();
 		if (camera) {
 			auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
 			pTc.rotate.y = camera->GetRotation().y;
+			input.lockRotation = true; // CharacterMovementSystemでの移動方向への自動回転をブロック
 		}
+	} else {
+		input.lockRotation = false;
 	}
 
 	// ★入力ベクトルの大きさが1.0に制限されるため、移動速度そのものを変更する
@@ -1236,7 +1357,7 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 	}
 }
 
-void PlayerScript::UpdateGun(entt::entity /*entity*/, GameScene* scene, float /*dt*/) {
+void PlayerScript::UpdateGun(entt::entity entity, GameScene* scene, float /*dt*/) {
 	entt::entity gun = scene->FindObjectByName(gunName_);
 	if (gun == entt::null) return;
 
@@ -1244,13 +1365,54 @@ void PlayerScript::UpdateGun(entt::entity /*entity*/, GameScene* scene, float /*
 	
 	if (isAiming_) {
 		// エイム時：しっかり構える（平行に、少し低く）
-		gunTc.translate = { 0.6f, 1.0f, 1.0f };
+		gunTc.translate = { 0.6f, 2.0f, 1.0f }; // ★Y軸オフセットを+1.0
 		gunTc.rotate = { 0.0f, 0.0f, 0.0f };
 	} else {
 		// 非エイム時：腰だめ（平行に、もっと低く）
-		gunTc.translate = { 0.8f, 0.7f, 0.6f };
+		gunTc.translate = { 0.8f, 1.7f, 0.6f }; // ★Y軸オフセットを+1.0
 		gunTc.rotate = { 0.0f, 0.0f, 0.0f }; // 地面と平行に
 	}
+
+	// ★追加: 飛行中でロックしている敵がいる場合は、銃口だけ敵の方を向かせる
+	if (isFlying_ && lockedEnemy_ != entt::null && scene->GetRegistry().valid(lockedEnemy_)) {
+		auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
+		auto& eTc = scene->GetRegistry().get<TransformComponent>(lockedEnemy_);
+		
+		float dx = eTc.translate.x - pTc.translate.x;
+		float dy = (eTc.translate.y + 1.0f) - (pTc.translate.y + 1.0f); // 敵の胸を狙う (銃の高さは概ね+1.0f)
+		float dz = eTc.translate.z - pTc.translate.z;
+		
+		float distXZ = std::sqrt(dx*dx + dz*dz);
+		float targetYaw = std::atan2(dx, dz);
+		float targetPitch = std::atan2(-dy, distXZ);
+		
+		// 銃はプレイヤーの子なので、プレイヤーの回転を打ち消す（ローカルYaw）
+		float localYaw = targetYaw - pTc.rotate.y;
+		while (localYaw >  DirectX::XM_PI) localYaw -= DirectX::XM_2PI;
+		while (localYaw < -DirectX::XM_PI) localYaw += DirectX::XM_2PI;
+
+		// 360度自然に構えるために、銃のローカル座標も旋回させる（プレイヤーを中心に公転）
+		float offsetX = 0.8f;
+		float offsetY = 1.7f; // ★Y軸オフセットを+1.0
+		float offsetZ = 0.6f;
+		
+		float cy = std::cos(localYaw);
+		float sy = std::sin(localYaw);
+		
+		// 右手(X=0.8)を基準に回転させる
+		gunTc.translate.x = offsetX * cy + offsetZ * sy;
+		gunTc.translate.y = offsetY;
+		gunTc.translate.z = -offsetX * sy + offsetZ * cy;
+
+		// スムーズな回転補間（360度滑らかに追従）
+		float diffYaw = localYaw - gunTc.rotate.y;
+		while (diffYaw >  DirectX::XM_PI) diffYaw -= DirectX::XM_2PI;
+		while (diffYaw < -DirectX::XM_PI) diffYaw += DirectX::XM_2PI;
+		
+		gunTc.rotate.y += diffYaw * 0.2f; // Lerp
+		gunTc.rotate.x = targetPitch;
+	}
+
 	gunTc.scale = { 0.15f, 0.15f, 1.2f }; 
 }
 
@@ -1286,17 +1448,8 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 		}
 		lockedEnemy_ = bestEnemy;
 
-		// 飛行中は常に敵の方向を向く
-		if (lockedEnemy_ != entt::null && scene->GetRegistry().valid(lockedEnemy_)) {
-			auto& eTc = scene->GetRegistry().get<TransformComponent>(lockedEnemy_);
-			float dx = eTc.translate.x - pTc.translate.x;
-			float dz = eTc.translate.z - pTc.translate.z;
-			float targetYaw = std::atan2(dx, dz);
-			float diff = targetYaw - pTc.rotate.y;
-			while (diff >  DirectX::XM_PI) diff -= DirectX::XM_2PI;
-			while (diff < -DirectX::XM_PI) diff += DirectX::XM_2PI;
-			pTc.rotate.y += diff * std::min(1.0f, 30.0f * dt);
-		}
+		// 飛行中は本体（プレイヤー）は移動方向を向くため、ここでは敵の方へ回転させない
+		// (銃口のみが敵を追う処理は UpdateGun にて実装済み)
 	} else {
 		lockedEnemy_ = entt::null;
 		
@@ -1985,23 +2138,28 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 	bTc.rotate.y += spreadYaw;
 	bTc.rotate.x += spreadPitch;
 	
-	// ★追加: ターゲットロック中のオートエイム（地上の場合）
+	// ★追加: ターゲットロック中のオートエイム（地上・空中問わずロック中ならそちらを向く）
+	entt::entity targetToAim = entt::null;
 	if (!isFlying_ && scene->GetRegistry().all_of<CameraTargetComponent>(entity)) {
 		auto& ct = scene->GetRegistry().get<CameraTargetComponent>(entity);
-		if (ct.lockedTarget != entt::null && scene->GetRegistry().valid(ct.lockedTarget)) {
-			auto& eTc = scene->GetRegistry().get<TransformComponent>(ct.lockedTarget);
-			float dx = eTc.translate.x - bTc.translate.x;
-			float dy = (eTc.translate.y + 1.0f) - bTc.translate.y; // 敵の胸を狙う
-			float dz = eTc.translate.z - bTc.translate.z;
-			
-			float distXZ = std::sqrt(dx*dx + dz*dz);
-			float yaw = std::atan2(dx, dz);
-			float pitch = std::atan2(-dy, distXZ);
+		targetToAim = ct.lockedTarget;
+	} else if (isFlying_) {
+		targetToAim = lockedEnemy_;
+	}
 
-			bTc.rotate.y = yaw + spreadYaw;
-			bTc.rotate.x = pitch + spreadPitch;
-			bTc.rotate.z = 0.0f;
-		}
+	if (targetToAim != entt::null && scene->GetRegistry().valid(targetToAim)) {
+		auto& eTc = scene->GetRegistry().get<TransformComponent>(targetToAim);
+		float dx = eTc.translate.x - bTc.translate.x;
+		float dy = (eTc.translate.y + 1.0f) - bTc.translate.y; // 敵の胸を狙う
+		float dz = eTc.translate.z - bTc.translate.z;
+		
+		float distXZ = std::sqrt(dx*dx + dz*dz);
+		float yaw = std::atan2(dx, dz);
+		float pitch = std::atan2(-dy, distXZ);
+
+		bTc.rotate.y = yaw + spreadYaw;
+		bTc.rotate.x = pitch + spreadPitch;
+		bTc.rotate.z = 0.0f;
 	}
 
 	// ★追加・変更: ロックオン中または飛行中のロック対象に対して追尾弾にする
@@ -2048,7 +2206,7 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 
 	// ★変更: レティクル（カメラの中心）へ正確に弾を飛ばすためのレイキャスト判定
 	auto* camera = &scene->GetCamera();
-	if (camera && playerType_ == PlayerType::Gun && !isFlying_) {
+	if (camera && playerType_ == PlayerType::Gun && !isFlying_ && targetToAim == entt::null) {
 		Engine::Vector3 camRot = camera->GetRotation();
 		Engine::Vector3 camPos = camera->GetPosition();
 		
