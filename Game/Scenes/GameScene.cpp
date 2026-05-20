@@ -527,11 +527,12 @@ void GameScene::Update() {
 						const auto& data = m->GetData();
 						for (const auto& a : data.animations) {
 							if (a.name == anim.currentAnimation) {
-								if (anim.time > a.duration) {
+								float durationInFrames = (a.duration / a.ticksPerSecond) * 60.0f;
+								if (anim.time > durationInFrames) {
 									if (anim.loop)
-										anim.time = std::fmod(anim.time, a.duration);
+										anim.time = std::fmod(anim.time, durationInFrames);
 									else {
-										anim.time = a.duration;
+										anim.time = durationInFrames;
 										anim.isPlaying = false;
 									}
 								}

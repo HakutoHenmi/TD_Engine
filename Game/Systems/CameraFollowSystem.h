@@ -38,6 +38,7 @@ public:
 
 			auto& tc = view.get<TransformComponent>(entity);
 			DirectX::XMFLOAT3 targetPos = tc.translate;
+			targetPos.y += 1.0f; // ★追加: プレイヤーの原点が足元になったため、カメラの注視点を中心(胸元)にずらす
 
 			// ★追加: ホイール押し込みによるターゲットロック
 			bool currentMButton = (GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
