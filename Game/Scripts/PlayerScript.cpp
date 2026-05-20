@@ -1432,17 +1432,22 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 	if (isFlying_) {
 		float minDist = 1000.0f;
 		entt::entity bestEnemy = entt::null;
-		auto enemies = scene->GetRegistry().view<TagComponent, TransformComponent, HealthComponent>();
+		auto& registry = scene->GetRegistry();
+		auto enemies = registry.view<TagComponent>();
 		for (auto e : enemies) {
-			if (enemies.get<TagComponent>(e).tag == TagType::Enemy && !enemies.get<HealthComponent>(e).isDead) {
-				const auto& eTc = enemies.get<TransformComponent>(e).translate;
-				float dx = eTc.x - pTc.translate.x;
-				float dy = eTc.y - pTc.translate.y;
-				float dz = eTc.z - pTc.translate.z;
-				float distSq = dx*dx + dy*dy + dz*dz;
-				if (distSq < minDist * minDist) {
-					minDist = std::sqrt(distSq);
-					bestEnemy = e;
+			if (enemies.get<TagComponent>(e).tag == TagType::Enemy) {
+				auto* tc = registry.try_get<TransformComponent>(e);
+				auto* hc = registry.try_get<HealthComponent>(e);
+				if (tc && hc && !hc->isDead) {
+					const auto& eTc = tc->translate;
+					float dx = eTc.x - pTc.translate.x;
+					float dy = eTc.y - pTc.translate.y;
+					float dz = eTc.z - pTc.translate.z;
+					float distSq = dx*dx + dy*dy + dz*dz;
+					if (distSq < minDist * minDist) {
+						minDist = std::sqrt(distSq);
+						bestEnemy = e;
+					}
 				}
 			}
 		}

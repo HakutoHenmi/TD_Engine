@@ -106,6 +106,8 @@ public:
 					if (aTag == TagType::Bullet || aTag == TagType::PlayerSword || aTag == TagType::Sword) { if (dTag != TagType::Enemy) skipDamage = true; }
 					if (aTag != TagType::Untagged && aTag == dTag) skipDamage = true;
 					if (aTag == TagType::EnemyBullet && dTag == TagType::Enemy) skipDamage = true;
+					// ★ミサイル/弾がCanonタグ（タワー）に当たらないようにする
+					if ((aTag == TagType::Bullet || aTag == TagType::EnemyBullet) && dTag == TagType::Canon) skipDamage = true;
 					if (skipDamage) continue;
 
 					if (registry.all_of<HealthComponent>(defenderEntity)) {
