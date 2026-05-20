@@ -115,6 +115,7 @@ static void CollectConnectedCanons(
 
 void Canon::Start(entt::entity entity, GameScene* scene) {
 	attackTimer_ = 0.0f;
+	idleSteamTimer_ = 0.0f; // 常時蒸気用タイマー初期化
 	auto& registry = scene->GetRegistry();
 	
 	if (!registry.all_of<HealthComponent>(entity)) {
@@ -194,11 +195,33 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	}
 
-	if (!registry.all_of<TransformComponent>(entity)) {
-		return;
-	}
-
 	TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
+
+	// ★追加: 常時立ち上る美しい蒸気エフェクト (SpaceShatterScriptのProceduralSmokeを応用)
+	idleSteamTimer_ -= dt;
+	if (idleSteamTimer_ <= 0.0f) {
+		idleSteamTimer_ = 0.2f; // 0.2秒に1回立ち上らせる（高密度で絶え間ない蒸気の流れ）
+
+		entt::entity idleSteam = scene->CreateEntity("CanonIdleSteam_VFX");
+		scene->SetTag(idleSteam, TagType::VFX);
+		auto& isTrans = registry.get<TransformComponent>(idleSteam);
+		isTrans.translate = canonTransform.translate;
+		isTrans.translate.y += 2.4f; // ゲージとの干渉を避けるため、発生位置を少し高めに調整
+
+		auto& isVc = registry.emplace<VariableComponent>(idleSteam);
+		isVc.SetValue("NormalX", 0.0f);
+		isVc.SetValue("NormalY", 1.0f); // 真上に噴き上がらせる
+		isVc.SetValue("NormalZ", 0.0f);
+		isVc.SetValue("Radius", 2.2f); // 煙が大きく豊かに広がるサイズ
+		isVc.SetValue("Duration", 2.5f); // 上空高くゆっくり立ち上って消えるまで長めに設定（ゲージをはるか上に通過）
+		isVc.SetValue("ScatterMode", 0.0f);
+		isVc.SetValue("ScatterSpeed", 11.0f); // 速度を倍増させ、ゲージの位置を瞬時に通過させる
+		isVc.SetValue("Count", 6.0f); // 1回あたりの煙の量を増やして豪華に
+		isVc.SetValue("IsFlight", 1.0f); // 火花は出さず、美しい蒸気（煙）だけを生成
+
+		auto& isSc = registry.emplace<ScriptComponent>(idleSteam);
+		isSc.scripts.push_back({"SpaceShatterScript", "", nullptr});
+	}
 
 	if (registry.valid(currentTarget_)) {
 		if (!registry.all_of<TransformComponent>(currentTarget_)) {
@@ -333,7 +356,53 @@ if (attackTimer_ > 0.0f) {
 	attackTimer_ = currentAttackInterval_;
 	SetVar(entity, scene, "CoolTimeRate", 0.0f);
 
+	// --- マズルフラッシュエフェクト (軽量かつ高級感のある専用設計) ---
+	entt::entity muzzleVfx = scene->CreateEntity("CanonMuzzle_VFX");
+	scene->SetTag(muzzleVfx, TagType::VFX);
+	TransformComponent& vfxTrans = registry.get<TransformComponent>(muzzleVfx);
+	vfxTrans.translate = bulletTransform.translate;
 
+	// 1. 銃口からの火花＆スモーク（Playerがブーストで使用するSpaceShatterScriptを応用し、同じ美しい表現に統一）
+	float dirX = std::sin(canonTransform.rotate.y) * cosX;
+	float dirY = -sinX;
+	float dirZ = std::cos(canonTransform.rotate.y) * cosX;
+
+	auto& vc = registry.emplace<VariableComponent>(muzzleVfx);
+	vc.SetValue("NormalX", dirX);
+	vc.SetValue("NormalY", dirY);
+	vc.SetValue("NormalZ", dirZ);
+	vc.SetValue("Radius", 3.5f);
+	vc.SetValue("Duration", 0.5f);
+	vc.SetValue("ScatterMode", 0.0f); // マズルエフェクトモード
+	vc.SetValue("ScatterSpeed", 18.0f);
+	vc.SetValue("Count", 30.0f);
+	vc.SetValue("IsFlight", 0.0f); // スパークと煙の両方を出す
+
+	auto& sc = registry.emplace<ScriptComponent>(muzzleVfx);
+	sc.scripts.push_back({"SpaceShatterScript", "", nullptr});
+
+	// 2. 大砲の銃身から上に伸びる煙・蒸気（発射時の排気・反動演出、同じSpaceShatterScriptの仕組みで美しい煙のみを真上に放出）
+	entt::entity aroundSmoke = scene->CreateEntity("CanonAround_Smoke_VFX");
+	scene->SetTag(aroundSmoke, TagType::VFX);
+	auto& asTrans = registry.get<TransformComponent>(aroundSmoke);
+	asTrans.translate = canonTransform.translate;
+	asTrans.translate.y += 2.4f; // 発生高度を少し高めにしてゲージをクリア
+
+	auto& asVc = registry.emplace<VariableComponent>(aroundSmoke);
+	asVc.SetValue("NormalX", 0.0f);
+	asVc.SetValue("NormalY", 1.0f); // 真上に向けて吹き出させる
+	asVc.SetValue("NormalZ", 0.0f);
+	asVc.SetValue("Radius", 2.0f); // 煙が広がる半径
+	asVc.SetValue("Duration", 1.2f); // 寿命を伸ばし上空高くへ立ち上らせる
+	asVc.SetValue("ScatterMode", 0.0f);
+	asVc.SetValue("ScatterSpeed", 15.0f); // 噴射速度をほぼ倍増させ、ゲージの上へと一瞬で突き抜けさせる
+	asVc.SetValue("Count", 15.0f); // 煙の密度
+	asVc.SetValue("IsFlight", 1.0f); // 1.0fを設定することで火花（Shard）は出さず、美しい蒸気（煙）だけを生成
+
+	auto& asSc = registry.emplace<ScriptComponent>(aroundSmoke);
+	asSc.scripts.push_back({"SpaceShatterScript", "", nullptr});
+
+	// 地面が光る演出（PointLightComponent）は完全に削除しました。
 }
 
 void Canon::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}

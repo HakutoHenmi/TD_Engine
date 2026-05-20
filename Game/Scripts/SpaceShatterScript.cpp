@@ -317,20 +317,34 @@ void SpaceShatterScript::GenerateSmokeParticles(GameScene* scene, int count) {
 
         float spd = (3.0f + (rand() % 100) / 100.0f * 5.0f) * (shatterRadius_ / 5.0f);
         if (!scatterMode_) {
-            // スチームパンク風の蒸気排気：銃の後方から左右に逃げるように
-            float sideDir = (i % 2 == 0) ? 1.0f : -1.0f;
-            float sideSpd = spd * 2.5f; // 横への勢いを強く
-            float fwdSpd = spd * -0.2f; // わずかに後ろに流れる
+            if (isFlight_) {
+                // 飛行用・上に伸びる排気用 - 法線（真上・真下など）方向にまっすぐ強く噴射させ、横への拡散を小さく抑える
+                float fwdSpd = spd * 3.5f; // 法線方向への力強い推進
+                sp.velocity = {
+                    planeNormal_.x * fwdSpd,
+                    planeNormal_.y * fwdSpd,
+                    planeNormal_.z * fwdSpd
+                };
+                // わずかな自然な揺らぎ（極小に制限）
+                sp.velocity.x += ((rand() % 100) / 100.0f - 0.5f) * 0.8f;
+                sp.velocity.y += ((rand() % 100) / 100.0f - 0.5f) * 0.8f;
+                sp.velocity.z += ((rand() % 100) / 100.0f - 0.5f) * 0.8f;
+            } else {
+                // スチームパンク風の蒸気排気：銃の後方から左右に逃げるように
+                float sideDir = (i % 2 == 0) ? 1.0f : -1.0f;
+                float sideSpd = spd * 2.5f; // 横への勢いを強く
+                float fwdSpd = spd * -0.2f; // わずかに後ろに流れる
 
-            sp.velocity = { 
-                planeNormal_.x * fwdSpd + planeRight_.x * sideSpd * sideDir,
-                planeNormal_.y * fwdSpd + planeRight_.y * sideSpd * sideDir,
-                planeNormal_.z * fwdSpd + planeRight_.z * sideSpd * sideDir
-            };
-            // わずかな拡散ランダム
-            sp.velocity.x += ((rand() % 100) / 100.0f - 0.5f) * 2.0f;
-            sp.velocity.y += ((rand() % 100) / 100.0f - 0.5f) * 2.0f;
-            sp.velocity.z += ((rand() % 100) / 100.0f - 0.5f) * 2.0f;
+                sp.velocity = { 
+                    planeNormal_.x * fwdSpd + planeRight_.x * sideSpd * sideDir,
+                    planeNormal_.y * fwdSpd + planeRight_.y * sideSpd * sideDir,
+                    planeNormal_.z * fwdSpd + planeRight_.z * sideSpd * sideDir
+                };
+                // わずかな拡散ランダム
+                sp.velocity.x += ((rand() % 100) / 100.0f - 0.5f) * 2.0f;
+                sp.velocity.y += ((rand() % 100) / 100.0f - 0.5f) * 2.0f;
+                sp.velocity.z += ((rand() % 100) / 100.0f - 0.5f) * 2.0f;
+            }
         } else {
             // 着弾時（全方位に散る）
             float spdImpact = spd * 4.5f;

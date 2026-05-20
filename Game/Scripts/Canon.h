@@ -35,6 +35,7 @@ private:
 	float skillSpeedRate = 1.0f;
 	float skillRangeRate = 1.0f;
 	entt::entity coolTimeGaugeEntity_ = entt::null;
+	float idleSteamTimer_ = 0.0f;
 
 
 
