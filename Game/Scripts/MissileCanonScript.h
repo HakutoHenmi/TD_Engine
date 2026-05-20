@@ -25,6 +25,8 @@ private:
 	float connectionCheckTimer_ = 0.0f;
 	bool isConnectedToTank_ = false;
 	entt::entity currentTarget_ = entt::null;
+	float idleSparkTimer_ = 0.0f;
+	float idleDistortionTimer_ = 0.0f;
 
 private:
 	void Debug(bool connected);

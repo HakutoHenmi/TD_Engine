@@ -32,6 +32,10 @@ private:
 	float explosionRadius_ = 1.0f;
 
 	Vector3 startPosition_ = {0.0f, 0.0f, 0.0f};
+
+	entt::entity engineFlameVfx_ = entt::null;
+	entt::entity trailSmokeVfxA_ = entt::null;
+	entt::entity trailSmokeVfxB_ = entt::null;
 };
 
 } // namespace Game

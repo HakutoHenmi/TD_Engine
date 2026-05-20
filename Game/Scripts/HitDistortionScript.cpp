@@ -10,6 +10,16 @@ namespace Game {
 void HitDistortionScript::Start(entt::entity entity, GameScene* scene) {
     OutputDebugStringA("[HitDistortionScript] Start!\n");
     auto& registry = scene->GetRegistry();
+    
+    // ★追加: VariableComponentからカスタムパラメータを読み取り
+    if (registry.all_of<VariableComponent>(entity)) {
+        auto& vc = registry.get<VariableComponent>(entity);
+        duration_ = vc.GetValue("Duration", duration_);
+        startScale_ = vc.GetValue("StartScale", startScale_);
+        endScale_ = vc.GetValue("EndScale", endScale_);
+        initialAlpha_ = vc.GetValue("InitialAlpha", initialAlpha_);
+    }
+
     if (registry.all_of<TransformComponent>(entity)) {
         auto& tc = registry.get<TransformComponent>(entity);
         tc.scale = {startScale_, startScale_, startScale_};
@@ -30,11 +40,23 @@ void HitDistortionScript::Update(entt::entity entity, GameScene* scene, float dt
     float t = std::min(timer_ / duration_, 1.0f);
 
     auto& registry = scene->GetRegistry();
+    
+    float riseSpeed = 0.0f;
+    if (registry.all_of<VariableComponent>(entity)) {
+        auto& vc = registry.get<VariableComponent>(entity);
+        riseSpeed = vc.GetValue("RiseSpeed", 0.0f);
+    }
+
     if (registry.all_of<TransformComponent>(entity)) {
         auto& tc = registry.get<TransformComponent>(entity);
         // キレのある拡大: EaseOutExpo
         float scaleVal = startScale_ + (endScale_ - startScale_) * (1.0f - std::powf(2.0f, -10.0f * t));
         tc.scale = {scaleVal, scaleVal, scaleVal};
+
+        // ★追加: 上昇処理 (陽炎用)
+        if (riseSpeed > 0.0f) {
+            tc.translate.y += riseSpeed * dt;
+        }
 
         // ★追加: ビルボード処理 (常にカメラの方を向く)
         auto camRot = scene->GetCamera().Rotation();
@@ -52,6 +74,7 @@ void HitDistortionScript::Update(entt::entity entity, GameScene* scene, float dt
     if (timer_ >= duration_) {
         OutputDebugStringA("[HitDistortionScript] Destroying distortion object.\n");
         scene->DestroyObject(static_cast<uint32_t>(entity));
+        return;
     }
 }
 
