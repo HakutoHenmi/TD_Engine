@@ -2,9 +2,92 @@
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
+#include "ScriptUtils.h"
 #include <cmath>
 
 namespace Game {
+
+static void SpawnExplosion(entt::registry& registry, GameScene* scene, const TransformComponent& posTrans) {
+	if (!scene) return;
+
+	entt::entity explosionVfx = scene->CreateEntity("CanonExplosion_VFX");
+	scene->SetTag(explosionVfx, TagType::VFX);
+
+	auto& vfxTrans = registry.get<TransformComponent>(explosionVfx);
+	vfxTrans.translate = posTrans.translate;
+
+	// 1. 火花（きらめくテクスチャを使用）
+	auto& pec = registry.emplace<ParticleEmitterComponent>(explosionVfx);
+	pec.emitter.params.name = "ImpactExplosion";
+	pec.emitter.params.texturePath = "Resources/Textures/particles/diamond_flare.png";
+	pec.emitter.params.emitRate = 0.0f;
+	pec.emitter.params.shape = Engine::EmissionShape::Sphere;
+	pec.emitter.params.shapeRadius = 0.5f;
+	pec.emitter.params.startVelocity = {0.0f, 6.0f, 0.0f};
+	pec.emitter.params.velocityVariance = {4.0f, 4.0f, 4.0f};
+	pec.emitter.params.acceleration = {0.0f, -9.8f, 0.0f}; // 重力落下
+	pec.emitter.params.startColor = {1.0f, 0.8f, 0.3f, 1.0f};
+	pec.emitter.params.endColor = {1.0f, 0.2f, 0.0f, 0.0f};
+	pec.emitter.params.startSize = {0.4f, 0.4f, 0.4f};
+	pec.emitter.params.endSize = {0.05f, 0.05f, 0.05f};
+	pec.emitter.params.lifeTime = 0.6f;
+	pec.emitter.params.lifeTimeVariance = 0.2f;
+	pec.emitter.params.damping = 1.0f;
+	pec.emitter.params.isAdditive = true;
+
+	// 明示的に初期化し、その場でバースト放出！
+	pec.emitter.Initialize(*scene->GetRenderer(), "ImpactExplosion_Emitter");
+	pec.isInitialized = true;
+	pec.emitter.EmitBurst(12);
+
+	// 2. 煙（白煙）
+	entt::entity smokeVfx = scene->CreateEntity("CanonExplosion_Smoke_VFX");
+	scene->SetTag(smokeVfx, TagType::VFX);
+	auto& sTrans = registry.get<TransformComponent>(smokeVfx);
+	sTrans.translate = posTrans.translate;
+
+	auto& spec = registry.emplace<ParticleEmitterComponent>(smokeVfx);
+	spec.emitter.params.name = "ImpactSmoke";
+	spec.emitter.params.texturePath = "Resources/Textures/white1x1.png";
+	spec.emitter.params.emitRate = 0.0f;
+	spec.emitter.params.shape = Engine::EmissionShape::Sphere;
+	spec.emitter.params.shapeRadius = 0.8f;
+	spec.emitter.params.startVelocity = {0.0f, 2.0f, 0.0f};
+	spec.emitter.params.velocityVariance = {1.5f, 1.0f, 1.5f};
+	spec.emitter.params.startColor = {0.4f, 0.4f, 0.4f, 0.15f};
+	spec.emitter.params.endColor = {0.2f, 0.2f, 0.2f, 0.0f};
+	spec.emitter.params.startSize = {0.8f, 0.8f, 0.8f};
+	spec.emitter.params.endSize = {1.8f, 1.8f, 1.8f};
+	spec.emitter.params.lifeTime = 0.8f;
+	spec.emitter.params.lifeTimeVariance = 0.3f;
+	spec.emitter.params.damping = 1.5f;
+	spec.emitter.params.isAdditive = false;
+
+	// 明示的に初期化し、その場でバースト放出！
+	spec.emitter.Initialize(*scene->GetRenderer(), "ImpactSmoke_Emitter");
+	spec.isInitialized = true;
+	spec.emitter.EmitBurst(8);
+
+	// スクリプト登録
+	auto& sc = registry.emplace<ScriptComponent>(explosionVfx);
+	sc.scripts.push_back({"BulletScript", "", nullptr});
+	auto& vc = registry.emplace<VariableComponent>(explosionVfx);
+	vc.SetValue("Speed", 0.0f);
+	vc.SetValue("MaxLifeTime", 1.0f); // パーティクルが消え終わるまでオブジェクトを生かしておく
+
+	auto& sSc = registry.emplace<ScriptComponent>(smokeVfx);
+	sSc.scripts.push_back({"BulletScript", "", nullptr});
+	auto& sVc = registry.emplace<VariableComponent>(smokeVfx);
+	sVc.SetValue("Speed", 0.0f);
+	sVc.SetValue("MaxLifeTime", 1.5f);
+
+	// 地面が安っぽく光るのを完全に防ぐため、光源強度と半径を極小に制限
+	auto& pointLight = registry.emplace<PointLightComponent>(explosionVfx);
+	pointLight.color = {1.0f, 0.6f, 0.2f};
+	pointLight.intensity = 1.5f;
+	pointLight.range = 3.0f;
+	pointLight.atten = {1.0f, 0.8f, 0.2f};
+}
 
 void BulletScript::Start(entt::entity entity, GameScene* scene) {
 	lifeTime_ = 0.0f;
@@ -104,6 +187,9 @@ void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 						scene->GetEventSystem().Emit("EnhancedBulletHit", static_cast<float>(static_cast<uint32_t>(entity)));
 					}
 				}
+				if (registry.all_of<TagComponent>(entity) && registry.get<TagComponent>(entity).tag == TagType::Bullet) {
+					SpawnExplosion(registry, scene, bulletTransform);
+				}
 				scene->DestroyObject(static_cast<uint32_t>(entity));
 				return;
 			}
@@ -148,6 +234,9 @@ void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 				scene->GetEventSystem().Emit("EnhancedBulletHit", static_cast<float>(static_cast<uint32_t>(entity)));
 			}
 		}
+		if (registry.all_of<TagComponent>(entity) && registry.get<TagComponent>(entity).tag == TagType::Bullet) {
+			SpawnExplosion(registry, scene, bulletTransform);
+		}
 		scene->DestroyObject(static_cast<uint32_t>(entity));
 		return;
 	}
@@ -164,7 +253,8 @@ void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	bulletTransform.rotate.x = pitch;
 }
 
-void BulletScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
+void BulletScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
+}
 
 REGISTER_SCRIPT(BulletScript);
 
