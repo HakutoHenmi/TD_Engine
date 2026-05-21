@@ -142,7 +142,7 @@ void Canon::Start(entt::entity entity, GameScene* scene) {
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
 		MeshRendererComponent& baseRenderer = registry.emplace<MeshRendererComponent>(baseEntity_);
-		baseRenderer.modelHandle = renderer->LoadObjMesh("Resources/Models/CanonBase.obj");
+		baseRenderer.modelHandle = renderer->LoadObjMesh("Resources/Models/CanonBase/CanonBase.obj");
 		baseRenderer.textureHandle = renderer->LoadTexture2D("Resources/Textures/canonbase.png");
 	}
 
