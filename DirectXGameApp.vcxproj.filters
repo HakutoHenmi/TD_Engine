@@ -86,6 +86,9 @@
     <ClCompile Include="Game\Scripts\ResultManagerScript.cpp" />
     <ClCompile Include="Game\Scripts\IceBulletScript.cpp" />
     <ClCompile Include="Game\Scripts\IceCanon.cpp" />
+    <ClCompile Include="Game\Scripts\IceSpikeScript.cpp">
+      <Filter>Scripts</Filter>
+    </ClCompile>
     <ClCompile Include="Game\Scripts\Enemy\SkyGunner.cpp" />
     <ClCompile Include="Game\Scripts\MirrorShatterScript.cpp" />
     <ClCompile Include="Game\Scripts\SpaceShatterScript.cpp" />
@@ -212,6 +215,9 @@
     <ClInclude Include="Game\Scripts\ResultManagerScript.h" />
     <ClInclude Include="Game\Scripts\IceBulletScript.h" />
     <ClInclude Include="Game\Scripts\IceCanon.h" />
+    <ClInclude Include="Game\Scripts\IceSpikeScript.h">
+      <Filter>Scripts</Filter>
+    </ClInclude>
     <ClInclude Include="Game\Scripts\Enemy\SkyGunner.h" />
     <ClInclude Include="Game\Scripts\MirrorShatterScript.h" />
     <ClInclude Include="Game\Scripts\SpaceShatterScript.h" />

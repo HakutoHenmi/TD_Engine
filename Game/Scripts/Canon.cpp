@@ -200,7 +200,7 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	// ★追加: 常時立ち上る美しい蒸気エフェクト (SpaceShatterScriptのProceduralSmokeを応用)
 	idleSteamTimer_ -= dt;
 	if (idleSteamTimer_ <= 0.0f) {
-		idleSteamTimer_ = 0.2f; // 0.2秒に1回立ち上らせる（高密度で絶え間ない蒸気の流れ）
+		idleSteamTimer_ = 1.0f; // ★最適化: 0.2秒→1.0秒に削減（エンティティ生成を80%削減）
 
 		entt::entity idleSteam = scene->CreateEntity("CanonIdleSteam_VFX");
 		scene->SetTag(idleSteam, TagType::VFX);

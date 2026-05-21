@@ -475,8 +475,12 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 				float len = std::sqrt(dx * dx + dz * dz);
 				if (len > 0.001f) {
 					dx /= len; dz /= len;
-					recoilVelocity_.x = dx * DASH_POWER;
-					recoilVelocity_.z = dz * DASH_POWER;
+					if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
+						auto& rb = scene->GetRegistry().get<RigidbodyComponent>(entity);
+						rb.velocity.x = dx * DASH_POWER;
+						rb.velocity.z = dz * DASH_POWER;
+						recoilVelocity_ = rb.velocity; // エフェクト用に保持
+					}
 
 					// ★演出: ブースト噴射エフェクト (進行方向と逆へ大量に噴射)
 					for (int i = 0; i < 2; ++i) { // 2回生成して密度を倍増
@@ -524,91 +528,10 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		}
 		prevDashKeyDown_ = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
 
-		// ★追加: ジャンプ開始時は反動のY速度をリセットしてジャンプが小さくなるのを防ぐ
-		if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
-			auto& rb = scene->GetRegistry().get<RigidbodyComponent>(entity);
-			if (rb.velocity.y > 0.01f) {
-				recoilVelocity_.y = 0.0f;
-			}
-		}
+		// ★ジャンプ開始時の反動Yリセットはもう不要（rbに統合したため）
 
-		// ★追加: 物理・反動移動の更新 (全モード共通)
-		float recoilLenSq = recoilVelocity_.x * recoilVelocity_.x + recoilVelocity_.y * recoilVelocity_.y + recoilVelocity_.z * recoilVelocity_.z;
-		if (recoilLenSq > 0.001f) {
-			float moveX = recoilVelocity_.x * dt;
-			float moveZ = recoilVelocity_.z * dt;
-			float moveDist = std::sqrt(moveX * moveX + moveZ * moveZ);
+		// ★CharacterMovementSystem に完全に移動処理を委譲したため、独自の raycast 移動・壁判定・減衰処理は削除
 
-			if (moveDist > 0.001f) {
-				Engine::Vector3 rayOrig = {pTc.translate.x, pTc.translate.y + 0.5f, pTc.translate.z};
-				Engine::Vector3 rayDir = {moveX / moveDist, 0.0f, moveZ / moveDist};
-				
-				// 1フレームの移動距離 + キャラクター半径マージン (0.5m)
-				float checkDist = moveDist + 0.5f;
-				float hitDist = 0.0f;
-				
-				// ダッシュ経路上に見えない壁（コライダー）があるか検出
-				if (scene->RayCast(rayOrig, rayDir, checkDist, static_cast<uint32_t>(entity), hitDist)) {
-					// コライダーの手前で安全に停止させる
-					float safeDist = std::max(0.0f, hitDist - 0.5f);
-					pTc.translate.x += rayDir.x * safeDist;
-					pTc.translate.z += rayDir.z * safeDist;
-					
-					// 反動速度を完全にゼロにして停止
-					recoilVelocity_.x = 0.0f;
-					recoilVelocity_.z = 0.0f;
-				} else {
-					// 障害物がなければ通常通り移動
-					pTc.translate.x += moveX;
-					pTc.translate.z += moveZ;
-				}
-			}
-
-			// ★フェイルセーフ: 地面が存在しない虚無ゾーンへの進入を防ぐ
-			float nextGround = scene->GetHeightAt(pTc.translate.x, pTc.translate.z, pTc.translate.y + 1.0f);
-			if (nextGround <= -5000.0f) {
-				// 移動を取り消して元の位置で留まらせる
-				pTc.translate.x -= moveX;
-				pTc.translate.z -= moveZ;
-				recoilVelocity_.x = 0.0f;
-				recoilVelocity_.z = 0.0f;
-			}
-
-			pTc.translate.y += recoilVelocity_.y * dt; // ★高さ移動
-
-			float groundY = scene->GetHeightAt(pTc.translate.x, pTc.translate.z, pTc.translate.y + 1.0f);
-			float landingY = groundY + 1.0f; // キャラクター中心の接地高さ
-
-			// 減衰 (XZのみ): 空中ダッシュと地上ダッシュの距離を揃える
-			// 不自然な接地摩擦（バグ）が消えたため、本来の空気抵抗による減衰をしっかりと引き締める
-			bool isCurrentlyInAir = (pTc.translate.y > landingY + 0.1f);
-			float dampingVal = isCurrentlyInAir ? 0.0001f : 0.001f; 
-			float damping = std::pow(dampingVal, dt);
-			recoilVelocity_.x *= damping;
-			recoilVelocity_.z *= damping;
-
-			// ★重力と着地判定 (地形の高さを考慮)
-			if (!isFlying_) {
-				recoilVelocity_.y -= 55.0f * dt; // 重力
-			} else {
-				// 飛行中はY軸（上下）の勢いも素早く減衰させてピタッとホバリングさせる
-				recoilVelocity_.y *= std::pow(0.001f, dt);
-			}
-			
-			if (pTc.translate.y < landingY) {
-				// 落下移動する前の高さを計算し、前フレームで明らかに空中にいたかを判定
-				float prevY = pTc.translate.y - recoilVelocity_.y * dt;
-				bool wasInAir = (prevY > landingY + 0.2f);
-
-				// 空中からの着地（落下速度があり、かつ前フレームで空中だった）の時だけ摩擦をかける
-				if (wasInAir && recoilVelocity_.y < -1.0f) {
-					recoilVelocity_.x *= 0.65f; // 着地時の減速を少し強めにして距離の差をさらに縮める
-					recoilVelocity_.z *= 0.65f;
-				}
-				pTc.translate.y = landingY;
-				recoilVelocity_.y = 0.0f;
-			}
-		}
 
 		// ★追加: 飛行システム
 		bool isGrounded = (pTc.translate.y <= scene->GetHeightAt(pTc.translate.x, pTc.translate.z, pTc.translate.y + 1.0f) + 1.1f);
@@ -626,7 +549,9 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 					isFlying_ = false;
 				} else if (flightPressure_ >= maxFlightPressure_) {
 					isFlying_ = true;
-					recoilVelocity_.y = 20.0f; // ★飛び上がる初速
+					if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
+						scene->GetRegistry().get<RigidbodyComponent>(entity).velocity.y = 20.0f;
+					}
 				}
 			}
 
@@ -639,12 +564,15 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 					float groundY = scene->GetHeightAt(pTc.translate.x, pTc.translate.z, pTc.translate.y + 1.0f);
 					if (currentRightClickDown) {
 						// チャージ中（押している間）は上昇
-						recoilVelocity_.y += 60.0f * dt; // 上昇推力
-						if (pTc.translate.y - groundY > MAX_FLIGHT_HEIGHT) {
-							if (recoilVelocity_.y > 0.0f) recoilVelocity_.y *= 0.5f; 
+						if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
+							auto& rb = scene->GetRegistry().get<RigidbodyComponent>(entity);
+							rb.velocity.y += 60.0f * dt; // 上昇推力
+							if (pTc.translate.y - groundY > MAX_FLIGHT_HEIGHT) {
+								if (rb.velocity.y > 0.0f) rb.velocity.y *= 0.5f; 
+							}
 						}
 					}
-					// 離している間は上部の recoilVelocity_.y の減衰処理により自動的にホバリング（静止）する
+					// 離している間はシステム側の減衰処理により自動的にホバリング（静止）する
 
 					// 飛行中のスチームエフェクト
 					static float flightVfxTimer = 0.0f;
@@ -677,7 +605,6 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			auto& rb = scene->GetRegistry().get<RigidbodyComponent>(entity);
 			if (isFlying_) {
 				rb.useGravity = false;
-				rb.velocity.y = 0.0f; // ★システム側の落下速度を強制ゼロにして完全な静止を実現
 			} else {
 				rb.useGravity = true;
 			}
@@ -763,9 +690,11 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 		// 動いているか
 		bool isMoving = false;
+		float rbVelSqXZ = 0.0f;
 		if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
 			const auto& vel = scene->GetRegistry().get<RigidbodyComponent>(entity).velocity;
-			if (vel.x * vel.x + vel.z * vel.z > 0.05f) {
+			rbVelSqXZ = vel.x * vel.x + vel.z * vel.z;
+			if (rbVelSqXZ > 0.05f) {
 				isMoving = true;
 			}
 		}
@@ -798,7 +727,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			speed = 1.0f;
 		}
 		// 4. ダッシュ / 圧力ブースト
-		else if (recoilVelocity_.x * recoilVelocity_.x + recoilVelocity_.z * recoilVelocity_.z > 50.0f) {
+		else if (rbVelSqXZ > 2500.0f) { // 速度50以上(二乗で2500)でダッシュモーション
 			nextAnim = "圧力ダッシュ";
 			loop = false; // ★ダッシュ時も同じく止める
 			speed = 1.0f;
@@ -1148,9 +1077,12 @@ void PlayerScript::UpdateAttack(entt::entity entity, GameScene* scene, float dt)
 						auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
 						float dx = std::sin(pTc.rotate.y);
 						float dz = std::cos(pTc.rotate.y);
-						recoilVelocity_.x = dx * 38.0f;
-						recoilVelocity_.z = dz * 38.0f;
-						recoilVelocity_.y = 22.0f; // ★垂直方向の推進力を追加
+						if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
+							auto& rb = scene->GetRegistry().get<RigidbodyComponent>(entity);
+							rb.velocity.x = dx * 38.0f;
+							rb.velocity.z = dz * 38.0f;
+							rb.velocity.y = 22.0f; // ★垂直方向の推進力を追加
+						}
 
 						if (auto* camera = scene->GetContext().camera) {
 							camera->StartShake(0.35f, 0.45f, 0.02f);

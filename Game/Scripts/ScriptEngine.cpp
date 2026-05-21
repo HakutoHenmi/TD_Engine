@@ -26,6 +26,9 @@
 #include "PhaseTransition.h"
 #include "WaveManagement.h"
 #include "SpaceShatterScript.h" // ★追加
+#include "IceCanon.h"
+#include "IceBulletScript.h"
+#include "IceSpikeScript.h"
 
 
 namespace Game {
@@ -67,6 +70,9 @@ void ScriptEngine::Initialize() {
 	RegisterScript("PhaseTransition", []() { return std::make_shared<PhaseTransition>(); });
 	RegisterScript("WaveManagement", []() { return std::make_shared<WaveManagement>(); });
 	RegisterScript("SpaceShatterScript", []() { return std::make_shared<SpaceShatterScript>(); }); // ★追加
+	RegisterScript("IceCanon", []() { return std::make_shared<IceCanon>(); });
+	RegisterScript("IceBulletScript", []() { return std::make_shared<IceBulletScript>(); });
+	RegisterScript("IceSpikeScript", []() { return std::make_shared<IceSpikeScript>(); });
 }
 
 void ScriptEngine::Shutdown() {

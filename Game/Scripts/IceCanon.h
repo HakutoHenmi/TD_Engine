@@ -13,6 +13,14 @@ public:
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
 
 private:
+	// 待機用エフェクトの永続エンティティ
+	entt::entity persistentMistVfx_ = entt::null;
+	entt::entity persistentCrystalVfx_ = entt::null;
+	bool persistentVfxCreated_ = false;
+	float vfxDelayTimer_ = 0.1f;
+
+	void CreatePersistentVFX(entt::entity entity, GameScene* scene);
+
 	float attackInterval_ = 1.5f;
 	float attackTimer_ = 0.0f;
 

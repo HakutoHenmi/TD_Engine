@@ -25,6 +25,9 @@ private:
 	float maxLifeTime_ = 6.0f;
 	float upTime_ = 0.4f;
 
+	entt::entity bulletVfx_ = entt::null;
+	bool vfxCreated_ = false;
+
 	bool hasTarget_ = false;
 	entt::entity target_ = entt::null;
 
