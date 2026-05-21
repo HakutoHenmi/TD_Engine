@@ -27,6 +27,10 @@ private:
 	entt::entity currentTarget_ = entt::null;
 	float idleSparkTimer_ = 0.0f;
 	float idleDistortionTimer_ = 0.0f;
+	entt::entity baseEntity_ = entt::null;
+
+	void CreateBase(entt::entity entity, GameScene* scene);
+	void UpdateBase(entt::entity entity, GameScene* scene);
 
 private:
 	void Debug(bool connected);

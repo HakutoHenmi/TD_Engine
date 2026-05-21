@@ -115,18 +115,48 @@ static void CollectConnectedCanons(
 
 void Canon::Start(entt::entity entity, GameScene* scene) {
 	attackTimer_ = 0.0f;
-	idleSteamTimer_ = 0.0f; // 常時蒸気用タイマー初期化
-	auto& registry = scene->GetRegistry();
-	
+	baseEntity_ = entt::null;
+
+	if (!scene) {
+		return;
+	}
+
+	entt::registry& registry = scene->GetRegistry();
+
+	baseEntity_ = registry.create();
+
+
+
+	if (registry.all_of<TransformComponent>(entity)) {
+		TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
+
+
+
+
+		TransformComponent& baseTransform = registry.emplace<TransformComponent>(baseEntity_);
+		baseTransform.translate = canonTransform.translate;
+		baseTransform.rotate = {0.0f, canonTransform.rotate.y, 0.0f};
+		baseTransform.scale = canonTransform.scale;
+	}
+
+	auto* renderer = scene->GetRenderer();
+	if (renderer) {
+		MeshRendererComponent& baseRenderer = registry.emplace<MeshRendererComponent>(baseEntity_);
+		baseRenderer.modelHandle = renderer->LoadObjMesh("Resources/Models/CanonBase.obj");
+		baseRenderer.textureHandle = renderer->LoadTexture2D("Resources/Textures/canonbase.png");
+	}
+
 	if (!registry.all_of<HealthComponent>(entity)) {
-		auto& hc = registry.emplace<HealthComponent>(entity);
+		HealthComponent& hc = registry.emplace<HealthComponent>(entity);
 		hc.hp = 100.0f;
 		hc.maxHp = 100.0f;
 	}
+
 	if (!registry.all_of<HurtboxComponent>(entity)) {
-		auto& hurtbox = registry.emplace<HurtboxComponent>(entity);
+		HurtboxComponent& hurtbox = registry.emplace<HurtboxComponent>(entity);
 		hurtbox.size = {2.0f, 2.0f, 2.0f};
 	}
+
 	if (!registry.all_of<WorldSpaceUIComponent>(entity)) {
 		registry.emplace<WorldSpaceUIComponent>(entity);
 	}
@@ -285,13 +315,14 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	}
 
-	float desiredYaw = std::atan2(toX, toZ);
+float desiredYaw = std::atan2(toX, toZ) + 3.14159265f;
+
 	float toY = targetTransform.translate.y - canonTransform.translate.y;
 	float distanceXZ = std::sqrt(toX * toX + toZ * toZ);
 	float desiredPitch = std::atan2(toY, distanceXZ);
 
 	canonTransform.rotate.y = desiredYaw;
-	canonTransform.rotate.x = -desiredPitch;
+	canonTransform.rotate.x = desiredPitch;
 
 if (attackTimer_ > 0.0f) {
 
@@ -324,7 +355,7 @@ if (attackTimer_ > 0.0f) {
 	float baseHeight = 0.0f;
 	bulletTransform.translate.y += baseHeight;
 
-	float muzzleOffset = 2.5f;
+	float muzzleOffset = -2.5f;
 	float cosX = std::cos(canonTransform.rotate.x);
 	float sinX = std::sin(canonTransform.rotate.x);
 
@@ -364,7 +395,7 @@ if (attackTimer_ > 0.0f) {
 
 	// 1. 銃口からの火花＆スモーク（Playerがブーストで使用するSpaceShatterScriptを応用し、同じ美しい表現に統一）
 	float dirX = std::sin(canonTransform.rotate.y) * cosX;
-	float dirY = -sinX;
+	float dirY = sinX;
 	float dirZ = std::cos(canonTransform.rotate.y) * cosX;
 
 	auto& vc = registry.emplace<VariableComponent>(muzzleVfx);

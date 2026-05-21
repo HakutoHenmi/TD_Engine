@@ -118,8 +118,12 @@ void MissileCanonScript::Start(entt::entity entity, GameScene* scene) {
 	if (!registry.all_of<WorldSpaceUIComponent>(entity)) {
 		registry.emplace<WorldSpaceUIComponent>(entity);
 	}
+	CreateBase(entity, scene);
 }
 
+
+
+//update
 void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (!scene) {
 		return;
@@ -130,7 +134,7 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 	if (!registry.valid(entity)) {
 		return;
 	}
-
+	UpdateBase(entity, scene);
 	connectionCheckTimer_ -= dt;
 	if (connectionCheckTimer_ <= 0.0f) {
 		connectionCheckTimer_ = 2.0f; // ★最適化: チェック間隔を0.5秒から2.0秒に延長してCPUスパイクを劇的削減
@@ -411,6 +415,9 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 	attackTimer_ = currentAttackInterval;
 
 }
+
+
+
 void MissileCanonScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 void MissileCanonScript::OnEditorUI() {
@@ -479,7 +486,75 @@ void MissileCanonScript::UpdateConnection(entt::entity entity, GameScene* scene)
 }
 
 void MissileCanonScript::Debug(bool /*connected*/) {}
+void MissileCanonScript::CreateBase(entt::entity entity, GameScene* scene) {
+	if (!scene) {
+		return;
+	}
 
+	entt::registry& registry = scene->GetRegistry();
+
+	if (!registry.valid(entity)) {
+		return;
+	}
+
+	if (!registry.all_of<TransformComponent>(entity)) {
+		return;
+	
+	}
+
+	//updatebase	
+	//UpdateBase(entity, scene);
+
+	const TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
+
+	baseEntity_ = scene->CreateEntity("MissileCanonBase");
+	scene->SetTag(baseEntity_, TagType::Canon);
+
+	TransformComponent& baseTransform = registry.get<TransformComponent>(baseEntity_);
+	baseTransform.translate = canonTransform.translate;
+	baseTransform.translate.y -= 0.6f;
+	baseTransform.rotate = {0.0f, 0.0f, 0.0f};
+	baseTransform.scale = {1.0f, 1.0f, 1.0};
+
+	Engine::Renderer* renderer = scene->GetRenderer();
+	if (renderer) {
+		MeshRendererComponent& meshRenderer = registry.emplace<MeshRendererComponent>(baseEntity_);
+		meshRenderer.modelHandle = renderer->LoadObjMesh("Resources/Models/Misiilebase/MisiileBase.obj");
+		meshRenderer.textureHandle = renderer->LoadTexture2D("Resources/Models/Misiilebase/MisileBase.png");
+	}
+}
+
+void MissileCanonScript::UpdateBase(entt::entity entity, GameScene* scene) {
+	if (!scene) {
+		return;
+	}
+
+	entt::registry& registry = scene->GetRegistry();
+
+	if (!registry.valid(entity)) {
+		return;
+	}
+
+	if (!registry.valid(baseEntity_)) {
+		return;
+	}
+
+	if (!registry.all_of<TransformComponent>(entity)) {
+		return;
+	}
+
+	if (!registry.all_of<TransformComponent>(baseEntity_)) {
+		return;
+	}
+
+	const TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
+	TransformComponent& baseTransform = registry.get<TransformComponent>(baseEntity_);
+
+	baseTransform.translate = canonTransform.translate;
+	baseTransform.translate.y -= 0.6f;
+
+	baseTransform.rotate = {0.0f, 0.0f, 0.0f};
+}
 REGISTER_SCRIPT(MissileCanonScript);
 
 } // namespace Game
