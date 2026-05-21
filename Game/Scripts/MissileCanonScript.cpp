@@ -420,12 +420,42 @@ void MissileCanonScript::CreateBase(entt::entity entity, GameScene* scene) {
 		return;
 	}
 
+
+
+	if (!registry.all_of<TransformComponent>(entity)) {
+		return;
+	
+	}
+
+	//updatebase	
+	//UpdateBase(entity, scene);
+
+	const TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
+
+	baseEntity_ = scene->CreateEntity("MissileCanonBase");
+	scene->SetTag(baseEntity_, TagType::Canon);
+
+	TransformComponent& baseTransform = registry.get<TransformComponent>(baseEntity_);
+	baseTransform.translate = canonTransform.translate;
+	baseTransform.translate.y -= 0.6f;
+	baseTransform.rotate = {0.0f, 0.0f, 0.0f};
+	baseTransform.scale = {1.0f, 1.0f, 1.0};
+
+	Engine::Renderer* renderer = scene->GetRenderer();
+	if (renderer) {
+		MeshRendererComponent& meshRenderer = registry.emplace<MeshRendererComponent>(baseEntity_);
+		meshRenderer.modelHandle = renderer->LoadObjMesh("Resources/Models/Misiilebase/MisiileBase.obj");
+		meshRenderer.textureHandle = renderer->LoadTexture2D("Resources/Models/Misiilebase/MisileBase.png");
+	}
+}
 // ★追加: 永続VFXの初期化（1回だけ呼ばれる）
 void MissileCanonScript::CreatePersistentVFX(entt::entity entity, GameScene* scene) {
-	if (!scene || persistentVfxCreated_) return;
+	if (!scene || persistentVfxCreated_)
+		return;
 	auto& registry = scene->GetRegistry();
 	Engine::Renderer* renderer = scene->GetRenderer();
-	if (!renderer) return;
+	if (!renderer)
+		return;
 
 	auto& canonTransform = registry.get<TransformComponent>(entity);
 	DirectX::XMFLOAT3 muzzlePos = canonTransform.translate;
@@ -453,7 +483,7 @@ void MissileCanonScript::CreatePersistentVFX(entt::entity entity, GameScene* sce
 	pec.emitter.params.lifeTimeVariance = 0.08f;
 	pec.emitter.params.damping = 0.9f;
 	pec.emitter.params.isAdditive = true;
-	pec.emitter.params.position = { muzzlePos.x, muzzlePos.y, muzzlePos.z };
+	pec.emitter.params.position = {muzzlePos.x, muzzlePos.y, muzzlePos.z};
 	pec.emitter.Initialize(*renderer, "MissileIdleSpark");
 	pec.isInitialized = true;
 
@@ -482,40 +512,12 @@ void MissileCanonScript::CreatePersistentVFX(entt::entity entity, GameScene* sce
 	pecSmoke.emitter.params.endColor = {0.6f, 0.62f, 0.65f, 0.0f};
 	pecSmoke.emitter.params.startSize = {1.2f, 1.2f, 1.2f};
 	pecSmoke.emitter.params.endSize = {3.6f, 3.6f, 3.6f};
-	pecSmoke.emitter.params.position = { smTrans.translate.x, smTrans.translate.y, smTrans.translate.z };
+	pecSmoke.emitter.params.position = {smTrans.translate.x, smTrans.translate.y, smTrans.translate.z};
 	pecSmoke.emitter.Initialize(*renderer, "MissileIdleSmoke");
 	pecSmoke.isInitialized = true;
 
 	persistentVfxCreated_ = true;
 }
-
-	if (!registry.all_of<TransformComponent>(entity)) {
-		return;
-	
-	}
-
-	//updatebase	
-	//UpdateBase(entity, scene);
-
-	const TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
-
-	baseEntity_ = scene->CreateEntity("MissileCanonBase");
-	scene->SetTag(baseEntity_, TagType::Canon);
-
-	TransformComponent& baseTransform = registry.get<TransformComponent>(baseEntity_);
-	baseTransform.translate = canonTransform.translate;
-	baseTransform.translate.y -= 0.6f;
-	baseTransform.rotate = {0.0f, 0.0f, 0.0f};
-	baseTransform.scale = {1.0f, 1.0f, 1.0};
-
-	Engine::Renderer* renderer = scene->GetRenderer();
-	if (renderer) {
-		MeshRendererComponent& meshRenderer = registry.emplace<MeshRendererComponent>(baseEntity_);
-		meshRenderer.modelHandle = renderer->LoadObjMesh("Resources/Models/Misiilebase/MisiileBase.obj");
-		meshRenderer.textureHandle = renderer->LoadTexture2D("Resources/Models/Misiilebase/MisileBase.png");
-	}
-}
-
 void MissileCanonScript::UpdateBase(entt::entity entity, GameScene* scene) {
 	if (!scene) {
 		return;
