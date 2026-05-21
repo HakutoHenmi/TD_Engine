@@ -1115,7 +1115,8 @@ void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vec
 			auto tag = registry.get<TagComponent>(entity).tag;
 			// 接続可能な施設（タンク、大砲、ミサイル、ポイズンなど）の場合のみ十字を描画
 			if (tag == TagType::Canon || tag == TagType::Cannon || tag == TagType::BulletTank || 
-				tag == TagType::Missile || tag == TagType::Poison || tag == TagType::PipeCannon) {
+				tag == TagType::Missile || tag == TagType::Poison || tag == TagType::PipeCannon||
+				tag == TagType::IceCanon) {
 				const auto& tc = registry.get<TransformComponent>(entity);
 				Engine::Transform planeTr;
 				planeTr.scale = {1.0f, 0.05f, 1.0f};
