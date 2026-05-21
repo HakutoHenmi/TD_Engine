@@ -143,17 +143,30 @@ public:
 		float noiseStrength = 0.0f;
 		float distortion = 0.0f;
 		float chromaShift = 0.0f;
-		float vignette = 0.0f;
+		float vignette = 0.3f;           // ★変更: デフォルトで軽いビネット有効
 		float scanline = 0.0f;
 		float san = 0.0f;
 
-		// ★追加: ブルーム＆DOFパラメータ
-		float bloomIntensity = 0.6f;     // ブルームの強さ (0=無効, 1=標準)
-		float bloomThreshold = 0.95f;    // 輝度抽出の閾値 (0.95以上にすることで、本当に明るい場所だけ光る)
+		// ブルームパラメータ
+		float bloomIntensity = 0.5f;     // ブルームの強さ (0=無効, 1=標準)
+		float bloomThreshold = 0.95f;    // 輝度抽出の閾値
 		float bloomRadius = 1.2f;        // ブルームの広がり半径
-		float dofFocusDistance = 50.0f;  // DOFのフォーカス距離を少し遠くに（40->50）
-		float dofFocusRange = 100.0f;    // DOFのピントが合う範囲をさらに広く（50->100）
-		float dofIntensity = 0.3f;       // DOFのぼかし強度 (タワーディフェンスなので控えめに0.3)
+		float dofFocusDistance = 50.0f;  // DOFのフォーカス距離 (互換用)
+		float dofFocusRange = 100.0f;    // DOFのピントが合う範囲 (互換用)
+		float dofIntensity = 0.0f;       // DOFのぼかし強度 (互換用, 無効)
+
+		// ★追加: フォグパラメータ
+		float fogDensity = 0.012f;       // フォグ密度
+		float fogStart = 20.0f;          // フォグ開始距離
+		float fogEnd = 300.0f;           // フォグ終了距離
+		float fogHeightFalloff = 0.0f;   // 高さ減衰
+		Vector3 fogColor{0.3f, 0.32f, 0.35f}; // スモッグのかかった重苦しい鉛色 (暗い青灰色)
+
+		// ★追加: FXAA・露出パラメータ
+		float fxaaEnabled = 1.0f;        // FXAA有効フラグ (1.0=有効, 0.0=無効)
+		float exposure = 1.0f;           // 露出補正
+		float nearPlane = 0.1f;          // カメラ近面 (深度リニア化用)
+		float farPlane = 500.0f;         // カメラ遠面 (深度リニア化用)
 	};
 
 	// ★追加: フレーム統計情報
@@ -479,6 +492,7 @@ private:
 	bool InitPostProcess_();
 	bool InitBloom_();           // ★追加: ブルームパイプライン初期化
 	void ExecuteBloomPass_();    // ★追加: ブルームパス実行
+	void ExecuteSSAO_();         // ★追加: SSAOパス実行
 	bool CreatePSO(const std::string& name, ID3DBlob* vsBlob, ID3DBlob* psBlob);
 	bool CreatePSO(const std::string& name, ID3DBlob* vsBlob, ID3DBlob* psBlob, const D3D12_INPUT_ELEMENT_DESC* layout, UINT numElements);
 
@@ -609,6 +623,19 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoBloomUp_;     // アップサンプルPSO
 	bool bloomInitialized_ = false;
 
+	// ★追加: SSAO用リソース
+	Microsoft::WRL::ComPtr<ID3D12Resource> ssaoTex_;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> ssaoRtvHeap_;
+	D3D12_CPU_DESCRIPTOR_HANDLE ssaoRtv_{};
+	D3D12_GPU_DESCRIPTOR_HANDLE ssaoSrvGpu_{};
+	D3D12_RESOURCE_STATES ssaoState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoSSAO_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoSSAOBlur_; // SSAOブラー用
+	
+	Microsoft::WRL::ComPtr<ID3D12Resource> ssaoBlurTex_;
+	D3D12_CPU_DESCRIPTOR_HANDLE ssaoBlurRtv_{};
+	D3D12_GPU_DESCRIPTOR_HANDLE ssaoBlurSrvGpu_{};
+	D3D12_RESOURCE_STATES ssaoBlurState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 	// ★追加: 深度バッファSRV (DOF用)
 	D3D12_GPU_DESCRIPTOR_HANDLE depthSrvGpu_{};
 
@@ -645,6 +672,9 @@ private:
 		Vector4 windParams = {1.0f, 0.0f, 0.5f, 0.2f}; // x,y:方向, z:速度, w:強さ
 		Vector3 playerPos = {0.0f, 0.0f, 0.0f};
 		uint32_t useCubemapBackground = 0; // ★追加: 背景も環境マップを使うか
+		Matrix4x4 invView;
+		Matrix4x4 invProj;
+		Matrix4x4 invViewProj;
 	} cbFrame_{};
 #ifdef _MSC_VER
 #pragma warning(pop)

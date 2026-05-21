@@ -14,10 +14,12 @@ public:
 	void Draw(entt::entity entity, GameScene* scene) override;
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
 
-private:
 	float rotationSpeed_ = 1.0f; // パイプの回転速度（ラジアン/秒）
 	uint32_t cylinderModelHandle_ = 0;
 	uint32_t cylinderTextureHandle_ = 0;
+	uint32_t glowMesh_ = 0;
+	uint32_t glowTex_ = 0;
+	float timer_ = 0.0f;
 
 private:
 	float connectionCheckTimer_ = 0.0f;

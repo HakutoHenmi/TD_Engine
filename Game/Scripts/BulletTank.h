@@ -13,6 +13,7 @@ public:
 
 private:
 	float rotationSpeed_ = 1.0f;
+	float timer_ = 0.0f;
 };
 
 } // namespace Game

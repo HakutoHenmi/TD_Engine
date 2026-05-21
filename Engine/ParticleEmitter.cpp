@@ -73,7 +73,11 @@ void ParticleEmitter::Draw(const Camera& cam) {
 }
 
 void ParticleEmitter::EmitBurst(int count) {
-	for(int i = 0; i < count; ++i) {
+	// ★最適化: 手動発射されるパーティクルバースト数も一律で60%にカットする
+	int actualCount = static_cast<int>(count * 0.6f);
+	if (actualCount < 1 && count > 0) actualCount = 1; // 最低1つは出す
+
+	for(int i = 0; i < actualCount; ++i) {
 		Vector3 startVel = RandomVector3(params.startVelocity, params.velocityVariance);
 		Vector3 startPos = params.position;
 
@@ -244,6 +248,11 @@ bool ParticleEmitter::LoadFromJson(const std::string& path) {
 		if (j.contains("uvAnimCols")) params.uvAnimCols = j["uvAnimCols"].get<int>();
 		if (j.contains("uvAnimRows")) params.uvAnimRows = j["uvAnimRows"].get<int>();
 		if (j.contains("uvAnimFps")) params.uvAnimFps = j["uvAnimFps"].get<float>();
+
+		// ★最適化: グローバルなVFX発生数のダイエット
+		// 画面の派手さを維持しつつオーバードローを抑えるため、全エフェクトの発生量を60%に絞る
+		params.emitRate *= 0.6f;
+		params.burstCount = static_cast<int>(params.burstCount * 0.6f);
 
 		ApplySystemSettings();
 		return true;

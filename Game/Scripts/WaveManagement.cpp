@@ -153,7 +153,7 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 						planeTr.translate = { pFloat3.x, pFloat3.y, pFloat3.z };
 						planeTr.rotate = { pitch, yaw, 0.0f };
 						planeTr.scale = { tc->scale.x * 2.0f, tc->scale.y * 2.0f, tc->scale.z * 2.0f };
-						renderer->DrawMesh(planeMeshHandle, spawnerTexHandle, planeTr, planeColor, "Toon");
+						renderer->DrawMesh(planeMeshHandle, spawnerTexHandle, planeTr, planeColor, "Unlit");
 
 						// 2D Sprite表示 (距離が30m以上のとき画面端に50x50で表示)
 						if (distance >= 30.0f) {

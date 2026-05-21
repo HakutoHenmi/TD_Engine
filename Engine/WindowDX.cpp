@@ -121,9 +121,9 @@ void WindowDX::EndFrame() {
 	ID3D12CommandList* lists[] = {list_.Get()};
 	que_->ExecuteCommandLists(1, lists);
 
-	// ★VSYNC完全無効化
+	// ★VSYNCを有効化 (60FPS固定)
 	auto startPresent = std::chrono::high_resolution_clock::now();
-	swap_->Present(0, 0); 
+	swap_->Present(1, 0); // 第1引数 1 で垂直同期ON
 	auto endPresent = std::chrono::high_resolution_clock::now();
 	lastPresentMs_ = std::chrono::duration<float, std::milli>(endPresent - startPresent).count();
 
@@ -134,16 +134,8 @@ void WindowDX::EndFrame() {
 
 	fi_ = swap_->GetCurrentBackBufferIndex();
 
-	// ★フレームレート制限（Busy Wait）で60FPSに固定する
-	constexpr long long kMinFrameTime = 1000000 / 60;
-	while (true) {
-		auto now = std::chrono::steady_clock::now();
-		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(now - lastFrameTime_).count();
-		if (duration >= kMinFrameTime) {
-			lastFrameTime_ = now;
-			break;
-		}
-	}
+	// ★プログラム側の手動フレームレート制限（空回りループ）は削除し、
+	// swap_->Present(1, 0) によるグラフィックボード側のVSyncに完全に任せる
 	lastFrameTime_ = std::chrono::steady_clock::now();
 }
 

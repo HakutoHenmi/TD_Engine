@@ -8,6 +8,12 @@ cbuffer ViewProjection : register(b0)
     matrix viewProj; // ビュープロジェクション行列
     float3 cameraPos; // カメラ座標
     float time; // シェーダー時間
+    float4 windParams; // 風パラメータ
+    float3 playerPos; // プレイヤー座標
+    uint useCubemapBackground; // 背景キューブマップフラグ
+    matrix invView; // 逆ビュー行列
+    matrix invProj; // 逆プロジェクション行列
+    matrix invViewProj; // 逆ビュープロジェクション行列
 };
 
 // b1: オブジェクト固有情報 (Renderer::CBObj に対応)
