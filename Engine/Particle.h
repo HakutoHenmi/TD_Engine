@@ -38,7 +38,8 @@ struct Particle {
 // ★追加: グローバルパーティクルバジェット管理
 class ParticleBudget {
 public:
-	static constexpr uint32_t kMaxGlobalParticles = 4000; // 画面全体の上限
+	// ★最適化: パーティクルの絶対上限 (弾幕が多いので少し余裕を持たせる)
+	static constexpr uint32_t kMaxGlobalParticles = 2500; // 画面全体の上限
 
 	static uint32_t GetActiveCount() { return activeCount_.load(std::memory_order_relaxed); }
 	static bool CanEmit(uint32_t count = 1) { return activeCount_.load(std::memory_order_relaxed) + count <= kMaxGlobalParticles; }

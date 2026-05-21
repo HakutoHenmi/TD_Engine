@@ -724,7 +724,7 @@ void Renderer::EndFrame() {
 		
 		// Normal Shadow Pass
 		for (const auto& dc : drawCalls_) {
-			if (dc.isParticle || dc.shaderName == "Particle" || dc.shaderName == "ParticleAdditive" || dc.shaderName == "ProceduralSmoke" || dc.shaderName == "ProceduralSmokeAdditive" || dc.shaderName == "2D" || dc.shaderName == "Distortion" || dc.shaderName == "GlassShatter") continue;
+			if (dc.isParticle || dc.shaderName == "Particle" || dc.shaderName == "ParticleAdditive" || dc.shaderName == "ProceduralSmoke" || dc.shaderName == "ProceduralSmokeAdditive" || dc.shaderName == "2D" || dc.shaderName == "Distortion" || dc.shaderName == "GlassShatter" || dc.shaderName == "Unlit") continue;
 			if (isLightweightMesh(dc.mesh)) continue; // ★スキップ最適化
 
 			auto* model = GetModel(dc.mesh);
@@ -906,6 +906,9 @@ void Renderer::EndFrame() {
 		ppSceneState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 	}
 
+	// ★追加: SSAOパスの実行（深度バッファから ssaoTex_ を生成）
+	ExecuteSSAO_();
+
 	// ★追加: ブルームパスの実行（ppSceneColor_ → bloomMips_[0]）
 	ExecuteBloomPass_();
 
@@ -938,7 +941,7 @@ void Renderer::EndFrame() {
 #pragma warning(push)
 #pragma warning(disable : 4324)
 #endif
-		// ★修正: CBPost構造体にブルーム・DOFパラメータを追加
+		// ★修正: CBPost構造体 - HDRComposite.hlsl の CBPost と完全一致
 		struct alignas(256) CBPost {
 			float time;
 			float noiseStrength;
@@ -947,11 +950,23 @@ void Renderer::EndFrame() {
 			float vignette;
 			float scanline;
 			float san;
-			float bloomIntensity;     // ★追加: ブルーム強度
-			float dofFocusDistance;   // ★追加: DOFフォーカス距離
-			float dofFocusRange;      // ★追加: DOFフォーカス範囲
-			float dofIntensity;       // ★追加: DOFぼかし強度
-			float pad[5];
+			float bloomIntensity;
+			float dofFocusDistance;
+			float dofFocusRange;
+			float dofIntensity;
+			// フォグパラメータ
+			float fogDensity;
+			float fogStart;
+			float fogEnd;
+			float fogHeightFalloff;
+			// カメラ・FXAA
+			float nearPlane;
+			float farPlane;
+			float fxaaEnabled;
+			float exposure;
+			// フォグ色
+			float fogColorR, fogColorG, fogColorB;
+			float pad0;
 		};
 #ifdef _MSC_VER
 #pragma warning(pop)
@@ -964,10 +979,21 @@ void Renderer::EndFrame() {
 		cb.vignette = ppParams_.vignette;
 		cb.scanline = ppParams_.scanline;
 		cb.san = ppParams_.san;
-		cb.bloomIntensity = ppParams_.bloomIntensity;     // ★追加
-		cb.dofFocusDistance = ppParams_.dofFocusDistance; // ★追加
-		cb.dofFocusRange = ppParams_.dofFocusRange;       // ★追加
-		cb.dofIntensity = ppParams_.dofIntensity;          // ★追加
+		cb.bloomIntensity = ppParams_.bloomIntensity;
+		cb.dofFocusDistance = ppParams_.dofFocusDistance;
+		cb.dofFocusRange = ppParams_.dofFocusRange;
+		cb.dofIntensity = ppParams_.dofIntensity;
+		cb.fogDensity = ppParams_.fogDensity;
+		cb.fogStart = ppParams_.fogStart;
+		cb.fogEnd = ppParams_.fogEnd;
+		cb.fogHeightFalloff = ppParams_.fogHeightFalloff;
+		cb.nearPlane = ppParams_.nearPlane;
+		cb.farPlane = ppParams_.farPlane;
+		cb.fxaaEnabled = ppParams_.fxaaEnabled;
+		cb.exposure = ppParams_.exposure;
+		cb.fogColorR = ppParams_.fogColor.x;
+		cb.fogColorG = ppParams_.fogColor.y;
+		cb.fogColorB = ppParams_.fogColor.z;
 
 		const uint32_t off = upload_[fi].Allocate(sizeof(CBPost), 256);
 		if (off != UINT32_MAX) {
@@ -990,6 +1016,9 @@ void Renderer::EndFrame() {
 	}
 	if (depthSrvGpu_.ptr != 0) {
 		list_->SetGraphicsRootDescriptorTable(3, depthSrvGpu_);     // t2: 深度テクスチャ
+	}
+	if (ssaoSrvGpu_.ptr != 0) {
+		list_->SetGraphicsRootDescriptorTable(4, ssaoSrvGpu_);      // t3: SSAOテクスチャ
 	}
 	list_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	list_->DrawInstanced(3, 1, 0, 0);
@@ -1034,6 +1063,9 @@ void Renderer::SetCamera(const Camera& camera) {
 	cbFrame_.view = XMToM4(camera.View());
 	cbFrame_.proj = XMToM4(camera.Proj());
 	cbFrame_.viewProj = Matrix4x4::Multiply(cbFrame_.view, cbFrame_.proj);
+	cbFrame_.invView = Matrix4x4::Inverse(cbFrame_.view);
+	cbFrame_.invProj = Matrix4x4::Inverse(cbFrame_.proj);
+	cbFrame_.invViewProj = Matrix4x4::Inverse(cbFrame_.viewProj);
 	auto p = camera.Position();
 	cbFrame_.cameraPos = Vector3{p.x, p.y, p.z};
 }
@@ -1505,9 +1537,18 @@ float CalcShadow(float3 worldPos) {
     return gShadowMap.SampleCmpLevelZero(gShadowSmp, projCoords.xy, projCoords.z).r;
 }
 
+// ========================================================
 float4 main(float4 svpos:SV_POSITION, float3 worldPos:TEXCOORD0, float3 normal:TEXCOORD1, float2 uv:TEXCOORD2) : SV_TARGET {
-    float4 tex = gTex.Sample(gSmp, uv); 
-    float3 albedo = tex.rgb * gColor.rgb; 
+    // 地面（カラーが[0.99, 0.99, 0.99]）の場合はワールド座標をUVとして使う
+    float2 sampleUV = uv;
+    if (abs(gColor.r - 0.99f) < 0.005f && abs(gColor.g - 0.99f) < 0.005f && abs(gColor.b - 0.99f) < 0.005f) {
+        sampleUV = worldPos.xz * 0.05f; // スケール調整
+    }
+
+    float4 tex = gTex.Sample(gSmp, sampleUV); 
+    // 地面の場合は色を真っ白(1.0)として扱い、元の0.99の暗さを避ける
+    float3 cColor = (abs(gColor.r - 0.99f) < 0.005f) ? float3(1,1,1) : gColor.rgb;
+    float3 albedo = tex.rgb * cColor; 
     float3 N = normalize(normal); 
     float3 V = normalize(gCamPos - worldPos);
     float3 finalColor = albedo * gAmbientColor;
@@ -1627,11 +1668,22 @@ float CalcShadow(float3 worldPos) {
     // ★最適化: ハードウェアPCF(2x2)を利用し、テクスチャフェッチを9回から1回に激減させる
     return gShadowMap.SampleCmpLevelZero(gShadowSmp, projCoords.xy, projCoords.z).r;
 }
+
+// ========================================================
 float4 main(float4 svpos:SV_POSITION, float3 worldPos:TEXCOORD0, float3 normal:TEXCOORD1, float2 uv:TEXCOORD2, float4 color:COLOR0) : SV_TARGET {
-    float4 tex = gTex.Sample(gSmp, uv);
-    float3 albedo = tex.rgb * color.rgb;
+    // 地面（カラーが[0.99, 0.99, 0.99]）の場合はワールド座標をUVとして使う
+    float2 sampleUV = uv;
+    if (abs(color.r - 0.99f) < 0.005f && abs(color.g - 0.99f) < 0.005f && abs(color.b - 0.99f) < 0.005f) {
+        sampleUV = worldPos.xz * 0.05f; // スケール調整
+    }
+
+    float4 tex = gTex.Sample(gSmp, sampleUV);
+    // 地面の場合は色を真っ白(1.0)として扱い、元の0.99の暗さを避ける
+    float3 cColor = (abs(color.r - 0.99f) < 0.005f) ? float3(1,1,1) : color.rgb;
+    float3 albedo = tex.rgb * cColor;
     float3 N = normalize(normal);
     float3 V = normalize(gCamPos - worldPos);
+
     float3 finalColor = albedo * gAmbientColor;
     float shadowFactor = CalcShadow(worldPos);
     for(int i=0; i<MAX_DIR; ++i) if(gDir[i].enabled) finalColor += BlinnPhong(normalize(-gDir[i].dir), V, N, gDir[i].color, albedo) * shadowFactor;
@@ -2256,6 +2308,13 @@ float4 main(PSIn i) : SV_TARGET { return i.color; }
 		auto psDissolve = CompileShaderFromFile(L"Resources/shaders/DissolvePS.hlsl", "main", "ps_5_0");
 		if (vsDissolve && psDissolve) {
 			CreatePSO("Dissolve", vsDissolve.Get(), psDissolve.Get());
+		}
+
+		// --- Unlit (ライティングなし) ---
+		auto vsUnlit = CompileShaderFromFile(L"Resources/shaders/ObjVS.hlsl", "main", "vs_5_0");
+		auto psUnlit = CompileShaderFromFile(L"Resources/shaders/UnlitPS.hlsl", "main", "ps_5_0");
+		if (vsUnlit && psUnlit) {
+			CreatePSO("Unlit", vsUnlit.Get(), psUnlit.Get());
 		}
 	}
 
@@ -3180,6 +3239,7 @@ bool Renderer::InitPostProcess_() {
 	{
 		const UINT W = Engine::WindowDX::kW;
 		const UINT H = Engine::WindowDX::kH;
+		// ppSceneColor_: メインシーン描画先 (既存PSOとの互換性のためR8G8B8A8_UNORM維持)
 		D3D12_RESOURCE_DESC rd{};
 		rd.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 		rd.Width = W;
@@ -3208,7 +3268,7 @@ bool Renderer::InitPostProcess_() {
 
 		const uint32_t idx = AllocateSrvIndex();
 		D3D12_CPU_DESCRIPTOR_HANDLE cpu = window_->SRV_CPU((int)idx);
-		D3D12_CPU_DESCRIPTOR_HANDLE cpuMaster = window_->SRV_CPU_Master((int)idx); // ★追加
+		D3D12_CPU_DESCRIPTOR_HANDLE cpuMaster = window_->SRV_CPU_Master((int)idx);
 		ppSrvGpu_ = window_->SRV_GPU((int)idx);
 		D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
 		srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -3216,7 +3276,7 @@ bool Renderer::InitPostProcess_() {
 		srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srv.Texture2D.MipLevels = 1;
 		dev_->CreateShaderResourceView(ppSceneColor_.Get(), &srv, cpu);
-		dev_->CreateShaderResourceView(ppSceneColor_.Get(), &srv, cpuMaster); // ★追加
+		dev_->CreateShaderResourceView(ppSceneColor_.Get(), &srv, cpuMaster);
 	}
 	{
 		static const char* kVSPP = R"(
@@ -3243,22 +3303,29 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
     return float4(saturate(col), 1);
 })";
 		auto vs = CompileShader(kVSPP, "main", "vs_5_0");
-		auto ps = CompileShaderFromFile(L"Resources/shaders/CRTPost.hlsl", "main", "ps_5_0");
+		// ★修正: HDRComposite.hlslを統合ポストプロセスとして使用
+		auto ps = CompileShaderFromFile(L"Resources/shaders/HDRComposite.hlsl", "main", "ps_5_0");
+		if (!ps) {
+			OutputDebugStringA("[Renderer] HDRComposite.hlsl failed, falling back to CRT.\n");
+			ps = CompileShaderFromFile(L"Resources/shaders/CRTPost.hlsl", "main", "ps_5_0");
+		}
 		if (!ps)
 			ps = CompileShader(kPSPP, "main", "ps_5_0");
 		if (!vs || !ps)
 			return false;
 
-		// ★修正: PPルートシグネチャにブルーム(t1)と深度(t2)のSRVスロットを追加
-		CD3DX12_DESCRIPTOR_RANGE rangeSRV0, rangeSRV1, rangeSRV2;
+		// ★修正: PPルートシグネチャにブルーム(t1)と深度(t2)、SSAO(t3)のSRVスロットを追加
+		CD3DX12_DESCRIPTOR_RANGE rangeSRV0, rangeSRV1, rangeSRV2, rangeSRV3;
 		rangeSRV0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0); // t0: シーンカラー
 		rangeSRV1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1); // t1: ブルームテクスチャ
 		rangeSRV2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2); // t2: 深度テクスチャ
-		CD3DX12_ROOT_PARAMETER params[4]{};
+		rangeSRV3.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3); // t3: SSAOテクスチャ
+		CD3DX12_ROOT_PARAMETER params[5]{};
 		params[0].InitAsConstantBufferView(0);
 		params[1].InitAsDescriptorTable(1, &rangeSRV0, D3D12_SHADER_VISIBILITY_PIXEL);
 		params[2].InitAsDescriptorTable(1, &rangeSRV1, D3D12_SHADER_VISIBILITY_PIXEL);
 		params[3].InitAsDescriptorTable(1, &rangeSRV2, D3D12_SHADER_VISIBILITY_PIXEL);
+		params[4].InitAsDescriptorTable(1, &rangeSRV3, D3D12_SHADER_VISIBILITY_PIXEL);
 		CD3DX12_STATIC_SAMPLER_DESC samp(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
 		CD3DX12_ROOT_SIGNATURE_DESC rs{};
 		rs.Init(_countof(params), params, 1, &samp, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -3296,40 +3363,26 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
 			dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoCopy_));
 		}
 
-		// ★追加: Rich PostProcess パイプライン
-		auto psRich = CompileShaderFromFile(L"Resources/shaders/RichPostProcess.hlsl", "main", "ps_5_0");
-		if (psRich) {
-			pso.PS = { psRich->GetBufferPointer(), psRich->GetBufferSize() };
-			Microsoft::WRL::ComPtr<ID3D12PipelineState> psoRich;
-			if (SUCCEEDED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoRich)))) {
-				pipelines_["Rich"] = psoRich;
-			}
-		}
 
-		// ★追加: Anime PostProcess パイプライン
-		auto psAnime = CompileShaderFromFile(L"Resources/shaders/AnimePostProcess.hlsl", "main", "ps_5_0");
-		if (!psAnime) {
-			psAnime = psRich; // ファイルがない場合は Rich を代用
-		}
-		if (psAnime) {
-			pso.PS = { psAnime->GetBufferPointer(), psAnime->GetBufferSize() };
-			Microsoft::WRL::ComPtr<ID3D12PipelineState> psoAnime;
-			if (SUCCEEDED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoAnime)))) {
-				pipelines_["Anime"] = psoAnime;
-			}
-		}
 
-		// ★追加: Painterly PostProcess パイプライン
-		auto psPainterly = CompileShaderFromFile(L"Resources/shaders/PainterlyPost.hlsl", "main", "ps_5_0");
-		if (!psPainterly) {
-			psPainterly = psAnime;
+		// ★追加: SSAO PSO の作成
+		auto psSSAO = CompileShaderFromFile(L"Resources/shaders/SSAOPS.hlsl", "main", "ps_5_0");
+		if (psSSAO) {
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC psoSSAODesc = pso;
+			psoSSAODesc.pRootSignature = rootSig3D_.Get();
+			psoSSAODesc.PS = { psSSAO->GetBufferPointer(), psSSAO->GetBufferSize() };
+			psoSSAODesc.RTVFormats[0] = DXGI_FORMAT_R8_UNORM;
+			dev_->CreateGraphicsPipelineState(&psoSSAODesc, IID_PPV_ARGS(&psoSSAO_));
 		}
-		if (psPainterly) {
-			pso.PS = { psPainterly->GetBufferPointer(), psPainterly->GetBufferSize() };
-			Microsoft::WRL::ComPtr<ID3D12PipelineState> psoPainterly;
-			if (SUCCEEDED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoPainterly)))) {
-				pipelines_["Painterly"] = psoPainterly;
-			}
+		
+		// ★追加: SSAO ブラー PSO の作成
+		auto psSSAOBlur = CompileShaderFromFile(L"Resources/shaders/SSAOBlurPS.hlsl", "main", "ps_5_0");
+		if (psSSAOBlur) {
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC psoSSAOBlurDesc = pso;
+			psoSSAOBlurDesc.pRootSignature = rootSigPP_.Get(); // 全画面Quad用のためrootSigPP_を使用
+			psoSSAOBlurDesc.PS = { psSSAOBlur->GetBufferPointer(), psSSAOBlur->GetBufferSize() };
+			psoSSAOBlurDesc.RTVFormats[0] = DXGI_FORMAT_R8_UNORM;
+			dev_->CreateGraphicsPipelineState(&psoSSAOBlurDesc, IID_PPV_ARGS(&psoSSAOBlur_));
 		}
 
 		// ★全初期化の最後に、現在の psoPP_ をデフォルトとして保存する
@@ -3599,6 +3652,64 @@ bool Renderer::InitBloom_() {
 	}
 
 	// -----------------------------------------------------------------
+	// 4. SSAO用リソースの作成
+	// -----------------------------------------------------------------
+	{
+		const UINT ssaoW = Engine::WindowDX::kW;
+		const UINT ssaoH = Engine::WindowDX::kH;
+		D3D12_RESOURCE_DESC rd = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8_UNORM, ssaoW, ssaoH, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+		CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_DEFAULT);
+		D3D12_CLEAR_VALUE cv = { DXGI_FORMAT_R8_UNORM, {1, 1, 1, 1} }; // SSAOは初期値1.0(遮蔽なし)
+		HRESULT hr = dev_->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &cv, IID_PPV_ARGS(&ssaoTex_));
+		if (SUCCEEDED(hr)) {
+			ssaoState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+			
+			D3D12_DESCRIPTOR_HEAP_DESC hd{};
+			hd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+			hd.NumDescriptors = 2; // SSAO と SSAOBlur の2つ
+			dev_->CreateDescriptorHeap(&hd, IID_PPV_ARGS(&ssaoRtvHeap_));
+			
+			ssaoRtv_ = ssaoRtvHeap_->GetCPUDescriptorHandleForHeapStart();
+			dev_->CreateRenderTargetView(ssaoTex_.Get(), nullptr, ssaoRtv_);
+			
+			ssaoBlurRtv_ = ssaoRtv_;
+			ssaoBlurRtv_.ptr += dev_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+			
+			uint32_t srvIdx = AllocateSrvIndex();
+			ssaoSrvGpu_ = window_->SRV_GPU((int)srvIdx);
+			D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
+			srv.Format = DXGI_FORMAT_R8_UNORM;
+			srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+			srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			srv.Texture2D.MipLevels = 1;
+			dev_->CreateShaderResourceView(ssaoTex_.Get(), &srv, window_->SRV_CPU((int)srvIdx));
+			dev_->CreateShaderResourceView(ssaoTex_.Get(), &srv, window_->SRV_CPU_Master((int)srvIdx));
+			OutputDebugStringA("[Renderer] SSAO Texture created.\n");
+		}
+		
+		// ブラー用テクスチャの作成
+		hr = dev_->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, &cv, IID_PPV_ARGS(&ssaoBlurTex_));
+		if (SUCCEEDED(hr)) {
+			ssaoBlurState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+			
+			// RTV作成 (上で確保した2つ目のスロット)
+			dev_->CreateRenderTargetView(ssaoBlurTex_.Get(), nullptr, ssaoBlurRtv_);
+			
+			// SRV作成
+			uint32_t srvIdx = AllocateSrvIndex();
+			ssaoBlurSrvGpu_ = window_->SRV_GPU((int)srvIdx);
+			D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
+			srv.Format = DXGI_FORMAT_R8_UNORM;
+			srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+			srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			srv.Texture2D.MipLevels = 1;
+			dev_->CreateShaderResourceView(ssaoBlurTex_.Get(), &srv, window_->SRV_CPU((int)srvIdx));
+			dev_->CreateShaderResourceView(ssaoBlurTex_.Get(), &srv, window_->SRV_CPU_Master((int)srvIdx));
+			OutputDebugStringA("[Renderer] SSAO Blur Texture created.\n");
+		}
+	}
+
+	// -----------------------------------------------------------------
 	// 4. ブルーム用ルートシグネチャの作成
 	// b0: 定数バッファ（テクセルサイズ、閾値など）
 	// t0: 入力テクスチャ（SRV）
@@ -3691,6 +3802,81 @@ VSOut main(uint vid : SV_VertexID) {
 }
 
 // ============================================================================
+// ★追加: ExecuteSSAO_() - SSAOパスの実行
+void Renderer::ExecuteSSAO_() {
+	if (!psoSSAO_ || !ssaoTex_ || depthSrvGpu_.ptr == 0) return;
+
+	// SSAOテクスチャをレンダーターゲットステートへ遷移
+	if (ssaoState_ != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+		auto b = CD3DX12_RESOURCE_BARRIER::Transition(ssaoTex_.Get(), ssaoState_, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		list_->ResourceBarrier(1, &b);
+		ssaoState_ = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	}
+
+	list_->OMSetRenderTargets(1, &ssaoRtv_, FALSE, nullptr);
+	
+	// 白色(1.0)でクリア（遮蔽なし）
+	const float clearColor[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	list_->ClearRenderTargetView(ssaoRtv_, clearColor, 0, nullptr);
+
+	list_->SetPipelineState(psoSSAO_.Get());
+	list_->SetGraphicsRootSignature(rootSig3D_.Get()); // rootSig3Dを使用
+
+	list_->RSSetViewports(1, &viewport_);
+	list_->RSSetScissorRects(1, &scissor_);
+
+	ID3D12DescriptorHeap* heaps[] = { srvHeap_ };
+	list_->SetDescriptorHeaps(1, heaps);
+
+	// rootSig3D_ の b0 (パラメータ0) に CBFrame をバインド
+	list_->SetGraphicsRootConstantBufferView(0, cbFrameAddr_);
+	// rootSig3D_ のパラメータ3が t0 (DescriptorTable)。ここに深度バッファをバインド
+	list_->SetGraphicsRootDescriptorTable(3, depthSrvGpu_);
+
+	list_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	list_->DrawInstanced(3, 1, 0, 0);
+
+	// 次のパスで使えるようにSRVステートに戻す
+	if (ssaoState_ != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+		auto b = CD3DX12_RESOURCE_BARRIER::Transition(ssaoTex_.Get(), ssaoState_, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		list_->ResourceBarrier(1, &b);
+		ssaoState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+	}
+
+	// -------------------------------------------------------------
+	// 2. SSAO ブラー パス
+	// -------------------------------------------------------------
+	// ブラーテクスチャをRenderTargetにする
+	if (ssaoBlurState_ != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+		auto b = CD3DX12_RESOURCE_BARRIER::Transition(ssaoBlurTex_.Get(), ssaoBlurState_, D3D12_RESOURCE_STATE_RENDER_TARGET);
+		list_->ResourceBarrier(1, &b);
+		ssaoBlurState_ = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	}
+
+	list_->OMSetRenderTargets(1, &ssaoBlurRtv_, FALSE, nullptr);
+	// ブラーも初期値は白（1.0）クリア
+	list_->ClearRenderTargetView(ssaoBlurRtv_, clearColor, 0, nullptr);
+
+	list_->SetPipelineState(psoSSAOBlur_.Get());
+	list_->SetGraphicsRootSignature(rootSigPP_.Get()); // 全画面Quad用
+
+	list_->RSSetViewports(1, &viewport_);
+	list_->RSSetScissorRects(1, &scissor_);
+
+	// 入力として先ほど作った ssaoTex_ をバインド (rootSigPP_ の t0 はパラメータインデックス 1)
+	list_->SetGraphicsRootDescriptorTable(1, ssaoSrvGpu_);
+
+	list_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	list_->DrawInstanced(3, 1, 0, 0);
+
+	// 次の合成パスで使えるようにSRVステートに戻す
+	if (ssaoBlurState_ != D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE) {
+		auto b = CD3DX12_RESOURCE_BARRIER::Transition(ssaoBlurTex_.Get(), ssaoBlurState_, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+		list_->ResourceBarrier(1, &b);
+		ssaoBlurState_ = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+	}
+}
+
 // ★追加: ExecuteBloomPass_() - ブルームパスの実行
 // ============================================================================
 // EndFrame内で呼び出される。ppSceneColor_（シーン描画結果）を入力として、
@@ -3856,15 +4042,10 @@ namespace {
 }
 
 void Renderer::SetPostEffect(const std::string& name) {
-	// 文字列の内容をアトミックに伝えるため、既知の定数ポインタに変換
-	const char* req = nullptr;
-	if (name == "Anime") req = "Anime";
-	else if (name == "Rich") req = "Rich";
-	else if (name == "Default") req = "Default";
-	else if (name == "Painterly") req = "Painterly";
-	else if (name == "") req = "";
-	else return; // 未知の名前は無視（安全性のため）
-
+	// ★変更: 統合HDRパイプラインへ移行したため、すべての旧エフェクト要求をHDRCompositeに強制ルーティング
+	const char* req = "HDRComposite";
+	if (name == "" || name == "None") req = "";
+	
 	sNextEffectRequest.store(req, std::memory_order_release);
 }
 

@@ -2,8 +2,11 @@
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
+#include "Renderer.h"
+#include "Camera.h"
 #include <cmath>
 #include <vector>
+#include <DirectXMath.h>
 
 namespace Game {
 
@@ -125,6 +128,8 @@ void PipeScript::Start(entt::entity obj, GameScene* scene) {
 		auto* renderer = scene->GetRenderer();
 		cylinderModelHandle_ = renderer->LoadObjMesh("Resources/Models/Cylinder/cylinder.obj");
 		cylinderTextureHandle_ = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+		glowMesh_ = renderer->LoadObjMesh("Resources/Models/plane.obj");
+		glowTex_ = renderer->LoadTexture2D("Resources/Textures/particles/diamond_flare.png");
 	}
 
 	// タイマーをランダムに分散させて全パイプの同時更新スパイクを防ぐ
@@ -138,13 +143,7 @@ void PipeScript::Update(entt::entity obj, GameScene* scene, float dt) {
 
 	entt::registry& registry = scene->GetRegistry();
 
-	float speed = rotationSpeed_;
-
-	if (registry.all_of<TransformComponent>(obj)) {
-		TransformComponent& pipeTransform = registry.get<TransformComponent>(obj);
-		pipeTransform.rotate.z += speed * dt;
-	}
-
+	timer_ += dt;
 	connectionCheckTimer_ += dt;
 
 	if (connectionCheckTimer_ >= connectionCheckInterval_) {
@@ -238,7 +237,7 @@ void PipeScript::Draw(entt::entity obj, GameScene* scene) {
 		float dist = std::sqrt(distSq);
 		Engine::Vector3 dir = diff * (1.0f / dist);
 
-		float cyLen = (dist - 0.2f) / 3.0f; // ★シリンダーモデルは高さが3なので3で割る
+		float cyLen = dist / 3.0f; // ★シリンダーモデルは高さが3なので3で割る
 		if (cyLen < 0.01f) {
 			cyLen = 0.01f;
 		}
@@ -254,6 +253,40 @@ void PipeScript::Draw(entt::entity obj, GameScene* scene) {
 		);
 
 		renderer->DrawMeshInstanced(cylinderModelHandle_, cylinderTextureHandle_, world, color, "Toon");
+
+		// --- パイプラインに沿ってエネルギーの光点を流す ---
+		float flowSpeed = 1.5f;
+		int pointCount = static_cast<int>(dist / 1.5f); // 1.5ユニットにつき1つの光点
+		if (pointCount < 1) pointCount = 1;
+
+		auto camPosRaw = scene->GetCamera().GetPosition();
+		using namespace DirectX;
+		XMVECTOR camPos = XMLoadFloat3(reinterpret_cast<const XMFLOAT3*>(&camPosRaw));
+
+		for (int p = 0; p < pointCount; ++p) {
+			float phase = std::fmod(timer_ * flowSpeed + static_cast<float>(p) / pointCount, 1.0f);
+			
+			Engine::Vector3 pPos = startPos + diff * phase;
+			XMFLOAT3 pfPos = {pPos.x, pPos.y, pPos.z};
+			XMVECTOR pVec = XMLoadFloat3(&pfPos);
+			XMVECTOR toCam = XMVector3Normalize(camPos - pVec);
+			XMVECTOR upVec = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+			XMVECTOR rightVec = XMVector3Normalize(XMVector3Cross(upVec, toCam));
+			upVec = XMVector3Cross(toCam, rightVec);
+
+			float pScale = 0.8f;
+			XMMATRIX pm;
+			pm.r[0] = rightVec * pScale;
+			pm.r[1] = upVec * pScale;
+			pm.r[2] = toCam * pScale;
+			pm.r[3] = XMVectorSetW(pVec, 1.0f);
+
+			Engine::Matrix4x4 pWorld;
+			XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&pWorld), pm);
+
+			Engine::Vector4 pColor = {0.2f, 1.0f, 0.8f, 1.0f}; // タンクと同系色のエネルギー
+			renderer->DrawParticleInstanced(glowMesh_, glowTex_, pWorld, pColor, {1.0f, 1.0f, 0.0f, 0.0f}, "ParticleAdditive");
+		}
 	}
 }
 

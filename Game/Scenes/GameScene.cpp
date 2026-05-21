@@ -1202,9 +1202,26 @@ void GameScene::Draw() {
 #endif
 	{
 	ScopedTimer _particle(profiler_.frameStats.drawParticleMs);
+	
+	// ★追加: パーティクル用フラスタムカリング設定
+	Engine::FrustumCullSettings pCullSettings;
+	pCullSettings.fovScale = 1.3f; // パーティクルは広がるのでカリング判定を少し緩めにする
+	pCullSettings.padHorizontal = 0.5f;
+	pCullSettings.padTop = 0.5f;
+	pCullSettings.padBottom = 0.5f;
+	Engine::Frustum pFrustum = Engine::Frustum::FromCamera(camera_, pCullSettings);
+
 	auto peView = registry_.view<ParticleEmitterComponent>();
-	peView.each([&](auto, ParticleEmitterComponent& pe) {
+	peView.each([&](auto entity, ParticleEmitterComponent& pe) {
 		if (pe.enabled) {
+			// ★追加: 簡易カリング判定
+			if (auto* tc = registry_.try_get<TransformComponent>(entity)) {
+				Engine::Matrix4x4 world = GetWorldMatrix(static_cast<int>(entity));
+				float radius = 40.0f; // パーティクルの広がりをカバーする半径
+				if (!pFrustum.IntersectsLocalAABB(world, {-radius, -radius, -radius}, {radius, radius, radius})) {
+					return; // カメラ範囲外なら描画をスキップ (GPUフィルレートを大幅に節約)
+				}
+			}
 			pe.emitter.Draw(camera_);
 		}
 	});

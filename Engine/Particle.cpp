@@ -73,11 +73,23 @@ void ParticleSystem::Emit(const Vector3& pos, const Vector3& vel, const Vector3&
 }
 
 void ParticleSystem::Update(float dt) {
+	// ★最適化: パーティクルが溢れそうになったら、古い煙のフェードアウトを加速する「プロのズル」
+	float ageAcceleration = 1.0f;
+	uint32_t currentActive = ParticleBudget::GetActiveCount();
+	// 上限の70% (約1050個) を超えたら徐々に寿命の進みを速める
+	if (currentActive > ParticleBudget::kMaxGlobalParticles * 0.7f) {
+		float ratio = (float)(currentActive - ParticleBudget::kMaxGlobalParticles * 0.7f) / (ParticleBudget::kMaxGlobalParticles * 0.3f);
+		ageAcceleration = 1.0f + ratio * 3.0f; // 最大で4倍の速度で消滅させる
+	}
+
 	for (auto& p : particles_) {
 		if (!p.active)
 			continue;
 
-		p.age += dt;
+		// ★修正: 設置中のサークルなど（長寿命のもの）は消さず、爆発や煙（短寿命）だけを加速させる
+		float currentAccel = (p.life < 2.5f) ? ageAcceleration : 1.0f;
+		
+		p.age += dt * currentAccel; // 寿命を適用
 		if (p.age >= p.life) {
 			p.active = false;
 			continue;

@@ -78,7 +78,7 @@ void App::Run() {
 		TimeManager::GetInstance().Update(1.0f / 60.0f);
 
 		dx_.BeginFrame();
-		const float clearColor[] = {0.1f, 0.25f, 0.5f, 1.0f};
+		const float clearColor[] = {0.3f, 0.32f, 0.35f, 1.0f};
 		renderer_.BeginFrame(clearColor);
 
 #ifdef USE_IMGUI
