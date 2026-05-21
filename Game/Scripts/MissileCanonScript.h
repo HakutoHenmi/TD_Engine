@@ -28,9 +28,16 @@ private:
 	float idleSparkTimer_ = 0.0f;
 	float idleDistortionTimer_ = 0.0f;
 
+	// ★追加: 永続VFXエンティティ（毎フレーム生成を廃止）
+	entt::entity persistentSparkVfx_ = entt::null;
+	entt::entity persistentSmokeVfx_ = entt::null;
+	bool persistentVfxCreated_ = false;
+
 private:
 	void Debug(bool connected);
 	void UpdateConnection(entt::entity entity, GameScene* scene);
+	// ★追加: 永続VFX初期化
+	void CreatePersistentVFX(entt::entity entity, GameScene* scene);
 };
 
 } // namespace Game

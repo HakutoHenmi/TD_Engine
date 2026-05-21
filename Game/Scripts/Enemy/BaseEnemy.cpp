@@ -19,6 +19,7 @@ static bool HasTag(entt::registry& registry, entt::entity entity, TagType tagNam
 
 void BaseEnemy::Start(entt::entity entity, GameScene* scene) {
 	ownerId_ = static_cast<uint32_t>(entity);
+	frozenParticleTimer_ = 0.0f;
 	pCurrentScene_ = scene;
 	auto& registry = scene->GetRegistry();
 	auto& tc = registry.get<TransformComponent>(entity);
@@ -55,6 +56,81 @@ void BaseEnemy::Start(entt::entity entity, GameScene* scene) {
 
 void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
 	auto& registry = scene->GetRegistry();
+
+	// --- 凍結状態時のビジュアル＆冷気エフェクト ---
+	if (registry.all_of<VariableComponent>(entity)) {
+		auto& vc = registry.get<VariableComponent>(entity);
+		float frozenTimer = vc.GetValue("FrozenTimer", 0.0f);
+		if (frozenTimer > 0.0f) {
+			vc.SetValue("FrozenTimer", frozenTimer - dt);
+
+			// 凍結中の青白い表現
+			if (registry.all_of<MeshRendererComponent>(entity)) {
+				auto& mr = registry.get<MeshRendererComponent>(entity);
+				mr.color = { 0.4f, 0.7f, 1.0f, 1.0f }; // 青白い凍結カラー
+			}
+
+			// 定期的に足元から冷気（霧）を噴射
+			frozenParticleTimer_ -= dt;
+			if (frozenParticleTimer_ <= 0.0f) {
+				frozenParticleTimer_ = 0.15f; // 0.15秒に1回
+
+				auto& tc = registry.get<TransformComponent>(entity);
+
+				entt::entity frost = scene->CreateEntity("FrozenFrost_VFX");
+				scene->SetTag(frost, TagType::VFX);
+				auto& fTrans = registry.get<TransformComponent>(frost);
+				fTrans.translate = tc.translate;
+				fTrans.translate.y -= 0.6f; // 足元付近
+
+				auto& pec = registry.emplace<ParticleEmitterComponent>(frost);
+				pec.emitter.params.name = "FrozenFrost";
+				pec.emitter.params.texturePath = "Resources/Textures/white1x1.png";
+				pec.emitter.params.emitRate = 0.0f;
+				pec.emitter.params.shape = Engine::EmissionShape::Sphere;
+				pec.emitter.params.shapeRadius = 0.8f;
+				pec.emitter.params.lifeTime = 0.6f;
+				pec.emitter.params.lifeTimeVariance = 0.15f;
+				pec.emitter.params.startVelocity = {0.0f, 0.6f, 0.0f};
+				pec.emitter.params.velocityVariance = {0.4f, 0.15f, 0.4f};
+				pec.emitter.params.startColor = {0.6f, 0.85f, 1.0f, 0.3f};
+				pec.emitter.params.endColor = {0.8f, 0.95f, 1.0f, 0.0f};
+				pec.emitter.params.startSize = {0.3f, 0.3f, 0.3f};
+				pec.emitter.params.endSize = {1.0f, 1.0f, 1.0f};
+				pec.emitter.params.isAdditive = true;
+				pec.emitter.params.position = { fTrans.translate.x, fTrans.translate.y, fTrans.translate.z };
+
+				pec.emitter.Initialize(*scene->GetRenderer(), "FrozenFrost_Emitter");
+				pec.isInitialized = true;
+				pec.emitter.EmitBurst(3);
+
+				// 弾丸スクリプトをアタッチして自動破棄させる
+				auto& sc = registry.emplace<ScriptComponent>(frost);
+				sc.scripts.push_back({"BulletScript", "", nullptr});
+				auto& vcFrost = registry.emplace<VariableComponent>(frost);
+				vcFrost.SetValue("Speed", 0.0f);
+				vcFrost.SetValue("MaxLifeTime", 0.8f);
+			}
+
+			// 解除時の処理
+			if (frozenTimer - dt <= 0.0f) {
+				if (registry.all_of<MeshRendererComponent>(entity)) {
+					auto& mr = registry.get<MeshRendererComponent>(entity);
+					if (registry.all_of<HealthComponent>(entity)) {
+						auto& hc = registry.get<HealthComponent>(entity);
+						if (hc.baseColorSaved) {
+							mr.color = hc.baseColor;
+						} else {
+							mr.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+						}
+					} else {
+						mr.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+					}
+				}
+				vc.SetValue("IsFrozen", 0.0f);
+			}
+		}
+	}
 
 	// 定期的に索敵(共通)
 	scanTimer_ += dt;

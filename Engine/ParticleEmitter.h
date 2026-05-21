@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Particle.h"
 #include <string>
@@ -90,6 +90,9 @@ public:
 
 	// 制御用
 	bool isPlaying = true;
+
+	// ★追加: アクティブパーティクル数を取得
+	uint32_t GetActiveCount() const { return particleSystem_.GetActiveCount(); }
 	
 private:
 	ParticleSystem particleSystem_;

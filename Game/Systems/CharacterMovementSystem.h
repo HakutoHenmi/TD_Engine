@@ -64,6 +64,9 @@ public:
 			float targetVelX = moveX * currentSpeed;
 			float targetVelZ = moveZ * currentSpeed;
 
+			// 目標速度に向かって補間（加速度・摩擦・方向転換を兼ねる）
+			float responsiveness = 18.0f; 
+
 			// ★追加: 空中での大剣溜め・攻撃中は、正面に自動推進（スチームブースト前進）させる
 			if (!cm.isGrounded && registry.all_of<VariableComponent>(entity)) {
 				auto& vc = registry.get<VariableComponent>(entity);
@@ -81,11 +84,26 @@ public:
 					targetVelX = frontX * forwardBoost;
 					targetVelZ = frontZ * forwardBoost;
 				}
+			} 
+			// ★追加: 攻撃中の移動が滑るのを防ぐ (地上)
+			else if (cm.isGrounded && registry.all_of<VariableComponent>(entity)) {
+				auto& vc = registry.get<VariableComponent>(entity);
+				bool isAttacking = vc.GetValue("IsSwordAttacking", 0.0f) > 0.5f;
+				bool isCharging = vc.GetValue("IsSwordCharging", 0.0f) > 0.5f;
+				if (isAttacking || isCharging) {
+					// 移動は許可するが、摩擦力を極端に強くして即座に加速・停止させる（滑り防止）
+					responsiveness = 40.0f; 
+				}
 			}
 
-			// 目標速度に向かって補間（加速度・摩擦・方向転換を兼ねる）
-			// 数値が小さいほど滑りやすく、大きいほどキビキビ動く
-			float responsiveness = 18.0f; 
+			// ★追加: ダッシュ等で基本速度を超えている場合は急ブレーキをかけず自然減衰させる
+			float currentSpeedSq = rb.velocity.x * rb.velocity.x + rb.velocity.z * rb.velocity.z;
+			if (currentSpeedSq > (currentSpeed * currentSpeed * 1.5f) && responsiveness < 50.0f) {
+				targetVelX = 0.0f;
+				targetVelZ = 0.0f;
+				responsiveness = 4.0f; // 滑らかに空気抵抗で減衰させる
+			}
+
 			float lerpFactor = responsiveness * ctx.dt;
 			if (lerpFactor > 1.0f) lerpFactor = 1.0f;
 
@@ -178,7 +196,9 @@ public:
 					float gravityMultiplier = (rb.velocity.y < 0.0f) ? 1.8f : 1.0f;
 					rb.velocity.y -= cm.gravity * gravityMultiplier * gravityScale * ctx.dt;
 				} else {
-					rb.velocity.y = 0.0f;
+					// ★変更: 重力無効時(飛行時)は強制的に0にせず、空気抵抗で自然減衰させる
+					rb.velocity.y *= std::pow(0.001f, ctx.dt);
+					if (std::abs(rb.velocity.y) < 0.1f) rb.velocity.y = 0.0f;
 				}
 			}
 			tc.translate.y += rb.velocity.y * ctx.dt;

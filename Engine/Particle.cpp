@@ -5,6 +5,9 @@
 
 namespace Engine {
 
+// ★追加: グローバルパーティクルバジェットの静的メンバ初期化
+std::atomic<uint32_t> ParticleBudget::activeCount_{0};
+
 void ParticleSystem::Initialize(Renderer& renderer, size_t maxCount, const std::string& meshPath, const std::string& texturePath, bool sRGB, bool useBillboard) {
 
 	renderer_ = &renderer;
@@ -20,10 +23,23 @@ void ParticleSystem::Initialize(Renderer& renderer, size_t maxCount, const std::
 }
 
 // ★変更: angVelとdampingを受け取ってセットする
+// ★追加: アクティブパーティクル数を取得
+uint32_t ParticleSystem::GetActiveCount() const {
+	uint32_t count = 0;
+	for (const auto& p : particles_) {
+		if (p.active) ++count;
+	}
+	return count;
+}
+
+// ★変更: angVelとdampingを受け取ってセットする + バジェットチェック
 void ParticleSystem::Emit(const Vector3& pos, const Vector3& vel, const Vector3& acceleration, 
 			  const Vector3& startScale, const Vector3& endScale,
 			  const Vector4& startColor, const Vector4& endColor, 
 			  float life, const Vector3& angVel, float damping) {
+	// ★追加: グローバルバジェットチェック — 上限超過時はスキップ
+	if (!ParticleBudget::CanEmit()) return;
+
 	for (auto& p : particles_) {
 		if (!p.active) {
 			p.active = true;
@@ -47,6 +63,9 @@ void ParticleSystem::Emit(const Vector3& pos, const Vector3& vel, const Vector3&
 			float r2 = (float)(rand() % 628) / 100.0f;
 			float r3 = (float)(rand() % 628) / 100.0f;
 			p.rotation = {r1, r2, r3};
+
+			// ★追加: バジェットに登録
+			ParticleBudget::Register(1);
 
 			break;
 		}
@@ -111,8 +130,34 @@ void ParticleSystem::Draw(const Camera& cam, const std::string& shaderName, bool
 	const auto cp = cam.Position();
 	const Vector3 camPos{cp.x, cp.y, cp.z};
 
+	// ★追加: 距離ベースLODカリング
+	float dx = emitterPosition_.x - camPos.x;
+	float dy = emitterPosition_.y - camPos.y;
+	float dz = emitterPosition_.z - camPos.z;
+	float distSq = dx * dx + dy * dy + dz * dz;
+
+	// 完全カリング: kLodFarDist 以上は描画しない
+	if (distSq > kLodFarDist * kLodFarDist) return;
+
+	// LODスケール計算: 距離に応じてスキップ率を決定
+	int skipRate = 1; // 1 = 全部描画
+	if (distSq > kLodNearDist * kLodNearDist) {
+		float dist = std::sqrt(distSq);
+		float lodT = (dist - kLodNearDist) / (kLodFarDist - kLodNearDist);
+		// lodT: 0.0(近い)〜1.0(遠い)
+		// skipRate: 1(全部)→2(半分)→4(1/4)と段階的に
+		if (lodT > 0.66f) skipRate = 4;
+		else if (lodT > 0.33f) skipRate = 3;
+		else skipRate = 2;
+	}
+
+	int drawIdx = 0;
 	for (auto& p : particles_) {
 		if (!p.active)
+			continue;
+
+		// ★追加: LODスキップ（遠方では間引き描画）
+		if (skipRate > 1 && (drawIdx++ % skipRate) != 0)
 			continue;
 
 		Transform tf;
@@ -120,21 +165,14 @@ void ParticleSystem::Draw(const Camera& cam, const std::string& shaderName, bool
 		tf.scale = p.scale;
 
 		if (useBillboard_) {
-			// Billboard：パーティクル→カメラ方向
-			Vector3 d = camPos - p.pos;
-			const float len = std::sqrt(d.x * d.x + d.y * d.y + d.z * d.z);
-			if (len > 1e-6f) {
-				d.x /= len;
-				d.y /= len;
-				d.z /= len;
-			} else {
-				d = {0, 0, 1};
-			}
+			// ★修正: ジンバルロック（フリップ現象）によるがくがくを防ぐため、
+			// カメラのオイラー角を使った Screen-Aligned Billboard に変更
+			Engine::Vector3 camRot = cam.GetRotation();
+			// カメラに対して常に正対させる（+Zをカメラ方向に向ける）
+			float pitch = -camRot.x;
+			float yaw = camRot.y + 3.14159265f;
+			float roll = p.rotation.z; // パーティクルのZ回転（ロール）を適用できるようにする
 
-			// +Z をカメラ方向へ向ける（Yaw/Pitch）
-			const float yaw = std::atan2(d.x, d.z);
-			const float pitch = std::atan2(-d.y, std::sqrt(d.x * d.x + d.z * d.z));
-			const float roll = 0.0f;
 			tf.rotate = {pitch, yaw, roll};
 		} else {
 			// ★追加: 自由回転（紙吹雪など）

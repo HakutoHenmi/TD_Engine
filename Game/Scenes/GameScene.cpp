@@ -670,6 +670,9 @@ void GameScene::Update() {
 	// パーティクルエミッターコンポーネント
 	{
 	ScopedTimer _particleTimer(profiler_.frameStats.particleUpdateMs);
+	// ★追加: フレーム先頭でグローバルバジェットをリセット
+	Engine::ParticleBudget::ResetFrame();
+
 	auto peView = registry_.view<ParticleEmitterComponent, TransformComponent, NameComponent>();
 	peView.each([&](auto, ParticleEmitterComponent& pe, const TransformComponent& tc, const NameComponent& nc) {
 		if (!pe.enabled)
@@ -685,6 +688,9 @@ void GameScene::Update() {
 
 		pe.emitter.params.position = {tc.translate.x, tc.translate.y, tc.translate.z};
 		pe.emitter.Update(dt);
+
+		// ★追加: 更新後のアクティブパーティクル数をバジェットに登録
+		Engine::ParticleBudget::Register(pe.emitter.GetActiveCount());
 	});
 	}
 
