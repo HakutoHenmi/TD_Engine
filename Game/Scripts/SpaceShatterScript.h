@@ -27,10 +27,10 @@ private:
     float shatterRadius_ = 5.0f;  // 割れ目全体の半径
     int shardCount_ = 60;         // 破片の数
 
-    // 散らばるモード（銃撃エフェクト用）
     bool scatterMode_ = false;
     bool isSpecial_ = false;      // 特殊射撃フラグ
     bool isFlight_ = false;       // 飛行エフェクトフラグ
+    int colorMode_ = 0;           // 0=通常, 1=Poison
     float scatterDelay_ = 0.05f;
     float scatterSpeed_ = 10.0f;
 

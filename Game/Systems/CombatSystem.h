@@ -103,7 +103,7 @@ public:
 					TagType dTag = registry.all_of<TagComponent>(defenderEntity) ? registry.get<TagComponent>(defenderEntity).tag : TagType::Untagged;
 					
 					bool skipDamage = false;
-					if (aTag == TagType::Bullet || aTag == TagType::PlayerSword || aTag == TagType::Sword) { if (dTag != TagType::Enemy) skipDamage = true; }
+					if (aTag == TagType::Bullet || aTag == TagType::PlayerSword || aTag == TagType::Sword || aTag == TagType::Poison) { if (dTag != TagType::Enemy) skipDamage = true; }
 					if (aTag != TagType::Untagged && aTag == dTag) skipDamage = true;
 					if (aTag == TagType::EnemyBullet && dTag == TagType::Enemy) skipDamage = true;
 					// ★ミサイル/弾がCanonタグ（タワー）に当たらないようにする
@@ -116,6 +116,14 @@ public:
 							auto& hurtbox = registry.get<HurtboxComponent>(defenderEntity);
 							hc.hp -= hitbox.damage * hurtbox.damageMultiplier;
 							hc.invincibleTime = 0.5f;
+
+							if (aTag == TagType::Poison && dTag == TagType::Enemy) {
+								auto& enemyVc = registry.all_of<VariableComponent>(defenderEntity) ? 
+									registry.get<VariableComponent>(defenderEntity) : 
+									registry.emplace<VariableComponent>(defenderEntity);
+								enemyVc.SetValue("IsPoisoned", 1.0f);
+								enemyVc.SetValue("PoisonedTimer", 3.0f);
+							}
 
 							if (ctx.scene) {
 								if (dTag == TagType::Player) {

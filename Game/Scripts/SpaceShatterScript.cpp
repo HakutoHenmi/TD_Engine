@@ -42,6 +42,7 @@ void SpaceShatterScript::Start(entt::entity entity, GameScene* scene) {
         scatterMode_ = vc.GetValue("ScatterMode", 0.0f) > 0.5f;
         isSpecial_ = vc.GetValue("IsSpecial", 0.0f) > 0.5f;
         isFlight_ = vc.GetValue("IsFlight", 0.0f) > 0.5f;
+        colorMode_ = (int)vc.GetValue("ColorMode", 0.0f);
         scatterDelay_ = vc.GetValue("ScatterDelay", 0.05f);
         scatterSpeed_ = vc.GetValue("ScatterSpeed", 10.0f);
     }
@@ -76,10 +77,14 @@ void SpaceShatterScript::Start(entt::entity entity, GameScene* scene) {
         normal.x * planeRight_.y - normal.y * planeRight_.x
     };
 
-    if (!isFlight_) {
+    if (!isFlight_ && colorMode_ != 1) {
         GenerateShards(scene);
     }
-    GenerateSmokeParticles(scene, isFlight_ ? shardCount_ : (isSpecial_ ? 15 : 10));
+    
+    int sCount = isFlight_ ? shardCount_ : (isSpecial_ ? 15 : 10);
+    if (colorMode_ == 1) sCount = shardCount_; // 毒霧モードは破片の代わりに煙を大量に生成
+    
+    GenerateSmokeParticles(scene, sCount);
 }
 
 void SpaceShatterScript::GenerateShards(GameScene* scene) {
@@ -217,7 +222,9 @@ void SpaceShatterScript::Draw(entt::entity /*entity*/, GameScene* scene) {
                 XMMatrixRotationRollPitchYaw(sh.rot.x, sh.rot.y, sh.rot.z) *
                 XMMatrixTranslation(sh.pos.x, sh.pos.y, sh.pos.z);
             Engine::Matrix4x4 world; XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&world), m);
-            renderer->DrawParticleInstanced(cubeMesh_, sparkTex_, world, {0.2f, 0.7f, 2.0f, lifeT}, {1,1,0,0}, "ParticleAdditive");
+            Engine::Vector4 color = {0.2f, 0.7f, 2.0f, lifeT};
+            if (colorMode_ == 1) color = {0.3f, 0.9f, 0.1f, lifeT};
+            renderer->DrawParticleInstanced(cubeMesh_, sparkTex_, world, color, {1,1,0,0}, "ParticleAdditive");
         } else {
             m = XMMatrixScaling(s, s, s) *
                 XMMatrixRotationRollPitchYaw(sh.rot.x, sh.rot.y, sh.rot.z) *
@@ -225,6 +232,7 @@ void SpaceShatterScript::Draw(entt::entity /*entity*/, GameScene* scene) {
             Engine::Matrix4x4 world; XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&world), m);
             Engine::Vector4 color = {1.0f, 1.0f, 1.0f, lifeT};
             if (sh.colorType == 1) color = {1.2f, 1.4f, 1.8f, lifeT};
+            if (colorMode_ == 1) color = {0.4f, 0.9f, 0.2f, lifeT};
             renderer->DrawParticleInstanced(cubeMesh_, 0, world, color, {1.0f, 1.0f, 0.0f, 0.0f}, "Default");
         }
     }
@@ -305,14 +313,18 @@ void SpaceShatterScript::GenerateSmokeParticles(GameScene* scene, int count) {
         sp.isAppeared = false;
         sp.rot = {0,0,0};
 
-        if (!scatterMode_) {
-            if (isFlight_) {
-                sp.color = isSteam ? DirectX::XMFLOAT4{1.0f, 0.95f, 0.85f, 1.0f} : DirectX::XMFLOAT4{0.9f, 0.8f, 0.7f, 1.0f};
-            } else {
-                sp.color = isSteam ? DirectX::XMFLOAT4{1.0f, 1.0f, 1.1f, 1.0f} : DirectX::XMFLOAT4{0.4f, 0.35f, 0.3f, 1.0f};
-            }
+        if (colorMode_ == 1) { // Poison Color
+            sp.color = isSteam ? DirectX::XMFLOAT4{0.4f, 0.9f, 0.2f, 1.0f} : DirectX::XMFLOAT4{0.2f, 0.7f, 0.1f, 1.0f};
         } else {
-            sp.color = isSteam ? DirectX::XMFLOAT4{0.8f, 0.8f, 0.9f, 1.0f} : DirectX::XMFLOAT4{0.1f, 0.1f, 0.1f, 1.0f};
+            if (!scatterMode_) {
+                if (isFlight_) {
+                    sp.color = isSteam ? DirectX::XMFLOAT4{1.0f, 0.95f, 0.85f, 1.0f} : DirectX::XMFLOAT4{0.9f, 0.8f, 0.7f, 1.0f};
+                } else {
+                    sp.color = isSteam ? DirectX::XMFLOAT4{1.0f, 1.0f, 1.1f, 1.0f} : DirectX::XMFLOAT4{0.4f, 0.35f, 0.3f, 1.0f};
+                }
+            } else {
+                sp.color = isSteam ? DirectX::XMFLOAT4{0.8f, 0.8f, 0.9f, 1.0f} : DirectX::XMFLOAT4{0.1f, 0.1f, 0.1f, 1.0f};
+            }
         }
 
         float spd = (3.0f + (rand() % 100) / 100.0f * 5.0f) * (shatterRadius_ / 5.0f);
@@ -347,12 +359,23 @@ void SpaceShatterScript::GenerateSmokeParticles(GameScene* scene, int count) {
             }
         } else {
             // 着弾時（全方位に散る）
-            float spdImpact = spd * 4.5f;
-            sp.velocity = { 
-                planeNormal_.x * spdImpact + ((rand() % 100) / 100.0f - 0.5f) * 5.0f,
-                planeNormal_.y * spdImpact + 1.5f + ((rand() % 100) / 100.0f - 0.5f) * 5.0f,
-                planeNormal_.z * spdImpact + ((rand() % 100) / 100.0f - 0.5f) * 5.0f 
-            };
+            if (colorMode_ == 1) {
+                // 毒霧の場合は横方向（XZ平面）に大きく広がり、上方向（Y）は抑える
+                float angleXZ = ((float)(rand() % 1000) / 1000.0f) * DirectX::XM_2PI;
+                float spdImpact = spd * 2.5f; // 少しマイルドに
+                sp.velocity = { 
+                    std::cos(angleXZ) * spdImpact * 1.5f,
+                    ((rand() % 100) / 100.0f) * 1.5f + 0.5f, // 少しだけ上にフワッと
+                    std::sin(angleXZ) * spdImpact * 1.5f 
+                };
+            } else {
+                float spdImpact = spd * 4.5f;
+                sp.velocity = { 
+                    planeNormal_.x * spdImpact + ((rand() % 100) / 100.0f - 0.5f) * 5.0f,
+                    planeNormal_.y * spdImpact + 1.5f + ((rand() % 100) / 100.0f - 0.5f) * 5.0f,
+                    planeNormal_.z * spdImpact + ((rand() % 100) / 100.0f - 0.5f) * 5.0f 
+                };
+            }
         }
 
         smokeParticles_.push_back(sp);

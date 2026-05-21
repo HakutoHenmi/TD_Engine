@@ -15,7 +15,7 @@ public:
 
 private:
 	float lifeTime_ = 0.0f;
-	float maxLifeTime_ = 0.5f;
+	float maxLifeTime_ = 2.0f;
 };
 
 } // namespace Game
