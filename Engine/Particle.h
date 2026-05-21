@@ -1,4 +1,5 @@
-﻿#pragma once
+#pragma once
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -34,6 +35,24 @@ struct Particle {
 	Vector3 angVel{};   // 回転速度
 };
 
+// ★追加: グローバルパーティクルバジェット管理
+class ParticleBudget {
+public:
+	static constexpr uint32_t kMaxGlobalParticles = 4000; // 画面全体の上限
+
+	static uint32_t GetActiveCount() { return activeCount_.load(std::memory_order_relaxed); }
+	static bool CanEmit(uint32_t count = 1) { return activeCount_.load(std::memory_order_relaxed) + count <= kMaxGlobalParticles; }
+	static void Register(uint32_t count) { activeCount_.fetch_add(count, std::memory_order_relaxed); }
+	static void Unregister(uint32_t count) { 
+		uint32_t prev = activeCount_.load(std::memory_order_relaxed);
+		while (prev > 0 && !activeCount_.compare_exchange_weak(prev, prev > count ? prev - count : 0, std::memory_order_relaxed));
+	}
+	static void ResetFrame() { activeCount_.store(0, std::memory_order_relaxed); }
+
+private:
+	static std::atomic<uint32_t> activeCount_;
+};
+
 class ParticleSystem {
 public:
 	// texturePath は任意。存在する png を指定してください（例: "Resources/Textures/uvChecker.png"）
@@ -56,6 +75,12 @@ public:
 			  const Vector4& startColor, const Vector4& endColor, 
 			  float life, const Vector3& angVel = {0, 0, 0}, float damping = 0.0f);
 
+	// ★追加: アクティブパーティクル数を取得
+	uint32_t GetActiveCount() const;
+
+	// ★追加: エミッター位置を設定（LODカリング用）
+	void SetEmitterPosition(const Vector3& pos) { emitterPosition_ = pos; }
+
 private:
 	Renderer* renderer_ = nullptr;
 
@@ -66,6 +91,11 @@ private:
 
 	// ★追加: ビルボードを使用するかどうか
 	bool useBillboard_ = true;
+
+	// ★追加: LODカリング用
+	Vector3 emitterPosition_{};
+	static constexpr float kLodNearDist = 100.0f;  // フル品質距離
+	static constexpr float kLodFarDist = 200.0f;  // 完全カリング距離
 };
 
 } // namespace Engine

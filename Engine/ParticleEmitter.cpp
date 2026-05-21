@@ -1,4 +1,4 @@
-﻿#include "ParticleEmitter.h"
+#include "ParticleEmitter.h"
 #include <fstream>
 #include <cstdlib>
 
@@ -26,7 +26,14 @@ void ParticleEmitter::Initialize(Renderer& renderer, const std::string& name) {
 
 void ParticleEmitter::ApplySystemSettings() {
 	if (!renderer_) return;
-	particleSystem_.Initialize(*renderer_, 1000, "Resources/Models/plane.obj", params.texturePath, true, params.useBillboard);
+	// ★最適化: emitRate と lifeTime から必要最大数を動的に計算（1000固定を廃止）
+	size_t needed = static_cast<size_t>(params.emitRate * (params.lifeTime + params.lifeTimeVariance) * 1.5f);
+	// バーストエミッターは burstCount の2倍を最低保証
+	needed = (std::max)(needed, static_cast<size_t>(params.burstCount * 2));
+	// 最低16、最大512にクランプ
+	if (needed < 16) needed = 16;
+	if (needed > 512) needed = 512;
+	particleSystem_.Initialize(*renderer_, needed, "Resources/Models/plane.obj", params.texturePath, true, params.useBillboard);
 	currentTexturePath_ = params.texturePath;
 	currentBillboard_ = params.useBillboard;
 }
@@ -45,6 +52,9 @@ void ParticleEmitter::Update(float dt) {
 			EmitBurst(1);
 		}
 	}
+
+	// ★追加: LODカリング用にエミッター位置をParticleSystemに伝達
+	particleSystem_.SetEmitterPosition({params.position.x, params.position.y, params.position.z});
 
 	particleSystem_.Update(dt);
 }

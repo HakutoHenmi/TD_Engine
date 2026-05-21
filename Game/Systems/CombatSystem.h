@@ -103,7 +103,7 @@ public:
 					TagType dTag = registry.all_of<TagComponent>(defenderEntity) ? registry.get<TagComponent>(defenderEntity).tag : TagType::Untagged;
 					
 					bool skipDamage = false;
-					if (aTag == TagType::Bullet || aTag == TagType::PlayerSword || aTag == TagType::Sword) { if (dTag != TagType::Enemy) skipDamage = true; }
+					if (aTag == TagType::Bullet || aTag == TagType::PlayerSword || aTag == TagType::Sword || aTag == TagType::Poison) { if (dTag != TagType::Enemy) skipDamage = true; }
 					if (aTag != TagType::Untagged && aTag == dTag) skipDamage = true;
 					if (aTag == TagType::EnemyBullet && dTag == TagType::Enemy) skipDamage = true;
 					// ★ミサイル/弾がCanonタグ（タワー）に当たらないようにする
@@ -116,6 +116,14 @@ public:
 							auto& hurtbox = registry.get<HurtboxComponent>(defenderEntity);
 							hc.hp -= hitbox.damage * hurtbox.damageMultiplier;
 							hc.invincibleTime = 0.5f;
+
+							if (aTag == TagType::Poison && dTag == TagType::Enemy) {
+								auto& enemyVc = registry.all_of<VariableComponent>(defenderEntity) ? 
+									registry.get<VariableComponent>(defenderEntity) : 
+									registry.emplace<VariableComponent>(defenderEntity);
+								enemyVc.SetValue("IsPoisoned", 1.0f);
+								enemyVc.SetValue("PoisonedTimer", 3.0f);
+							}
 
 							if (ctx.scene) {
 								if (dTag == TagType::Player) {
@@ -181,83 +189,225 @@ public:
 						if (aTag == TagType::Bullet && registry.all_of<TransformComponent>(attackerEntity)) {
 							auto& bulletTrans = registry.get<TransformComponent>(attackerEntity);
 							
-							entt::entity explosionVfx = ctx.scene->CreateEntity("CanonExplosion_VFX");
-							ctx.scene->SetTag(explosionVfx, TagType::VFX);
+							// アイスキャノンの弾丸（IceBulletScript）であるかチェック
+							bool isIceBullet = false;
+							if (registry.all_of<ScriptComponent>(attackerEntity)) {
+								const auto& sc = registry.get<ScriptComponent>(attackerEntity);
+								for (const auto& instance : sc.scripts) {
+									if (instance.scriptPath == "IceBulletScript") {
+										isIceBullet = true;
+										break;
+									}
+								}
+							}
 
-							auto& vfxTrans = registry.get<TransformComponent>(explosionVfx);
-							vfxTrans.translate = bulletTrans.translate;
+							if (isIceBullet) {
+								// 敵に凍結デバフを適用
+								if (registry.all_of<VariableComponent>(attackerEntity)) {
+									float stopTime = registry.get<VariableComponent>(attackerEntity).GetValue("StopTime", 1.0f);
+									
+									auto& enemyVc = registry.all_of<VariableComponent>(defenderEntity) ? 
+										registry.get<VariableComponent>(defenderEntity) : 
+										registry.emplace<VariableComponent>(defenderEntity);
+									
+									enemyVc.SetValue("SpeedBuffTimer", stopTime);
+									enemyVc.SetValue("SpeedBuffMultiplier", 0.0f); // 速度を0に
 
-							// 1. 火花（きらめくテクスチャを使用）
-							auto& pec = registry.emplace<ParticleEmitterComponent>(explosionVfx);
-							pec.emitter.params.name = "ImpactExplosion";
-							pec.emitter.params.texturePath = "Resources/Textures/particles/diamond_flare.png";
-							pec.emitter.params.emitRate = 0.0f;
-							pec.emitter.params.shape = Engine::EmissionShape::Sphere;
-							pec.emitter.params.shapeRadius = 0.5f;
-							pec.emitter.params.startVelocity = {0.0f, 6.0f, 0.0f};
-							pec.emitter.params.velocityVariance = {4.0f, 4.0f, 4.0f};
-							pec.emitter.params.acceleration = {0.0f, -9.8f, 0.0f}; // 重力落下
-							pec.emitter.params.startColor = {1.0f, 0.8f, 0.3f, 1.0f};
-							pec.emitter.params.endColor = {1.0f, 0.2f, 0.0f, 0.0f};
-							pec.emitter.params.startSize = {0.4f, 0.4f, 0.4f};
-							pec.emitter.params.endSize = {0.05f, 0.05f, 0.05f};
-							pec.emitter.params.lifeTime = 0.6f;
-							pec.emitter.params.lifeTimeVariance = 0.2f;
-							pec.emitter.params.damping = 1.0f;
-							pec.emitter.params.isAdditive = true;
+									enemyVc.SetValue("IsFrozen", 1.0f);
+									enemyVc.SetValue("FrozenTimer", stopTime);
+								}
 
-							// 明示的に初期化し、その場でバースト放出！
-							pec.emitter.Initialize(*ctx.renderer, "ImpactExplosion_Emitter");
-							pec.isInitialized = true;
-							pec.emitter.EmitBurst(12);
+								// 地面から氷の棘（スパイク）が放射状に突き出す
+								DirectX::XMFLOAT3 impactPos = bulletTrans.translate;
+								float groundH = ctx.scene->GetHeightAt(impactPos.x, impactPos.z, impactPos.y + 1.0f, static_cast<uint32_t>(attackerEntity));
+								if (groundH > -5000.0f) {
+									impactPos.y = groundH;
+								}
 
-							// 2. 煙（白煙）
-							entt::entity smokeVfx = ctx.scene->CreateEntity("CanonExplosion_Smoke_VFX");
-							ctx.scene->SetTag(smokeVfx, TagType::VFX);
-							auto& sTrans = registry.get<TransformComponent>(smokeVfx);
-							sTrans.translate = bulletTrans.translate;
+								int spikeCount = 8;
+								for (int i = 0; i < spikeCount; ++i) {
+									float angle = (6.283185f / static_cast<float>(spikeCount)) * static_cast<float>(i);
+									
+									entt::entity spike = ctx.scene->CreateEntity("IceSpike_VFX");
+									ctx.scene->SetTag(spike, TagType::VFX);
 
-							auto& spec = registry.emplace<ParticleEmitterComponent>(smokeVfx);
-							spec.emitter.params.name = "ImpactSmoke";
-							spec.emitter.params.texturePath = "Resources/Textures/white1x1.png";
-							spec.emitter.params.emitRate = 0.0f;
-							spec.emitter.params.shape = Engine::EmissionShape::Sphere;
-							spec.emitter.params.shapeRadius = 0.8f;
-							spec.emitter.params.startVelocity = {0.0f, 2.0f, 0.0f};
-							spec.emitter.params.velocityVariance = {1.5f, 1.0f, 1.5f};
-							spec.emitter.params.startColor = {0.4f, 0.4f, 0.4f, 0.15f};
-							spec.emitter.params.endColor = {0.2f, 0.2f, 0.2f, 0.0f};
-							spec.emitter.params.startSize = {0.8f, 0.8f, 0.8f};
-							spec.emitter.params.endSize = {1.8f, 1.8f, 1.8f};
-							spec.emitter.params.lifeTime = 0.8f;
-							spec.emitter.params.lifeTimeVariance = 0.3f;
-							spec.emitter.params.damping = 1.5f;
-							spec.emitter.params.isAdditive = false;
+									auto& sTrans = registry.get<TransformComponent>(spike);
+									sTrans.translate = impactPos;
+									
+									float dist = 1.2f; // ★より広く (0.4f -> 1.2f)
+									sTrans.translate.x += std::cos(angle) * dist;
+									sTrans.translate.z += std::sin(angle) * dist;
+									sTrans.translate.y -= 0.5f; // 地面下に埋める
 
-							// 明示的に初期化し、その場でバースト放出！
-							spec.emitter.Initialize(*ctx.renderer, "ImpactSmoke_Emitter");
-							spec.isInitialized = true;
-							spec.emitter.EmitBurst(8);
+									sTrans.rotate.y = -angle;
+									sTrans.rotate.x = 0.85f; // ★もっと外側に傾ける (0.35f -> 0.85f)
+									sTrans.scale = { 0.12f, 0.01f, 0.12f };
 
-							// スクリプトと光を追加
-							auto& sc = registry.emplace<ScriptComponent>(explosionVfx);
-							sc.scripts.push_back({"BulletScript", "", nullptr});
-							auto& vc = registry.emplace<VariableComponent>(explosionVfx);
-							vc.SetValue("Speed", 0.0f);
-							vc.SetValue("MaxLifeTime", 1.0f); // パーティクルが消え終わるまでオブジェクトを生かしておく
+									if (ctx.renderer) {
+										auto& mr = registry.emplace<MeshRendererComponent>(spike);
+										mr.modelHandle = ctx.renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+										mr.textureHandle = ctx.renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+										mr.color = { 0.5f, 0.85f, 1.0f, 1.5f }; // 青白い半透明色
+									}
 
-							auto& sSc = registry.emplace<ScriptComponent>(smokeVfx);
-							sSc.scripts.push_back({"BulletScript", "", nullptr});
-							auto& sVc = registry.emplace<VariableComponent>(smokeVfx);
-							sVc.SetValue("Speed", 0.0f);
-							sVc.SetValue("MaxLifeTime", 1.5f);
+									auto& sc = registry.emplace<ScriptComponent>(spike);
+									sc.scripts.push_back({ "IceSpikeScript", "", nullptr });
 
-							// 地面が安っぽく光るのを完全に防ぐため、光源強度と半径を極小に制限
-							auto& pointLight = registry.emplace<PointLightComponent>(explosionVfx);
-							pointLight.color = {1.0f, 0.6f, 0.2f};
-							pointLight.intensity = 1.5f;
-							pointLight.range = 3.0f;
-							pointLight.atten = {1.0f, 0.8f, 0.2f};
+									auto& vc = registry.emplace<VariableComponent>(spike);
+									vc.SetValue("TargetScaleY", 1.0f + (rand() % 100) * 0.005f);
+									vc.SetValue("Angle", angle);
+								}
+
+								// 砕け散る氷の破片 (きらめく反射) & 凍結エフェクト
+								entt::entity impactVfx = ctx.scene->CreateEntity("IceImpact_VFX");
+								ctx.scene->SetTag(impactVfx, TagType::VFX);
+								auto& iTrans = registry.get<TransformComponent>(impactVfx);
+								iTrans.translate = bulletTrans.translate;
+
+								auto& pecShatter = registry.emplace<ParticleEmitterComponent>(impactVfx);
+								pecShatter.emitter.params.name = "IceImpactShatter";
+								pecShatter.emitter.params.texturePath = "Resources/Textures/particles/shattered_prism.png"; // 砕けたプリズム
+								pecShatter.emitter.params.emitRate = 0.0f;
+								pecShatter.emitter.params.shape = Engine::EmissionShape::Sphere;
+								pecShatter.emitter.params.shapeRadius = 1.2f;
+								pecShatter.emitter.params.lifeTime = 0.9f;
+								pecShatter.emitter.params.lifeTimeVariance = 0.25f;
+								pecShatter.emitter.params.startVelocity = { 0.0f, 1.5f, 0.0f };
+								pecShatter.emitter.params.velocityVariance = { 2.5f, 1.2f, 2.5f };
+								pecShatter.emitter.params.damping = 0.8f;
+								pecShatter.emitter.params.startColor = { 0.65f, 0.9f, 1.0f, 1.6f };
+								pecShatter.emitter.params.endColor = { 0.3f, 0.7f, 1.0f, 0.0f };
+								pecShatter.emitter.params.startSize = { 0.35f, 0.35f, 0.35f };
+								pecShatter.emitter.params.endSize = { 1.1f, 1.1f, 1.1f };
+								pecShatter.emitter.params.isAdditive = true;
+								pecShatter.emitter.params.position = { bulletTrans.translate.x, bulletTrans.translate.y, bulletTrans.translate.z };
+
+								pecShatter.emitter.Initialize(*ctx.renderer, "IceImpactShatter");
+								pecShatter.isInitialized = true;
+								pecShatter.emitter.EmitBurst(22);
+
+								// キラキラ光る反射スパーク
+								entt::entity sparkleVfx = ctx.scene->CreateEntity("IceImpactSparkle_VFX");
+								ctx.scene->SetTag(sparkleVfx, TagType::VFX);
+								auto& spTrans = registry.get<TransformComponent>(sparkleVfx);
+								spTrans.translate = bulletTrans.translate;
+
+								auto& pecSparkle = registry.emplace<ParticleEmitterComponent>(sparkleVfx);
+								pecSparkle.emitter.params.name = "IceImpactSparkle";
+								pecSparkle.emitter.params.texturePath = "Resources/Textures/particles/diamond_flare.png"; // ダイヤモンドフレア
+								pecSparkle.emitter.params.emitRate = 0.0f;
+								pecSparkle.emitter.params.shape = Engine::EmissionShape::Sphere;
+								pecSparkle.emitter.params.shapeRadius = 0.8f;
+								pecSparkle.emitter.params.lifeTime = 0.7f;
+								pecSparkle.emitter.params.lifeTimeVariance = 0.2f;
+								pecSparkle.emitter.params.startVelocity = { 0.0f, 3.5f, 0.0f };
+								pecSparkle.emitter.params.velocityVariance = { 4.5f, 3.5f, 4.5f };
+								pecSparkle.emitter.params.damping = 0.6f;
+								pecSparkle.emitter.params.startColor = { 0.8f, 0.95f, 1.0f, 1.8f };
+								pecSparkle.emitter.params.endColor = { 0.2f, 0.5f, 1.0f, 0.0f };
+								pecSparkle.emitter.params.startSize = { 0.2f, 0.2f, 0.2f };
+								pecSparkle.emitter.params.endSize = { 0.02f, 0.02f, 0.02f };
+								pecSparkle.emitter.params.angularVelocity = { 5.0f, 5.0f, 5.0f };
+								pecSparkle.emitter.params.angularVelocityVariance = { 10.0f, 10.0f, 10.0f };
+								pecSparkle.emitter.params.isAdditive = true;
+								pecSparkle.emitter.params.position = { bulletTrans.translate.x, bulletTrans.translate.y, bulletTrans.translate.z };
+
+								pecSparkle.emitter.Initialize(*ctx.renderer, "IceImpactSparkle");
+								pecSparkle.isInitialized = true;
+								pecSparkle.emitter.EmitBurst(25);
+
+								// スクリプトと寿命
+								auto& scSp = registry.emplace<ScriptComponent>(impactVfx);
+								scSp.scripts.push_back({ "BulletScript", "", nullptr });
+								auto& vcSp = registry.emplace<VariableComponent>(impactVfx);
+								vcSp.SetValue("Speed", 0.0f);
+								vcSp.SetValue("MaxLifeTime", 1.2f);
+
+								auto& scSparkle = registry.emplace<ScriptComponent>(sparkleVfx);
+								scSparkle.scripts.push_back({ "BulletScript", "", nullptr });
+								auto& vcSparkle = registry.emplace<VariableComponent>(sparkleVfx);
+								vcSparkle.SetValue("Speed", 0.0f);
+								vcSparkle.SetValue("MaxLifeTime", 1.0f);
+
+							} else {
+								entt::entity explosionVfx = ctx.scene->CreateEntity("CanonExplosion_VFX");
+								ctx.scene->SetTag(explosionVfx, TagType::VFX);
+
+								auto& vfxTrans = registry.get<TransformComponent>(explosionVfx);
+								vfxTrans.translate = bulletTrans.translate;
+
+								// 1. 火花（きらめくテクスチャを使用）
+								auto& pec = registry.emplace<ParticleEmitterComponent>(explosionVfx);
+								pec.emitter.params.name = "ImpactExplosion";
+								pec.emitter.params.texturePath = "Resources/Textures/particles/diamond_flare.png";
+								pec.emitter.params.emitRate = 0.0f;
+								pec.emitter.params.shape = Engine::EmissionShape::Sphere;
+								pec.emitter.params.shapeRadius = 0.5f;
+								pec.emitter.params.startVelocity = {0.0f, 6.0f, 0.0f};
+								pec.emitter.params.velocityVariance = {4.0f, 4.0f, 4.0f};
+								pec.emitter.params.acceleration = {0.0f, -9.8f, 0.0f}; // 重力落下
+								pec.emitter.params.startColor = {1.0f, 0.8f, 0.3f, 1.0f};
+								pec.emitter.params.endColor = {1.0f, 0.2f, 0.0f, 0.0f};
+								pec.emitter.params.startSize = {0.4f, 0.4f, 0.4f};
+								pec.emitter.params.endSize = {0.05f, 0.05f, 0.05f};
+								pec.emitter.params.lifeTime = 0.6f;
+								pec.emitter.params.lifeTimeVariance = 0.2f;
+								pec.emitter.params.damping = 1.0f;
+								pec.emitter.params.isAdditive = true;
+
+								// 明示的に初期化し、その場でバースト放出！
+								pec.emitter.Initialize(*ctx.renderer, "ImpactExplosion_Emitter");
+								pec.isInitialized = true;
+								pec.emitter.EmitBurst(12);
+
+								// 2. 煙（白煙）
+								entt::entity smokeVfx = ctx.scene->CreateEntity("CanonExplosion_Smoke_VFX");
+								ctx.scene->SetTag(smokeVfx, TagType::VFX);
+								auto& sTrans = registry.get<TransformComponent>(smokeVfx);
+								sTrans.translate = bulletTrans.translate;
+
+								auto& spec = registry.emplace<ParticleEmitterComponent>(smokeVfx);
+								spec.emitter.params.name = "ImpactSmoke";
+								spec.emitter.params.texturePath = "Resources/Textures/white1x1.png";
+								spec.emitter.params.emitRate = 0.0f;
+								spec.emitter.params.shape = Engine::EmissionShape::Sphere;
+								spec.emitter.params.shapeRadius = 0.8f;
+								spec.emitter.params.startVelocity = {0.0f, 2.0f, 0.0f};
+								spec.emitter.params.velocityVariance = {1.5f, 1.0f, 1.5f};
+								spec.emitter.params.startColor = {0.4f, 0.4f, 0.4f, 0.15f};
+								spec.emitter.params.endColor = {0.2f, 0.2f, 0.2f, 0.0f};
+								spec.emitter.params.startSize = {0.8f, 0.8f, 0.8f};
+								spec.emitter.params.endSize = {1.8f, 1.8f, 1.8f};
+								spec.emitter.params.lifeTime = 0.8f;
+								spec.emitter.params.lifeTimeVariance = 0.3f;
+								spec.emitter.params.damping = 1.5f;
+								spec.emitter.params.isAdditive = false;
+
+								// 明示的に初期化し、その場でバースト放出！
+								spec.emitter.Initialize(*ctx.renderer, "ImpactSmoke_Emitter");
+								spec.isInitialized = true;
+								spec.emitter.EmitBurst(8);
+
+								// スクリプトと光を追加
+								auto& sc = registry.emplace<ScriptComponent>(explosionVfx);
+								sc.scripts.push_back({"BulletScript", "", nullptr});
+								auto& vc = registry.emplace<VariableComponent>(explosionVfx);
+								vc.SetValue("Speed", 0.0f);
+								vc.SetValue("MaxLifeTime", 1.0f); // パーティクルが消え終わるまでオブジェクトを生かしておく
+
+								auto& sSc = registry.emplace<ScriptComponent>(smokeVfx);
+								sSc.scripts.push_back({"BulletScript", "", nullptr});
+								auto& sVc = registry.emplace<VariableComponent>(smokeVfx);
+								sVc.SetValue("Speed", 0.0f);
+								sVc.SetValue("MaxLifeTime", 1.5f);
+
+								// 地面が安っぽく光るのを完全に防ぐため、光源強度と半径を極小に制限
+								auto& pointLight = registry.emplace<PointLightComponent>(explosionVfx);
+								pointLight.color = {1.0f, 0.6f, 0.2f};
+								pointLight.intensity = 1.5f;
+								pointLight.range = 3.0f;
+								pointLight.atten = {1.0f, 0.8f, 0.2f};
+							}
 						}
 
 						ctx.scene->DestroyObject(static_cast<uint32_t>(attackerEntity));

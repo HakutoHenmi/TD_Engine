@@ -36,6 +36,11 @@ private:
 	float skillPowerRate_ = 1.0f;
 	float skillSpeedRate_ = 1.0f;
 	float skillRangeRate_ = 1.0f;
+
+	bool persistentVfxCreated_ = false;
+	entt::entity persistentGasVfx_ = entt::null;
+	float vfxDelayTimer_ = 0.0f;
+	void CreatePersistentVFX(entt::entity entity, GameScene* scene);
 };
 
 } // namespace Game
