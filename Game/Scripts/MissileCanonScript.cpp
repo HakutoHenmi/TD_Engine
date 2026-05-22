@@ -409,6 +409,7 @@ void MissileCanonScript::UpdateConnection(entt::entity entity, GameScene* scene)
 }
 
 void MissileCanonScript::Debug(bool /*connected*/) {}
+
 void MissileCanonScript::CreateBase(entt::entity entity, GameScene* scene) {
 	if (!scene) {
 		return;
