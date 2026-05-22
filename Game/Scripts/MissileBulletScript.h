@@ -36,6 +36,8 @@ private:
 	entt::entity engineFlameVfx_ = entt::null;
 	entt::entity trailSmokeVfxA_ = entt::null;
 	entt::entity trailSmokeVfxB_ = entt::null;
+	Vector3 lastTargetPosition_ = {0.0f, 0.0f, 0.0f};
+	bool hasLastTargetPosition_ = false;
 };
 
 } // namespace Game
