@@ -1,9 +1,9 @@
 #include "MissileBulletScript.h"
+#include "HitDistortionScript.h"
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
 #include "ScriptUtils.h"
-#include "HitDistortionScript.h"
 #include <cmath>
 
 namespace Game {
@@ -100,8 +100,8 @@ void MissileBulletScript::Start(entt::entity entity, GameScene* scene) {
 		pecSmokeA.emitter.params.lifeTimeVariance = 0.3f;
 		pecSmokeA.emitter.params.startVelocity = {0.0f, 0.3f, 0.0f};
 		pecSmokeA.emitter.params.velocityVariance = {0.2f, 0.1f, 0.2f};
-		pecSmokeA.emitter.params.acceleration = {0.0f, 0.5f, 0.0f}; // 上昇気流（プロシージャル煙と同じ）
-		pecSmokeA.emitter.params.damping = 1.0f;                      // プロシージャル煙と同じ
+		pecSmokeA.emitter.params.acceleration = {0.0f, 0.5f, 0.0f};       // 上昇気流（プロシージャル煙と同じ）
+		pecSmokeA.emitter.params.damping = 1.0f;                          // プロシージャル煙と同じ
 		pecSmokeA.emitter.params.startColor = {0.85f, 0.9f, 0.95f, 0.7f}; // プレイヤーブーストと同じ極上の白煙色
 		pecSmokeA.emitter.params.endColor = {0.6f, 0.65f, 0.7f, 0.0f};    // プレイヤーブーストと同じ
 		pecSmokeA.emitter.params.startSize = {0.6f, 0.6f, 0.6f};          // 螺旋軌跡の開始サイズ
@@ -158,20 +158,21 @@ void MissileBulletScript::Update(entt::entity entity, GameScene* scene, float dt
 
 	TransformComponent& missileTransform = registry.get<TransformComponent>(entity);
 
-	// デタッチラムダの定義
 	auto DetachVfx = [&](entt::entity vfx, float delay) {
 		if (registry.valid(vfx)) {
 			if (registry.all_of<ParticleEmitterComponent>(vfx)) {
-				auto& pec = registry.get<ParticleEmitterComponent>(vfx);
-				pec.emitter.isPlaying = false; // 新規放出停止
+				ParticleEmitterComponent& pec = registry.get<ParticleEmitterComponent>(vfx);
+				pec.emitter.isPlaying = false;
 			}
+
 			if (!registry.all_of<ScriptComponent>(vfx)) {
-				auto& sc = registry.emplace<ScriptComponent>(vfx);
-				sc.scripts.push_back({"BulletScript", "", nullptr});
+				ScriptComponent& scriptComponent = registry.emplace<ScriptComponent>(vfx);
+				scriptComponent.scripts.push_back({"BulletScript", "", nullptr});
 			}
-			auto& vc = registry.get_or_emplace<VariableComponent>(vfx);
-			vc.SetValue("Speed", 0.0f);
-			vc.SetValue("MaxLifeTime", delay);
+
+			VariableComponent& variableComponent = registry.get_or_emplace<VariableComponent>(vfx);
+			variableComponent.SetValue("Speed", 0.0f);
+			variableComponent.SetValue("MaxLifeTime", delay);
 		}
 	};
 
@@ -186,29 +187,37 @@ void MissileBulletScript::Update(entt::entity entity, GameScene* scene, float dt
 		return;
 	}
 
-	if (!hasTarget_) {
-		DetachVfx(engineFlameVfx_, 0.5f);
-		DetachVfx(trailSmokeVfxA_, 1.5f);
-		DetachVfx(trailSmokeVfxB_, 1.5f);
-		scene->DestroyObject(static_cast<uint32_t>(entity));
-		return;
-	}
-
 	if (!registry.valid(target_)) {
-		CreateExplosionAttackArea(entity, scene);
-		DetachVfx(engineFlameVfx_, 0.5f);
-		DetachVfx(trailSmokeVfxA_, 1.5f);
-		DetachVfx(trailSmokeVfxB_, 1.5f);
-		scene->DestroyObject(static_cast<uint32_t>(entity));
-		return;
+		hasTarget_ = false;
 	}
 
-	if (!registry.all_of<TransformComponent>(target_)) {
-		CreateExplosionAttackArea(entity, scene);
-		DetachVfx(engineFlameVfx_, 0.5f);
-		DetachVfx(trailSmokeVfxA_, 1.5f);
-		DetachVfx(trailSmokeVfxB_, 1.5f);
-		scene->DestroyObject(static_cast<uint32_t>(entity));
+	if (hasTarget_) {
+		if (!registry.all_of<TransformComponent>(target_)) {
+			hasTarget_ = false;
+		}
+	}
+
+if (!hasTarget_) {
+
+		float targetPitch = 1.3f;
+
+		missileTransform.rotate.x += (targetPitch - missileTransform.rotate.x) * 6.0f * dt;
+
+		missileTransform.translate.y -= 12.0f * dt;
+
+		if (missileTransform.translate.y <= 0.0f) {
+
+			missileTransform.translate.y = 0.0f;
+
+			CreateExplosionAttackArea(entity, scene);
+
+			DetachVfx(engineFlameVfx_, 0.5f);
+			DetachVfx(trailSmokeVfxA_, 1.5f);
+			DetachVfx(trailSmokeVfxB_, 1.5f);
+
+			scene->DestroyObject(static_cast<uint32_t>(entity));
+		}
+
 		return;
 	}
 
@@ -237,6 +246,25 @@ void MissileBulletScript::Update(entt::entity entity, GameScene* scene, float dt
 	missileTransform.translate.x = baseX;
 	missileTransform.translate.y = baseY + heightOffset;
 	missileTransform.translate.z = baseZ;
+
+	float hitDistance = 1.5f;
+
+	float hitDiffX = targetTransform.translate.x - missileTransform.translate.x;
+	float hitDiffY = targetTransform.translate.y - missileTransform.translate.y;
+	float hitDiffZ = targetTransform.translate.z - missileTransform.translate.z;
+
+	float hitDistanceLength = std::sqrt(hitDiffX * hitDiffX + hitDiffY * hitDiffY + hitDiffZ * hitDiffZ);
+
+	if (hitDistanceLength <= hitDistance) {
+		CreateExplosionAttackArea(entity, scene);
+
+		DetachVfx(engineFlameVfx_, 0.5f);
+		DetachVfx(trailSmokeVfxA_, 1.5f);
+		DetachVfx(trailSmokeVfxB_, 1.5f);
+
+		scene->DestroyObject(static_cast<uint32_t>(entity));
+		return;
+	}
 
 	float nextT = t + 0.02f;
 	if (nextT > 1.0f) {
@@ -268,7 +296,6 @@ void MissileBulletScript::Update(entt::entity entity, GameScene* scene, float dt
 		missileTransform.rotate.x = pitch;
 	}
 
-	// --- エフェクト追従・螺旋計算 ---
 	if (registry.valid(engineFlameVfx_) || registry.valid(trailSmokeVfxA_) || registry.valid(trailSmokeVfxB_)) {
 		DirectX::XMFLOAT3 bulletPos = missileTransform.translate;
 		float pitch = missileTransform.rotate.x;
@@ -279,67 +306,55 @@ void MissileBulletScript::Update(entt::entity entity, GameScene* scene, float dt
 		float sinY = std::sin(yaw);
 		float cosY = std::cos(yaw);
 
-		// 後方方向ベクトル
-		DirectX::XMFLOAT3 backDir = { -sinY * cosP, sinP, -cosY * cosP };
-		// 右・上ベクトル
-		DirectX::XMFLOAT3 rightVec = { cosY, 0.0f, -sinY };
-		DirectX::XMFLOAT3 upVec = { sinY * sinP, cosP, cosY * sinP };
+		DirectX::XMFLOAT3 backDir = {-sinY * cosP, sinP, -cosY * cosP};
+		DirectX::XMFLOAT3 rightVec = {cosY, 0.0f, -sinY};
+		DirectX::XMFLOAT3 upVec = {sinY * sinP, cosP, cosY * sinP};
 
 		float offsetBack = 1.0f;
-		DirectX::XMFLOAT3 flamePos = {
-			bulletPos.x + backDir.x * offsetBack,
-			bulletPos.y + backDir.y * offsetBack,
-			bulletPos.z + backDir.z * offsetBack
-		};
+		DirectX::XMFLOAT3 flamePos = {bulletPos.x + backDir.x * offsetBack, bulletPos.y + backDir.y * offsetBack, bulletPos.z + backDir.z * offsetBack};
 
-		// 1. 推進炎更新
 		if (registry.valid(engineFlameVfx_) && registry.all_of<ParticleEmitterComponent>(engineFlameVfx_)) {
-			auto& fTrans = registry.get<TransformComponent>(engineFlameVfx_);
-			fTrans.translate = flamePos;
-			fTrans.rotate = missileTransform.rotate;
+			TransformComponent& flameTransform = registry.get<TransformComponent>(engineFlameVfx_);
+			flameTransform.translate = flamePos;
+			flameTransform.rotate = missileTransform.rotate;
 
-			auto& pec = registry.get<ParticleEmitterComponent>(engineFlameVfx_);
-			pec.emitter.params.position = { flamePos.x, flamePos.y, flamePos.z };
-			pec.emitter.params.startVelocity = { backDir.x * 15.0f, backDir.y * 15.0f, backDir.z * 15.0f };
+			ParticleEmitterComponent& flameEmitter = registry.get<ParticleEmitterComponent>(engineFlameVfx_);
+			flameEmitter.emitter.params.position = {flamePos.x, flamePos.y, flamePos.z};
+			flameEmitter.emitter.params.startVelocity = {backDir.x * 15.0f, backDir.y * 15.0f, backDir.z * 15.0f};
 		}
 
-		// 2. トレイル螺旋煙更新
-		float angle = flightTime_ * 22.0f; // 螺旋回転スピード
+		float angle = flightTime_ * 22.0f;
 		float radius = 0.55f;
 
-		DirectX::XMFLOAT3 posA = {
-			bulletPos.x + backDir.x * 0.6f + (rightVec.x * std::cos(angle) + upVec.x * std::sin(angle)) * radius,
-			bulletPos.y + backDir.y * 0.6f + (rightVec.y * std::cos(angle) + upVec.y * std::sin(angle)) * radius,
-			bulletPos.z + backDir.z * 0.6f + (rightVec.z * std::cos(angle) + upVec.z * std::sin(angle)) * radius
-		};
+		DirectX::XMFLOAT3 smokePosA = {
+		    bulletPos.x + backDir.x * 0.6f + (rightVec.x * std::cos(angle) + upVec.x * std::sin(angle)) * radius,
+		    bulletPos.y + backDir.y * 0.6f + (rightVec.y * std::cos(angle) + upVec.y * std::sin(angle)) * radius,
+		    bulletPos.z + backDir.z * 0.6f + (rightVec.z * std::cos(angle) + upVec.z * std::sin(angle)) * radius};
 
-		DirectX::XMFLOAT3 posB = {
-			bulletPos.x + backDir.x * 0.6f - (rightVec.x * std::cos(angle) + upVec.x * std::sin(angle)) * radius,
-			bulletPos.y + backDir.y * 0.6f - (rightVec.y * std::cos(angle) + upVec.y * std::sin(angle)) * radius,
-			bulletPos.z + backDir.z * 0.6f - (rightVec.z * std::cos(angle) + upVec.z * std::sin(angle)) * radius
-		};
+		DirectX::XMFLOAT3 smokePosB = {
+		    bulletPos.x + backDir.x * 0.6f - (rightVec.x * std::cos(angle) + upVec.x * std::sin(angle)) * radius,
+		    bulletPos.y + backDir.y * 0.6f - (rightVec.y * std::cos(angle) + upVec.y * std::sin(angle)) * radius,
+		    bulletPos.z + backDir.z * 0.6f - (rightVec.z * std::cos(angle) + upVec.z * std::sin(angle)) * radius};
 
 		if (registry.valid(trailSmokeVfxA_) && registry.all_of<ParticleEmitterComponent>(trailSmokeVfxA_)) {
-			auto& sTransA = registry.get<TransformComponent>(trailSmokeVfxA_);
-			sTransA.translate = posA;
-			auto& pecA = registry.get<ParticleEmitterComponent>(trailSmokeVfxA_);
-			pecA.emitter.params.position = { posA.x, posA.y, posA.z };
+			TransformComponent& smokeTransformA = registry.get<TransformComponent>(trailSmokeVfxA_);
+			smokeTransformA.translate = smokePosA;
+
+			ParticleEmitterComponent& smokeEmitterA = registry.get<ParticleEmitterComponent>(trailSmokeVfxA_);
+			smokeEmitterA.emitter.params.position = {smokePosA.x, smokePosA.y, smokePosA.z};
 		}
 
 		if (registry.valid(trailSmokeVfxB_) && registry.all_of<ParticleEmitterComponent>(trailSmokeVfxB_)) {
-			auto& sTransB = registry.get<TransformComponent>(trailSmokeVfxB_);
-			sTransB.translate = posB;
-			auto& pecB = registry.get<ParticleEmitterComponent>(trailSmokeVfxB_);
-			pecB.emitter.params.position = { posB.x, posB.y, posB.z };
+			TransformComponent& smokeTransformB = registry.get<TransformComponent>(trailSmokeVfxB_);
+			smokeTransformB.translate = smokePosB;
+
+			ParticleEmitterComponent& smokeEmitterB = registry.get<ParticleEmitterComponent>(trailSmokeVfxB_);
+			smokeEmitterB.emitter.params.position = {smokePosB.x, smokePosB.y, smokePosB.z};
 		}
 	}
 
 	if (flightTime_ >= maxFlightTime_) {
-		CreateExplosionAttackArea(entity, scene);
-		DetachVfx(engineFlameVfx_, 0.5f);
-		DetachVfx(trailSmokeVfxA_, 1.5f);
-		DetachVfx(trailSmokeVfxB_, 1.5f);
-		scene->DestroyObject(static_cast<uint32_t>(entity));
+		hasTarget_ = false;
 		return;
 	}
 }
@@ -406,7 +421,7 @@ void MissileBulletScript::CreateExplosionAttackArea(entt::entity entity, GameSce
 		pecCF.emitter.params.isAdditive = true;
 
 		// ★パーティクル放出位置を着弾座標に設定
-		pecCF.emitter.params.position = { impPos.x, impPos.y, impPos.z };
+		pecCF.emitter.params.position = {impPos.x, impPos.y, impPos.z};
 
 		pecCF.emitter.Initialize(*renderer, "MissileCoreFlash");
 		pecCF.isInitialized = true;
@@ -437,15 +452,15 @@ void MissileBulletScript::CreateExplosionAttackArea(entt::entity entity, GameSce
 		pecVF.emitter.params.velocityVariance = {11.0f, 9.0f, 11.0f}; // 全方位に勢いよく
 		pecVF.emitter.params.angularVelocity = {0.0f, 0.0f, 0.0f};
 		pecVF.emitter.params.angularVelocityVariance = {5.0f, 6.0f, 5.0f}; // 渦を巻くような回転
-		pecVF.emitter.params.damping = 1.8f; // 広がりながら急減速するリアルな爆風
-		pecVF.emitter.params.startColor = {1.0f, 0.3f, 0.0f, 1.0f}; // 鮮やかな赤みの炎
-		pecVF.emitter.params.endColor = {0.15f, 0.0f, 0.0f, 0.0f};   // 燃え尽きて暗赤へ
+		pecVF.emitter.params.damping = 1.8f;                               // 広がりながら急減速するリアルな爆風
+		pecVF.emitter.params.startColor = {1.0f, 0.3f, 0.0f, 1.0f};        // 鮮やかな赤みの炎
+		pecVF.emitter.params.endColor = {0.15f, 0.0f, 0.0f, 0.0f};         // 燃え尽きて暗赤へ
 		pecVF.emitter.params.startSize = {1.4f, 1.4f, 1.4f};
 		pecVF.emitter.params.endSize = {4.2f, 4.2f, 4.2f};
 		pecVF.emitter.params.isAdditive = true;
 
 		// ★パーティクル放出位置を着弾座標に設定
-		pecVF.emitter.params.position = { impPos.x, impPos.y, impPos.z };
+		pecVF.emitter.params.position = {impPos.x, impPos.y, impPos.z};
 
 		pecVF.emitter.Initialize(*renderer, "MissileVortexFire");
 		pecVF.isInitialized = true;
@@ -476,7 +491,7 @@ void MissileBulletScript::CreateExplosionAttackArea(entt::entity entity, GameSce
 		auto& swSc = registry.emplace<ScriptComponent>(shockwave);
 		swSc.scripts.push_back({"HitDistortionScript", "", std::make_shared<HitDistortionScript>(), false});
 		auto& swVc = registry.emplace<VariableComponent>(shockwave);
-		swVc.SetValue("Duration", 0.5f);        // 0.5秒で高速伝播
+		swVc.SetValue("Duration", 0.5f); // 0.5秒で高速伝播
 		swVc.SetValue("StartScale", 0.5f);
 		swVc.SetValue("EndScale", explosionRadius_ * 2.8f); // 爆発半径に合わせて超巨大化
 		swVc.SetValue("InitialAlpha", 2.6f);
