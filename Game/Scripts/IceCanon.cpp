@@ -113,10 +113,20 @@ void IceCanon::Start(entt::entity entity, GameScene* scene) {
 
 	auto& registry = scene->GetRegistry();
 	
-	// 霜の降りたビジュアル表現：マテリアルカラーを青白くブレンド
+	// 霜の降りたビジュアル表現：マテリアルカラーを青白く発光させる（HDRカラー）
 	if (registry.all_of<MeshRendererComponent>(entity)) {
 		auto& mr = registry.get<MeshRendererComponent>(entity);
-		mr.color = { 0.65f, 0.85f, 1.0f, 1.0f };
+		mr.color = { 1.5f, 2.5f, 4.0f, 1.0f }; // 1.0以上の値でブルームを誘発
+	}
+
+	// タワー周囲の接地面を青く照らす
+	if (!registry.all_of<PointLightComponent>(entity)) {
+		auto& pl = registry.emplace<PointLightComponent>(entity);
+		pl.color = { 0.2f, 0.6f, 1.0f };
+		pl.intensity = 4.0f;
+		pl.range = 7.0f;
+		pl.offset = { 0.0f, 1.5f, 0.0f }; // ★ ライトを少し上にオフセット
+		pl.enabled = true;
 	}
 
 	if (!registry.all_of<HealthComponent>(entity)) {

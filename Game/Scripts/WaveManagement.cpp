@@ -93,6 +93,17 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 
 			for (entt::entity spawnerEntity : enemySpawners_[wi]) {
 				if (scene->GetRegistry().valid(spawnerEntity)) {
+					
+					// ★追加: スポナーの足元を照らすポイントライトを付与（黄色/オレンジ系）
+					if (!scene->GetRegistry().all_of<PointLightComponent>(spawnerEntity)) {
+						auto& pl = scene->GetRegistry().emplace<PointLightComponent>(spawnerEntity);
+						pl.color = { 1.0f, 0.8f, 0.2f };
+						pl.intensity = 3.5f;
+						pl.range = 8.0f;
+						pl.offset = { 0.0f, 1.5f, 0.0f }; // ★ ライトを少し上にオフセット
+						pl.enabled = true;
+					}
+
 					// スポナーの位置にプレビューを描画
 					if (auto* tc = scene->GetRegistry().try_get<TransformComponent>(spawnerEntity)) {
 						Engine::Matrix4x4 wm = scene->GetWorldMatrix(static_cast<int>(spawnerEntity));
@@ -113,7 +124,8 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 						float yaw = camRot.y + 3.1415926535f;
 						float pitch = -camRot.x;
 
-						Engine::Vector4 planeColor = {1.0f, 1.0f, 1.0f, 1.0f};
+						// ★変更: アイコン自体を発光させるため、HDRカラー（1.0以上の値）を設定
+						Engine::Vector4 planeColor = { 2.5f, 2.2f, 0.5f, 1.0f };
 
 						if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(spawnerEntity)) {
 							for (auto& entry : sc->scripts) {

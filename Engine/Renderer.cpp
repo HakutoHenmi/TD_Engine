@@ -946,7 +946,7 @@ void Renderer::EndFrame() {
 			float time;
 			float noiseStrength;
 			float distortion;
-			float chromaShift;
+			float damageVignette; // ★変更
 			float vignette;
 			float scanline;
 			float san;
@@ -975,7 +975,7 @@ void Renderer::EndFrame() {
 		cb.time = ppParams_.time;
 		cb.noiseStrength = ppParams_.noiseStrength;
 		cb.distortion = ppParams_.distortion;
-		cb.chromaShift = ppParams_.chromaShift;
+		cb.damageVignette = ppParams_.damageVignette; // ★変更
 		cb.vignette = ppParams_.vignette;
 		cb.scanline = ppParams_.scanline;
 		cb.san = ppParams_.san;
@@ -1933,7 +1933,7 @@ float4 main(VSIn v, uint instanceID : SV_InstanceID) : SV_POSITION {
 		static const char* kVS2D =
 		    R"(cbuffer CBSprite : register(b0) { float4x4 gMVP; float4 gColor; }; struct VSIn { float2 pos : POSITION; float2 uv : TEXCOORD0; }; struct VSOut { float4 svpos : SV_POSITION; float2 uv : TEXCOORD0; }; VSOut main(VSIn v) { VSOut o; o.svpos = mul(float4(v.pos, 0, 1), gMVP); o.uv = v.uv; return o; })";
 		static const char* kPS2D =
-		    R"(Texture2D gTex : register(t0); SamplerState gSmp : register(s0); cbuffer CBSprite : register(b0) { float4x4 gMVP; float4 gColor; }; float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET { return gTex.Sample(gSmp, uv) * gColor; })";
+		    R"(Texture2D gTex : register(t0); SamplerState gSmp : register(s0); cbuffer CBSprite : register(b0) { float4x4 gMVP; float4 gColor; }; float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET { float4 c = gTex.Sample(gSmp, uv) * gColor; c.rgb = pow(max(c.rgb, 0.0), 1.0 / 2.2); return c; })";
 		auto vs2d = CompileShader(kVS2D, "main", "vs_5_0");
 		auto ps2d = CompileShader(kPS2D, "main", "ps_5_0");
 		if (!vs2d || !ps2d)
@@ -2405,12 +2405,17 @@ Renderer::TextureHandle Renderer::LoadTexture2D(const std::string& filePath, boo
 	DirectX::ScratchImage img;
 	std::wstring wpath = PathUtils::FromUTF8(unifiedPath);
 	HRESULT hr = DirectX::LoadFromWICFile(wpath.c_str(), DirectX::WIC_FLAGS_NONE, nullptr, img);
-	if (FAILED(hr))
+	if (FAILED(hr)) {
+		// ロード失敗時もキャッシュに0を登録し、毎フレームの無駄なディスクアクセスを防ぐ
+		textureCache_[unifiedPath] = 0;
 		return 0;
+	}
 
 	const DirectX::Image* src = img.GetImage(0, 0, 0);
-	if (!src)
+	if (!src) {
+		textureCache_[unifiedPath] = 0;
 		return 0;
+	}
 
 	DirectX::ScratchImage conv;
 	if (src->format != DXGI_FORMAT_R8G8B8A8_UNORM && src->format != DXGI_FORMAT_R8G8B8A8_UNORM_SRGB) {
@@ -2521,10 +2526,10 @@ void Renderer::DrawMeshInstanced(MeshHandle mesh, TextureHandle texture, const M
 		it = instancedDrawCalls_.end() - 1;
 
 		// ★ デバッグ用：新しいバッチが作られた理由を確認する
-		char buf[256];
-		sprintf_s(buf, "[Batching] New Batch Created: Mesh=%u, Tex=%u, Shader=%s, ExtraTexSize=%zu\n", 
-				  (uint32_t)mesh, (uint32_t)texture, shaderName.c_str(), extraTex.size());
-		OutputDebugStringA(buf);
+		// char buf[256];
+		// sprintf_s(buf, "[Batching] New Batch Created: Mesh=%u, Tex=%u, Shader=%s, ExtraTexSize=%zu\n", 
+		// 		  (uint32_t)mesh, (uint32_t)texture, shaderName.c_str(), extraTex.size());
+		// OutputDebugStringA(buf);
 	}
 
 	lastIDCIndex_ = static_cast<int>(std::distance(instancedDrawCalls_.begin(), it));
@@ -2584,6 +2589,7 @@ Renderer::MeshHandle Renderer::LoadObjMesh(const std::string& objFilePath) {
 
 	// 作成した一時コマンドリストを渡す
 	if (!model->Load(dev_, cmd.Get(), unifiedPath)) {
+		meshCache_[unifiedPath] = 0; // 失敗時もキャッシュに登録して再ロードを防ぐ
 		return 0;
 	}
 

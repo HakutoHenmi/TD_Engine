@@ -326,6 +326,7 @@ struct PointLightComponent : public Component {
 	float intensity = 1.0f;
 	float range = 10.0f;
 	DirectX::XMFLOAT3 atten = {1.0f, 0.1f, 0.01f}; // 減衰(一定, 線形, 二次)
+	DirectX::XMFLOAT3 offset = {0.0f, 0.0f, 0.0f}; // ライトの位置オフセット
 	PointLightComponent() { type = ComponentType::PointLight; }
 };
 
