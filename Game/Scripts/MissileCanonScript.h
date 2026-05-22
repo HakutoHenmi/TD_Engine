@@ -37,6 +37,7 @@ private:
 	entt::entity persistentSmokeVfx_ = entt::null;
 	bool persistentVfxCreated_ = false;
 
+
 private:
 	void Debug(bool connected);
 	void UpdateConnection(entt::entity entity, GameScene* scene);

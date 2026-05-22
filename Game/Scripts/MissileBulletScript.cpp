@@ -18,7 +18,8 @@ void MissileBulletScript::Start(entt::entity entity, GameScene* scene) {
 	engineFlameVfx_ = entt::null;
 	trailSmokeVfxA_ = entt::null;
 	trailSmokeVfxB_ = entt::null;
-
+	hasLastTargetPosition_ = false;
+	lastTargetPosition_ = {0.0f, 0.0f, 0.0f};
 	if (!scene) {
 		return;
 	}
@@ -158,70 +159,64 @@ void MissileBulletScript::Update(entt::entity entity, GameScene* scene, float dt
 
 	TransformComponent& missileTransform = registry.get<TransformComponent>(entity);
 
-	auto DetachVfx = [&](entt::entity vfx, float delay) {
-		if (registry.valid(vfx)) {
-			if (registry.all_of<ParticleEmitterComponent>(vfx)) {
-				ParticleEmitterComponent& pec = registry.get<ParticleEmitterComponent>(vfx);
-				pec.emitter.isPlaying = false;
-			}
-
-			if (!registry.all_of<ScriptComponent>(vfx)) {
-				ScriptComponent& scriptComponent = registry.emplace<ScriptComponent>(vfx);
-				scriptComponent.scripts.push_back({"BulletScript", "", nullptr});
-			}
-
-			VariableComponent& variableComponent = registry.get_or_emplace<VariableComponent>(vfx);
-			variableComponent.SetValue("Speed", 0.0f);
-			variableComponent.SetValue("MaxLifeTime", delay);
-		}
-	};
-
 	lifeTime_ += dt;
 	flightTime_ += dt;
 
 	if (lifeTime_ >= maxLifeTime_) {
-		DetachVfx(engineFlameVfx_, 0.5f);
-		DetachVfx(trailSmokeVfxA_, 1.5f);
-		DetachVfx(trailSmokeVfxB_, 1.5f);
+		if (registry.valid(engineFlameVfx_) && registry.all_of<ParticleEmitterComponent>(engineFlameVfx_)) {
+			ParticleEmitterComponent& emitter = registry.get<ParticleEmitterComponent>(engineFlameVfx_);
+			emitter.emitter.isPlaying = false;
+		}
+
+		if (registry.valid(trailSmokeVfxA_) && registry.all_of<ParticleEmitterComponent>(trailSmokeVfxA_)) {
+			ParticleEmitterComponent& emitter = registry.get<ParticleEmitterComponent>(trailSmokeVfxA_);
+			emitter.emitter.isPlaying = false;
+		}
+
+		if (registry.valid(trailSmokeVfxB_) && registry.all_of<ParticleEmitterComponent>(trailSmokeVfxB_)) {
+			ParticleEmitterComponent& emitter = registry.get<ParticleEmitterComponent>(trailSmokeVfxB_);
+			emitter.emitter.isPlaying = false;
+		}
+
 		scene->DestroyObject(static_cast<uint32_t>(entity));
 		return;
 	}
 
-	if (!registry.valid(target_)) {
+	bool canUseTarget = false;
+
+	if (registry.valid(target_)) {
+		if (registry.all_of<TransformComponent>(target_)) {
+			canUseTarget = true;
+		}
+	}
+
+	float targetX = 0.0f;
+	float targetY = 0.0f;
+	float targetZ = 0.0f;
+
+	if (canUseTarget) {
+		TransformComponent& targetTransform = registry.get<TransformComponent>(target_);
+
+		targetX = targetTransform.translate.x;
+		targetY = targetTransform.translate.y;
+		targetZ = targetTransform.translate.z;
+
+		lastTargetPosition_.x = targetX;
+		lastTargetPosition_.y = targetY;
+		lastTargetPosition_.z = targetZ;
+		hasLastTargetPosition_ = true;
+	} else {
 		hasTarget_ = false;
-	}
 
-	if (hasTarget_) {
-		if (!registry.all_of<TransformComponent>(target_)) {
-			hasTarget_ = false;
-		}
-	}
-
-if (!hasTarget_) {
-
-		float targetPitch = 1.3f;
-
-		missileTransform.rotate.x += (targetPitch - missileTransform.rotate.x) * 6.0f * dt;
-
-		missileTransform.translate.y -= 12.0f * dt;
-
-		if (missileTransform.translate.y <= 0.0f) {
-
-			missileTransform.translate.y = 0.0f;
-
-			CreateExplosionAttackArea(entity, scene);
-
-			DetachVfx(engineFlameVfx_, 0.5f);
-			DetachVfx(trailSmokeVfxA_, 1.5f);
-			DetachVfx(trailSmokeVfxB_, 1.5f);
-
+		if (!hasLastTargetPosition_) {
 			scene->DestroyObject(static_cast<uint32_t>(entity));
+			return;
 		}
 
-		return;
+		targetX = lastTargetPosition_.x;
+		targetY = lastTargetPosition_.y;
+		targetZ = lastTargetPosition_.z;
 	}
-
-	TransformComponent& targetTransform = registry.get<TransformComponent>(target_);
 
 	float t = flightTime_ / maxFlightTime_;
 
@@ -232,10 +227,6 @@ if (!hasTarget_) {
 	if (t > 1.0f) {
 		t = 1.0f;
 	}
-
-	float targetX = targetTransform.translate.x;
-	float targetY = targetTransform.translate.y;
-	float targetZ = targetTransform.translate.z;
 
 	float baseX = LerpFloat(startPosition_.x, targetX, t);
 	float baseY = LerpFloat(startPosition_.y, targetY, t);
@@ -249,24 +240,21 @@ if (!hasTarget_) {
 
 	float hitDistance = 1.5f;
 
-	float hitDiffX = targetTransform.translate.x - missileTransform.translate.x;
-	float hitDiffY = targetTransform.translate.y - missileTransform.translate.y;
-	float hitDiffZ = targetTransform.translate.z - missileTransform.translate.z;
+	float hitDiffX = targetX - missileTransform.translate.x;
+	float hitDiffY = targetY - missileTransform.translate.y;
+	float hitDiffZ = targetZ - missileTransform.translate.z;
 
 	float hitDistanceLength = std::sqrt(hitDiffX * hitDiffX + hitDiffY * hitDiffY + hitDiffZ * hitDiffZ);
 
 	if (hitDistanceLength <= hitDistance) {
 		CreateExplosionAttackArea(entity, scene);
 
-		DetachVfx(engineFlameVfx_, 0.5f);
-		DetachVfx(trailSmokeVfxA_, 1.5f);
-		DetachVfx(trailSmokeVfxB_, 1.5f);
-
 		scene->DestroyObject(static_cast<uint32_t>(entity));
 		return;
 	}
 
 	float nextT = t + 0.02f;
+
 	if (nextT > 1.0f) {
 		nextT = 1.0f;
 	}
@@ -296,69 +284,12 @@ if (!hasTarget_) {
 		missileTransform.rotate.x = pitch;
 	}
 
-	if (registry.valid(engineFlameVfx_) || registry.valid(trailSmokeVfxA_) || registry.valid(trailSmokeVfxB_)) {
-		DirectX::XMFLOAT3 bulletPos = missileTransform.translate;
-		float pitch = missileTransform.rotate.x;
-		float yaw = missileTransform.rotate.y;
-
-		float cosP = std::cos(pitch);
-		float sinP = std::sin(pitch);
-		float sinY = std::sin(yaw);
-		float cosY = std::cos(yaw);
-
-		DirectX::XMFLOAT3 backDir = {-sinY * cosP, sinP, -cosY * cosP};
-		DirectX::XMFLOAT3 rightVec = {cosY, 0.0f, -sinY};
-		DirectX::XMFLOAT3 upVec = {sinY * sinP, cosP, cosY * sinP};
-
-		float offsetBack = 1.0f;
-		DirectX::XMFLOAT3 flamePos = {bulletPos.x + backDir.x * offsetBack, bulletPos.y + backDir.y * offsetBack, bulletPos.z + backDir.z * offsetBack};
-
-		if (registry.valid(engineFlameVfx_) && registry.all_of<ParticleEmitterComponent>(engineFlameVfx_)) {
-			TransformComponent& flameTransform = registry.get<TransformComponent>(engineFlameVfx_);
-			flameTransform.translate = flamePos;
-			flameTransform.rotate = missileTransform.rotate;
-
-			ParticleEmitterComponent& flameEmitter = registry.get<ParticleEmitterComponent>(engineFlameVfx_);
-			flameEmitter.emitter.params.position = {flamePos.x, flamePos.y, flamePos.z};
-			flameEmitter.emitter.params.startVelocity = {backDir.x * 15.0f, backDir.y * 15.0f, backDir.z * 15.0f};
-		}
-
-		float angle = flightTime_ * 22.0f;
-		float radius = 0.55f;
-
-		DirectX::XMFLOAT3 smokePosA = {
-		    bulletPos.x + backDir.x * 0.6f + (rightVec.x * std::cos(angle) + upVec.x * std::sin(angle)) * radius,
-		    bulletPos.y + backDir.y * 0.6f + (rightVec.y * std::cos(angle) + upVec.y * std::sin(angle)) * radius,
-		    bulletPos.z + backDir.z * 0.6f + (rightVec.z * std::cos(angle) + upVec.z * std::sin(angle)) * radius};
-
-		DirectX::XMFLOAT3 smokePosB = {
-		    bulletPos.x + backDir.x * 0.6f - (rightVec.x * std::cos(angle) + upVec.x * std::sin(angle)) * radius,
-		    bulletPos.y + backDir.y * 0.6f - (rightVec.y * std::cos(angle) + upVec.y * std::sin(angle)) * radius,
-		    bulletPos.z + backDir.z * 0.6f - (rightVec.z * std::cos(angle) + upVec.z * std::sin(angle)) * radius};
-
-		if (registry.valid(trailSmokeVfxA_) && registry.all_of<ParticleEmitterComponent>(trailSmokeVfxA_)) {
-			TransformComponent& smokeTransformA = registry.get<TransformComponent>(trailSmokeVfxA_);
-			smokeTransformA.translate = smokePosA;
-
-			ParticleEmitterComponent& smokeEmitterA = registry.get<ParticleEmitterComponent>(trailSmokeVfxA_);
-			smokeEmitterA.emitter.params.position = {smokePosA.x, smokePosA.y, smokePosA.z};
-		}
-
-		if (registry.valid(trailSmokeVfxB_) && registry.all_of<ParticleEmitterComponent>(trailSmokeVfxB_)) {
-			TransformComponent& smokeTransformB = registry.get<TransformComponent>(trailSmokeVfxB_);
-			smokeTransformB.translate = smokePosB;
-
-			ParticleEmitterComponent& smokeEmitterB = registry.get<ParticleEmitterComponent>(trailSmokeVfxB_);
-			smokeEmitterB.emitter.params.position = {smokePosB.x, smokePosB.y, smokePosB.z};
-		}
-	}
-
 	if (flightTime_ >= maxFlightTime_) {
-		hasTarget_ = false;
+		CreateExplosionAttackArea(entity, scene);
+		scene->DestroyObject(static_cast<uint32_t>(entity));
 		return;
 	}
 }
-
 void MissileBulletScript::CreateExplosionAttackArea(entt::entity entity, GameScene* scene) {
 	if (!scene) {
 		return;
