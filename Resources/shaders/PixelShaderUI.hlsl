@@ -32,6 +32,33 @@ static float2 Rotate(float2 p, float a) {
     return float2(c*p.x - s*p.y, s*p.x + c*p.y);
 }
 
+// Noise functions for realistic smoke
+float hash(float2 p) {
+    p = frac(p * float2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return frac(p.x * p.y);
+}
+
+float noise(float2 p) {
+    float2 i = floor(p);
+    float2 f = frac(p);
+    float2 u = f * f * (3.0 - 2.0 * f);
+    return lerp(lerp(hash(i + float2(0.0, 0.0)), 
+                     hash(i + float2(1.0, 0.0)), u.x),
+                lerp(hash(i + float2(0.0, 1.0)), 
+                     hash(i + float2(1.0, 1.0)), u.x), u.y);
+}
+
+float fbm(float2 p) {
+    float f = 0.0;
+    f += 0.5000 * noise(p); p = p * 2.02;
+    f += 0.2500 * noise(p); p = p * 2.03;
+    f += 0.1250 * noise(p); p = p * 2.01;
+    f += 0.0625 * noise(p);
+    return f;
+}
+
+
 // 距離関数 -------------------------------
 // 角丸矩形（中心原点、size=半サイズ、round=角丸半径）
 float sdRoundedBox(float2 p, float2 halfSize, float roundR) {
@@ -113,9 +140,53 @@ float4 mainPS(PSIn i) : SV_TARGET
     } else if (uShape == 1) {
         // 円：uSizePx.x を半径として使用
         d = sdCircle(p, uSizePx.x);
-    } else { // 2: Crescent
+    } else if (uShape == 2) {
+        // Crescent
         d = sdCrescent(p, uSizePx.x, uInner);
         innerMask *= innerMaskByInnerCircle(p, uInner);
+    } else if (uShape == 3) {
+        // リアルな煙（プロシージャル）
+        // UV座標に近い正規化された位置 (-0.5 to 0.5) を作る
+        float2 center = p / (max(uSizePx.x, 1.0) * 2.0);
+        float baseDist = length(center);
+        
+        // FBMノイズによる歪み
+        float2 noiseUV = center * 3.0 + float2(uRotateRad, uRotateRad * 0.5);
+        float n = fbm(noiseUV);
+        
+        float radius = baseDist * 2.0; 
+        // 外周に近づくにつれて完全に0になるように減衰させる
+        float falloff = saturate(1.0 - radius);
+        falloff = pow(falloff, 2.0); // 端でスムーズに0になるように
+        
+        // ノイズによって境界を不規則にする (雲のようなモクモク感)
+        float edge = saturate(falloff + (n - 0.5) * 1.5);
+        edge = pow(edge, 1.5) * falloff; // 外周では必ず0になるように強制
+        
+        float4 smokeCol;
+        // 色にもノイズを少し乗せる (煙の濃淡)
+        float3 color = uColor.rgb * lerp(0.7, 1.3, n);
+        // psoUI_ は SrcBlend=ONE のプリマルチプライドアルファを前提としているため、
+        // 最終的な RGB にも uColor.a を掛ける必要がある。
+        // （これを忘れると寿命でアルファが0になっても加算光が残り、消滅時にパッと消える不自然な見た目になる）
+        smokeCol.rgb = color * edge * uColor.a; 
+        smokeCol.a = edge * uColor.a;
+        
+        return smokeCol; 
+    } else if (uShape == 4) {
+        // 火花（プロシージャル加算合成用）
+        float2 sp = p;
+        sp.y *= 5.0; // 進行方向へ鋭く引き伸ばす
+        float r = length(sp) / max(uSizePx.x, 1.0);
+        
+        // 中心部は非常に明るく、外周は柔らかく減衰
+        float alpha = saturate(1.0 - r);
+        alpha = pow(alpha, 3.0); // 鋭い減衰
+        
+        float4 sparkCol;
+        sparkCol.rgb = uColor.rgb * alpha * 4.0; // コアを発光させるために色を強く乗せる
+        sparkCol.a   = alpha * uColor.a; // 加算合成のためそのままアルファを渡す
+        return sparkCol;
     }
 
     // 左から右へのプログレス(クリッピング)処理

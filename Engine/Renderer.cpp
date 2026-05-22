@@ -433,7 +433,7 @@ void Renderer::FlushDrawCalls() {
 	D3D12_GPU_DESCRIPTOR_HANDLE defaultSrv = textures_[0].srvGpu;
 
 	// ★追加: Skybox描画（最背面、全ドローコールの前）
-	DrawSkybox();
+	// DrawSkybox(); // GPU負荷軽減のため無効化
 
 	// ★RootSignatureを3D用に戻す（DrawSkyboxで変更されたため）
 	list_->SetGraphicsRootSignature(rootSig3D_.Get());
@@ -1983,6 +1983,13 @@ float4 main(VSIn v, uint instanceID : SV_InstanceID) : SV_POSITION {
 		pso.DSVFormat = DXGI_FORMAT_UNKNOWN;
 		if (FAILED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&pso2D_))))
 			return false;
+			
+		// ★追加: 2Dスプライト用の加算合成パイプライン
+		blend.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+		blend.RenderTarget[0].DestBlend = D3D12_BLEND_ONE; // 加算合成
+		pso.BlendState = blend;
+		if (FAILED(dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&pso2DAdditive_))))
+			return false;
 	}
 
 	// ★追加: SDF UI (PixelShaderUI) 用パイプライン
@@ -2057,6 +2064,13 @@ VSOut main(uint vid : SV_VertexID) {
 			pso.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 			pso.DepthStencilState.DepthEnable = FALSE;
 			dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoUI_));
+			
+			// ★追加: SDF UI用 加算合成パイプライン
+			blend.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+			blend.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+			blend.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+			pso.BlendState = blend;
+			dev_->CreateGraphicsPipelineState(&pso, IID_PPV_ARGS(&psoUIAdditive_));
 		}
 	}
 
@@ -2685,6 +2699,13 @@ void Renderer::DrawSprite(TextureHandle texH, const SpriteDesc& s) {
 	spriteDrawCalls_.push_back({ texH, s });
 }
 
+void Renderer::DrawSpriteAdditive(TextureHandle texH, const SpriteDesc& s) {
+	if (texH == 0 || texH >= textures_.size()) return;
+	SpriteDesc additiveDesc = s;
+	additiveDesc.additive = true;
+	spriteDrawCalls_.push_back({ texH, additiveDesc });
+}
+
 void Renderer::DrawSprite9Slice(TextureHandle texH, const Sprite9SliceDesc& s) {
 	if (texH >= textures_.size() || !textures_[texH].res) return;
 
@@ -2768,8 +2789,8 @@ void Renderer::FlushSprites() {
 
 		auto ToNDCX = [&](float x) { return (x / W) * 2.0f - 1.0f; };
 		auto ToNDCY = [&](float y) { return 1.0f - (y / H) * 2.0f; };
-		const float cx = s.x + s.w * 0.5f;
-		const float cy = s.y + s.h * 0.5f;
+		const float cx = s.x + s.w * s.pivotX;
+		const float cy = s.y + s.h * s.pivotY;
 
 		struct V {
 			float x, y;
@@ -2812,11 +2833,19 @@ void Renderer::FlushSprites() {
 		vbv.BufferLocation = upload_[fi].buffer->GetGPUVirtualAddress() + vbOff;
 		vbv.SizeInBytes = sizeof(vtx);
 		vbv.StrideInBytes = sizeof(V);
+		// shaderName で加算か通常かを切り替え
+		if (dc.desc.additive) {
+			list_->SetPipelineState(pso2DAdditive_.Get());
+		} else {
+			list_->SetPipelineState(pso2D_.Get());
+		}
 
 		list_->IASetVertexBuffers(0, 1, &vbv);
 		list_->SetGraphicsRootDescriptorTable(1, textures_[dc.tex].srvGpu); // ★修正: dc.texを使用
 		list_->DrawInstanced(6, 1, 0, 0);
 	}
+
+	spriteDrawCalls_.clear(); // ★追加: フラッシュ後にクリアして多重描画を防止
 }
 
 void Renderer::FlushSDFUI() {
@@ -2852,6 +2881,12 @@ void Renderer::FlushSDFUI() {
 		cb.uProgress = dc.desc.progress;
 		cb.uFill = dc.desc.fill;
 
+		if (dc.desc.additive) {
+			list_->SetPipelineState(psoUIAdditive_.Get());
+		} else {
+			list_->SetPipelineState(psoUI_.Get());
+		}
+
 		const uint32_t cbOff = upload_[fi].Allocate(sizeof(CBUI), 256);
 		if (cbOff != UINT32_MAX) {
 			std::memcpy(upload_[fi].mapped + cbOff, &cb, sizeof(CBUI));
@@ -2860,6 +2895,8 @@ void Renderer::FlushSDFUI() {
 			list_->DrawInstanced(6, 1, 0, 0);
 		}
 	}
+
+	sdfUIDrawCalls_.clear(); // ★追加: フラッシュ後にクリア
 }
 
 void Renderer::DrawSDFUI(const SdfUIDesc& desc) {
