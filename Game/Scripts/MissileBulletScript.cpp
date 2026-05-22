@@ -355,6 +355,7 @@ void MissileBulletScript::Update(entt::entity entity, GameScene* scene, float dt
 	}
 
 	if (flightTime_ >= maxFlightTime_) {
+		flightTime_ = maxFlightTime_;
 		CreateExplosionAttackArea(entity, scene);
 
 		DetachVfx(engineFlameVfx_, 0.5f);
@@ -365,7 +366,144 @@ void MissileBulletScript::Update(entt::entity entity, GameScene* scene, float dt
 		return;
 	}
 }
+void MissileBulletScript::CreateExplosionAttackArea(entt::entity entity, GameScene* scene) {
+	if (!scene) {
+		return;
+	}
 
+	entt::registry& registry = scene->GetRegistry();
+
+	if (!registry.valid(entity)) {
+		return;
+	}
+
+	if (!registry.all_of<TransformComponent>(entity)) {
+		return;
+	}
+
+	const TransformComponent& missileTransform = registry.get<TransformComponent>(entity);
+
+	entt::entity explosionAttackArea = registry.create();
+
+	Engine::Renderer* renderer = scene->GetRenderer();
+
+	TagComponent& explosionTag = registry.emplace<TagComponent>(explosionAttackArea);
+	explosionTag.tag = TagType::Bullet;
+
+	TransformComponent& explosionTransform = registry.emplace<TransformComponent>(explosionAttackArea);
+	explosionTransform.translate = missileTransform.translate;
+	explosionTransform.rotate = {0.0f, 0.0f, 0.0f};
+	explosionTransform.scale = {explosionRadius_, explosionRadius_, explosionRadius_};
+
+	ScriptComponent& explosionScript = registry.emplace<ScriptComponent>(explosionAttackArea);
+	explosionScript.scripts.push_back({"ExplosionAttackArea", "", nullptr});
+
+	SetVar(explosionAttackArea, scene, "Damage", damage_);
+	SetVar(explosionAttackArea, scene, "ExplosionRadius", explosionRadius_);
+
+	// ==================== 大迫力爆発エフェクト (Impact VFX) ====================
+	if (renderer) {
+		DirectX::XMFLOAT3 impPos = missileTransform.translate;
+
+		// 1. 中心白発光 (Core Flash) - 一瞬で広がり、オレンジに変わりつつ消える
+		entt::entity coreFlash = scene->CreateEntity("MissileCoreFlash_VFX");
+		scene->SetTag(coreFlash, TagType::VFX);
+		auto& cfTrans = registry.get<TransformComponent>(coreFlash);
+		cfTrans.translate = impPos;
+
+		auto& pecCF = registry.emplace<ParticleEmitterComponent>(coreFlash);
+		pecCF.emitter.params.name = "MissileCoreFlash";
+		pecCF.emitter.params.texturePath = "Resources/Textures/particles/diamond_flare.png";
+		pecCF.emitter.params.emitRate = 0.0f;
+		pecCF.emitter.params.shape = Engine::EmissionShape::Sphere;
+		pecCF.emitter.params.shapeRadius = 1.0f;
+		pecCF.emitter.params.lifeTime = 0.35f;
+		pecCF.emitter.params.lifeTimeVariance = 0.1f;
+		pecCF.emitter.params.startVelocity = {0.0f, 0.0f, 0.0f};
+		pecCF.emitter.params.velocityVariance = {1.5f, 1.5f, 1.5f};
+		pecCF.emitter.params.startColor = {2.0f, 2.0f, 2.0f, 1.0f}; // 白く強烈に発光
+		pecCF.emitter.params.endColor = {1.0f, 0.35f, 0.0f, 0.0f};  // オレンジフェード
+		pecCF.emitter.params.startSize = {4.5f, 4.5f, 4.5f};
+		pecCF.emitter.params.endSize = {0.5f, 0.5f, 0.5f};
+		pecCF.emitter.params.isAdditive = true;
+
+		// ★パーティクル放出位置を着弾座標に設定
+		pecCF.emitter.params.position = {impPos.x, impPos.y, impPos.z};
+
+		pecCF.emitter.Initialize(*renderer, "MissileCoreFlash");
+		pecCF.isInitialized = true;
+		pecCF.emitter.EmitBurst(6);
+
+		// スクリプトと寿命
+		auto& scCF = registry.emplace<ScriptComponent>(coreFlash);
+		scCF.scripts.push_back({"BulletScript", "", nullptr});
+		auto& vcCF = registry.emplace<VariableComponent>(coreFlash);
+		vcCF.SetValue("Speed", 0.0f);
+		vcCF.SetValue("MaxLifeTime", 0.6f);
+
+		// 2. 周囲に渦巻く赤い炎 (Vortex Fire) - 回転しながら広がる爆風
+		entt::entity vortexFire = scene->CreateEntity("MissileVortexFire_VFX");
+		scene->SetTag(vortexFire, TagType::VFX);
+		auto& vfTrans = registry.get<TransformComponent>(vortexFire);
+		vfTrans.translate = impPos;
+
+		auto& pecVF = registry.emplace<ParticleEmitterComponent>(vortexFire);
+		pecVF.emitter.params.name = "MissileVortexFire";
+		pecVF.emitter.params.texturePath = "Resources/Textures/particles/diamond_flare.png";
+		pecVF.emitter.params.emitRate = 0.0f;
+		pecVF.emitter.params.shape = Engine::EmissionShape::Sphere;
+		pecVF.emitter.params.shapeRadius = explosionRadius_ * 0.3f;
+		pecVF.emitter.params.lifeTime = 0.75f;
+		pecVF.emitter.params.lifeTimeVariance = 0.25f;
+		pecVF.emitter.params.startVelocity = {0.0f, 2.0f, 0.0f};
+		pecVF.emitter.params.velocityVariance = {11.0f, 9.0f, 11.0f}; // 全方位に勢いよく
+		pecVF.emitter.params.angularVelocity = {0.0f, 0.0f, 0.0f};
+		pecVF.emitter.params.angularVelocityVariance = {5.0f, 6.0f, 5.0f}; // 渦を巻くような回転
+		pecVF.emitter.params.damping = 1.8f;                               // 広がりながら急減速するリアルな爆風
+		pecVF.emitter.params.startColor = {1.0f, 0.3f, 0.0f, 1.0f};        // 鮮やかな赤みの炎
+		pecVF.emitter.params.endColor = {0.15f, 0.0f, 0.0f, 0.0f};         // 燃え尽きて暗赤へ
+		pecVF.emitter.params.startSize = {1.4f, 1.4f, 1.4f};
+		pecVF.emitter.params.endSize = {4.2f, 4.2f, 4.2f};
+		pecVF.emitter.params.isAdditive = true;
+
+		// ★パーティクル放出位置を着弾座標に設定
+		pecVF.emitter.params.position = {impPos.x, impPos.y, impPos.z};
+
+		pecVF.emitter.Initialize(*renderer, "MissileVortexFire");
+		pecVF.isInitialized = true;
+		pecVF.emitter.EmitBurst(25);
+
+		auto& scVF = registry.emplace<ScriptComponent>(vortexFire);
+		scVF.scripts.push_back({"BulletScript", "", nullptr});
+		auto& vcVF = registry.emplace<VariableComponent>(vortexFire);
+		vcVF.SetValue("Speed", 0.0f);
+		vcVF.SetValue("MaxLifeTime", 1.2f);
+
+		// 4. リング状の衝撃波（歪みエフェクト）
+		entt::entity shockwave = scene->CreateEntity("MissileShockwave_VFX");
+		scene->SetTag(shockwave, TagType::VFX);
+		auto& swTrans = registry.get<TransformComponent>(shockwave);
+		swTrans.translate = impPos;
+		swTrans.translate.y += 0.3f; // 地面と干渉しないようわずかに上に
+		swTrans.scale = {1.0f, 1.0f, 1.0f};
+
+		auto& swMrc = registry.emplace<MeshRendererComponent>(shockwave);
+		swMrc.shaderName = "Distortion";
+		swMrc.texturePath = "Resources/Textures/normal.png";
+		swMrc.modelPath = "Resources/Models/plane.obj";
+		swMrc.modelHandle = renderer->LoadObjMesh(swMrc.modelPath);
+		swMrc.textureHandle = renderer->LoadTexture2D(swMrc.texturePath);
+		swMrc.color = {1.0f, 1.0f, 1.0f, 2.5f}; // 歪み強度強め
+
+		auto& swSc = registry.emplace<ScriptComponent>(shockwave);
+		swSc.scripts.push_back({"HitDistortionScript", "", std::make_shared<HitDistortionScript>(), false});
+		auto& swVc = registry.emplace<VariableComponent>(shockwave);
+		swVc.SetValue("Duration", 0.5f); // 0.5秒で高速伝播
+		swVc.SetValue("StartScale", 0.5f);
+		swVc.SetValue("EndScale", explosionRadius_ * 2.8f); // 爆発半径に合わせて超巨大化
+		swVc.SetValue("InitialAlpha", 2.6f);
+	}
+}
 void MissileBulletScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 REGISTER_SCRIPT(MissileBulletScript);
