@@ -42,6 +42,9 @@ public:
 		Vector4 color{1, 1, 1, 1};
 		Vector4 uvScaleOffset{1.0f, 1.0f, 0.0f, 0.0f}; // ★追加: UVスケール・オフセット
 		int layer = 0; // ★追加: 描画レイヤー（大きいほど手前）
+		float pivotX = 0.5f; // ★追加: ピボットX (0=左, 0.5=中央, 1=右)
+		float pivotY = 0.5f; // ★追加: ピボットY (0=上, 0.5=中央, 1=下)
+		bool additive = false; // ★追加: 加算合成フラグ
 	};
 
 	struct CollisionRequest {
@@ -322,9 +325,11 @@ public:
 		float rotateRad = 0.0f;
 		float progress = 1.0f;
 		float fill = 1.0f; // ★追加: 1.0=塗りつぶし, 0.0=アウトライン
+		bool additive = false; // ★追加: 加算合成フラグ
 	};
 
 	void DrawSprite(TextureHandle texH, const SpriteDesc& s);
+	void DrawSpriteAdditive(TextureHandle texH, const SpriteDesc& s);
 	void DrawSprite9Slice(TextureHandle texH, const Sprite9SliceDesc& s); // ★追加
 	void DrawSDFUI(const SdfUIDesc& desc);
 	void FlushSprites(); // スプライトの描画実行
@@ -547,9 +552,11 @@ private:
 
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSig2D_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> pso2D_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> pso2DAdditive_; // ★追加: 加算合成用
 
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSigUI_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoUI_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoUIAdditive_; // ★追加: 加算合成UI用
 
 	// ★追加: テキスト描画用 (複数フォント対応)
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> psoText_;

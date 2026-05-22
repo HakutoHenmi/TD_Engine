@@ -90,6 +90,11 @@ void App::Run() {
 
 		renderer_.EndFrame();
 
+		// ★追加: テキスト等も含めた全ての描画が終わった後にシャッターを描画する
+		sceneManager_.DrawOverlay();
+		renderer_.FlushSprites();
+		renderer_.FlushSDFUI();
+
 #ifdef USE_IMGUI
  		Engine::IScene* currentScene = sceneManager_.Current();
  		if (currentScene) {

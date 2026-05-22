@@ -13,6 +13,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "Matrix4x4.h"
 
 namespace Engine {
 
@@ -24,6 +25,13 @@ public:
 public:
 	static SceneManager* GetInstance();
 
+	// フェード状態
+	enum class TransitionState {
+		None,
+		Closing,
+		Opening
+	};
+
 	using Factory = std::function<std::unique_ptr<IScene>()>;
 
 public:
@@ -34,6 +42,7 @@ public:
 
 	void Update();
 	void Draw();
+	void DrawOverlay(); // ★追加: 全ての最前面に描画する用
 
 	IScene* Current() const { return current_.get(); }
 	const std::string& CurrentName() const { return currentName_; }
@@ -49,27 +58,49 @@ public:
 	const std::string& GetGlobalSnapshot() const { return globalSnapshot_; }
 	void SetGlobalScenePath(const std::string& path) { globalScenePath_ = path; }
 	const std::string& GetGlobalScenePath() const { return globalScenePath_; }
-	void ClearGlobalPlayData() { isGlobalPlaying_ = false; globalSnapshot_.clear(); globalScenePath_.clear(); }
 
-	// ---- 追加：原因調査＆自動起動用 ----
+	// ★追加: 原因調査＆自動起動用
+	void ClearGlobalPlayData() { isGlobalPlaying_ = false; globalSnapshot_.clear(); globalScenePath_.clear(); }
 	bool Has(const std::string& name) const;
 	std::string FirstRegisteredName() const; // 登録済みの先頭（無ければ空）
 	std::vector<std::string> RegisteredNames() const;
 
 private:
+	static SceneManager* instance_;
+
 	std::unordered_map<std::string, Factory> factories_;
 	std::unique_ptr<IScene> current_;
 	std::string currentName_;
+
 	std::string pendingNext_;
 	SceneParameters pendingParams_;
+
 	WindowDX* dx_ = nullptr;
 
-	// ★追加: グローバルPlay状態
 	bool isGlobalPlaying_ = false;
-	std::string globalSnapshot_;    // Play開始時のシーンスナップショット
-	std::string globalScenePath_;   // Play開始時のシーンファイルパス
+	std::string globalSnapshot_ = "";
+	std::string globalScenePath_ = "";
 
-	static SceneManager* instance_;
+	// トランジション用
+	TransitionState transitionState_ = TransitionState::None;
+	float transitionTimer_ = 0.0f;
+	float transitionDuration_ = 1.2f; // 閉まる・開くそれぞれ1.2秒ずつ
+	
+	bool isShutterLoaded_ = false;
+	uint32_t shutterTex_ = 0;
+	uint32_t sparkTex_ = 0;
+
+	// ★フェード用パーティクル
+	struct ShutterParticle {
+		float x, y;
+		float vx, vy;
+		float life, maxLife;
+		float size;
+		float angle;
+		Vector4 color;
+		bool isSmoke;
+	};
+	std::vector<ShutterParticle> shutterParticles_;
 };
 
 } // namespace Engine
