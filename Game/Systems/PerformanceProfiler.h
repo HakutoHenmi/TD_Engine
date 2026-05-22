@@ -11,8 +11,11 @@
 #include <numeric>
 #include <Windows.h>
 #include <Psapi.h>
+#include <fstream>
+#include <iomanip>
 #include "../ObjectTypes.h"
 #include "../../externals/entt/entt.hpp"
+#include "../../Engine/ThirdParty/nlohmann/json.hpp"
 
 #ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
@@ -104,7 +107,10 @@ public:
 	bool enabled = true;  // P キーで切り替え
 	bool showOverlay = true;
 	bool showDetails = false;
-	bool logToDebugOutput = true;
+	bool logToDebugOutput = false;
+	bool enableJsonLogging = false; // ★追加: JSONファイルへの詳細記録
+	std::string jsonLogFilePath = "PerformanceLog.jsonl"; // JSON Linesフォーマット
+	std::vector<nlohmann::json> jsonFrameBuffer;
 
 	std::vector<SystemTiming> systemTimings;
 	EntityStats entityStats;
@@ -284,6 +290,85 @@ public:
 				frameStats.pendingDestroyMs);
 			OutputDebugStringA(buf2);
 		}
+
+		// ★追加: 詳細なJSONロギング (毎フレーム記録し、バッファリングしてファイル出力)
+		if (enableJsonLogging) {
+			nlohmann::json frameJson;
+			frameJson["FrameCount"] = frameCount;
+			frameJson["dt_ms"] = frameStats.dt * 1000.0f;
+			frameJson["fps"] = frameStats.fps;
+			frameJson["Memory_MB"] = memoryMB;
+			frameJson["PeakMemory_MB"] = peakMemoryMB;
+			
+			// FrameStats (CPU・描画)
+			frameJson["FrameStats"]["totalUpdateMs"] = frameStats.totalUpdateMs;
+			frameJson["FrameStats"]["totalDrawMs"] = frameStats.totalDrawMs;
+			frameJson["FrameStats"]["totalDrawUIMs"] = frameStats.totalDrawUIMs;
+			frameJson["FrameStats"]["tagSyncMs"] = frameStats.tagSyncMs;
+			frameJson["FrameStats"]["animationMs"] = frameStats.animationMs;
+			frameJson["FrameStats"]["lightSystemMs"] = frameStats.lightSystemMs;
+			frameJson["FrameStats"]["particleUpdateMs"] = frameStats.particleUpdateMs;
+			frameJson["FrameStats"]["pendingDestroyMs"] = frameStats.pendingDestroyMs;
+			frameJson["FrameStats"]["matrixCacheClearMs"] = frameStats.matrixCacheClearMs;
+			
+			// Draw Breakdown
+			frameJson["DrawBreakdown"]["drawMeshLoopMs"] = frameStats.drawMeshLoopMs;
+			frameJson["DrawBreakdown"]["drawParticleMs"] = frameStats.drawParticleMs;
+			frameJson["DrawBreakdown"]["drawSystemMs"] = frameStats.drawSystemMs;
+			frameJson["DrawBreakdown"]["drawGizmoMs"] = frameStats.drawGizmoMs;
+			frameJson["DrawBreakdown"]["gpuPresentMs"] = frameStats.gpuPresentMs;
+			frameJson["DrawBreakdown"]["gpuWaitMs"] = frameStats.gpuWaitMs;
+			frameJson["DrawBreakdown"]["drawMeshCount"] = frameStats.drawMeshCount;
+			frameJson["DrawBreakdown"]["drawSkinnedCount"] = frameStats.drawSkinnedCount;
+			frameJson["DrawBreakdown"]["drawIteratedCount"] = frameStats.drawIteratedCount;
+			frameJson["DrawBreakdown"]["drawCulledCount"] = frameStats.drawCulledCount;
+			
+			// System Timings (ECSシステムの各実行時間)
+			for (auto& st : systemTimings) {
+				frameJson["SystemTimings"][st.name] = st.currentMs;
+			}
+			
+			// Entity Stats
+			frameJson["EntityStats"]["Total"] = entityStats.totalEntities;
+			frameJson["EntityStats"]["Transform"] = entityStats.withTransform;
+			frameJson["EntityStats"]["MeshRenderer"] = entityStats.withMeshRenderer;
+			frameJson["EntityStats"]["Script"] = entityStats.withScript;
+			frameJson["EntityStats"]["Rigidbody"] = entityStats.withRigidbody;
+			frameJson["EntityStats"]["BoxCollider"] = entityStats.withBoxCollider;
+			frameJson["EntityStats"]["Health"] = entityStats.withHealth;
+			frameJson["EntityStats"]["Hitbox"] = entityStats.withHitbox;
+			frameJson["EntityStats"]["Hurtbox"] = entityStats.withHurtbox;
+			frameJson["EntityStats"]["Motion"] = entityStats.withMotion;
+			frameJson["EntityStats"]["Animator"] = entityStats.withAnimator;
+			frameJson["EntityStats"]["Particle"] = entityStats.withParticle;
+			
+			// Tags Breakdown
+			for(auto& [tagVal, count] : entityStats.tagCounts) {
+				frameJson["EntityStats"]["Tags"][std::to_string(tagVal)] = count;
+			}
+			
+			jsonFrameBuffer.push_back(frameJson);
+			
+			// 60フレーム(約1秒)ごとにファイルへ書き出し
+			if (jsonFrameBuffer.size() >= 60) {
+				FlushJsonLog();
+			}
+		}
+	}
+
+	void FlushJsonLog() {
+		if (jsonFrameBuffer.empty()) return;
+		// 追記モードで開く
+		std::ofstream ofs(jsonLogFilePath, std::ios::app);
+		if (ofs.is_open()) {
+			for (const auto& j : jsonFrameBuffer) {
+				// JSON Lines (JSONL) フォーマットとして改行区切りで出力 (インデントなしで1行にまとめる)
+				ofs << j.dump(-1) << "\n";
+			}
+		} else {
+			OutputDebugStringA("[PERF] Failed to open PerformanceLog.jsonl for writing.\n");
+		}
+		jsonFrameBuffer.clear();
 	}
 
 	// --- ImGui 表示 ---
@@ -447,13 +532,35 @@ public:
 				}
 			}
 
-			ImGui::Text("[P] Toggle | [O] Log:%s", logToDebugOutput ? "ON" : "OFF");
+			ImGui::Text("[P] Toggle | [O] Log:%s | [L] JSON Log:%s", 
+				logToDebugOutput ? "ON" : "OFF",
+				enableJsonLogging ? "REC" : "STOP");
+			if (enableJsonLogging) {
+				ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Recording to %s...", jsonLogFilePath.c_str());
+			}
 		}
 		ImGui::End();
 
 		// Oキーでログ出力切り替え
 		if (GetAsyncKeyState('O') & 1) {
 			logToDebugOutput = !logToDebugOutput;
+		}
+
+		// LキーでJSONファイル記録切り替え
+		if (GetAsyncKeyState('L') & 1) {
+			// キーリピート防止の簡易対策 (1回の判定で切り替える)
+			static bool L_pressed_last = false;
+			if (!L_pressed_last) {
+				enableJsonLogging = !enableJsonLogging;
+				if (!enableJsonLogging) {
+					// 停止時に残りのバッファをフラッシュ
+					FlushJsonLog();
+				}
+			}
+			L_pressed_last = true;
+		} else {
+			static bool L_pressed_last = false;
+			L_pressed_last = false;
 		}
 #endif
 	}

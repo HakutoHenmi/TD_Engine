@@ -142,8 +142,8 @@ public:
 		float time = 0.0f;
 		float noiseStrength = 0.0f;
 		float distortion = 0.0f;
-		float chromaShift = 0.0f;
-		float vignette = 0.3f;           // ★変更: デフォルトで軽いビネット有効
+		float damageVignette = 0.0f; // ★変更: chromaShiftをdamageVignetteに変更
+		float vignette = 0.3f;       // 黒ビネット
 		float scanline = 0.0f;
 		float san = 0.0f;
 
@@ -156,8 +156,8 @@ public:
 		float dofIntensity = 0.0f;       // DOFのぼかし強度 (互換用, 無効)
 
 		// ★追加: フォグパラメータ
-		float fogDensity = 0.012f;       // フォグ密度
-		float fogStart = 20.0f;          // フォグ開始距離
+		float fogDensity = 0.011f;       // ★修正: 0.010 -> 0.011
+		float fogStart = 30.0f;          // ★修正: 40.0 -> 30.0 (さらにもう少し手前に)
 		float fogEnd = 300.0f;           // フォグ終了距離
 		float fogHeightFalloff = 0.0f;   // 高さ減衰
 		Vector3 fogColor{0.3f, 0.32f, 0.35f}; // スモッグのかかった重苦しい鉛色 (暗い青灰色)

@@ -37,12 +37,12 @@ float4 main(float4 svpos : SV_POSITION, float2 uv : TEXCOORD0) : SV_TARGET
     float3 ddyPos = ddy(worldPos);
     float3 N = normalize(cross(ddxPos, ddyPos));
     
-    // SSAOパラメータ (★軽量化: 16 -> 8)
-    const int SAMPLES = 8; 
-    const float RADIUS = 0.6f;
-    const float BIAS = 0.005f;
-    const float NORMAL_BIAS = 0.08f;
-    const float INTENSITY = 2.8f; // サンプル数が減った分少し濃くする
+    // SSAOパラメータ (★接地感を出すため大幅に強化)
+    const int SAMPLES = 16; 
+    const float RADIUS = 1.5f;     // サンプリング半径を広げ、大きな暗がりを作る
+    const float BIAS = 0.01f;      // 微小な深度差を除外
+    const float NORMAL_BIAS = 0.03f; // 自己遮蔽防止（小さくして接地面に密着させる）
+    const float INTENSITY = 4.5f;  // 強度を上げて真っ黒に近い影を落とす
     
     float occlusion = 0.0f;
     
@@ -86,9 +86,9 @@ float4 main(float4 svpos : SV_POSITION, float2 uv : TEXCOORD0) : SV_TARGET
         }
     }
     
-    // 強調しつつ、真っ黒にならないよう制限
+    // 強調しつつ、真っ黒にならないよう制限 (ある程度の黒さは許容して重厚感を出す)
     occlusion = 1.0 - (occlusion / (float)SAMPLES) * INTENSITY;
-    occlusion = clamp(occlusion, 0.6f, 1.0f);
+    occlusion = clamp(occlusion, 0.1f, 1.0f);
     
     return float4(occlusion, occlusion, occlusion, 1.0f);
 }

@@ -98,7 +98,7 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	camera_.SetProjection(0.7854f, (float)Engine::WindowDX::kW / (float)Engine::WindowDX::kH, 0.1f, 1000.0f);
 	camera_.SetPosition(0, 2, -5);
 	camera_.SetRotation(0.2f, 0, 0);
-	renderer_->SetAmbientColor({0.4f, 0.4f, 0.45f});
+	renderer_->SetAmbientColor({0.15f, 0.15f, 0.2f}); // ★変更: 全体の環境光を下げ、影を暗くしてコントラストを高める
 	
 	// ★追加: デフォルトで絵画風（Painterly）ポストプロセスを有効にする
 	renderer_->SetPostEffect("Painterly");
@@ -634,7 +634,7 @@ void GameScene::Update() {
 		auto plView = registry_.view<PointLightComponent, TransformComponent>();
 		plView.each([&](auto, const PointLightComponent& pl, const TransformComponent& tc) {
 			if (pl.enabled && plCount < Engine::Renderer::kMaxPointLights) {
-				Engine::Vector3 pos = {tc.translate.x, tc.translate.y, tc.translate.z};
+				Engine::Vector3 pos = {tc.translate.x + pl.offset.x, tc.translate.y + pl.offset.y, tc.translate.z + pl.offset.z};
 				Engine::Vector3 color = {pl.color.x * pl.intensity, pl.color.y * pl.intensity, pl.color.z * pl.intensity};
 				Engine::Vector3 atten = {pl.atten.x, pl.atten.y, pl.atten.z};
 				renderer_->SetPointLight(plCount, pos, color, pl.range, atten, true);
@@ -1177,6 +1177,9 @@ void GameScene::Draw() {
 		if (rv.enabled && rv.meshHandle != 0) {
 			if (rv.textureHandle == 0 && !rv.texturePath.empty()) {
 				rv.textureHandle = renderer_->LoadTexture2D(rv.texturePath);
+				if (rv.textureHandle == 0) {
+					rv.texturePath.clear(); // ロード失敗時はパスを消去して再試行を防ぐ
+				}
 			}
 			Engine::Transform identity;
 			identity.translate = {0, 0, 0};
@@ -1572,7 +1575,7 @@ void GameScene::DrawLightGizmos() {
 	plView.each([&](auto entity, const PointLightComponent& pl, const TransformComponent& tc) {
 		if (!pl.enabled)
 			return;
-		Engine::Vector3 pos = {tc.translate.x, tc.translate.y, tc.translate.z};
+		Engine::Vector3 pos = {tc.translate.x + pl.offset.x, tc.translate.y + pl.offset.y, tc.translate.z + pl.offset.z};
 		bool isSelected = (selectedEntities_.find(entity) != selectedEntities_.end());
 		float alpha = isSelected ? 1.0f : 0.4f;
 

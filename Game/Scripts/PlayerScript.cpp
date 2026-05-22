@@ -91,7 +91,7 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 
 	// 必須コンポーネントを確実に付与・更新
 	auto& sTc = scene->GetRegistry().get_or_emplace<TransformComponent>(sword);
-	sTc.scale = { 0.45f, 0.40f, 3.2f }; // 大剣サイズ
+	sTc.scale = { 0.60f, 0.15f, 3.2f }; // 大剣サイズ
 
 	auto& sHierarchy = scene->GetRegistry().get_or_emplace<HierarchyComponent>(sword);
 	sHierarchy.parentId = entity; // プレイヤーの子にする
@@ -117,28 +117,28 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		float bsz = 3.2f;
 		if (index == 1) { // 横薙ぎ
 			clip.totalDuration = 0.7f;
-			clip.keyframes.push_back({0.00f, { 1.5f, 2.2f, -0.5f }, { 0.0f, 2.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
-			clip.keyframes.push_back({0.25f, { 1.8f, 2.0f, 0.0f }, { 0.0f, 1.8f, 0.0f }, { 0.45f, 0.40f, bsz + 0.5f }});
-			clip.keyframes.push_back({0.45f, { 0.0f, 2.0f, 2.5f }, { 0.0f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 1.2f }});
-			clip.keyframes.push_back({0.70f, {-2.2f, 1.8f, -0.8f }, { 0.0f, -2.2f, 0.0f }, { 0.45f, 0.40f, bsz }});
+			clip.keyframes.push_back({0.00f, { 1.5f, 2.2f, -0.5f }, { 0.0f, 2.0f, 0.0f }, { 0.60f, 0.15f, bsz }});
+			clip.keyframes.push_back({0.25f, { 1.8f, 2.0f, 0.0f }, { 0.0f, 1.8f, 0.0f }, { 0.60f, 0.15f, bsz + 0.5f }});
+			clip.keyframes.push_back({0.45f, { 0.0f, 2.0f, 2.5f }, { 0.0f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz + 1.2f }});
+			clip.keyframes.push_back({0.70f, {-2.2f, 1.8f, -0.8f }, { 0.0f, -2.2f, 0.0f }, { 0.60f, 0.15f, bsz }});
 		} else if (index == 2) { // 振り下ろし
 			clip.totalDuration = 0.8f;
-			clip.keyframes.push_back({0.00f, { 0.0f, 4.5f, -1.0f }, { -1.5f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
-			clip.keyframes.push_back({0.30f, { 0.0f, 4.8f, -0.5f }, { -1.8f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
-			clip.keyframes.push_back({0.50f, { 0.0f, 1.5f, 3.5f }, { 0.5f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 1.5f }});
-			clip.keyframes.push_back({0.80f, { 0.0f, 1.2f, 2.8f }, { 0.8f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
+			clip.keyframes.push_back({0.00f, { 0.0f, 4.5f, -1.0f }, { -1.5f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz }});
+			clip.keyframes.push_back({0.30f, { 0.0f, 4.8f, -0.5f }, { -1.8f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz }});
+			clip.keyframes.push_back({0.50f, { 0.0f, 1.5f, 3.5f }, { 0.5f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz + 1.5f }});
+			clip.keyframes.push_back({0.80f, { 0.0f, 1.2f, 2.8f }, { 0.8f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz }});
 		} else { // 飛翔大回転（前方に飛ばして戻す）
 			clip.totalDuration = 1.2f;
 			// 0.0s: 始動
-			clip.keyframes.push_back({0.00f, { 0.0f, 2.2f, 0.5f }, { 0.0f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
+			clip.keyframes.push_back({0.00f, { 0.0f, 2.2f, 0.5f }, { 0.0f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz }});
 			// 0.3s: 前方に射出開始 + 回転
-			clip.keyframes.push_back({0.30f, { 0.0f, 2.2f, 4.5f }, { 0.0f, 6.28f, 0.0f }, { 0.45f, 0.40f, bsz + 0.5f }});
+			clip.keyframes.push_back({0.30f, { 0.0f, 2.2f, 4.5f }, { 0.0f, 6.28f, 0.0f }, { 0.60f, 0.15f, bsz + 0.5f }});
 			// 0.6s: 最遠地点で激しく回転 (Boomerang Peak)
-			clip.keyframes.push_back({0.60f, { 0.0f, 2.2f, 7.5f }, { 0.0f, 12.56f, 0.0f }, { 0.45f, 0.40f, bsz + 1.0f }});
+			clip.keyframes.push_back({0.60f, { 0.0f, 2.2f, 7.5f }, { 0.0f, 12.56f, 0.0f }, { 0.60f, 0.15f, bsz + 1.0f }});
 			// 0.9s: 帰還開始
-			clip.keyframes.push_back({0.90f, { 0.0f, 2.2f, 3.5f }, { 0.0f, 18.84f, 0.0f }, { 0.45f, 0.40f, bsz + 0.5f }});
+			clip.keyframes.push_back({0.90f, { 0.0f, 2.2f, 3.5f }, { 0.0f, 18.84f, 0.0f }, { 0.60f, 0.15f, bsz + 0.5f }});
 			// 1.2s: キャッチ
-			clip.keyframes.push_back({1.20f, { -1.0f, 1.8f, -0.5f }, { 0.0f, 20.41f, 0.0f }, { 0.45f, 0.40f, bsz }});
+			clip.keyframes.push_back({1.20f, { -1.0f, 1.8f, -0.5f }, { 0.0f, 20.41f, 0.0f }, { 0.60f, 0.15f, bsz }});
 		}
 		sMotion.clips[name] = clip;
 	};
@@ -155,15 +155,15 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		float bsz = 3.2f;
 
 		// 0.0s: 溜め・溜め開放（身構える）
-		clip.keyframes.push_back({0.00f, { 0.0f, 1.5f, 0.0f }, { -0.5f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
+		clip.keyframes.push_back({0.00f, { 0.0f, 1.5f, 0.0f }, { -0.5f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz }});
 		// 0.2s: 跳躍開始（少し上へ、少し前へ）
-		clip.keyframes.push_back({0.20f, { 0.0f, 3.5f, 1.5f }, { -1.5f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 0.5f }});
+		clip.keyframes.push_back({0.20f, { 0.0f, 3.5f, 1.5f }, { -1.5f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz + 0.5f }});
 		// 0.45s: 空中ピーク（最大限に振りかぶる）
-		clip.keyframes.push_back({0.45f, { 0.0f, 6.0f, 3.5f }, { -2.8f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 1.0f }});
+		clip.keyframes.push_back({0.45f, { 0.0f, 6.0f, 3.5f }, { -2.8f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz + 1.0f }});
 		// 0.7s: 叩きつけ（最速で地面へ、前方に大きくリーチ）
-		clip.keyframes.push_back({0.70f, { 0.0f, 1.2f, 5.5f }, { 0.8f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz + 1.8f }});
+		clip.keyframes.push_back({0.70f, { 0.0f, 1.2f, 5.5f }, { 0.8f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz + 1.8f }});
 		// 1.1s: 着地硬直
-		clip.keyframes.push_back({1.10f, { 0.0f, 1.1f, 4.0f }, { 1.2f, 0.0f, 0.0f }, { 0.45f, 0.40f, bsz }});
+		clip.keyframes.push_back({1.10f, { 0.0f, 1.1f, 4.0f }, { 1.2f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz }});
 		
 		motion->clips[clip.name] = clip;
 	}
@@ -329,10 +329,10 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			auto params = renderer->GetPostProcessParams();
 			float rate = damageEffectTimer_ / DAMAGE_EFFECT_DURATION; // 1.0 -> 0.0
 			
-			// ビネット強度 (最大1.5)
-			params.vignette = rate * 1.5f;
-			// 色収差 (最大0.05)
-			params.chromaShift = rate * 0.05f;
+			// ビネット強度 (最大1.5) を赤色ビネットに変更
+			params.damageVignette = rate * 1.5f;
+			// 色収差は廃止されたのでコメントアウト
+			// params.chromaShift = rate * 0.05f;
 			
 			renderer->SetPostProcessParams(params);
 			renderer->SetPostProcessEnabled(true);
@@ -341,9 +341,8 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		// 演出終了時はパラメータをリセットし、現在のフェーズに合わせたポストプロセスに戻す
 		if (renderer) {
 			auto params = renderer->GetPostProcessParams();
-			if (params.vignette > 0.0f || params.chromaShift > 0.0f) {
-				params.vignette = 0.0f;
-				params.chromaShift = 0.0f;
+			if (params.damageVignette > 0.0f) {
+				params.damageVignette = 0.0f;
 				renderer->SetPostProcessParams(params);
 				
 				// ダメージ終了の瞬間に元の絵画風ポストプロセスに戻す
@@ -1148,9 +1147,9 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 	
 	if (!isAttacking_) {
 		// 非攻撃時は常に背中に背負う配置にする
-		swordTc.translate = { -0.3f, 1.2f, -0.6f };
-		swordTc.rotate = { DirectX::XMConvertToRadians(35.0f), 0.0f, DirectX::XMConvertToRadians(25.0f) };
-		swordTc.scale = { 0.45f, 0.40f, 3.2f }; // ★大剣サイズ
+		swordTc.translate = { 0.0f, 1.4f, -0.6f }; // 背中に密着しつつ少し離す
+		swordTc.rotate = { DirectX::XMConvertToRadians(-45.0f), DirectX::XMConvertToRadians(-90.0f), DirectX::XMConvertToRadians(-90.0f) }; // オイラー角順序を考慮した、完全な「平らに斜め背負い」の角度
+		swordTc.scale = { 0.60f, 0.15f, 3.2f }; // ★大剣サイズ (X:幅, Y:厚み, Z:長さ)
 
 		// ★MotionSystemによる待機中のスケール＆座標リセットを防ぐため、再生クリップを空にする
 		if (auto* motion = scene->GetRegistry().try_get<MotionComponent>(sword)) {
@@ -1294,6 +1293,11 @@ void PlayerScript::UpdateGun(entt::entity entity, GameScene* scene, float /*dt*/
 	if (gun == entt::null) return;
 
 	auto& gunTc = scene->GetRegistry().get<TransformComponent>(gun);
+	
+	// ★追加：ガンナーモードの時のみ銃を表示する
+	if (auto* mr = scene->GetRegistry().try_get<MeshRendererComponent>(gun)) {
+		mr->enabled = (playerType_ == PlayerType::Gun);
+	}
 	
 	if (isAiming_) {
 		// エイム時：しっかり構える（平行に、少し低く）

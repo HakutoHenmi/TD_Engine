@@ -748,9 +748,11 @@ void SkillTree::DrawNodes(Engine::Renderer* renderer, float screenW, float scree
 			isHovered = true;
 		}
 
-		Engine::Vector4 color;
+		Engine::Vector4 bgColor;
+		Engine::Vector4 iconColor = {1.0f, 1.0f, 1.0f, 1.0f}; // アイコン自体は本来の明るい色(白)を維持
+
 		if (node.unlocked) {
-			color = {0.2f, 0.85f, 0.3f, 1.0f};
+			bgColor = {0.2f, 0.85f, 0.3f, 1.0f}; // 解放済み：緑の枠
 		} else {
 			bool canUnlock = true;
 			if (node.parentId >= 0) {
@@ -765,21 +767,33 @@ void SkillTree::DrawNodes(Engine::Renderer* renderer, float screenW, float scree
 
 			if (canUnlock && skillPoints_ >= node.cost) {
 				if (isHovered) {
-					color = {1.0f, 0.9f, 0.3f, 1.0f};
+					bgColor = {1.0f, 0.9f, 0.3f, 1.0f}; // 解放可能(ホバー)：明るい黄色の枠
 				} else {
-					color = {0.8f, 0.7f, 0.2f, 0.9f};
+					bgColor = {0.8f, 0.7f, 0.2f, 0.9f}; // 解放可能：暗い黄色の枠
 				}
 			} else {
-				color = {0.3f, 0.3f, 0.3f, 0.7f};
+				bgColor = {0.3f, 0.3f, 0.3f, 0.7f}; // ロック中：灰色の枠
+				iconColor = {0.4f, 0.4f, 0.4f, 1.0f}; // ロック中のアイコンは暗くする
 			}
 		}
 
+		// ★追加: 状態を示すカラーを「背景の枠」として描画する
+		Engine::Renderer::SpriteDesc bgSprite;
+		bgSprite.x = nodeX - halfSize - 4.0f; // アイコンより少し大きくする
+		bgSprite.y = nodeY - halfSize - 4.0f;
+		bgSprite.w = kNodeSize + 8.0f;
+		bgSprite.h = kNodeSize + 8.0f;
+		bgSprite.color = bgColor;
+		// texPanel_ (または無地の白テクスチャ) を使って枠を描画
+		renderer->DrawSprite(texPanel_, bgSprite);
+
+		// ★修正: アイコン自体は本来の色(iconColor)で描画する
 		Engine::Renderer::SpriteDesc sprite;
 		sprite.x = nodeX - halfSize;
 		sprite.y = nodeY - halfSize;
 		sprite.w = kNodeSize;
 		sprite.h = kNodeSize;
-		sprite.color = color;
+		sprite.color = iconColor;
 
 		uint32_t textureHandle = 0;
 		if (node.textureHandle != 0) {

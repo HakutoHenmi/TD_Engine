@@ -166,14 +166,20 @@ float4 main(VSOutput input) : SV_TARGET
             {
                 float3 L = Lvec / max(d, 1e-5);
                 float att = AttenDist(pointLights[j].atten, d);
+                
+                // 境界で急に光が消えないよう滑らかにフェードアウト
+                float rangeFade = smoothstep(pointLights[j].range, pointLights[j].range * 0.2f, d);
+                att *= rangeFade;
 
                 // 角度によって完全に真っ暗になるのを防ぐためラップライティング
                 float NdotL = saturate(dot(N, L) * 0.8f + 0.2f);
                 float3 H = normalize(L + V);
-                float spec = pow(saturate(dot(N, H)), 32.0f);
+                
+                // ハイライトが床で一直線に伸びる不自然さを解消するため、PointLightのスペキュラを大きく抑える
+                float spec = pow(saturate(dot(N, H)), 16.0f); 
 
                 float3 diffuse = albedo * NdotL;
-                float3 specular = m_specular * spec;
+                float3 specular = m_specular * spec * 0.05f; // スペキュラ強度を大幅に落とす
 
                 finalColor += (diffuse + specular) * pointLights[j].color * att;
             }

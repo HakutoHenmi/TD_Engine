@@ -127,7 +127,7 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 			btn.isPressed = registry.get<UIButtonComponent>(btn.entity).isPressed;
 		}
 
-		// テクスチャの同期
+		// テクスチャと色の同期
 		if (registry.all_of<UIImageComponent>(btn.entity)) {
 			auto& img = registry.get<UIImageComponent>(btn.entity);
 			if (img.texturePath != btn.texturePath) {
@@ -135,6 +135,12 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 				if (scene->GetRenderer()) {
 					img.textureHandle = scene->GetRenderer()->LoadTexture2D(btn.texturePath);
 				}
+			}
+			// ★追加: DeleteButton の場合は明度を強制的に上げる（2.0倍の明るさ）
+			if (btn.name == "DeleteButton") {
+				img.color = {2.0f, 2.0f, 2.0f, 1.0f}; // RGBを2倍にブースト
+			} else {
+				img.color = {1.0f, 1.0f, 1.0f, 1.0f}; // 通常のボタンは等倍
 			}
 		}
 

@@ -12,15 +12,15 @@ cbuffer CBPost : register(b0)
 {
     float gTime;
     float gNoiseStrength;    // 未使用（互換用）
-    float gDistortion;      // 未使用（互換用）
-    float gChromaShift;     // 未使用（互換用）
-    float gVignette;
-    float gScanline;        // 未使用（互換用）
-    float gSan;             // グレースケール強度 (死亡演出用)
+    float gDistortion;       // 未使用（互換用）
+    float gDamageVignette;   // ダメージ用の赤色ビネット
+    float gVignette;         // 通常の黒色ビネット
+    float gScanline;         // 未使用（互換用）
+    float gSan;              // グレースケール強度 (死亡演出用)
     float gBloomIntensity;
-    float gDofFocusDist;    // 未使用（互換用）
-    float gDofFocusRange;   // 未使用（互換用）
-    float gDofIntensity;    // 未使用（互換用）
+    float gDofFocusDist;     // 未使用（互換用）
+    float gDofFocusRange;    // 未使用（互換用）
+    float gDofIntensity;     // 未使用（互換用）
 
     // フォグパラメータ
     float gFogDensity;
@@ -56,14 +56,28 @@ float LinearizeDepth(float rawDepth)
     return near * far / (far - rawDepth * (far - near));
 }
 
-// ビネット効果 (控えめ)
+// ビネット効果 (黒色ビネットとダメージ用赤色ビネットの合成)
 // =========================================================================
 float3 ApplyVignette(float3 color, float2 uv)
 {
-    if (gVignette <= 0.0f) return color;
     float2 d = uv - 0.5f;
-    float v = 1.0f - dot(d, d) * gVignette * 2.0f;
-    return color * saturate(v);
+    float distSq = dot(d, d);
+    
+    // 1. 通常の黒ビネット
+    if (gVignette > 0.0f) {
+        float v = saturate(1.0f - distSq * gVignette * 2.0f);
+        color *= v;
+    }
+    
+    // 2. ダメージ時の赤ビネット
+    if (gDamageVignette > 0.0f) {
+        float vDamage = saturate(1.0f - distSq * gDamageVignette * 2.0f);
+        float damageFactor = 1.0f - vDamage;
+        float3 bloodColor = float3(0.8f, 0.0f, 0.0f);
+        color = lerp(color, bloodColor, damageFactor * 0.7f);
+    }
+    
+    return color;
 }
 
 // =========================================================================
@@ -184,7 +198,7 @@ float4 main(float4 svpos : SV_POSITION, float2 uv : TEXCOORD0) : SV_TARGET
     float ssao = gSSAO.Sample(gSmp, uv).r;
     sceneColor *= ssao;
     
-    // 2. 距離フォグ (リニア空間で計算)
+    // 2. 距離フォグ (リニア空間で計算 + 満ち引きの動き)
     float rawDepth = gDepth.Sample(gSmp, uv).r;
     float linearDepth = LinearizeDepth(rawDepth);
     // フォグカラーもリニア空間として扱う
@@ -193,10 +207,33 @@ float4 main(float4 svpos : SV_POSITION, float2 uv : TEXCOORD0) : SV_TARGET
     
     if (gFogDensity > 0.0f) {
         float dist = max(linearDepth - gFogStart, 0.0f);
-        float fogFactor = 1.0f - exp(-(dist * gFogDensity) * (dist * gFogDensity));
-        fogFactor = saturate(fogFactor);
-        float3 fogColorExp = lerp(fogColorLinear, fogColorLinear * 1.2f, fogFactor);
-        sceneColor = lerp(sceneColor, fogColorExp, fogFactor);
+        
+        // 1. ベースフォグ（絶対に境目や奥の地平線を見せない、完全に静止したフォグ）
+        float baseFogFactor = 1.0f - exp(-(dist * gFogDensity) * (dist * gFogDensity));
+        
+        // 2. 動的フォグ（空間を漂うムラ成分）
+        float2 pseudoWorldXZ = float2(uv.x * 2.0f - 1.0f, 1.0f) * dist; 
+        
+        float spaceWave1 = sin(pseudoWorldXZ.x * 0.015f + gTime * 0.3f);
+        float spaceWave2 = cos(pseudoWorldXZ.y * 0.02f + gTime * 0.4f);
+        float spaceWave3 = sin((pseudoWorldXZ.x + pseudoWorldXZ.y) * 0.01f - gTime * 0.2f);
+        
+        float spatialVariation = (spaceWave1 + spaceWave2 + spaceWave3) / 3.0f;
+        spatialVariation = spatialVariation * 0.5f + 0.5f; // 0.0 〜 1.0
+        
+        float timeWave = sin(gTime * 0.5f) * 0.5f + 0.5f; 
+        
+        // ムラ成分によって「さらに濃くなる」だけの追加密度を計算
+        // （ベースより薄くなる＝晴れて境目が見える ことを防ぐため）
+        float extraDensity = gFogDensity * 0.7f * spatialVariation * timeWave;
+        float extraFogFactor = 1.0f - exp(-(dist * extraDensity) * (dist * extraDensity));
+        
+        // 3. ベースフォグと追加フォグを合成
+        // ベースの濃さを最低保証しつつ、ムラの部分だけ少し濃くなる
+        float finalFogFactor = saturate(baseFogFactor + extraFogFactor * 0.6f);
+        
+        float3 fogColorExp = lerp(fogColorLinear, fogColorLinear * 1.2f, finalFogFactor);
+        sceneColor = lerp(sceneColor, fogColorExp, finalFogFactor);
     }
     
     // 3. ブルーム合成 (リニア空間で加算)

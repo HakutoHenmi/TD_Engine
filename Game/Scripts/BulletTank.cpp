@@ -17,6 +17,7 @@ void BulletTank::Start(entt::entity entity, GameScene* scene) {
         light.color = {0.2f, 1.0f, 0.8f};
         light.range = 5.0f;
         light.intensity = 0.0f;
+        light.offset = {0.0f, 1.5f, 0.0f}; // ★ ライトを少し上にオフセット
     }
 }
 
@@ -30,18 +31,18 @@ void BulletTank::Update(entt::entity entity, GameScene* scene, float dt) {
 	// 呼吸するようなパルス発光 (ゆっくりと明滅)
 	float pulse = (std::sin(timer_ * 2.0f) * 0.5f) + 0.5f; // 0.0 ~ 1.0
 
-	// タンク自体をシアン系に明滅させる
+	// タンク自体をシアン系に明滅させる (HDRカラーにしてBloomを誘発)
 	if (registry.all_of<MeshRendererComponent>(entity)) {
 		auto& mesh = registry.get<MeshRendererComponent>(entity);
-		mesh.color.x = 0.3f + pulse * 0.2f;
-		mesh.color.y = 0.3f + pulse * 0.7f;
-		mesh.color.z = 0.3f + pulse * 0.7f;
+		mesh.color.x = (0.3f + pulse * 0.2f) * 3.0f;
+		mesh.color.y = (0.3f + pulse * 0.7f) * 3.0f;
+		mesh.color.z = (0.3f + pulse * 0.7f) * 3.0f;
 	}
 
 	// タンクの周囲を照らすライト
 	if (registry.all_of<PointLightComponent>(entity)) {
 		auto& light = registry.get<PointLightComponent>(entity);
-		light.intensity = 1.5f + pulse * 4.0f; // 1.5から5.5への明滅
+		light.intensity = 2.0f + pulse * 5.0f; // 床面にしっかり色が落ちるように強化
 		light.range = 8.0f;
 		light.color = {0.2f, 1.0f, 0.8f};
 	}
