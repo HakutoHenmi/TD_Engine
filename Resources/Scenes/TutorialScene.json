@@ -98,9 +98,9 @@
       "locked": false,
       "translate": [0.763783, 1.80906, -11.6188],
       "rotate": [0.785398, -14.043, 0.523599],
-      "scale": [0.15, 0.15, 1.8],
+      "scale": [1, 1, 1],
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "shaderName": "Default", "color": [0.9,0.9,0.9,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/sword/ken.obj", "texturePath": "Resources/Models/3Dmodel/sword/ken_tex.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
         {"type": "Tag", "enabled": true, "tag": "PlayerSword"},
         {"type": "Motion", "enabled": true, "activeClip": "Default", "clips": {
           "Combo1": {"totalDuration": 0.4, "loop": false, "keyframes": [

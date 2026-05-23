@@ -91,7 +91,7 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 
 	// 必須コンポーネントを確実に付与・更新
 	auto& sTc = scene->GetRegistry().get_or_emplace<TransformComponent>(sword);
-	sTc.scale = { 0.60f, 0.15f, 3.2f }; // 大剣サイズ
+	sTc.scale = { 1.0f, 1.0f, 1.0f }; // 剣サイズ
 
 	auto& sHierarchy = scene->GetRegistry().get_or_emplace<HierarchyComponent>(sword);
 	sHierarchy.parentId = entity; // プレイヤーの子にする
@@ -102,9 +102,10 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
 		auto& sMr = scene->GetRegistry().get_or_emplace<MeshRendererComponent>(sword);
-		sMr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
-		sMr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-		sMr.color = { 0.8f, 0.8f, 0.85f, 1.0f }; // 少し金属質なグレー
+		sMr.modelHandle = renderer->LoadObjMesh("Resources/Models/3Dmodel/sword/ken.obj");
+		sMr.textureHandle = renderer->LoadTexture2D("Resources/Models/3Dmodel/sword/ken_tex.png"); // ★直接テクスチャをロードして適用
+		sMr.shaderName = "Toon"; // ★デフォルトからToonシェーダーに変更して輪郭と陰影をくっきり見やすく！
+		sMr.color = { 1.2f, 1.2f, 1.2f, 1.0f }; // ★少し輝度をブーストして暗いステージでも存在感を出す
 		sMr.enabled = true;
 	}
 
@@ -114,31 +115,31 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		MotionComponent::MotionClip clip;
 		clip.name = name;
 		clip.loop = false;
-		float bsz = 3.2f;
+		float bsz = 1.3f; // スケールアップに合わせて1.3に変更
 		if (index == 1) { // 横薙ぎ
 			clip.totalDuration = 0.7f;
-			clip.keyframes.push_back({0.00f, { 1.5f, 2.2f, -0.5f }, { 0.0f, 2.0f, 0.0f }, { 0.60f, 0.15f, bsz }});
-			clip.keyframes.push_back({0.25f, { 1.8f, 2.0f, 0.0f }, { 0.0f, 1.8f, 0.0f }, { 0.60f, 0.15f, bsz + 0.5f }});
-			clip.keyframes.push_back({0.45f, { 0.0f, 2.0f, 2.5f }, { 0.0f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz + 1.2f }});
-			clip.keyframes.push_back({0.70f, {-2.2f, 1.8f, -0.8f }, { 0.0f, -2.2f, 0.0f }, { 0.60f, 0.15f, bsz }});
+			clip.keyframes.push_back({0.00f, { 0.6f, 1.8f, 0.4f }, { 0.0f, 0.0f, -1.57f }, { 1.3f, 1.3f, bsz }}); // 始動: 真右(Yaw=0.0f)
+			clip.keyframes.push_back({0.25f, { 0.7f, 1.8f, 0.6f }, { 0.0f, -0.78f, -1.57f }, { 1.3f, 1.3f, bsz + 0.5f }}); // 右前(Yaw=-0.78f)
+			clip.keyframes.push_back({0.45f, { 0.0f, 1.8f, 1.2f }, { 0.0f, -1.57f, -1.57f }, { 1.3f, 1.3f, bsz + 1.2f }}); // 真前を通る(Yaw=-1.57f)
+			clip.keyframes.push_back({0.70f, {-0.6f, 1.8f, 0.4f }, { 0.0f, -3.14f, -1.57f }, { 1.3f, 1.3f, bsz }}); // 真左で終了(Yaw=-3.14f)、正面を通る右から左の180度に修正
 		} else if (index == 2) { // 振り下ろし
 			clip.totalDuration = 0.8f;
-			clip.keyframes.push_back({0.00f, { 0.0f, 4.5f, -1.0f }, { -1.5f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz }});
-			clip.keyframes.push_back({0.30f, { 0.0f, 4.8f, -0.5f }, { -1.8f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz }});
-			clip.keyframes.push_back({0.50f, { 0.0f, 1.5f, 3.5f }, { 0.5f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz + 1.5f }});
-			clip.keyframes.push_back({0.80f, { 0.0f, 1.2f, 2.8f }, { 0.8f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz }});
+			clip.keyframes.push_back({0.00f, { 0.0f, 4.5f, -1.0f }, { -1.5f + 1.57f, 0.0f, 0.0f }, { 1.3f, 1.3f, bsz }});
+			clip.keyframes.push_back({0.30f, { 0.0f, 4.8f, -0.5f }, { -1.8f + 1.57f, 0.0f, 0.0f }, { 1.3f, 1.3f, bsz }});
+			clip.keyframes.push_back({0.50f, { 0.0f, 1.5f, 3.5f }, { 0.5f + 1.57f, 0.0f, 0.0f }, { 1.3f, 1.3f, bsz + 1.5f }});
+			clip.keyframes.push_back({0.80f, { 0.0f, 1.2f, 2.8f }, { 0.8f + 1.57f, 0.0f, 0.0f }, { 1.3f, 1.3f, bsz }});
 		} else { // 飛翔大回転（前方に飛ばして戻す）
 			clip.totalDuration = 1.2f;
 			// 0.0s: 始動
-			clip.keyframes.push_back({0.00f, { 0.0f, 2.2f, 0.5f }, { 0.0f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz }});
+			clip.keyframes.push_back({0.00f, { 0.0f, 2.2f, 0.5f },  { 0.0f, 0.0f, 1.57f }, { 1.3f, 1.3f, bsz }});
 			// 0.3s: 前方に射出開始 + 回転
-			clip.keyframes.push_back({0.30f, { 0.0f, 2.2f, 4.5f }, { 0.0f, 6.28f, 0.0f }, { 0.60f, 0.15f, bsz + 0.5f }});
+			clip.keyframes.push_back({0.30f, { 0.0f, 2.2f, 4.5f },  { 0.0f, 6.28f, 1.57f }, { 1.3f, 1.3f, bsz + 0.5f }});
 			// 0.6s: 最遠地点で激しく回転 (Boomerang Peak)
-			clip.keyframes.push_back({0.60f, { 0.0f, 2.2f, 7.5f }, { 0.0f, 12.56f, 0.0f }, { 0.60f, 0.15f, bsz + 1.0f }});
+			clip.keyframes.push_back({0.60f, { 0.0f, 2.2f, 7.5f },  { 0.0f, 12.56f, 1.57f }, { 1.3f, 1.3f, bsz + 1.0f }});
 			// 0.9s: 帰還開始
-			clip.keyframes.push_back({0.90f, { 0.0f, 2.2f, 3.5f }, { 0.0f, 18.84f, 0.0f }, { 0.60f, 0.15f, bsz + 0.5f }});
+			clip.keyframes.push_back({0.90f, { 0.0f, 2.2f, 3.5f },  { 0.0f, 18.84f, 1.57f }, { 1.3f, 1.3f, bsz + 0.5f }});
 			// 1.2s: キャッチ
-			clip.keyframes.push_back({1.20f, { -1.0f, 1.8f, -0.5f }, { 0.0f, 20.41f, 0.0f }, { 0.60f, 0.15f, bsz }});
+			clip.keyframes.push_back({1.20f, { -1.0f, 1.8f, -0.5f }, { 0.0f, 20.41f, 1.57f }, { 1.3f, 1.3f, bsz }});
 		}
 		sMotion.clips[name] = clip;
 	};
@@ -152,18 +153,18 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		clip.name = "SwordChargeAttack";
 		clip.totalDuration = 1.1f;
 		clip.loop = false;
-		float bsz = 3.2f;
+		float bsz = 1.3f; // スケールアップに合わせて1.3に変更
 
 		// 0.0s: 溜め・溜め開放（身構える）
-		clip.keyframes.push_back({0.00f, { 0.0f, 1.5f, 0.0f }, { -0.5f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz }});
+		clip.keyframes.push_back({0.00f, { 0.0f, 1.5f, 0.0f }, { -0.5f + 1.57f, 0.0f, 0.0f }, { 1.3f, 1.3f, bsz }});
 		// 0.2s: 跳躍開始（少し上へ、少し前へ）
-		clip.keyframes.push_back({0.20f, { 0.0f, 3.5f, 1.5f }, { -1.5f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz + 0.5f }});
+		clip.keyframes.push_back({0.20f, { 0.0f, 3.5f, 1.5f }, { -1.5f + 1.57f, 0.0f, 0.0f }, { 1.3f, 1.3f, bsz + 0.5f }});
 		// 0.45s: 空中ピーク（最大限に振りかぶる）
-		clip.keyframes.push_back({0.45f, { 0.0f, 6.0f, 3.5f }, { -2.8f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz + 1.0f }});
+		clip.keyframes.push_back({0.45f, { 0.0f, 6.0f, 3.5f }, { -2.8f + 1.57f, 0.0f, 0.0f }, { 1.3f, 1.3f, bsz + 1.0f }});
 		// 0.7s: 叩きつけ（最速で地面へ、前方に大きくリーチ）
-		clip.keyframes.push_back({0.70f, { 0.0f, 1.2f, 5.5f }, { 0.8f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz + 1.8f }});
+		clip.keyframes.push_back({0.70f, { 0.0f, 1.2f, 5.5f }, { 0.8f + 1.57f, 0.0f, 0.0f }, { 1.3f, 1.3f, bsz + 1.8f }});
 		// 1.1s: 着地硬直
-		clip.keyframes.push_back({1.10f, { 0.0f, 1.1f, 4.0f }, { 1.2f, 0.0f, 0.0f }, { 0.60f, 0.15f, bsz }});
+		clip.keyframes.push_back({1.10f, { 0.0f, 1.1f, 4.0f }, { 1.2f + 1.57f, 0.0f, 0.0f }, { 1.3f, 1.3f, bsz }});
 		
 		motion->clips[clip.name] = clip;
 	}
@@ -1147,9 +1148,10 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 	
 	if (!isAttacking_) {
 		// 非攻撃時は常に背中に背負う配置にする
-		swordTc.translate = { 0.0f, 1.4f, -0.6f }; // 背中に密着しつつ少し離す
-		swordTc.rotate = { DirectX::XMConvertToRadians(-45.0f), DirectX::XMConvertToRadians(-90.0f), DirectX::XMConvertToRadians(-90.0f) }; // オイラー角順序を考慮した、完全な「平らに斜め背負い」の角度
-		swordTc.scale = { 0.60f, 0.15f, 3.2f }; // ★大剣サイズ (X:幅, Y:厚み, Z:長さ)
+		swordTc.translate = { 1.5f, 4.8f, -1.5f }; // ★さらに微調整で右へ動かすため、Xを1.5fに変更
+		// Y軸回転を90度にしたことで逆になった傾きを正すため, X軸の回転を 30度 に変更
+		swordTc.rotate = { DirectX::XMConvertToRadians(30.0f), DirectX::XMConvertToRadians(90.0f), DirectX::XMConvertToRadians(180.0f) };
+		swordTc.scale = { 1.3f, 1.3f, 1.3f }; // ★剣サイズを1.3倍に拡大
 
 		// ★MotionSystemによる待機中のスケール＆座標リセットを防ぐため、再生クリップを空にする
 		if (auto* motion = scene->GetRegistry().try_get<MotionComponent>(sword)) {
@@ -1245,12 +1247,24 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 		hitboxActive = scene->GetRegistry().get<HitboxComponent>(sword).isActive;
 	}
 
+	// ★追加：攻撃中の剣のダイナミック自発光エフェクト（青白くネオン発光）
+	if (scene->GetRegistry().all_of<MeshRendererComponent>(sword)) {
+		auto& sMr = scene->GetRegistry().get<MeshRendererComponent>(sword);
+		if (isAttacking_) {
+			// 攻撃中は青白く美しく発光（HDRによるブルーム効果で光り溢れます）
+			sMr.color = { 1.5f, 2.2f, 3.2f, 1.0f }; 
+		} else {
+			// 通常時はToonかつほんのり微発光
+			sMr.color = { 1.2f, 1.2f, 1.2f, 1.0f };
+		}
+	}
+
 	if (isAttacking_ && hitboxActive) {
 		Engine::Matrix4x4 worldMat = scene->GetWorldMatrix((int)sword);
 		DirectX::XMMATRIX m = DirectX::XMLoadFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&worldMat));
 		float bladeLen = 3.2f; // ★大剣の長さに合わせる
-		DirectX::XMVECTOR basePos = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(0, 0, -bladeLen*0.1f, 1), m);
-		DirectX::XMVECTOR tipPos = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(0, 0, bladeLen*0.9f, 1), m);
+		DirectX::XMVECTOR basePos = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(0, -bladeLen*0.1f, 0, 1), m); // 大剣モデル本来の長手方向であるY軸を使用
+		DirectX::XMVECTOR tipPos = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(0, bladeLen*0.9f, 0, 1), m);
 
 		TrailPoint tp;
 		DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&tp.base), basePos);
