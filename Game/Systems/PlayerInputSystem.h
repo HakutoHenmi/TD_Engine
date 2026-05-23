@@ -10,8 +10,9 @@ class PlayerInputSystem : public ISystem {
 public:
 	void Update(entt::registry& registry, GameContext& ctx) override {
 		if (!ctx.isPlaying) return;
-		// ★追加: エディタUI操作中はゲーム入力を無視
+		// ★追加: エディタUI操作中やインサート演出中はゲーム入力を無視
 		if (ctx.input && ctx.input->IsGameInputBlocked()) return;
+		if (Game::PhaseSystemScript::IsPhase() == Game::PhaseSystemScript::InsertPhase) return;
 
 		auto view = registry.view<PlayerInputComponent>();
 		for (auto entity : view) {
@@ -44,10 +45,14 @@ public:
 				// 攻撃入力
 				pi.attackRequested = input->Down(DIK_J);
 
-				// ★追加: Shiftダッシュ入力
+				// Shiftダッシュ入力
 				pi.sprintRequested = input->Down(DIK_LSHIFT);
-				// 準備フェーズ中はShiftキーの影響を受けないようにする
+
+				// ★追加: 準備フェーズ中は移動・攻撃等のキャラクターアクション入力をすべて無効化する（視点操作以外）
 				if (PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase) {
+					pi.moveDir = {0.0f, 0.0f};
+					pi.jumpRequested = false;
+					pi.attackRequested = false;
 					pi.sprintRequested = false;
 				}
 
