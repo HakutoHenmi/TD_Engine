@@ -93,6 +93,7 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	eventSystem_.Clear(); // ★追加: イベントリスナーをクリア
 	WaveManagement::ResetState(); // ★追加: ゲーム状態を完全にリセット
 	playTime_ = 0.0f;
+	stagePath_ = params.stagePath;
 	camera_.Initialize();
 	// ★追加: 明示的にプロジェクションを設定 (1920x1080のアスペクト比)
 	camera_.SetProjection(0.7854f, (float)Engine::WindowDX::kW / (float)Engine::WindowDX::kH, 0.1f, 1000.0f);
@@ -138,11 +139,13 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 			OutputDebugStringA(("[GameScene] Restoring from global snapshot for " + scenePath + "...\n").c_str());
 			EditorUI::LoadFromMemory(this, sm->GetGlobalSnapshot());
 			EditorUI::currentScenePath = sm->GetGlobalScenePath();
+			stagePath_ = sm->GetGlobalScenePath();
 			sceneSnapshot_ = sm->GetGlobalSnapshot(); // 現在のスナップショットとして保持
 			loaded = true;
 		} else if (std::filesystem::exists(Engine::PathUtils::FromUTF8(scenePath))) {
 			OutputDebugStringA(("[GameScene] " + scenePath + " found. Loading...\n").c_str());
 			EditorUI::LoadScene(this, scenePath);
+			stagePath_ = scenePath;
 			sceneSnapshot_ = EditorUI::SaveToMemory(this); // ★追加: 初期ロード直後の状態を保存
 			loaded = true;
 		} else {
@@ -480,6 +483,7 @@ void GameScene::Update() {
 			res.isWin = win;
 			res.score = win ? 1500 : 300;
 			res.clearTime = playTime_;
+			ResultManagerScript::pendingOriginalScene = stagePath_;
 			Engine::SceneManager::GetInstance()->RequestChange("Result", res);
 			isPlaying_ = false;
 			// 修正: 即座に return せず、以降のガード (!isPlaying_) でシステムをスキップさせつつ、

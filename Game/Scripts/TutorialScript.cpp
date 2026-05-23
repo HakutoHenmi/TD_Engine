@@ -11,6 +11,7 @@
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
 #include "WaveManagement.h"
+#include "ResultManagerScript.h"
 #include <cfloat>
 #include <cmath>
 #include <fstream>
@@ -486,6 +487,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
             res.isWin = true;
             res.score = 99999;
             res.clearTime = 0.0f;
+            ResultManagerScript::pendingOriginalScene = scene->GetStagePath();
 			// シーンマネージャーを使って、パラメータと共に「Result」シーンへの切り替えを要求します
             Engine::SceneManager::GetInstance()->RequestChange("Result", res);
         }

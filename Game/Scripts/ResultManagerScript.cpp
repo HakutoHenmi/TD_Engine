@@ -65,7 +65,7 @@ void ResultManagerScript::Update(entt::entity entity, GameScene* scene, float dt
 					return;
 				} else if (name == "ToRetryButton") {
 					Engine::SceneParameters p;
-					p.stagePath = "Resources/Scenes/tesuto_light.json";
+					p.stagePath = originalScene_;
 					p.sceneName = "Game";
 					Engine::SceneManager::GetInstance()->RequestChange("Game", p);
 					return;

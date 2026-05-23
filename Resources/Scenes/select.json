@@ -29,10 +29,10 @@
       "scale": [1, 1, 1],
       "components": [
         {"type": "Tag", "enabled": true, "tag": "Default"},
-        {"type": "Variable", "enabled": true, "values": {}, "strings": {"Path": "Resources/Scenes/PhaseSystem.json"}},
-        {"type": "RectTransform", "enabled": true, "pos": [0,-82.9258], "size": [500,60], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "Variable", "enabled": true, "values": {}, "strings": {"Path": "Resources/Scenes/TutorialScene.json"}},
+        {"type": "RectTransform", "enabled": true, "pos": [0,-120.0], "size": [500,60], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIText", "enabled": true, "text": "チュートリアルステージ", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
+        {"type": "UIText", "enabled": true, "text": "チュートリアル", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
         {"type": "UIButton", "enabled": true, "normalColor": [0.25,0.25,0.35,1], "hoverColor": [0.4,0.4,0.6,1], "pressedColor": [0.15,0.15,0.25,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
@@ -46,10 +46,27 @@
       "scale": [1, 1, 1],
       "components": [
         {"type": "Tag", "enabled": true, "tag": "Default"},
-        {"type": "Variable", "enabled": true, "values": {}, "strings": {"Path": "Resources/Scenes/PhaseSystem.json"}},
-        {"type": "RectTransform", "enabled": true, "pos": [0,158.646], "size": [500,60], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "Variable", "enabled": true, "values": {}, "strings": {"Path": "Resources/Scenes/Stage1.json"}},
+        {"type": "RectTransform", "enabled": true, "pos": [0,0.0], "size": [500,60], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIText", "enabled": true, "text": "ステージ 1", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
+        {"type": "UIButton", "enabled": true, "normalColor": [0.25,0.25,0.35,1], "hoverColor": [0.4,0.4,0.6,1], "pressedColor": [0.15,0.15,0.25,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+      ]
+    },
+    {
+      "id": 1048578,
+      "parentId": 4294967295,
+      "name": "StageButton_2",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Tag", "enabled": true, "tag": "Default"},
+        {"type": "Variable", "enabled": true, "values": {}, "strings": {"Path": "Resources/Scenes/Stage2.json"}},
+        {"type": "RectTransform", "enabled": true, "pos": [0,120.0], "size": [500,60], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIText", "enabled": true, "text": "ステージ 2", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
         {"type": "UIButton", "enabled": true, "normalColor": [0.25,0.25,0.35,1], "hoverColor": [0.4,0.4,0.6,1], "pressedColor": [0.15,0.15,0.25,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
