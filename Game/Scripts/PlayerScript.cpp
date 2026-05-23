@@ -186,16 +186,17 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 	scene->SetTag(gun, TagType::Player); // ★追加: RayCastの地形判定から除外するためプレイヤー属性を付与
 
 	auto& gTc = scene->GetRegistry().get_or_emplace<TransformComponent>(gun);
-	gTc.scale = { 0.1f, 0.1f, 0.8f };
+	gTc.scale = { 2.2f, 2.2f, 2.2f }; // ピストルを大きく表示
 
 	auto& gHierarchy = scene->GetRegistry().get_or_emplace<HierarchyComponent>(gun);
 	gHierarchy.parentId = entity;
 
 	if (renderer) {
 		auto& gMr = scene->GetRegistry().get_or_emplace<MeshRendererComponent>(gun);
-		gMr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
-		gMr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-		gMr.color = { 0.2f, 0.2f, 0.2f, 1.0f };
+		gMr.modelHandle = renderer->LoadObjMesh("Resources/Models/3Dmodel/pistol/pistol.obj");
+		gMr.textureHandle = renderer->LoadTexture2D("Resources/Models/3Dmodel/pistol/pistol.png");
+		gMr.shaderName = "Toon"; // トゥーンシェーダーで輪郭と陰影をくっきり表示
+		gMr.color = { 1.0f, 1.0f, 1.0f, 1.0f }; // テクスチャ本来の色を表示するため白色に変更
 		gMr.enabled = true;
 	}
 
@@ -379,19 +380,27 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		}
 	}
 
-	bool currentSwitchKeyDown = (GetAsyncKeyState('T') & 0x8000) != 0;
-	if (currentSwitchKeyDown && !prevPlayerSwitchKeyDown_) {
-		SwitchPlayerType(entity, scene);
-	}
-	prevPlayerSwitchKeyDown_ = currentSwitchKeyDown;
-
-	bool currentSkillKeyDown = (GetAsyncKeyState('E') & 0x8000) != 0;
-	if (currentSkillKeyDown && !prevSkillKeyDown_) {
-		ExecuteSkill(entity, scene);
-	}
-	prevSkillKeyDown_ = currentSkillKeyDown;
-
 	isPrep = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase);
+	bool isInsert = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::InsertPhase);
+
+	// ★追加: インサート中や準備フェーズ中は武器の切り替えやスキル発動を無効化
+	if (!isPrep && !isInsert) {
+		bool currentSwitchKeyDown = (GetAsyncKeyState('T') & 0x8000) != 0;
+		if (currentSwitchKeyDown && !prevPlayerSwitchKeyDown_) {
+			SwitchPlayerType(entity, scene);
+		}
+		prevPlayerSwitchKeyDown_ = currentSwitchKeyDown;
+
+		bool currentSkillKeyDown = (GetAsyncKeyState('E') & 0x8000) != 0;
+		if (currentSkillKeyDown && !prevSkillKeyDown_) {
+			ExecuteSkill(entity, scene);
+		}
+		prevSkillKeyDown_ = currentSkillKeyDown;
+	} else {
+		prevPlayerSwitchKeyDown_ = false;
+		prevSkillKeyDown_ = false;
+	}
+
 	static bool s_wasPrep = true;
 
 	if (isPrep && !s_wasPrep) {
@@ -443,7 +452,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	
 	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
 
-	if (!isPrep) {
+	if (!isPrep && !isInsert) {
 		// ★追加: スチーム・ブースト（剣士モード専用の高速回避）
 		bool currentDashKeyDown = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
 		if (currentDashKeyDown && !prevDashKeyDown_ && playerType_ == PlayerType::Sword) {
@@ -543,7 +552,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		}
 
 		bool currentRightClickDown = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
-		if (playerType_ == PlayerType::Gun && !isPrep) {
+		if (playerType_ == PlayerType::Gun && !isPrep && !isInsert) {
 			if (currentRightClickDown && !prevRightClickDown_) {
 				if (isFlying_) {
 					isFlying_ = false;
@@ -612,7 +621,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	}
 
-	if (isPrep) {
+	if (isPrep || isInsert) {
 		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) scene->GetRegistry().get<CameraTargetComponent>(entity).enabled = false;
 		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))  scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = false;
 
@@ -1315,11 +1324,11 @@ void PlayerScript::UpdateGun(entt::entity entity, GameScene* scene, float /*dt*/
 	
 	if (isAiming_) {
 		// エイム時：しっかり構える（平行に、少し低く）
-		gunTc.translate = { 0.6f, 2.0f, 1.0f }; // ★Y軸オフセットを+1.0
+		gunTc.translate = { 0.6f, 2.0f, 2.0f }; // ★Z軸(前方向)を+1.0して前に出す
 		gunTc.rotate = { 0.0f, 0.0f, 0.0f };
 	} else {
 		// 非エイム時：腰だめ（平行に、もっと低く）
-		gunTc.translate = { 0.8f, 1.7f, 0.6f }; // ★Y軸オフセットを+1.0
+		gunTc.translate = { 0.8f, 1.7f, 1.8f }; // ★Z軸(前方向)を+1.2して前に出す
 		gunTc.rotate = { 0.0f, 0.0f, 0.0f }; // 地面と平行に
 	}
 
@@ -1343,8 +1352,8 @@ void PlayerScript::UpdateGun(entt::entity entity, GameScene* scene, float /*dt*/
 
 		// 360度自然に構えるために、銃のローカル座標も旋回させる（プレイヤーを中心に公転）
 		float offsetX = 0.8f;
-		float offsetY = 1.7f; // ★Y軸オフセットを+1.0
-		float offsetZ = 0.6f;
+		float offsetY = 1.7f; 
+		float offsetZ = 1.8f; // ★Z軸を前に出してめり込み防止
 		
 		float cy = std::cos(localYaw);
 		float sy = std::sin(localYaw);
@@ -1363,7 +1372,7 @@ void PlayerScript::UpdateGun(entt::entity entity, GameScene* scene, float /*dt*/
 		gunTc.rotate.x = targetPitch;
 	}
 
-	gunTc.scale = { 0.15f, 0.15f, 1.2f }; 
+	gunTc.scale = { 2.2f, 2.2f, 2.2f }; // ピストルのアスペクト比を維持しつつ大きく表示
 }
 
 void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float dt) {

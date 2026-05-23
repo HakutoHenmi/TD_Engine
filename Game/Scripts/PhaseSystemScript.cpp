@@ -136,10 +136,26 @@ bool TryGetPlacementSurfaceYAt(GameScene* scene, float x, float z, float& outY) 
 
 void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	(void)entity;
-	(void)scene;
-	isPhase_ = PreparationPhase;
-	NextPhase_ = PreparationPhase;
-	preIsPhase_ = PreparationPhase;
+	
+	// チュートリアルシーン以外ならインサートカメラ演出から開始
+	bool isTutorial = false;
+	if (scene) {
+		const auto& path = scene->GetStagePath();
+		if (path.find("Tutorial") != std::string::npos || path.find("tutorial") != std::string::npos) {
+			isTutorial = true;
+		}
+	}
+
+	if (!isTutorial) {
+		isPhase_ = InsertPhase;
+		NextPhase_ = InsertPhase;
+		preIsPhase_ = InsertPhase;
+	} else {
+		isPhase_ = PreparationPhase;
+		NextPhase_ = PreparationPhase;
+		preIsPhase_ = PreparationPhase;
+	}
+
 	currentPhase_ = 0;
 	CoinCount = StartCoinCount_;
 
@@ -153,6 +169,14 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 
 	enemyCountUI_ = entt::null;
 	installationCostUI_ = entt::null;
+	
+	// インサートカメラ変数の初期化
+	isInsertInitialized_ = false;
+	currentWaypointIndex_ = 0;
+	waypointTime_ = 0.0f;
+	skipHoldTime_ = 0.0f;
+	skipPromptUI_ = entt::null;
+	skipProgressUI_ = entt::null;
 
 	// キー入力の初期化
 	preKeyP_ = false;
@@ -193,8 +217,12 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 
 void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	(void)entity;
-	(void)scene;
-	(void)dt;
+	
+	if (isPhase_ == InsertPhase) {
+		UpdateInsertPhase(scene, dt);
+		return;
+	}
+
 	auto* input = Engine::Input::GetInstance();
 	if (!input)
 		return;
@@ -1311,6 +1339,275 @@ void PhaseSystemScript::OnEditorUI() {
 }
 
 void PhaseSystemScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
+
+void PhaseSystemScript::InitializeInsertPhase(GameScene* scene) {
+	if (isInsertInitialized_) return;
+
+	insertWaypoints_.clear();
+
+	// 1. コアと最初のスポナーの座標を検索
+	DirectX::XMFLOAT3 corePos = {0.0f, 0.0f, 0.0f};
+	auto coreObj = scene->FindObjectByName("Core");
+	if (scene->GetRegistry().valid(coreObj) && scene->GetRegistry().all_of<TransformComponent>(coreObj)) {
+		auto& tc = scene->GetRegistry().get<TransformComponent>(coreObj);
+		corePos = {tc.translate.x, tc.translate.y, tc.translate.z};
+	}
+
+	DirectX::XMFLOAT3 spawnerPos = {25.0f, 0.0f, 25.0f}; // フォールバック値
+	auto spawnerObj = scene->FindObjectByName("Spawner_W1_1");
+	if (!scene->GetRegistry().valid(spawnerObj)) {
+		// スポナー名に "Spawner" が入っているものを探す
+		auto view = scene->GetRegistry().view<NameComponent, TransformComponent>();
+		for (auto e : view) {
+			const auto& name = view.get<NameComponent>(e).name;
+			if (name.find("Spawner") != std::string::npos) {
+				auto& tc = view.get<TransformComponent>(e);
+				spawnerPos = {tc.translate.x, tc.translate.y, tc.translate.z};
+				break;
+			}
+		}
+	} else if (scene->GetRegistry().all_of<TransformComponent>(spawnerObj)) {
+		auto& tc = scene->GetRegistry().get<TransformComponent>(spawnerObj);
+		spawnerPos = {tc.translate.x, tc.translate.y, tc.translate.z};
+	}
+
+	// 2. カメラの現在位置・回転を保存
+	auto& camera = scene->GetCamera();
+	originalCameraPos_ = {camera.Position().x, camera.Position().y, camera.Position().z};
+	originalCameraRot_ = {camera.Rotation().x, camera.Rotation().y, camera.Rotation().z};
+
+	// 3. ウェイポイントの構築 (コア -> 鳥瞰 -> スポナー -> 元に戻る)
+	// WP0: コアを見下ろす視点 (開始)
+	insertWaypoints_.push_back({
+		{corePos.x, corePos.y + 12.0f, corePos.z - 20.0f},
+		{0.45f, 0.0f, 0.0f}, // Pitch 25度下向き
+		3.5f
+	});
+
+	// WP1: ステージ全体を見下ろす鳥瞰視点
+	insertWaypoints_.push_back({
+		{corePos.x, corePos.y + 40.0f, corePos.z - 45.0f},
+		{0.7f, 0.0f, 0.0f}, // Pitch 40度下向き
+		4.0f
+	});
+
+	// WP2: 最初の敵出現地点（スポナー）にクローズアップする視点
+	insertWaypoints_.push_back({
+		{spawnerPos.x, spawnerPos.y + 8.0f, spawnerPos.z - 15.0f},
+		{0.4f, 0.0f, 0.0f}, // Pitch 22度下向き
+		4.0f
+	});
+
+	// WP3: プレイヤー操作開始位置にスムーズに戻る
+	insertWaypoints_.push_back({
+		{corePos.x, corePos.y + 25.0f, corePos.z - 25.0f},
+		{0.5f, 0.0f, 0.0f},
+		2.0f
+	});
+
+	currentWaypointIndex_ = 0;
+	waypointTime_ = 0.0f;
+	skipHoldTime_ = 0.0f;
+
+	// 4. スキップ案内UIを生成
+	CreateSkipUI(scene);
+
+	// 演出中はカーソルを非表示
+	while (ShowCursor(FALSE) >= 0);
+
+	// 5. インサート演出中の不要な入力と追従を無効化する
+	auto player = scene->FindObjectByName("Player");
+	if (scene->GetRegistry().valid(player) && scene->GetRegistry().all_of<PlayerInputComponent>(player)) {
+		scene->GetRegistry().get<PlayerInputComponent>(player).enabled = false;
+	}
+	auto prepCam = scene->FindObjectByName("PreparationCamera");
+	if (scene->GetRegistry().valid(prepCam)) {
+		if (scene->GetRegistry().all_of<PlayerInputComponent>(prepCam)) {
+			scene->GetRegistry().get<PlayerInputComponent>(prepCam).enabled = false;
+		}
+		if (scene->GetRegistry().all_of<CameraTargetComponent>(prepCam)) {
+			scene->GetRegistry().get<CameraTargetComponent>(prepCam).enabled = false;
+		}
+	}
+
+	isInsertInitialized_ = true;
+}
+
+void PhaseSystemScript::UpdateInsertPhase(GameScene* scene, float dt) {
+	auto* input = Engine::Input::GetInstance();
+	if (!input) return;
+
+	if (!isInsertInitialized_) {
+		InitializeInsertPhase(scene);
+	}
+
+	// Sキー長押しでスキップ
+	bool isHoldingSkip = input->Down(DIK_S) || (GetAsyncKeyState('S') & 0x8000);
+	if (isHoldingSkip) {
+		skipHoldTime_ += dt;
+	} else {
+		skipHoldTime_ = 0.0f;
+	}
+
+	UpdateSkipUIProgress(scene);
+
+	if (skipHoldTime_ >= 1.0f || currentWaypointIndex_ >= (int)insertWaypoints_.size()) {
+		EndInsertPhase(scene);
+		return;
+	}
+
+	auto& camera = scene->GetCamera();
+	const auto& target = insertWaypoints_[currentWaypointIndex_];
+
+	DirectX::XMFLOAT3 startPos = originalCameraPos_;
+	DirectX::XMFLOAT3 startRot = originalCameraRot_;
+	if (currentWaypointIndex_ > 0) {
+		startPos = insertWaypoints_[currentWaypointIndex_ - 1].position;
+		startRot = insertWaypoints_[currentWaypointIndex_ - 1].rotation;
+	}
+
+	waypointTime_ += dt;
+	float t = waypointTime_ / target.duration;
+	if (t > 1.0f) t = 1.0f;
+
+	// Smooth Step (3t^2 - 2t^3) による滑らかな加減速補間
+	float smoothT = t * t * (3.0f - 2.0f * t);
+
+	DirectX::XMFLOAT3 currentPos;
+	currentPos.x = startPos.x + (target.position.x - startPos.x) * smoothT;
+	currentPos.y = startPos.y + (target.position.y - startPos.y) * smoothT;
+	currentPos.z = startPos.z + (target.position.z - startPos.z) * smoothT;
+
+	DirectX::XMFLOAT3 currentRot;
+	currentRot.x = startRot.x + (target.rotation.x - startRot.x) * smoothT;
+	currentRot.y = startRot.y + (target.rotation.y - startRot.y) * smoothT;
+	currentRot.z = startRot.z + (target.rotation.z - startRot.z) * smoothT;
+
+	camera.SetPosition({currentPos.x, currentPos.y, currentPos.z});
+	camera.SetRotation({currentRot.x, currentRot.y, currentRot.z});
+
+	if (t >= 1.0f) {
+		currentWaypointIndex_++;
+		waypointTime_ = 0.0f;
+	}
+}
+
+void PhaseSystemScript::CreateSkipUI(GameScene* scene) {
+	if (!scene) return;
+	auto& reg = scene->GetRegistry();
+
+	// 1. テキストUI
+	skipPromptUI_ = scene->CreateEntity("SkipPromptUI");
+	auto& rectPrompt = reg.emplace<RectTransformComponent>(skipPromptUI_);
+	rectPrompt.pos = {650.0f, 400.0f}; // 画面右下
+	rectPrompt.anchor = {0.5f, 0.5f};
+	rectPrompt.pivot = {0.5f, 0.5f};
+	rectPrompt.size = {400.0f, 50.0f};
+
+	auto& textPrompt = reg.emplace<UITextComponent>(skipPromptUI_);
+	textPrompt.text = "[S]長押しでスキップ";
+	textPrompt.fontSize = 32.0f;
+	textPrompt.color = {1.0f, 1.0f, 1.0f, 1.0f};
+	textPrompt.fontPath = "Resources\\Fonts\\ZenAntique-Regular.ttf";
+	textPrompt.outlineEnabled = true;
+	textPrompt.outlineColor = {0.0f, 0.0f, 0.0f, 1.0f};
+	textPrompt.outlineThickness = 2.0f;
+
+	// 2. プログレスバーUI
+	skipProgressUI_ = scene->CreateEntity("SkipProgressUI");
+	auto& rectBar = reg.emplace<RectTransformComponent>(skipProgressUI_);
+	rectBar.pos = {650.0f, 440.0f};
+	rectBar.anchor = {0.5f, 0.5f};
+	rectBar.pivot = {0.5f, 0.5f};
+	rectBar.size = {0.0f, 8.0f};
+
+	auto& imgBar = reg.emplace<UIImageComponent>(skipProgressUI_);
+	imgBar.color = {1.0f, 0.3f, 0.3f, 0.8f};
+}
+
+void PhaseSystemScript::UpdateSkipUIProgress(GameScene* scene) {
+	if (!scene || skipProgressUI_ == entt::null) return;
+	auto& reg = scene->GetRegistry();
+
+	if (reg.valid(skipProgressUI_) && reg.all_of<RectTransformComponent>(skipProgressUI_)) {
+		auto& rect = reg.get<RectTransformComponent>(skipProgressUI_);
+		float progress = skipHoldTime_ / 1.0f;
+		if (progress > 1.0f) progress = 1.0f;
+		rect.size.x = progress * 250.0f;
+	}
+}
+
+void PhaseSystemScript::EndInsertPhase(GameScene* scene) {
+	if (!scene) return;
+
+	// UIオブジェクトの破棄
+	if (skipPromptUI_ != entt::null && scene->GetRegistry().valid(skipPromptUI_)) {
+		scene->DestroyObject(static_cast<uint32_t>(skipPromptUI_));
+		skipPromptUI_ = entt::null;
+	}
+	if (skipProgressUI_ != entt::null && scene->GetRegistry().valid(skipProgressUI_)) {
+		scene->DestroyObject(static_cast<uint32_t>(skipProgressUI_));
+		skipProgressUI_ = entt::null;
+	}
+
+	// 終了時に標準の準備フェーズ用カメラ（コア見下ろし）に移行
+	auto prepCam = scene->FindObjectByName("PreparationCamera");
+	auto core = scene->FindObjectByName("Core");
+	if (scene->GetRegistry().valid(core) && scene->GetRegistry().valid(prepCam)) {
+		auto& coreTc = scene->GetRegistry().get<TransformComponent>(core);
+		
+		if (scene->GetRegistry().all_of<TransformComponent>(prepCam)) {
+			auto& camTc = scene->GetRegistry().get<TransformComponent>(prepCam);
+			camTc.translate = coreTc.translate;
+		}
+		
+		if (scene->GetRegistry().all_of<PlayerInputComponent>(prepCam)) {
+			auto& camPi = scene->GetRegistry().get<PlayerInputComponent>(prepCam);
+			camPi.cameraPitch = 0.5f;
+			camPi.cameraYaw = 0.0f;
+			
+			auto& camera = scene->GetCamera();
+			auto rot = camera.Rotation();
+			rot.x = 0.5f;
+			rot.y = 0.0f;
+			camera.SetRotation(rot);
+		}
+		
+		if (scene->GetRegistry().all_of<CameraTargetComponent>(prepCam)) {
+			auto& ct = scene->GetRegistry().get<CameraTargetComponent>(prepCam);
+			ct.distance = 25.0f;
+			ct.height = 10.0f;
+		}
+
+		auto& camera = scene->GetCamera();
+		camera.SetPosition({coreTc.translate.x, coreTc.translate.y + 25.0f, coreTc.translate.z - 25.0f});
+		camera.SetRotation({0.5f, 0.0f, 0.0f});
+	}
+
+	// 演出中に無効化していた入力を復旧
+	auto player = scene->FindObjectByName("Player");
+	if (scene->GetRegistry().valid(player) && scene->GetRegistry().all_of<PlayerInputComponent>(player)) {
+		scene->GetRegistry().get<PlayerInputComponent>(player).enabled = true;
+	}
+	if (scene->GetRegistry().valid(prepCam)) {
+		if (scene->GetRegistry().all_of<PlayerInputComponent>(prepCam)) {
+			scene->GetRegistry().get<PlayerInputComponent>(prepCam).enabled = true;
+		}
+		if (scene->GetRegistry().all_of<CameraTargetComponent>(prepCam)) {
+			scene->GetRegistry().get<CameraTargetComponent>(prepCam).enabled = true;
+		}
+	}
+
+	// カーソルを強制表示
+	while (ShowCursor(TRUE) < 0);
+
+	// 通常の準備フェーズに移行
+	isPhase_ = PreparationPhase;
+	NextPhase_ = PreparationPhase;
+	preIsPhase_ = PreparationPhase;
+
+	isInsertInitialized_ = false;
+}
 
 REGISTER_SCRIPT(PhaseSystemScript);
 

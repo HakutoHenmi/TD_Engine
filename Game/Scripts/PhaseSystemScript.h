@@ -2,6 +2,7 @@
 #include "../../externals/entt/entt.hpp"
 #include "IScript.h"
 #include "SkillTree.h"
+#include <DirectXMath.h>
 
 struct ImVec2; // 前方宣言
 namespace Engine {
@@ -12,7 +13,13 @@ namespace Game {
 
 class PhaseSystemScript : public IScript {
 public:
-	enum PhaseState { PreparationPhase, BattlePhase, Transition };
+	enum PhaseState { PreparationPhase, BattlePhase, Transition, InsertPhase };
+
+	struct CameraWaypoint {
+		DirectX::XMFLOAT3 position;
+		DirectX::XMFLOAT3 rotation; // Pitch, Yaw, Roll
+		float duration;             // Duration to travel to this point
+	};
 
 	void Start(entt::entity entity, GameScene* scene) override;
 	void Update(entt::entity entity, GameScene* scene, float dt) override;
@@ -95,6 +102,24 @@ private:
 
 	entt::entity enemyCountUI_ = entt::null;
 	entt::entity installationCostUI_ = entt::null;
+
+	// インサートカメラ演出用
+	std::vector<CameraWaypoint> insertWaypoints_;
+	int currentWaypointIndex_ = 0;
+	float waypointTime_ = 0.0f;
+	float skipHoldTime_ = 0.0f;
+	bool isInsertInitialized_ = false;
+	entt::entity skipPromptUI_ = entt::null;
+	entt::entity skipProgressUI_ = entt::null;
+	DirectX::XMFLOAT3 originalCameraPos_ = {0.0f, 0.0f, 0.0f};
+	DirectX::XMFLOAT3 originalCameraRot_ = {0.0f, 0.0f, 0.0f};
+
+	// インサートカメラ演出関連のヘルパーメソッド
+	void InitializeInsertPhase(GameScene* scene);
+	void UpdateInsertPhase(GameScene* scene, float dt);
+	void CreateSkipUI(GameScene* scene);
+	void UpdateSkipUIProgress(GameScene* scene);
+	void EndInsertPhase(GameScene* scene);
 };
 
 } // namespace Game

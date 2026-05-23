@@ -10,6 +10,7 @@ class CameraFollowSystem : public ISystem {
 public:
 	void Update(entt::registry& registry, GameContext& ctx) override {
 		if (!ctx.isPlaying || !ctx.camera) return;
+		if (Game::PhaseSystemScript::IsPhase() == Game::PhaseSystemScript::InsertPhase) return; // ★インサート中はカメラ上書きを停止
 
 		auto view = registry.view<CameraTargetComponent, TransformComponent>();
 		for (auto entity : view) {
