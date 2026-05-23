@@ -18,8 +18,8 @@ void SelectManagerScript::Start(entt::entity entity, GameScene* scene) {
 	// ステージリスト
 	stages_.clear();
 	stages_.push_back({"チュートリアル", "Resources/Scenes/TutorialScene.json", "Standard TD map"});
-	stages_.push_back({"1ステージ", "Resources/Scenes/tesuto_light.json", "Action oriented map"});
-	stages_.push_back({"Stage 3: Tower Defense", "Resources/Scenes/PhaseSystem.json", "Defend the core"});
+	stages_.push_back({"ステージ１", "Resources/Scenes/Stage1.json", "Standard TD map"});
+	stages_.push_back({"ステージ２", "Resources/Scenes/Stage2.json", "Advanced challenge"});
 
 	// UIが存在するかチェック
 	auto backBtn = scene->FindObjectByName("BackButton");
@@ -40,9 +40,16 @@ void SelectManagerScript::Start(entt::entity entity, GameScene* scene) {
 	}
 	auto btn1 = scene->FindObjectByName("StageButton_1");
 	if (btn1 != entt::null && scene->GetRegistry().all_of<UITextComponent>(btn1)) {
-		scene->GetRegistry().get<UITextComponent>(btn1).text = "1ステージ";
+		scene->GetRegistry().get<UITextComponent>(btn1).text = "ステージ１";
 		if (scene->GetRegistry().all_of<VariableComponent>(btn1)) {
-			scene->GetRegistry().get<VariableComponent>(btn1).SetString("Path", "Resources/Scenes/tesuto_light.json");
+			scene->GetRegistry().get<VariableComponent>(btn1).SetString("Path", "Resources/Scenes/Stage1.json");
+		}
+	}
+	auto btn2 = scene->FindObjectByName("StageButton_2");
+	if (btn2 != entt::null && scene->GetRegistry().all_of<UITextComponent>(btn2)) {
+		scene->GetRegistry().get<UITextComponent>(btn2).text = "ステージ２";
+		if (scene->GetRegistry().all_of<VariableComponent>(btn2)) {
+			scene->GetRegistry().get<VariableComponent>(btn2).SetString("Path", "Resources/Scenes/Stage2.json");
 		}
 	}
 }
@@ -127,8 +134,8 @@ void SelectManagerScript::CreateFallbackUI(GameScene* scene) {
 	};
 	std::vector<LocalStageInfo> defaultStages = {
 		{"チュートリアル", "Resources/Scenes/TutorialScene.json"},
-		{"1ステージ", "Resources/Scenes/tesuto_light.json"},
-		{"Stage 3: Tower Defense", "Resources/Scenes/PhaseSystem.json"}
+		{"ステージ１", "Resources/Scenes/Stage1.json"},
+		{"ステージ２", "Resources/Scenes/Stage2.json"}
 	};
 
 	// ステージボタン

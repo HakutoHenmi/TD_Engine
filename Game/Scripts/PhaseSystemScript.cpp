@@ -704,7 +704,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		if (isCoreDead) {
 			ResultManagerScript::pendingIsWin = false;
-			ResultManagerScript::pendingOriginalScene = "tesuto_light"; 
+			ResultManagerScript::pendingOriginalScene = scene->GetStagePath(); 
 			Engine::SceneParameters p;
 			p.sceneName = "Result";
 			p.isWin = false;
@@ -716,7 +716,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			isPhase_ = Transition;
 		} else if (WaveManagement::IsWaveEnded()) {
 			ResultManagerScript::pendingIsWin = true;
-			ResultManagerScript::pendingOriginalScene = "tesuto_light";
+			ResultManagerScript::pendingOriginalScene = scene->GetStagePath();
 			Engine::SceneParameters p;
 			p.sceneName = "Result";
 			p.isWin = true;

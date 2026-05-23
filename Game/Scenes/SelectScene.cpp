@@ -16,9 +16,9 @@ void SelectScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters
 	camera_.SetPosition(0, 0, -10);
 
 	// ステージリストのセットアップ
-	stages_.push_back({"Stage 1: Main City", "Resources/Scenes/scene.json", "Standard TD map"});
-	stages_.push_back({"Stage 2: TPS Arena", "Resources/Scenes/PhaseSystem.json", "Action oriented map"});
-	stages_.push_back({"Stage 3: Tower Defense", "Resources/Scenes/TutorialScene.json", "Defend the core"});
+	stages_.push_back({"Tutorial", "Resources/Scenes/TutorialScene.json", "Learn the basics"});
+	stages_.push_back({"Stage 1", "Resources/Scenes/Stage1.json", "Standard TD map"});
+	stages_.push_back({"Stage 2", "Resources/Scenes/Stage2.json", "Advanced challenge"});
 
 	// システムのセットアップ
 	systems_.clear();

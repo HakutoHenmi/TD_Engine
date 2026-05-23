@@ -67,6 +67,7 @@ public:
 
 	// ★追加: シーン名の取得
 	const std::string& GetSceneName() const { return sceneName_; }
+	const std::string& GetStagePath() const { return stagePath_; }
 	float GetPlayTime() const { return playTime_; }
 
 	// ★追加: 名前でオブジェクトを検索するヘルパー
@@ -130,6 +131,7 @@ private:
     Engine::ParticleEditor particleEditor_;
 
     float playTime_ = 0.0f; // クリアタイム計測用
+    std::string stagePath_; // ロードしたステージのJSONパス
 
     DirectX::XMFLOAT3 editorCameraPos_ = {0.0f, 2.0f, -5.0f};
     DirectX::XMFLOAT3 editorCameraRot_ = {0.2f, 0.0f, 0.0f};
