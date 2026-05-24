@@ -10,6 +10,9 @@
 
 namespace Game {
 
+// ★ マスクを保存するグローバルマップ（隣のパイプが曲がりかどうかを判定するため）
+static std::unordered_map<entt::entity, int> g_PipeConnectionMasks;
+
 static bool HasTag(GameScene* scene, entt::entity entity, TagType tagName) {
 	if (!scene->GetRegistry().all_of<TagComponent>(entity)) return false;
 	return scene->GetRegistry().get<TagComponent>(entity).tag == tagName;
@@ -126,8 +129,12 @@ void PipeScript::Start(entt::entity obj, GameScene* scene) {
 	(void)obj;
 	if (scene && scene->GetRenderer()) {
 		auto* renderer = scene->GetRenderer();
-		cylinderModelHandle_ = renderer->LoadObjMesh("Resources/Models/Cylinder/cylinder.obj");
-		cylinderTextureHandle_ = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+		pipe1Model_ = renderer->LoadObjMesh("Resources/Models/3Dmodel/pipe/pipe1.obj");
+		pipe1Tex_ = renderer->LoadTexture2D("Resources/Models/3Dmodel/pipe/pipe1.png");
+		pipe2Model_ = renderer->LoadObjMesh("Resources/Models/3Dmodel/pipe/pipe2.obj");
+		pipe2Tex_ = renderer->LoadTexture2D("Resources/Models/3Dmodel/pipe/pipe2.png");
+		pipe3Model_ = renderer->LoadObjMesh("Resources/Models/3Dmodel/pipe/pipe3.obj");
+		pipe3Tex_ = renderer->LoadTexture2D("Resources/Models/3Dmodel/pipe/pipe3.png");
 		glowMesh_ = renderer->LoadObjMesh("Resources/Models/plane.obj");
 		glowTex_ = renderer->LoadTexture2D("Resources/Textures/particles/diamond_flare.png");
 	}
@@ -154,6 +161,8 @@ void PipeScript::Update(entt::entity obj, GameScene* scene, float dt) {
 
 			currentConnections_.clear();
 			currentConnections_.reserve(8);
+			allConnections_.clear();
+			allConnections_.reserve(8);
 
 			const TagType connectableTags[] = {
 				TagType::Pipe, TagType::BulletTank, TagType::Cannon, 
@@ -163,17 +172,11 @@ void PipeScript::Update(entt::entity obj, GameScene* scene, float dt) {
 			for (TagType tag : connectableTags) {
 				const auto& entities = scene->GetEntitiesByTag(tag);
 				for (entt::entity other : entities) {
-					if (other == obj) {
-						continue;
-					}
+					if (other == obj) continue;
+					if (!registry.valid(other)) continue;
+					if (!IsConnectedSphere(scene, obj, other, connectRange)) continue;
 
-					if (!registry.valid(other)) {
-						continue;
-					}
-
-					if (!IsConnectedSphere(scene, obj, other, connectRange)) {
-						continue;
-					}
+					allConnections_.push_back(other);
 
 					bool shouldCreate = false;
 
@@ -189,6 +192,122 @@ void PipeScript::Update(entt::entity obj, GameScene* scene, float dt) {
 						currentConnections_.push_back(other);
 					}
 				}
+			}
+			
+			// 接続状態からパイプの形状（まっすぐ、曲がり、交差）を決定する
+			int connectionMask = 0;
+			auto& myTc = registry.get<TransformComponent>(obj);
+			Engine::Vector3 myPos = {myTc.translate.x, myTc.translate.y, myTc.translate.z};
+
+			for (auto target : allConnections_) {
+				if (!registry.valid(target) || !registry.all_of<TransformComponent>(target)) continue;
+				auto& tgtTc = registry.get<TransformComponent>(target);
+				float dx = tgtTc.translate.x - myPos.x;
+				float dz = tgtTc.translate.z - myPos.z;
+				if (std::abs(dx) > std::abs(dz)) {
+					if (dx > 0) connectionMask |= 1; // +X
+					else connectionMask |= 2; // -X
+				} else {
+					if (dz > 0) connectionMask |= 4; // +Z
+					else connectionMask |= 8; // -Z
+				}
+			}
+
+			uint32_t targetModel = pipe1Model_;
+			uint32_t targetTex = pipe1Tex_;
+			float targetRotY = 0.0f;
+			float targetOffsetX = 0.0f;
+			float targetOffsetY = -3.5f; // 直線パイプの完璧な高さ
+			float targetOffsetZ = 0.0f;
+			float targetScale = 2.0f;
+
+			// 接続状況から描画する方向フラグを初期化
+			drawPipeX_ = false;
+			drawPipeZ_ = false;
+
+			// ビット数を数えて接続数を判定
+			int connectionCount = 0;
+			if (connectionMask & 1) connectionCount++;
+			if (connectionMask & 2) connectionCount++;
+			if (connectionMask & 4) connectionCount++;
+			if (connectionMask & 8) connectionCount++;
+
+			// 1. 交差（T字や十字）の場合は、直線パイプを十字に交差させて表現（すっきりして太くならない）
+			if (connectionCount >= 3) {
+				targetModel = pipe1Model_;
+				targetTex = pipe1Tex_;
+				targetOffsetY = -3.5f;
+				targetScale = 2.0f;
+				drawPipeX_ = true;
+				drawPipeZ_ = true;
+			}
+			// 2. 角（L字）の場合は、曲がりパイプ（pipe2）を使用してスッキリ曲げる
+			else if (connectionMask == 5 || connectionMask == 6 || connectionMask == 9 || connectionMask == 10) {
+				targetModel = pipe2Model_;
+				targetTex = pipe2Tex_;
+				targetOffsetY = 2.7f; // 曲がりパイプの本来の高さ（浮きを抑えるため 3.1f から 2.7f に下げました）
+				targetScale = 1.8f;  // 先ほど決定したベストサイズ
+				
+				float dx = 1.0f; // 先ほど決定したベストオフセット
+				float dz = 1.0f;
+
+				if (connectionMask == 5) {
+					targetRotY = 3.14159265f; // 180度反転
+					targetOffsetX = dx;
+					targetOffsetZ = dz;
+				}
+				else if (connectionMask == 6) {
+					targetRotY = -3.14159265f * 0.5f; // 180度反転
+					targetOffsetX = -dz;
+					targetOffsetZ = dx;
+				}
+				else if (connectionMask == 10) {
+					targetRotY = 0.0f; // 180度反転
+					targetOffsetX = -dx;
+					targetOffsetZ = -dz;
+				}
+				else if (connectionMask == 9) {
+					targetRotY = 3.14159265f * 0.5f; // 180度反転
+					targetOffsetX = dz;
+					targetOffsetZ = -dx;
+				}
+			}
+			// 3. 直線（または端点）
+			else {
+				targetModel = pipe1Model_;
+				targetTex = pipe1Tex_;
+				targetOffsetY = -3.5f;
+				targetScale = 2.0f;
+
+				if (connectionMask & 1 || connectionMask & 2) {
+					drawPipeX_ = true;
+				}
+				if (connectionMask & 4 || connectionMask & 8) {
+					drawPipeZ_ = true;
+				}
+				if (!drawPipeX_ && !drawPipeZ_) {
+					drawPipeX_ = true;
+				}
+			}
+
+			// 保存しておく
+			currentModel_ = targetModel;
+			currentTex_ = targetTex;
+			currentRotY_ = targetRotY;
+			currentScale_ = targetScale;
+			currentOffsetX_ = targetOffsetX;
+			currentOffsetY_ = targetOffsetY;
+			currentOffsetZ_ = targetOffsetZ;
+
+			// 今のマスク状態を保存しておく（描画時に隣をチェックするため）
+			g_PipeConnectionMasks[obj] = connectionMask;
+
+			// 標準のメッシュ描画を無効化し、手動で描画するようにする
+			if (registry.all_of<MeshRendererComponent>(obj)) {
+				const MeshRendererComponent& pipeMesh = registry.get<MeshRendererComponent>(obj);
+				pipeColor_ = {pipeMesh.color.x, pipeMesh.color.y, pipeMesh.color.z, pipeMesh.color.w};
+				// enabled = false がエンジン側で無視されて二重描画されるのを防ぐため、コンポーネントごと削除する
+				registry.remove<MeshRendererComponent>(obj);
 			}
 		}
 	}
@@ -207,11 +326,47 @@ void PipeScript::Draw(entt::entity obj, GameScene* scene) {
 
 	TransformComponent& objTc = registry.get<TransformComponent>(obj);
 
-	// パイプのMeshRendererカラーを取得
-	Engine::Vector4 color = {0.75f, 0.75f, 0.75f, 1.0f};
-	if (registry.all_of<MeshRendererComponent>(obj)) {
-		const MeshRendererComponent& pipeMesh = registry.get<MeshRendererComponent>(obj);
-		color = {pipeMesh.color.x, pipeMesh.color.y, pipeMesh.color.z, pipeMesh.color.w};
+	// パイプのMeshRendererカラーはUpdate時に保存したものを使用
+	Engine::Vector4 color = pipeColor_;
+
+	// パイプ自体の描画
+	if (currentModel_ != 0) {
+		if (currentModel_ == pipe2Model_) {
+			// 曲がりパイプ（pipe2）の描画
+			Engine::Vector3 finalRot = {0.0f, currentRotY_, 0.0f};
+			Engine::Matrix4x4 myWorld = Engine::Matrix4x4::MakeAffineMatrix(
+				{currentScale_, currentScale_, currentScale_},
+				finalRot,
+				{objTc.translate.x + currentOffsetX_, objTc.translate.y + currentOffsetY_, objTc.translate.z + currentOffsetZ_}
+			);
+			renderer->DrawMeshInstanced(currentModel_, currentTex_, myWorld, color, "Toon");
+		}
+		else {
+			// 直線パイプ（pipe1）の描画（交差や直線のフラグ制御）
+			float lengthScale = 1.3f; // 直線パイプの長さスケール
+			
+			// X軸方向の直線パイプ
+			if (drawPipeX_) {
+				Engine::Vector3 finalRot = {objTc.rotate.x, objTc.rotate.y + 0.0f, objTc.rotate.z};
+				Engine::Matrix4x4 myWorld = Engine::Matrix4x4::MakeAffineMatrix(
+					{currentScale_, currentScale_, lengthScale},
+					finalRot,
+					{objTc.translate.x + currentOffsetX_, objTc.translate.y + currentOffsetY_, objTc.translate.z + currentOffsetZ_}
+				);
+				renderer->DrawMeshInstanced(currentModel_, currentTex_, myWorld, color, "Toon");
+			}
+
+			// Z軸方向の直線パイプ
+			if (drawPipeZ_) {
+				Engine::Vector3 finalRot = {objTc.rotate.x, objTc.rotate.y + 3.14159265f * 0.5f, objTc.rotate.z};
+				Engine::Matrix4x4 myWorld = Engine::Matrix4x4::MakeAffineMatrix(
+					{currentScale_, currentScale_, lengthScale},
+					finalRot,
+					{objTc.translate.x + currentOffsetX_, objTc.translate.y + currentOffsetY_, objTc.translate.z + currentOffsetZ_}
+				);
+				renderer->DrawMeshInstanced(currentModel_, currentTex_, myWorld, color, "Toon");
+			}
+		}
 	}
 
 	// 接続されている全てのパイプ/施設へのシリンダーを描画（ポーズ中も呼ばれる）
@@ -237,22 +392,8 @@ void PipeScript::Draw(entt::entity obj, GameScene* scene) {
 		float dist = std::sqrt(distSq);
 		Engine::Vector3 dir = diff * (1.0f / dist);
 
-		float cyLen = dist / 3.0f; // ★シリンダーモデルは高さが3なので3で割る
-		if (cyLen < 0.01f) {
-			cyLen = 0.01f;
-		}
-
-		Engine::Vector3 center = startPos + diff * 0.5f;
-		Engine::Vector3 euler = Engine::LookRotation(dir);
-
-		// Z軸方向のシリンダーモデルとしてスケールと回転を適用
-		Engine::Matrix4x4 world = Engine::Matrix4x4::MakeAffineMatrix(
-			{0.25f, 0.25f, cyLen},
-			{euler.x, euler.y, euler.z},
-			{center.x, center.y, center.z}
-		);
-
-		renderer->DrawMeshInstanced(cylinderModelHandle_, cylinderTextureHandle_, world, color, "Toon");
+		// ★シリンダーモデルは描画しない（パイプモデル自体が形を成すため）
+		// renderer->DrawMeshInstanced(cylinderModelHandle_, cylinderTextureHandle_, world, color, "Toon");
 
 		// --- パイプラインに沿ってエネルギーの光点を流す ---
 		float flowSpeed = 1.5f;
