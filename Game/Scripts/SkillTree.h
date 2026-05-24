@@ -88,7 +88,7 @@ private:
 	int skillPoints_ = 100;
 	int pendingUnlockId_ = -1;
 	int currentPageId_ = 0;
-	int pageCount_ = 5;
+	int pageCount_ = 0;
 
 	std::vector<SkillNode> nodes_;
 

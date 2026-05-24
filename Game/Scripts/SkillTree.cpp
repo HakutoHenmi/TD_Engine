@@ -487,6 +487,42 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 		stopTimeRateIceCanon *= 1.50f;
 	}
 	//page4
+	//  Player
+	//float playerMoveSpeedRate = 1.0f; //
+
+	//float playerSwordAttackSpeedRate = 1.0f;
+	//float playerGunAttackSpeedRate = 1.0f;
+
+	//float playerSwordAttackPowerRate = 1.0f;
+	//float playerGunAttackPowerRate = 1.0f;
+
+	//float playerMaxSteamPressureRate = 1.0f;
+
+	//float playerSwordSkillCooldownRate = 1.0f;
+	//float playerGunSkillCooldownRate = 1.0f;
+
+	//float playerSwordSkillAttackPowerRate = 1.0f;
+	//float playerGunSkillAttackPowerRate = 1.0f;
+
+	if (IsSkillUnlocked(401)) {
+	//	playerMoveSpeedRate *= 1.20f;
+	}
+
+	if (IsSkillUnlocked(402)) {
+		//playerGunDamageRate *= 1.30f;
+	}
+
+	if (IsSkillUnlocked(403)) {
+		//playerMaxSteamRate *= 1.30f;
+	}
+
+	//const std::vector<entt::entity>& players = scene->GetEntitiesByTag(TagType::Player);
+
+	//for (entt::entity player : players) {
+	//	//SetVar(player, scene, "PlayerMoveSpeedRate", playerMoveSpeedRate);
+	//	//SetVar(player, scene, "PlayerGunDamageRate", playerGunDamageRate);
+	//	//SetVar(player, scene, "PlayerMaxSteamRate", playerMaxSteamRate);
+	//}
 	// canon
 	SetVar(entity, scene, "AttackPowerRateCanon", attackPowerRateCanon);
 	SetVar(entity, scene, "AttackSpeedRateCanon", attackSpeedRateCanon);
@@ -814,8 +850,8 @@ void SkillTree::DrawNodes(Engine::Renderer* renderer, float screenW, float scree
 void SkillTree::DrawSkillPointsText(Engine::Renderer* renderer, float screenW, float screenH) {
 	(void)screenW;
 
-	float baseX = kPanelMargin + 20.0f;
-	float baseY = screenH - kPanelMargin - 40.0f;
+	float baseX = kPanelMargin + 40.0f;
+	float baseY = screenH - kPanelMargin - 70.0f;
 	float dotSize = 16.0f;
 	float dotGap = 4.0f;
 	int displayPoints = (std::min)(skillPoints_, 20);
@@ -947,15 +983,15 @@ void SkillTree::UpdatePageButtonRect(float screenW, float screenH) {
 	float buttonWidth = 80.0f;
 	float buttonHeight = 50.0f;
 	float offsetY = 770.0f;
-
+	float paddingX = 40.0f;
 	// 左ボタン
-	prevButtonLeft_ = kPanelMargin + padding;
+	prevButtonLeft_ = kPanelMargin + padding + paddingX;
 	prevButtonTop_ = screenH - kPanelMargin - padding - buttonHeight - offsetY;
 	prevButtonRight_ = prevButtonLeft_ + buttonWidth;
 	prevButtonBottom_ = prevButtonTop_ + buttonHeight;
 
 	// 右ボタン
-	nextButtonLeft_ = screenW - kPanelMargin - padding - buttonWidth;
+	nextButtonLeft_ = screenW - kPanelMargin - padding - buttonWidth - paddingX;
 	nextButtonTop_ = screenH - kPanelMargin - padding - buttonHeight - offsetY;
 	nextButtonRight_ = nextButtonLeft_ + buttonWidth;
 	nextButtonBottom_ = nextButtonTop_ + buttonHeight;

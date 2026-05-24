@@ -233,7 +233,7 @@
       "description": "設定中",
       "pageId": 2
     },
-{
+    {
   "id": 300,
   "name": "Base3",
   "cost": 0,
@@ -243,7 +243,7 @@
   "gridY": 0.0,
   "description": "アイスキャノンの基本性能",
   "pageId": 3
-},
+   },
 {
   "id": 301,
   "name": "Attack",
@@ -313,79 +313,167 @@
 
 {
   "id": 400,
-  "name": "Base3",
+  "name": "PlayerBase",
   "cost": 0,
   "parentId": -1,
   "unlocked": true,
-  "gridX": 1.0,
+  "gridX": 3.0,
   "gridY": 0.0,
   "description": "プレイヤーの基本性能",
   "pageId": 4
 },
 {
   "id": 401,
-  "name": "Attack",
+  "name": "GunAttack",
   "cost": 1,
   "parentId": 400,
   "unlocked": false,
   "gridX": 0.0,
-  "gridY": 0.0,
-  "description": "プレイヤーの攻撃力が1.5倍になります。",
+  "gridY": 1.0,
+  "description": "銃の攻撃力が上がります。",
   "pageId": 4
 },
 {
   "id": 402,
-  "name": "AttackSpeed",
+  "name": "SwordAttack",
   "cost": 1,
   "parentId": 400,
   "unlocked": false,
-  "gridX": 2.0,
-  "gridY": 0.0,
-  "description": "プレイヤーの爆発範囲が1.5倍になります。",
+  "gridX": 6.0,
+  "gridY": 1.0,
+  "description": "剣の攻撃力が上がります。",
   "pageId": 4
 },
 {
   "id": 403,
-  "name": "AllUp",
+  "name": "PlayerAllUp",
   "cost": 1,
   "parentId": 400,
   "unlocked": false,
-  "gridX": 1.0,
+  "gridX": 3.0,
   "gridY": 1.0,
-  "description": "プレイヤーの全性能がアップします。",
+  "description": "プレイヤー全体を強化します。",
   "pageId": 4
 },
 {
   "id": 404,
-  "name": "None",
+  "name": "GunAttack2",
   "cost": 1,
   "parentId": 401,
   "unlocked": false,
   "gridX": 0.0,
-  "gridY": 1.0,
-  "description": "設定中",
+  "gridY": 2.0,
+  "description": "銃の攻撃力がさらに上がります。",
   "pageId": 4
 },
 {
   "id": 405,
-  "name": "None",
+  "name": "SwordAttack2",
   "cost": 1,
   "parentId": 402,
   "unlocked": false,
-  "gridX": 2.0,
-  "gridY": 1.0,
-  "description": "設定中",
+  "gridX": 6.0,
+  "gridY": 2.0,
+  "description": "剣の攻撃力がさらに上がります。",
   "pageId": 4
 },
 {
   "id": 406,
-  "name": "None",
+  "name": "SteamPressure",
   "cost": 1,
   "parentId": 403,
   "unlocked": false,
+  "gridX": 3.0,
+  "gridY": 2.0,
+  "description": "蒸気消費量が減少します。",
+  "pageId": 4
+},
+{
+  "id": 407,
+  "name": "GunAttackSpeed",
+  "cost": 1,
+  "parentId": 404,
+  "unlocked": false,
   "gridX": 1.0,
   "gridY": 3.0,
-  "description": "設定中",
+  "description": "銃の攻撃速度が上がります。",
+  "pageId": 4
+},
+{
+  "id": 408,
+  "name": "SwordAttackSpeed",
+  "cost": 1,
+  "parentId": 405,
+  "unlocked": false,
+  "gridX": 5.0,
+  "gridY": 3.0,
+  "description": "剣の攻撃速度が上がります。",
+  "pageId": 4
+},
+{
+  "id": 409,
+  "name": "MoveSpeed",
+  "cost": 1,
+  "parentId": 406,
+  "unlocked": false,
+  "gridX": 3.0,
+  "gridY": 3.0,
+  "description": "移動速度が上がります。",
+  "pageId": 4
+},
+{
+  "id": 410,
+  "name": "GunSkillCooldown",
+  "cost": 1,
+  "parentId": 407,
+  "unlocked": false,
+  "gridX": 0.0,
+  "gridY": 4.0,
+  "description": "銃スキルのリチャージ時間が短くなります。",
+  "pageId": 4
+},
+{
+  "id": 411,
+  "name": "SwordSkillCooldown",
+  "cost": 1,
+  "parentId": 408,
+  "unlocked": false,
+  "gridX": 6.0,
+  "gridY": 4.0,
+  "description": "剣スキルのリチャージ時間が短くなります。",
+  "pageId": 4
+},
+{
+  "id": 412,
+  "name": "PlayerSpeedBoost",
+  "cost": 1,
+  "parentId": 409,
+  "unlocked": false,
+  "gridX": 3.0,
+  "gridY": 4.0,
+  "description": "プレイヤー全体の行動速度が上がります。",
+  "pageId": 4
+},
+{
+  "id": 413,
+  "name": "GunSkillPower",
+  "cost": 1,
+  "parentId": 410,
+  "unlocked": false,
+  "gridX": 0.0,
+  "gridY": 5.0,
+  "description": "銃スキルの攻撃力が上がります。",
+  "pageId": 4
+},
+{
+  "id": 414,
+  "name": "SwordSkillPower",
+  "cost": 1,
+  "parentId": 411,
+  "unlocked": false,
+  "gridX": 6.0,
+  "gridY": 5.0,
+  "description": "剣スキルの攻撃力が上がります。",
   "pageId": 4
 }
 
