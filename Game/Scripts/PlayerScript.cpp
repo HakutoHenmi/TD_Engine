@@ -209,7 +209,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (scene->GetRegistry().all_of<HealthComponent>(entity)) {
 		if (scene->GetRegistry().get<HealthComponent>(entity).isDead) return;
 	}
-
+	ApplySkillEffects(entity, scene);
 	if (!isSubscribed_) {
 		scene->GetEventSystem().Subscribe("GainExp", [this, scene](float amount) {
 			experience_ += amount;
@@ -2411,7 +2411,42 @@ void PlayerScript::OnEditorUI() {
 	ImGui::Text("Last Value: %.2f", debugLastValue_);
 #endif
 }
+void PlayerScript::ApplySkillEffects(entt::entity entity, GameScene* scene) {
+	(void)entity;
+	if (!scene) {
+		return;
+	}
 
+	entt::registry& registry = scene->GetRegistry();
+
+	entt::entity gm = entt::null;
+	auto viewScript = registry.view<ScriptComponent>();
+
+	for (entt::entity e : viewScript) {
+		const ScriptComponent& sc = viewScript.get<ScriptComponent>(e);
+
+		for (const auto& instance : sc.scripts) {
+			if (instance.scriptPath == "PhaseSystemScript" || instance.scriptPath == "TutorialScript") {
+				gm = e;
+				break;
+			}
+		}
+
+		if (gm != entt::null) {
+			break;
+		}
+	}
+
+	if (gm == entt::null) {
+		return;
+	}
+
+	playerMoveSpeedRate_ = GetVar(gm, scene, "PlayerMoveSpeedRate", 1.0f);
+
+	playerGunDamageRate_ = GetVar(gm, scene, "PlayerGunDamageRate", 1.0f);
+
+	playerMaxSteamRate_ = GetVar(gm, scene, "PlayerMaxSteamRate", 1.0f);
+}
 void PlayerScript::DrawUI(entt::entity /*entity*/, GameScene* /*scene*/) {
 	// ※注意: DrawUI は Renderer::EndFrame の後（ImGuiフェーズ）に呼び出されるため、
 	// ここで renderer->DrawSDFUI や DrawString などを呼んでも次のフレームの先頭でクリアされてしまい描画されません。

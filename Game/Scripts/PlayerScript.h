@@ -83,7 +83,7 @@ private:
 	void SpawnBullet(entt::entity entity, GameScene* scene, float spreadYaw, float spreadPitch, float damage, float lifeTime = 5.0f, bool enhanced = false, bool explode = false);
 	void ShootGun(entt::entity entity, GameScene* scene);
 	void SpawnCrystalBurst(const DirectX::XMFLOAT3& pos, int count, bool enhanced);
-
+	void ApplySkillEffects(entt::entity entity, GameScene* scene);
 	float experience_ = 0.0f;
 	int level_ = 1;
 	float nextExperience_ = 100.0f;
@@ -185,6 +185,12 @@ private:
 	void ShootChargeShot(entt::entity entity, GameScene* scene);
 	void DrawPressureGauge(GameScene* scene);
 	void DrawReticle(entt::entity playerEntity, GameScene* scene);
+
+
+	//スキル
+	float playerMoveSpeedRate_ = 1.0f;
+	float playerGunDamageRate_ = 1.0f;
+	float playerMaxSteamRate_ = 1.0f;
 };
 
 } // namespace Game

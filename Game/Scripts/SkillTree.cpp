@@ -34,6 +34,7 @@ void SkillTree::LoadFromJson(const std::string& path) {
 				SkillNode node;
 
 				node.id = skillJson.value("id", 0);
+				node.icon = skillJson.value("icon", "None");
 				node.name = skillJson.value("name", "Skill");
 				node.cost = skillJson.value("cost", 1);
 				node.parentId = skillJson.value("parentId", -1);
@@ -44,8 +45,9 @@ void SkillTree::LoadFromJson(const std::string& path) {
 				node.pageId = skillJson.value("pageId", 0);
 
 				// アイコン読み込み
-				std::string iconName = skillJson.value("name", "");
-				std::string iconPath = "Resources/Skills/" + iconName + ".png";
+				std::string iconName = skillJson.value("icon", "");
+				// アイコン読み込み
+				std::string iconPath = "Resources/Skills/" + node.icon + ".png";
 
 				node.texturePath = iconPath;
 
@@ -486,43 +488,44 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 		attackRangeRateIceCanon *= 1.50f;
 		stopTimeRateIceCanon *= 1.50f;
 	}
-	//page4
-	//  Player
-	//float playerMoveSpeedRate = 1.0f; //
+	// page4
+	//   Player
+	float playerMoveSpeedRate = 1.5f;
 
-	//float playerSwordAttackSpeedRate = 1.0f;
-	//float playerGunAttackSpeedRate = 1.0f;
+	float playerGunDamageRate = 1.5f;
 
-	//float playerSwordAttackPowerRate = 1.0f;
-	//float playerGunAttackPowerRate = 1.0f;
+	float playerMaxSteamRate = 1.5f;
+	// float playerSwordAttackSpeedRate = 1.5f;
+	// float playerGunAttackSpeedRate = 1.5f;
 
-	//float playerMaxSteamPressureRate = 1.0f;
+	// float playerSwordAttackPowerRate = 1.0f;
+	// float playerGunAttackPowerRate = 1.0f;
 
-	//float playerSwordSkillCooldownRate = 1.0f;
-	//float playerGunSkillCooldownRate = 1.0f;
+	// float playerMaxSteamPressureRate = 1.0f;
 
-	//float playerSwordSkillAttackPowerRate = 1.0f;
-	//float playerGunSkillAttackPowerRate = 1.0f;
+	// float playerSwordSkillCooldownRate = 1.0f;
+	// float playerGunSkillCooldownRate = 1.0f;
+
+	// float playerSwordSkillAttackPowerRate = 1.0f;
+	// float playerGunSkillAttackPowerRate = 1.0f;
 
 	if (IsSkillUnlocked(401)) {
-	//	playerMoveSpeedRate *= 1.20f;
+		//	playerMoveSpeedRate *= 1.20f;
 	}
 
 	if (IsSkillUnlocked(402)) {
-		//playerGunDamageRate *= 1.30f;
+		// playerGunDamageRate *= 1.30f;
 	}
 
 	if (IsSkillUnlocked(403)) {
-		//playerMaxSteamRate *= 1.30f;
+		// playerMaxSteamRate *= 1.30f;
 	}
 
-	//const std::vector<entt::entity>& players = scene->GetEntitiesByTag(TagType::Player);
+	// player
+	SetVar(entity, scene, "PlayerMoveSpeedRate", playerMoveSpeedRate);
+	SetVar(entity, scene, "PlayerGunDamageRate", playerGunDamageRate);
+	SetVar(entity, scene, "PlayerMaxSteamRate", playerMaxSteamRate);
 
-	//for (entt::entity player : players) {
-	//	//SetVar(player, scene, "PlayerMoveSpeedRate", playerMoveSpeedRate);
-	//	//SetVar(player, scene, "PlayerGunDamageRate", playerGunDamageRate);
-	//	//SetVar(player, scene, "PlayerMaxSteamRate", playerMaxSteamRate);
-	//}
 	// canon
 	SetVar(entity, scene, "AttackPowerRateCanon", attackPowerRateCanon);
 	SetVar(entity, scene, "AttackSpeedRateCanon", attackSpeedRateCanon);
@@ -548,22 +551,29 @@ void SkillTree::HandleInput(float screenW, float screenH, float mouseX, float mo
 		return;
 	}
 
-	if (HandlePageButtonInput(screenW, screenH, mouseX, mouseY)) {
-		return;
-	}
 	if (!input->IsMouseTrigger(0)) {
 		return;
 	}
 
+	// 解放確認中はページ変更禁止
 	if (pendingUnlockId_ != -1) {
 		float centerX = screenW * 0.5f;
 		float centerY = screenH * 0.5f;
 
 		if (mouseX >= centerX - 110 && mouseX <= centerX - 10 && mouseY >= centerY + 20 && mouseY <= centerY + 60) {
+
 			ConfirmUnlock();
+
 		} else if (mouseX >= centerX + 10 && mouseX <= centerX + 110 && mouseY >= centerY + 20 && mouseY <= centerY + 60) {
+
 			CancelUnlock();
 		}
+
+		return;
+	}
+
+	// 確認ダイアログ出てない時だけページ変更
+	if (HandlePageButtonInput(screenW, screenH, mouseX, mouseY)) {
 		return;
 	}
 
@@ -577,7 +587,9 @@ void SkillTree::HandleInput(float screenW, float screenH, float mouseX, float mo
 		GetNodeScreenPos(nodes_[i], screenW, screenH, nodeX, nodeY);
 
 		float halfSize = kNodeSize * 0.5f;
+
 		if (mouseX >= nodeX - halfSize && mouseX <= nodeX + halfSize && mouseY >= nodeY - halfSize && mouseY <= nodeY + halfSize) {
+
 			TryUnlockSkill(i);
 			break;
 		}
@@ -808,7 +820,7 @@ void SkillTree::DrawNodes(Engine::Renderer* renderer, float screenW, float scree
 					bgColor = {0.8f, 0.7f, 0.2f, 0.9f}; // 解放可能：暗い黄色の枠
 				}
 			} else {
-				bgColor = {0.3f, 0.3f, 0.3f, 0.7f}; // ロック中：灰色の枠
+				bgColor = {0.3f, 0.3f, 0.3f, 0.7f};   // ロック中：灰色の枠
 				iconColor = {0.4f, 0.4f, 0.4f, 1.0f}; // ロック中のアイコンは暗くする
 			}
 		}

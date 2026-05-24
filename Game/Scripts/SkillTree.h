@@ -16,6 +16,7 @@ class GameScene;
 struct SkillNode {
 	int id = 0;
 	std::string name;
+	std::string icon;
 	std::string texturePath;
 	int cost = 1;
 	int parentId = -1;
