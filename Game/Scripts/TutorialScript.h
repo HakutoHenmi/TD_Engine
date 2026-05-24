@@ -37,7 +37,12 @@ public:
 	void Update(entt::entity entity, GameScene* scene, float dt) override;
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
 
+	static TutorialScript* GetInstance() { return instance_; }
+	TutorialStep GetCurrentStep() const { return tutorialStep_; }
+	bool IsStep10PlacedExtraTank() const { return step10_placedExtraTank_; }
+
 private:
+	static TutorialScript* instance_;
 	void EnterStep(TutorialStep step);
 	void RequestPhaseChange(PhaseSystemScript::PhaseState nextPhase);
 	void UpdatePhaseTransition(GameScene* scene);

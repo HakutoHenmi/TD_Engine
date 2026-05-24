@@ -27,6 +27,8 @@ using json = nlohmann::json;
 
 namespace Game {
 
+TutorialScript* TutorialScript::instance_ = nullptr;
+
 namespace {
 // チュートリアルの各ステップにおけるテキストガイドの内容
 // 簡単に文言や行数を変更できます。SPACEキーで次の行に進みます。
@@ -196,6 +198,7 @@ entt::entity GetFacilityInRange(GameScene* scene, float x, float z, float range 
 
 // チュートリアルスクリプトの初期化処理。フェーズや変数の初期化、スキルツリーの読み込みなどを行う
 void TutorialScript::Start(entt::entity entity, GameScene* scene) {
+    instance_ = this;
     tutorialStep_ = TutorialStep::Step1_Greeting;
     currentLineIndex_ = 0;
     phaseState_ = PhaseSystemScript::PreparationPhase;
@@ -370,13 +373,19 @@ void TutorialScript::DrawHighlights(GameScene* scene) {
             Draw3DHighlight(scene, core, { 0.2f, 0.6f, 1.0f, 1.0f }, 4.0f);
         }
     }
-    else if (tutorialStep_ == TutorialStep::Step3_SpawnerIntro) {
+
+    // スポナーのガイド（Step 3 または 戦闘フェーズ中）
+    const bool isBattlePhase = (phaseState_ == PhaseSystemScript::BattlePhase);
+    if (tutorialStep_ == TutorialStep::Step3_SpawnerIntro || isBattlePhase) {
         auto& registry = scene->GetRegistry();
         registry.view<NameComponent, TransformComponent>().each([&](entt::entity entity, const NameComponent& nc, const TransformComponent& tc) {
             if (nc.name.find("Spawner") != std::string::npos && 
                 (!registry.all_of<HierarchyComponent>(entity) || registry.get<HierarchyComponent>(entity).parentId == entt::null)) {
 
-                Draw3DHighlight(scene, entity, { 1.0f, 0.2f, 0.2f, 1.0f }, 3.0f);
+                // Step 3 の時だけ足元をハイライト
+                if (tutorialStep_ == TutorialStep::Step3_SpawnerIntro) {
+                    Draw3DHighlight(scene, entity, { 1.0f, 0.2f, 0.2f, 1.0f }, 3.0f);
+                }
 
                 auto& camera = scene->GetCamera();
                 DirectX::XMMATRIX view = camera.View();
@@ -1370,6 +1379,7 @@ void TutorialScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector3& 
 
 // スクリプト破棄時の処理。スキルツリーを閉じ、フェーズを初期状態にリセットする
 void TutorialScript::OnDestroy(entt::entity /*entity*/, GameScene* scene) {
+    if (instance_ == this) instance_ = nullptr;
     skillTree_.Close(scene);
     PhaseSystemScript::ForcePhaseState(PhaseSystemScript::PreparationPhase);
 }
