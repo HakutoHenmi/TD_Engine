@@ -33,7 +33,7 @@ namespace {
 const std::unordered_map<TutorialScript::TutorialStep, std::vector<std::string>> kTutorialTexts = {
     { TutorialScript::TutorialStep::Step1_Greeting, {
         "こんにちは！このゲームのチュートリアルへようこそ。",
-        "防衛戦の基本を説明します。[SPACE]キーで読み進めてください。"
+        "防衛戦の基本を説明します。[SPACE]キーで読み進めてください。",
     }},
     { TutorialScript::TutorialStep::Step2_CoreIntro, {
         "まずはこちら、青い『コア』です。敵はこれを破壊しにきます。",
@@ -105,6 +105,7 @@ const std::unordered_map<TutorialScript::TutorialStep, std::vector<std::string>>
 // 2x2のグリッドに値をスナップさせる（2の倍数に丸める）
 float SnapTo2x2Grid(float value) { return std::floor(value / 2.0f) * 2.0f; }
 
+// マウスカーソルが施設設置用のボタン（UI）の上にあるかどうかを判定する
 bool IsPointerOverInstallationButton(GameScene* scene) {
     if (!scene)
         return false;
@@ -241,6 +242,7 @@ void TutorialScript::Start(entt::entity entity, GameScene* scene) {
     }
 }
 
+// チュートリアルの指定されたステップに移行し、必要な初期状態のセットアップやフェーズ切り替えを行う
 void TutorialScript::EnterStep(TutorialStep step) {
     tutorialStep_ = step;
     stepGuideShown_ = false;
@@ -279,6 +281,7 @@ void TutorialScript::EnterStep(TutorialStep step) {
     }
 }
 
+// 現在のステップをログ出力などの形でガイド表示する（ステップごとに1回のみ）
 void TutorialScript::ShowStepGuide() {
     if (stepGuideShown_)
         return;
@@ -287,6 +290,7 @@ void TutorialScript::ShowStepGuide() {
     stepGuideShown_ = true;
 }
 
+// スキルツリーのUIの表示切り替えや中身の更新処理を行う
 void TutorialScript::UpdateSkillTree(entt::entity entity, GameScene* scene, bool& outKeyN) {
     auto* input = Engine::Input::GetInstance();
     if (!input || !scene)
@@ -326,6 +330,7 @@ void TutorialScript::UpdateSkillTree(entt::entity entity, GameScene* scene, bool
     }
 }
 
+// 指定されたエンティティを中心とした床面に3Dのハイライトの円を描画する
 void TutorialScript::Draw3DHighlight(GameScene* scene, entt::entity entity, const Engine::Vector4& color, float radius) {
     if (!scene || entity == entt::null || !scene->GetRegistry().valid(entity)) return;
     auto* renderer = scene->GetRenderer();
@@ -351,6 +356,7 @@ void TutorialScript::Draw3DHighlight(GameScene* scene, entt::entity entity, cons
     }
 }
 
+// チュートリアルのステップに応じて、コアやスポナーなどの注目させたいオブジェクトにハイライトを描画する
 void TutorialScript::DrawHighlights(GameScene* scene) {
     if (!scene) return;
     auto* renderer = scene->GetRenderer();
@@ -367,7 +373,9 @@ void TutorialScript::DrawHighlights(GameScene* scene) {
     else if (tutorialStep_ == TutorialStep::Step3_SpawnerIntro) {
         auto& registry = scene->GetRegistry();
         registry.view<NameComponent, TransformComponent>().each([&](entt::entity entity, const NameComponent& nc, const TransformComponent& tc) {
-            if (nc.name.find("Spawner") != std::string::npos) {
+            if (nc.name.find("Spawner") != std::string::npos && 
+                (!registry.all_of<HierarchyComponent>(entity) || registry.get<HierarchyComponent>(entity).parentId == entt::null)) {
+
                 Draw3DHighlight(scene, entity, { 1.0f, 0.2f, 0.2f, 1.0f }, 3.0f);
 
                 auto& camera = scene->GetCamera();
@@ -417,6 +425,7 @@ void TutorialScript::DrawHighlights(GameScene* scene) {
     }
 }
 
+// 施設の売却（削除）モードの切り替えおよび、削除対象のハイライト表示・クリックによる削除処理を行う
 void TutorialScript::UpdateSellMode(GameScene* scene) {
     if (!scene) return;
     auto* input = Engine::Input::GetInstance();
@@ -532,6 +541,7 @@ void TutorialScript::UpdateSellMode(GameScene* scene) {
     }
 }
 
+// 毎フレームの更新処理。チュートリアルのステップ進行判定やキー入力の処理を一括して行う
 void TutorialScript::Update(entt::entity entity, GameScene* scene, float /*dt*/) {
     auto* input = Engine::Input::GetInstance();
     if (!scene || !input)
@@ -840,6 +850,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float /*dt*/)
     UpdatePhaseTransition(scene);
 }
 
+// 準備フェーズと戦闘フェーズの間で状態を切り替えるよう要求する（フェード遷移を開始する）
 void TutorialScript::RequestPhaseChange(PhaseSystemScript::PhaseState nextPhase) {
     if (phaseState_ == PhaseSystemScript::Transition || isPhaseTransitioning_)
         return;
@@ -857,6 +868,7 @@ void TutorialScript::RequestPhaseChange(PhaseSystemScript::PhaseState nextPhase)
     }
 }
 
+// フェーズ遷移中の処理を更新し、フェード完了タイミングで実際のフェーズ状態切り替えを適用する
 void TutorialScript::UpdatePhaseTransition(GameScene* scene) {
     if (!isPhaseTransitioning_)
         return;
@@ -892,6 +904,7 @@ void TutorialScript::UpdatePhaseTransition(GameScene* scene) {
     }
 }
 
+// 現在のチュートリアルステップに基づくテキストをUIテキストコンポーネントに適用する
 void TutorialScript::ShowGuideText(entt::entity entity, GameScene* scene) {
     if (!scene) return;
     auto& registry = scene->GetRegistry();
