@@ -87,7 +87,7 @@ void IceBulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			pec.emitter.params.angularVelocity = {0.0f, 0.0f, 5.0f};
 			pec.emitter.params.angularVelocityVariance = {0.0f, 0.0f, 10.0f};
 			pec.emitter.params.isAdditive = true;
-			pec.emitter.params.position = { bulletTransform.translate.x, bulletTransform.translate.y, bulletTransform.translate.z };
+			pec.emitter.params.position = {bulletTransform.translate.x, bulletTransform.translate.y, bulletTransform.translate.z};
 
 			pec.emitter.Initialize(*renderer, "IceBulletTrail");
 			pec.isInitialized = true;
@@ -98,7 +98,7 @@ void IceBulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			vfxTrans.translate = bulletTransform.translate;
 			if (registry.all_of<ParticleEmitterComponent>(bulletVfx_)) {
 				auto& pec = registry.get<ParticleEmitterComponent>(bulletVfx_);
-				pec.emitter.params.position = { bulletTransform.translate.x, bulletTransform.translate.y, bulletTransform.translate.z };
+				pec.emitter.params.position = {bulletTransform.translate.x, bulletTransform.translate.y, bulletTransform.translate.z};
 			}
 		}
 	}
@@ -110,20 +110,24 @@ void IceBulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	}
 
-	if (hasTarget_) {
+if (hasTarget_) {
 		if (!registry.valid(target_)) {
 			hasTarget_ = false;
 			target_ = entt::null;
-		}
-	}
-
-	if (hasTarget_) {
-		if (!registry.all_of<TransformComponent>(target_)) {
+		} else if (!registry.all_of<TransformComponent>(target_)) {
 			hasTarget_ = false;
 			target_ = entt::null;
 		}
 	}
 
+	if (hasTarget_) {
+		if (registry.valid(target_) && registry.all_of<TransformComponent>(target_)) {
+			TransformComponent& targetTransform = registry.get<TransformComponent>(target_);
+
+			lastTargetPosition_ = targetTransform.translate;
+			hasLastTargetPosition_ = true;
+		}
+	}
 	// 1. 上に上がる
 	if (lifeTime_ < upTime_) {
 		bulletTransform.translate.y += 6.0f * dt;
@@ -144,8 +148,36 @@ void IceBulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	}
 
-	// 3. ターゲットがない場合は前に飛ぶ
-	if (!hasTarget_) {
+if (!hasTarget_) {
+		if (hasLastTargetPosition_) {
+			float directionX = lastTargetPosition_.x - bulletTransform.translate.x;
+			float directionY = lastTargetPosition_.y - bulletTransform.translate.y;
+			float directionZ = lastTargetPosition_.z - bulletTransform.translate.z;
+
+			float length = std::sqrt(directionX * directionX + directionY * directionY + directionZ * directionZ);
+
+			if (length <= 0.2f) {
+				scene->DestroyObject(static_cast<uint32_t>(entity));
+				return;
+			}
+
+			directionX /= length;
+			directionY /= length;
+			directionZ /= length;
+
+			bulletTransform.translate.x += directionX * speed_ * dt;
+			bulletTransform.translate.y += directionY * speed_ * dt;
+			bulletTransform.translate.z += directionZ * speed_ * dt;
+			float yaw = std::atan2(directionX, directionZ);
+			float horizontalLength = std::sqrt(directionX * directionX + directionZ * directionZ);
+			float pitch = std::atan2(-directionY, horizontalLength);
+
+			bulletTransform.rotate.y = yaw;
+			bulletTransform.rotate.x = pitch;
+			return;
+		}
+
+		// 今まで通り前に飛ぶ
 		float cosX = std::cos(bulletTransform.rotate.x);
 		float moveX = std::sin(bulletTransform.rotate.y) * cosX * speed_ * dt;
 		float moveY = -std::sin(bulletTransform.rotate.x) * speed_ * dt;

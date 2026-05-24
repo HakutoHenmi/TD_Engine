@@ -8,11 +8,7 @@ namespace Game {
 
 class IceBulletScript : public IScript {
 
-	struct Vector3 {
-		float x;
-		float y;
-		float z;
-	};
+
 
 public:
 	void Start(entt::entity entity, GameScene* scene) override;
@@ -20,6 +16,8 @@ public:
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
 
 private:
+	DirectX::XMFLOAT3 lastTargetPosition_;
+	bool hasLastTargetPosition_ = false;
 	float speed_ = 20.0f;
 	float lifeTime_ = 0.0f;
 	float maxLifeTime_ = 6.0f;
@@ -41,7 +39,7 @@ private:
 	float spiralAngle_ = 0.0f;
 	float spiralRadius_ = 0.0f;
 
-	Vector3 centerPosition_ = {0.0f, 0.0f, 0.0f};
+	DirectX::XMFLOAT3 centerPosition_ = {0.0f, 0.0f, 0.0f};
 };
 
 } // namespace Game

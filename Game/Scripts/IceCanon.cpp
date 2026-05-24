@@ -84,6 +84,12 @@ void IceCanon::UpdateConnection(entt::entity entity, GameScene* scene) {
 	std::unordered_set<entt::entity> foundTanks;
 	std::unordered_set<entt::entity> visitedPipesForTanks;
 
+	for (entt::entity tank : allTanks) {
+		if (IsConnectedSphere(registry, entity, tank, connectRange)) {
+			foundTanks.insert(tank);
+		}
+	}
+
 	for (entt::entity pipe : allPipes) {
 		if (!IsConnectedSphere(registry, entity, pipe, connectRange)) {
 			continue;
