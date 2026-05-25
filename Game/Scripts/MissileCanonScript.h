@@ -19,11 +19,6 @@ private:
 	float explosionRadius_ = 5.0f;
 	float attackTimer_ = 0.0f;
 	float rotationSpeed_ = 1.0f;
-
-	int connectedTankCount = 0;
-	int connectedCanonCount = 0;
-	float connectionCheckTimer_ = 0.0f;
-	bool isConnectedToTank_ = false;
 	entt::entity currentTarget_ = entt::null;
 	float idleSparkTimer_ = 0.0f;
 	float idleDistortionTimer_ = 0.0f;
@@ -40,7 +35,6 @@ private:
 
 private:
 	void Debug(bool connected);
-	void UpdateConnection(entt::entity entity, GameScene* scene);
 	// ★追加: 永続VFX初期化
 	void CreatePersistentVFX(entt::entity entity, GameScene* scene);
 };

@@ -20,15 +20,13 @@ public:
 		Step5_CameraControl,
 		Step6_FacilityIntro,
 		Step7_CannonInstall,
-		Step8_TankInstall,
-		Step9_PipeInstall,
-		Step10_DeleteIntro,
-		Step11_BattleTransition,
-		Step12_PlayerAttack,
-		Step13_CombatPlay,
-		Step14_SkillTree,
-		Step15_EndExplanation,
-		Step16_FreePlayBattle,
+		Step8_DeleteIntro,
+		Step9_BattleTransition,
+		Step10_PlayerAttack,
+		Step11_CombatPlay,
+		Step12_SkillTree,
+		Step13_EndExplanation,
+		Step14_FreePlayBattle,
 		Count
 	};
 
@@ -38,7 +36,7 @@ public:
 
 	static TutorialScript* GetInstance() { return instance_; }
 	TutorialStep GetCurrentStep() const { return tutorialStep_; }
-	bool IsStep10PlacedExtraTank() const { return step10_placedExtraTank_; }
+	bool IsStep8PlacedExtraCannon() const { return step8_placedExtraCannon_; }
 
 private:
 	static TutorialScript* instance_;
@@ -77,13 +75,6 @@ private:
 	bool isFadeFinished_ = false;
 
 	bool isPlacementMode_ = false;
-	bool isPipeSet_ = false;
-	bool hasPipeStartPoint_ = false;
-	float pipeStartX_ = 0.0f;
-	float pipeStartY_ = 0.0f;
-	float pipeStartZ_ = 0.0f;
-	bool hasPlacedTank_ = false;
-	bool hasPlacedPipe_ = false;
 	bool hasPlacedCannon_ = false;
 
 	std::string selectedObjPath_ = "Resources/Models/cube/cube.obj";
@@ -99,11 +90,11 @@ private:
 	int currentLineIndex_ = 0;
 
 	// 各種サブ状態
-	bool step10_placedExtraTank_ = false;
-	bool step10_deletedTank_ = false;
-	bool step14_pageSwitched_ = false;
-	bool step14_upgraded_ = false;
-	int step14_initialSP_ = 0;
+	bool step8_placedExtraCannon_ = false;
+	bool step8_deletedCannon_ = false;
+	bool step12_pageSwitched_ = false;
+	bool step12_upgraded_ = false;
+	int step12_initialSP_ = 0;
 
 	// 削除モード
 	bool isSellMode_ = false;

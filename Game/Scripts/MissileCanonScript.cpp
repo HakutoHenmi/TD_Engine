@@ -28,93 +28,7 @@ static float LerpAngle(float current, float target, float speed, float dt) {
 
 	return current;
 }
-static bool IsConnectedSphere(entt::registry& registry, entt::entity entityA, entt::entity entityB, float connectRange) {
-	if (!registry.valid(entityA) || !registry.valid(entityB))
-		return false;
-	if (!registry.all_of<TransformComponent>(entityA) || !registry.all_of<TransformComponent>(entityB))
-		return false;
 
-	const TransformComponent& transformA = registry.get<TransformComponent>(entityA);
-	const TransformComponent& transformB = registry.get<TransformComponent>(entityB);
-
-	float diffX = transformB.translate.x - transformA.translate.x;
-	float diffY = transformB.translate.y - transformA.translate.y;
-	float diffZ = transformB.translate.z - transformA.translate.z;
-
-	float connectRangeSq = connectRange * connectRange;
-	float dist3DSq = diffX * diffX + diffY * diffY + diffZ * diffZ;
-
-	if (dist3DSq <= connectRangeSq) {
-		return true;
-	}
-
-	float distXZSq = diffX * diffX + diffZ * diffZ;
-	float heightDifference = std::abs(diffY);
-
-	if (heightDifference >= 0.1f) {
-		if (distXZSq <= connectRangeSq) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
-static void CollectConnectedBulletTanks(
-    entt::registry& registry, entt::entity currentPipe, std::unordered_set<entt::entity>& visitedPipes, std::unordered_set<entt::entity>& foundTanks, const std::vector<entt::entity>& allPipes,
-    const std::vector<entt::entity>& allTanks, float connectRange) {
-	visitedPipes.insert(currentPipe);
-
-	for (entt::entity tank : allTanks) {
-		if (IsConnectedSphere(registry, currentPipe, tank, connectRange)) {
-			foundTanks.insert(tank);
-		}
-	}
-
-	for (entt::entity otherPipe : allPipes) {
-		if (otherPipe == currentPipe) {
-			continue;
-		}
-
-		if (visitedPipes.count(otherPipe) > 0) {
-			continue;
-		}
-
-		if (!IsConnectedSphere(registry, currentPipe, otherPipe, connectRange)) {
-			continue;
-		}
-
-		CollectConnectedBulletTanks(registry, otherPipe, visitedPipes, foundTanks, allPipes, allTanks, connectRange);
-	}
-}
-
-static void CollectConnectedCanons(
-    entt::registry& registry, entt::entity currentPipe, std::unordered_set<entt::entity>& visitedPipes, std::unordered_set<entt::entity>& foundCanons, const std::vector<entt::entity>& allPipes,
-    const std::vector<entt::entity>& allCanons, float connectRange) {
-	visitedPipes.insert(currentPipe);
-
-	for (entt::entity canon : allCanons) {
-		if (IsConnectedSphere(registry, currentPipe, canon, connectRange)) {
-			foundCanons.insert(canon);
-		}
-	}
-
-	for (entt::entity otherPipe : allPipes) {
-		if (otherPipe == currentPipe) {
-			continue;
-		}
-
-		if (visitedPipes.count(otherPipe) > 0) {
-			continue;
-		}
-
-		if (!IsConnectedSphere(registry, currentPipe, otherPipe, connectRange)) {
-			continue;
-		}
-
-		CollectConnectedCanons(registry, otherPipe, visitedPipes, foundCanons, allPipes, allCanons, connectRange);
-	}
-}
 
 void MissileCanonScript::Start(entt::entity entity, GameScene* scene) {
 	attackTimer_ = 0.0f;
@@ -134,6 +48,9 @@ void MissileCanonScript::Start(entt::entity entity, GameScene* scene) {
 	if (!registry.all_of<WorldSpaceUIComponent>(entity)) {
 		registry.emplace<WorldSpaceUIComponent>(entity);
 	}
+	if (!registry.all_of<BuffComponent>(entity)) {
+		registry.emplace<BuffComponent>(entity);
+	}
 	CreateBase(entity, scene);
 }
 
@@ -149,25 +66,13 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 		return;
 	}
 	UpdateBase(entity, scene);
-	connectionCheckTimer_ -= dt;
-	if (connectionCheckTimer_ <= 0.0f) {
-		connectionCheckTimer_ = 2.0f; // ★最適化: チェック間隔を0.5秒から2.0秒に延長してCPUスパイクを劇的削減
-		UpdateConnection(entity, scene);
-	}
 
-	float powerRate = 0.0f;
-
-	if (connectedCanonCount > 0) {
-		powerRate = static_cast<float>(connectedTankCount) / static_cast<float>(connectedCanonCount);
-	}
 
 	if (attackTimer_ > 0.0f) {
 		attackTimer_ -= dt;
 	}
 
-	if (!isConnectedToTank_) {
-		return;
-	}
+
 
 	if (!registry.all_of<TransformComponent>(entity)) {
 		return;
@@ -237,9 +142,32 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 
 	float currentAttackInterval = attackInterval_ * missileCoolDownRate;
 
-	if (powerRate > 0.0f) {
-		currentAttackInterval /= powerRate;
+	// ★追加: プレイヤーからの距離によるバフ適用
+	if (registry.all_of<BuffComponent>(entity)) {
+		auto& buff = registry.get<BuffComponent>(entity);
+		buff.isBuffed = false;
+
+		auto players = scene->GetEntitiesByTag(TagType::Player);
+		if (!players.empty() && registry.valid(players[0])) {
+			if (registry.all_of<TransformComponent>(players[0])) {
+				auto& pTrans = registry.get<TransformComponent>(players[0]);
+				auto& cTrans = registry.get<TransformComponent>(entity);
+				float dx = pTrans.translate.x - cTrans.translate.x;
+				float dy = pTrans.translate.y - cTrans.translate.y;
+				float dz = pTrans.translate.z - cTrans.translate.z;
+				float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+
+				if (dist <= buff.buffRadius) {
+					buff.isBuffed = true;
+					// ミサイルのバフ効果：リロード速度上昇、爆発範囲アップ
+					currentAttackInterval /= buff.buffMultiplier;
+					attackAreaRateMisile *= 1.3f;
+				}
+			}
+		}
 	}
+
+
 	float missileGaugeRate = 1.0f - (attackTimer_ / currentAttackInterval);
 
 	if (missileGaugeRate < 0.0f) {
@@ -369,62 +297,11 @@ void MissileCanonScript::OnEditorUI() {
 	ImGui::DragFloat("Explosion Radius", &explosionRadius_, 0.1f, 0.1f, 50.0f);
 
 	ImGui::Separator();
-	ImGui::Text("Connected Tanks: %d", connectedTankCount);
-	ImGui::Text("Connected Canons: %d", connectedCanonCount);
 
-	if (isConnectedToTank_) {
-		ImGui::Text("Connected to Tank: YES");
-	} else {
-		ImGui::Text("Connected to Tank: NO");
-	}
 #endif
 }
 
-void MissileCanonScript::UpdateConnection(entt::entity entity, GameScene* scene) {
-	if (!scene) {
-		return;
-	}
 
-	entt::registry& registry = scene->GetRegistry();
-	float connectRange = 2.5f;
-
-	const std::vector<entt::entity>& allPipes = scene->GetEntitiesByTag(TagType::Pipe);
-	const std::vector<entt::entity>& allTanks = scene->GetEntitiesByTag(TagType::BulletTank);
-	const std::vector<entt::entity>& allCanons = scene->GetEntitiesByTag(TagType::Canon);
-
-	std::unordered_set<entt::entity> foundTanks;
-	std::unordered_set<entt::entity> visitedPipesForTanks;
-
-	for (entt::entity pipe : allPipes) {
-		if (!IsConnectedSphere(registry, entity, pipe, connectRange)) {
-			continue;
-		}
-
-		CollectConnectedBulletTanks(registry, pipe, visitedPipesForTanks, foundTanks, allPipes, allTanks, connectRange);
-	}
-
-	connectedTankCount = static_cast<int>(foundTanks.size());
-
-	if (connectedTankCount > 0) {
-		isConnectedToTank_ = true;
-	} else {
-		isConnectedToTank_ = false;
-	}
-
-	std::unordered_set<entt::entity> foundCanons;
-	std::unordered_set<entt::entity> visitedPipesForCanons;
-
-	for (entt::entity pipe : allPipes) {
-		if (!IsConnectedSphere(registry, entity, pipe, connectRange)) {
-			continue;
-		}
-
-		CollectConnectedCanons(registry, pipe, visitedPipesForCanons, foundCanons, allPipes, allCanons, connectRange);
-	}
-
-	foundCanons.insert(entity);
-	connectedCanonCount = static_cast<int>(foundCanons.size());
-}
 
 void MissileCanonScript::Debug(bool /*connected*/) {}
 

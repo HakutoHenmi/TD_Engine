@@ -25,65 +25,7 @@ static bool HasTag(entt::registry& registry, entt::entity entity, TagType tagNam
 	return registry.get<TagComponent>(entity).tag == tagName;
 }
 
-static bool IsConnectedSphere(entt::registry& registry, entt::entity a, entt::entity b, float connectRange) {
-	if (!registry.valid(a) || !registry.valid(b))
-		return false;
-	if (!registry.all_of<TransformComponent>(a) || !registry.all_of<TransformComponent>(b))
-		return false;
 
-	const TransformComponent& transformA = registry.get<TransformComponent>(a);
-	const TransformComponent& transformB = registry.get<TransformComponent>(b);
-
-	float diffX = transformB.translate.x - transformA.translate.x;
-	float diffY = transformB.translate.y - transformA.translate.y;
-	float diffZ = transformB.translate.z - transformA.translate.z;
-
-	float connectRangeSq = connectRange * connectRange;
-	float dist3DSq = diffX * diffX + diffY * diffY + diffZ * diffZ;
-
-	if (dist3DSq <= connectRangeSq) {
-		return true;
-	}
-
-	float distXZSq = diffX * diffX + diffZ * diffZ;
-	float heightDifference = std::abs(diffY);
-
-	if (heightDifference >= 0.1f) {
-		if (distXZSq <= connectRangeSq) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
-static void CollectConnectedBulletTanks(
-    entt::registry& registry, entt::entity currentPipe, std::unordered_set<entt::entity>& visitedPipes, std::unordered_set<entt::entity>& foundTanks, const std::vector<entt::entity>& allPipes,
-    const std::vector<entt::entity>& allTanks, float connectRange) {
-	visitedPipes.insert(currentPipe);
-
-	for (entt::entity tank : allTanks) {
-		if (IsConnectedSphere(registry, currentPipe, tank, connectRange)) {
-			foundTanks.insert(tank);
-		}
-	}
-
-	for (entt::entity otherPipe : allPipes) {
-		if (otherPipe == currentPipe) {
-			continue;
-		}
-
-		if (visitedPipes.count(otherPipe) > 0) {
-			continue;
-		}
-
-		if (!IsConnectedSphere(registry, currentPipe, otherPipe, connectRange)) {
-			continue;
-		}
-
-		CollectConnectedBulletTanks(registry, otherPipe, visitedPipes, foundTanks, allPipes, allTanks, connectRange);
-	}
-}
 
 void PoisonTrap::Start(entt::entity entity, GameScene* scene) {
 	poisonActiveTimer_ = 0.0f;
@@ -96,6 +38,10 @@ void PoisonTrap::Start(entt::entity entity, GameScene* scene) {
 	if (registry.all_of<MeshRendererComponent>(entity)) {
 		auto& mr = registry.get<MeshRendererComponent>(entity);
 		mr.color = {0.7f, 1.0f, 0.6f, 1.0f};
+	}
+
+	if (!registry.all_of<BuffComponent>(entity)) {
+		registry.emplace<BuffComponent>(entity);
 	}
 }
 
@@ -110,12 +56,7 @@ void PoisonTrap::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	}
 
-	// 接続チェック
-	connectionCheckTimer_ -= dt;
-	if (connectionCheckTimer_ <= 0.0f) {
-		connectionCheckTimer_ = 2.0f; // ★最適化: チェック間隔を0.5秒から2.0秒に延長してCPUスパイクを劇的削減
-		UpdateConnection(entity, scene);
-	}
+
 
 	// --- 待機時エフェクト (Idle VFX) ---
 	if (!persistentVfxCreated_) {
@@ -124,16 +65,13 @@ void PoisonTrap::Update(entt::entity entity, GameScene* scene, float dt) {
 			CreatePersistentVFX(entity, scene);
 		}
 	} else {
-		float targetEmitRate = isConnectedToTank_ ? 8.0f : 0.0f;
+		float targetEmitRate = 8.0f;
 		if (registry.valid(persistentGasVfx_) && registry.all_of<ParticleEmitterComponent>(persistentGasVfx_)) {
 			auto& pec = registry.get<ParticleEmitterComponent>(persistentGasVfx_);
 			pec.emitter.params.emitRate = targetEmitRate;
 		}
 	}
 
-	if (!isConnectedToTank_) {
-		return;
-	}
 
 	if (!IsEnemyInRange(entity, scene, poisonRange_)) {
 		return;
@@ -213,6 +151,31 @@ void PoisonTrap::Update(entt::entity entity, GameScene* scene, float dt) {
 	float finalRange = poisonRange_ * skillRangeRate_;
 	finalPoisonActiveTime_ = poisonActiveTime_ * poisonDurationRate_;
 	finalPoisonCoolTime_ = poisonCoolTime_ * poisonCooldownRate_;
+
+	// ★追加: プレイヤーからの距離によるバフ適用
+	if (registry.all_of<BuffComponent>(entity)) {
+		auto& buff = registry.get<BuffComponent>(entity);
+		buff.isBuffed = false;
+
+		auto players = scene->GetEntitiesByTag(TagType::Player);
+		if (!players.empty() && registry.valid(players[0])) {
+			if (registry.all_of<TransformComponent>(players[0])) {
+				auto& pTrans = registry.get<TransformComponent>(players[0]);
+				auto& cTrans = registry.get<TransformComponent>(entity);
+				float dx = pTrans.translate.x - cTrans.translate.x;
+				float dy = pTrans.translate.y - cTrans.translate.y;
+				float dz = pTrans.translate.z - cTrans.translate.z;
+				float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+
+				if (dist <= buff.buffRadius) {
+					buff.isBuffed = true;
+					// ポイズンのバフ効果：範囲拡大、持続時間延長
+					finalRange *= buff.buffMultiplier;
+					finalPoisonActiveTime_ *= 1.2f;
+				}
+			}
+		}
+	}
 	CreatePoisonAttackArea(entity, scene, finalDamage, finalRange);
 
 // タイマー開始
@@ -237,36 +200,7 @@ void PoisonTrap::OnDestroy(entt::entity /*entity*/, GameScene* scene) {
 
 void PoisonTrap::OnEditorUI() {}
 
-void PoisonTrap::UpdateConnection(entt::entity entity, GameScene* scene) {
-	if (!scene) {
-		return;
-	}
 
-	entt::registry& registry = scene->GetRegistry();
-	float connectRange = 3.0f;
-
-	const std::vector<entt::entity>& allPipes = scene->GetEntitiesByTag(TagType::Pipe);
-	const std::vector<entt::entity>& allTanks = scene->GetEntitiesByTag(TagType::BulletTank);
-
-	std::unordered_set<entt::entity> foundTanks;
-	std::unordered_set<entt::entity> visitedPipesForTanks;
-
-	for (entt::entity pipe : allPipes) {
-		if (!IsConnectedSphere(registry, entity, pipe, connectRange)) {
-			continue;
-		}
-
-		CollectConnectedBulletTanks(registry, pipe, visitedPipesForTanks, foundTanks, allPipes, allTanks, connectRange);
-	}
-
-	connectedTankCount_ = static_cast<int>(foundTanks.size());
-
-	if (connectedTankCount_ > 0) {
-		isConnectedToTank_ = true;
-	} else {
-		isConnectedToTank_ = false;
-	}
-}
 #pragma region HelperFunctions
 bool PoisonTrap::IsEnemyInRange(entt::entity entity, GameScene* scene, float range) {
 	if (!scene) {

@@ -365,6 +365,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 				float expDmg = isSkillActive_ ? 80.0f : 32.0f;
 				expVc.SetValue("Damage", expDmg);
 				expVc.SetValue("ExplosionRadius", expRad);
+				expVc.SetValue("IsPlayerAttack", 1.0f); // ★追加: プレイヤー攻撃フラグ
 			}
 		});
 		// ★追加: プレイヤー被ダメージイベント
@@ -408,8 +409,41 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (gunShootTimer_ > 0.0f)
 		gunShootTimer_ -= dt;
 
-	// ★追加: ダメージ演出の更新
+	// ★追加: 設備へのバフ効果範囲の視覚化
 	auto* renderer = scene->GetRenderer();
+	if (renderer && scene->GetRegistry().all_of<TransformComponent>(entity)) {
+		auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
+		const int segments = 48;
+		for (int i = 0; i < segments; ++i) {
+			float theta1 = (2.0f * 3.14159265f * i) / segments;
+			float theta2 = (2.0f * 3.14159265f * (i + 1)) / segments;
+			Engine::Vector3 p1 = {pTc.translate.x + buffRadius_ * std::cos(theta1), pTc.translate.y + 0.15f, pTc.translate.z + buffRadius_ * std::sin(theta1)};
+			Engine::Vector3 p2 = {pTc.translate.x + buffRadius_ * std::cos(theta2), pTc.translate.y + 0.15f, pTc.translate.z + buffRadius_ * std::sin(theta2)};
+			// 発光する黄緑色のラインでオーラ範囲を描画
+			renderer->DrawLine3D(p1, p2, {0.6f, 1.0f, 0.2f, 1.0f}, true);
+		}
+
+		// ★追加: バフ中のタワーへのエネルギー線を描画 (案1)
+		auto viewBuff = scene->GetRegistry().view<BuffComponent, TransformComponent>();
+		for (auto e : viewBuff) {
+			auto& buff = viewBuff.get<BuffComponent>(e);
+			if (buff.isBuffed) {
+				auto& tTc = viewBuff.get<TransformComponent>(e);
+				// プレイヤーの胸辺りからタワーの少し高めの位置へ線を引く
+				Engine::Vector3 pCenter = {pTc.translate.x, pTc.translate.y + 1.0f, pTc.translate.z};
+				Engine::Vector3 tCenter = {tTc.translate.x, tTc.translate.y + 1.5f, tTc.translate.z};
+				
+				// 少し線を太く/光って見せるため、微小なオフセットをつけて複数本描画
+				renderer->DrawLine3D(pCenter, tCenter, {0.5f, 1.0f, 0.2f, 1.0f}, true);
+				Engine::Vector3 o1 = {tCenter.x + 0.05f, tCenter.y, tCenter.z + 0.05f};
+				renderer->DrawLine3D(pCenter, o1, {0.5f, 1.0f, 0.2f, 0.6f}, true);
+				Engine::Vector3 o2 = {tCenter.x - 0.05f, tCenter.y, tCenter.z - 0.05f};
+				renderer->DrawLine3D(pCenter, o2, {0.5f, 1.0f, 0.2f, 0.6f}, true);
+			}
+		}
+	}
+
+	// ★追加: ダメージ演出の更新
 	bool isPrep = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase);
 
 	if (damageEffectTimer_ > 0.0f) {
@@ -2432,6 +2466,7 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 	if (homingTarget != entt::null) {
 		auto& bVc = scene->GetRegistry().get_or_emplace<VariableComponent>(bullet);
 		bVc.SetValue("HasTarget", 1.0f);
+		bVc.SetValue("IsPlayerAttack", 1.0f); // ★追加: プレイヤー攻撃フラグ
 
 		uint32_t targetId = static_cast<uint32_t>(homingTarget);
 		bVc.SetValue("TargetHigh", static_cast<float>(targetId >> 16));
@@ -2537,6 +2572,7 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 	// ★修正: 先ほど get_or_emplace されている可能性があるため、ここも get_or_emplace に変更する
 	auto& vc = scene->GetRegistry().get_or_emplace<VariableComponent>(bullet);
 	vc.SetValue("MaxLifeTime", lifeTime);
+	vc.SetValue("IsPlayerAttack", 1.0f); // ★追加: プレイヤーの攻撃フラグ
 	if (explode) {
 		vc.SetValue("Enhanced", 1.0f);
 	}

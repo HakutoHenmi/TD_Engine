@@ -8,104 +8,7 @@
 #include <unordered_set>
 #include <vector>
 namespace Game {
-static bool IsConnectedSphere(entt::registry& registry, entt::entity a, entt::entity b, float connectRange) {
-	if (!registry.valid(a) || !registry.valid(b)) {
-		return false;
-	}
 
-	if (!registry.all_of<TransformComponent>(a) || !registry.all_of<TransformComponent>(b)) {
-		return false;
-	}
-
-	const TransformComponent& transformA = registry.get<TransformComponent>(a);
-	const TransformComponent& transformB = registry.get<TransformComponent>(b);
-
-	float diffX = transformB.translate.x - transformA.translate.x;
-	float diffY = transformB.translate.y - transformA.translate.y;
-	float diffZ = transformB.translate.z - transformA.translate.z;
-
-	float connectRangeSq = connectRange * connectRange;
-	float dist3DSq = diffX * diffX + diffY * diffY + diffZ * diffZ;
-
-	if (dist3DSq <= connectRangeSq) {
-		return true;
-	}
-
-	float distXZSq = diffX * diffX + diffZ * diffZ;
-	float heightDifference = std::abs(diffY);
-
-	if (heightDifference >= 0.1f) {
-		if (distXZSq <= connectRangeSq) {
-			return true;
-		}
-	}
-
-	return false;
-}
-static void CollectConnectedBulletTanks(
-    entt::registry& registry, entt::entity currentPipe, std::unordered_set<entt::entity>& visitedPipes, std::unordered_set<entt::entity>& foundTanks, const std::vector<entt::entity>& allPipes,
-    const std::vector<entt::entity>& allTanks, float connectRange) {
-
-	visitedPipes.insert(currentPipe);
-
-	for (entt::entity tank : allTanks) {
-		if (IsConnectedSphere(registry, currentPipe, tank, connectRange)) {
-			foundTanks.insert(tank);
-		}
-	}
-
-	for (entt::entity otherPipe : allPipes) {
-		if (otherPipe == currentPipe) {
-			continue;
-		}
-
-		if (visitedPipes.count(otherPipe) > 0) {
-			continue;
-		}
-
-		if (!IsConnectedSphere(registry, currentPipe, otherPipe, connectRange)) {
-			continue;
-		}
-
-		CollectConnectedBulletTanks(registry, otherPipe, visitedPipes, foundTanks, allPipes, allTanks, connectRange);
-	}
-}
-void IceCanon::UpdateConnection(entt::entity entity, GameScene* scene) {
-	if (!scene) {
-		return;
-	}
-
-	entt::registry& registry = scene->GetRegistry();
-	float connectRange = 3.0f;
-
-	const std::vector<entt::entity>& allPipes = scene->GetEntitiesByTag(TagType::Pipe);
-	const std::vector<entt::entity>& allTanks = scene->GetEntitiesByTag(TagType::BulletTank);
-
-	std::unordered_set<entt::entity> foundTanks;
-	std::unordered_set<entt::entity> visitedPipesForTanks;
-
-	for (entt::entity tank : allTanks) {
-		if (IsConnectedSphere(registry, entity, tank, connectRange)) {
-			foundTanks.insert(tank);
-		}
-	}
-
-	for (entt::entity pipe : allPipes) {
-		if (!IsConnectedSphere(registry, entity, pipe, connectRange)) {
-			continue;
-		}
-
-		CollectConnectedBulletTanks(registry, pipe, visitedPipesForTanks, foundTanks, allPipes, allTanks, connectRange);
-	}
-
-	connectedTankCount_ = static_cast<int>(foundTanks.size());
-
-	if (connectedTankCount_ > 0) {
-		isConnectedToTank_ = true;
-	} else {
-		isConnectedToTank_ = false;
-	}
-}
 
 
 
@@ -135,6 +38,10 @@ void IceCanon::Start(entt::entity entity, GameScene* scene) {
 		pl.enabled = true;
 	}
 
+	if (!registry.all_of<BuffComponent>(entity)) {
+		registry.emplace<BuffComponent>(entity);
+	}
+
 	if (!registry.all_of<HealthComponent>(entity)) {
 		auto& hc = registry.emplace<HealthComponent>(entity);
 		hc.hp = 100.0f;
@@ -159,11 +66,7 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (!registry.valid(entity)) {
 		return;
 	}
-	connectionCheckTimer_ -= dt;
-	if (connectionCheckTimer_ <= 0.0f) {
-		connectionCheckTimer_ = 2.0f;
-		UpdateConnection(entity, scene);
-	}
+
 
 	if (!registry.all_of<TransformComponent>(entity)) {
 		return;
@@ -179,9 +82,8 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 				CreatePersistentVFX(entity, scene);
 			}
 		} else {
-			// パイプが接続されている時のみ冷気を発生させる
-			float targetMistEmitRate = isConnectedToTank_ ? 22.0f : 0.0f;
-			float targetCrystalEmitRate = isConnectedToTank_ ? 12.0f : 0.0f;
+			float targetMistEmitRate = 22.0f;
+			float targetCrystalEmitRate = 12.0f;
 
 			if (registry.valid(persistentMistVfx_) && registry.all_of<ParticleEmitterComponent>(persistentMistVfx_)) {
 				auto& pec = registry.get<ParticleEmitterComponent>(persistentMistVfx_);
@@ -194,9 +96,7 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 		}
 	}
 
-	if (!isConnectedToTank_) {
-		return;
-	}
+
 
 	attackTimer_ -= dt;
 	if (attackTimer_ > 0.0f) {
@@ -241,6 +141,31 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 	float currentStopTime = stopTime_ * stopTimeRate;
 	int bulletCount = static_cast<int>(6.0f * bulletCountRate);
 
+	// ★追加: プレイヤーからの距離によるバフ適用
+	if (registry.all_of<BuffComponent>(entity)) {
+		auto& buff = registry.get<BuffComponent>(entity);
+		buff.isBuffed = false;
+
+		auto players = scene->GetEntitiesByTag(TagType::Player);
+		if (!players.empty() && registry.valid(players[0])) {
+			if (registry.all_of<TransformComponent>(players[0])) {
+				auto& pTrans = registry.get<TransformComponent>(players[0]);
+				auto& cTrans = registry.get<TransformComponent>(entity);
+				float dx = pTrans.translate.x - cTrans.translate.x;
+				float dy = pTrans.translate.y - cTrans.translate.y;
+				float dz = pTrans.translate.z - cTrans.translate.z;
+				float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+
+				if (dist <= buff.buffRadius) {
+					buff.isBuffed = true;
+					// アイスキャノンのバフ効果：弾数増加、フリーズ時間延長
+					bulletCount += 3;
+					currentStopTime *= 1.5f;
+				}
+			}
+		}
+	}
+
 	if (bulletCount < 1) {
 		bulletCount = 1;
 	}
@@ -257,9 +182,7 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 		}
 
 
-		if (!isConnectedToTank_) {
-			return;
-		}
+
 		if (!registry.all_of<TransformComponent>(other)) {
 			continue;
 		}

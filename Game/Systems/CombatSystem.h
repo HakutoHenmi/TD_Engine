@@ -114,7 +114,49 @@ public:
 						auto& hc = registry.get<HealthComponent>(defenderEntity);
 						if (hc.invincibleTime <= 0.0f) {
 							auto& hurtbox = registry.get<HurtboxComponent>(defenderEntity);
-							hc.hp -= hitbox.damage * hurtbox.damageMultiplier;
+							
+							// ★敵への攻撃判定・シールドとダメージ係数の処理
+							if (dTag == TagType::Enemy) {
+								bool isPlayerAttack = false;
+								if (aTag == TagType::PlayerSword || aTag == TagType::Sword) {
+									isPlayerAttack = true;
+								} else if (registry.all_of<VariableComponent>(attackerEntity)) {
+									if (registry.get<VariableComponent>(attackerEntity).GetValue("IsPlayerAttack", 0.0f) > 0.5f) {
+										isPlayerAttack = true;
+									}
+								}
+
+								// ダメージ係数
+								// プレイヤー攻撃: シールドに適正ダメージ(1.0倍)、本体には少しだけダメージ(0.2倍)
+								// タワー攻撃: シールドに極小ダメージ(0.1倍)、本体に超大ダメージ(2.0倍)
+								float shieldDamageRate = isPlayerAttack ? 1.0f : 0.1f;
+								float hpDamageRate = isPlayerAttack ? 0.2f : 2.0f;
+
+								float rawDamage = hitbox.damage * hurtbox.damageMultiplier;
+								float damageToApply = rawDamage;
+
+								if (hc.shieldHp > 0.0f) {
+									float effectiveShieldDamage = damageToApply * shieldDamageRate;
+									if (hc.shieldHp >= effectiveShieldDamage) {
+										hc.shieldHp -= effectiveShieldDamage;
+										damageToApply = 0.0f; // 全てシールドで吸収
+									} else {
+										float overflowDamage = effectiveShieldDamage - hc.shieldHp;
+										hc.shieldHp = 0.0f; // シールド破壊
+										// 残りのダメージを本体用の係数に変換して適用
+										damageToApply = (overflowDamage / shieldDamageRate) * hpDamageRate;
+									}
+								} else {
+									// シールドがない場合はそのまま本体へ
+									damageToApply *= hpDamageRate;
+								}
+
+								hc.hp -= damageToApply;
+							} else {
+								// 敵以外（プレイヤー等）への通常ダメージ処理
+								hc.hp -= hitbox.damage * hurtbox.damageMultiplier;
+							}
+							
 							hc.invincibleTime = 0.5f;
 
 							if (aTag == TagType::Poison && dTag == TagType::Enemy) {
