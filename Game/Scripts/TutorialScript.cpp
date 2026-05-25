@@ -90,7 +90,8 @@ const std::unordered_map<TutorialScript::TutorialStep, std::vector<std::string>>
     { TutorialScript::TutorialStep::Step14_SkillTree, {
         "敵を倒してレベルアップしました！能力を強化しましょう。\nNキーを押してスキルツリーを開いてください。",
         "スキルツリーが開きました。矢印キーか画面端のボタンでページを切り替えて、好きなスキルを1つ強化してください。",
-        "強化が完了しました！[SPACE]キーを押して説明を終わります。"
+        "強化が完了しました！",
+        "これでチュートリアルは終了ですが、ゲームはここからが本番です！"
     }},
     { TutorialScript::TutorialStep::Step15_EndExplanation, {
         "これでチュートリアルの説明は全て終了です！",
@@ -769,12 +770,10 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float /*dt*/)
         UpdateSkillTree(entity, scene, keyNTrigger);
 
         if (!skillTree_.IsOpen()) {
-            if (step14_pageSwitched_ && step14_upgraded_) {
-                currentLineIndex_ = 2;
-            } else {
-                currentLineIndex_ = 0;
-            }
+            // SkillTree が閉じられた
+            currentLineIndex_ = 3;
         } else {
+            // SkillTree が開いている
             if (input->IsMouseTrigger(0)) {
                 float mx = 0, my = 0;
                 input->GetMousePos(mx, my);
@@ -796,13 +795,14 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float /*dt*/)
             }
 
             if (skillTree_.GetSkillPoints() < step14_initialSP_) {
+                // スキルを強化した
                 step14_upgraded_ = true;
-            }
-
-            if (step14_pageSwitched_ && step14_upgraded_) {
                 currentLineIndex_ = 2;
-            } else {
+            } else if (keyNTrigger) {
+                // Nを押した
                 currentLineIndex_ = 1;
+            } else {
+                currentLineIndex_ = 0;
             }
         }
         preKeyN_ = keyNTrigger;
