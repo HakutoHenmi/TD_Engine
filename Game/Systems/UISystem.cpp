@@ -189,6 +189,29 @@ void UISystem::DrawUI(entt::registry& registry, GameContext& ctx) {
 					drawList->AddRectFilled(pMin, ImVec2(pMin.x + curW, pMax.y), IM_COL32(50, 230, 50, 255));
 					// 枠
 					drawList->AddRect(pMin, pMax, IM_COL32(255, 255, 255, 200));
+
+					// ★追加: シールドバーの描画 (HPバーのすぐ上に描画)
+					if (hc.maxShieldHp > 0.0f && hc.shieldHp > 0.0f) {
+						bool isEnemy = false;
+						if (registry.all_of<TagComponent>(e) && registry.get<TagComponent>(e).tag == TagType::Enemy) {
+							isEnemy = true;
+						}
+						
+						if (isEnemy) {
+							float shieldRate = hc.shieldHp / hc.maxShieldHp;
+							float shieldW = barW * std::clamp(shieldRate, 0.0f, 1.0f);
+							
+							ImVec2 sMin(pMin.x, pMin.y - barH - 2.0f); // HPバーの上に配置
+							ImVec2 sMax(pMax.x, pMin.y - 2.0f);
+							
+							// シールド背景
+							drawList->AddRectFilled(sMin, sMax, IM_COL32(20, 20, 60, 180));
+							// シールド残量 (青色)
+							drawList->AddRectFilled(sMin, ImVec2(sMin.x + shieldW, sMax.y), IM_COL32(50, 150, 255, 255));
+							// 枠
+							drawList->AddRect(sMin, sMax, IM_COL32(255, 255, 255, 200));
+						}
+					}
 				}
 			}
 		}
@@ -207,7 +230,40 @@ void UISystem::DrawUI(entt::registry& registry, GameContext& ctx) {
 	DrawCoolTimeUI(registry, ctx, drawList, TagType::Canon);
 	DrawMissileCoolTimeUI(registry, ctx, drawList);
 	DrawPoisonCoolTimeUI(registry, ctx, drawList);
-//	DrawCoolTimeUI(registry, ctx, drawList, TagType::);
+
+	// ★追加: 案4 バフアイコンの描画（タワーの頭上に上向き矢印）
+	auto viewBuff = registry.view<BuffComponent, TransformComponent>();
+	for (auto e : viewBuff) {
+		auto& buff = viewBuff.get<BuffComponent>(e);
+		if (buff.isBuffed) {
+			auto& tTc = viewBuff.get<TransformComponent>(e);
+			float sx, sy;
+			// クールタイムUIと被らないように少し高め(y+4.0f)に表示
+			DirectX::XMFLOAT3 pos = {tTc.translate.x, tTc.translate.y + 4.0f, tTc.translate.z};
+			if (WorldToScreenWithView(pos, *ctx.camera, ctx.viewportOffset, ctx.viewportSize, sx, sy)) {
+				ImVec2 center(sx, sy);
+				// 黄緑色の背景サークル
+				drawList->AddCircleFilled(center, 16.0f, IM_COL32(40, 160, 40, 220));
+				drawList->AddCircle(center, 16.0f, IM_COL32(120, 255, 120, 255), 24, 2.0f);
+				
+				// 白い上向きの矢印を描画
+				// 矢印の傘（三角形）
+				drawList->AddTriangleFilled(
+					ImVec2(sx, sy - 8.0f),
+					ImVec2(sx - 7.0f, sy + 2.0f),
+					ImVec2(sx + 7.0f, sy + 2.0f),
+					IM_COL32(255, 255, 255, 255)
+				);
+				// 矢印の棒（四角形）
+				drawList->AddRectFilled(
+					ImVec2(sx - 3.0f, sy + 2.0f),
+					ImVec2(sx + 3.0f, sy + 8.0f),
+					IM_COL32(255, 255, 255, 255)
+				);
+			}
+		}
+	}
+
 #endif
 }
 

@@ -15,7 +15,6 @@ public:
 
 private:
 	void Debug(bool connected);
-	void UpdateConnection(entt::entity entity, GameScene* scene);
 	bool IsEnemyInRange(entt::entity entity, GameScene* scene, float range);
 	void CreatePoisonAttackArea(entt::entity entity, GameScene* scene, float damage, float range);
 
@@ -28,10 +27,6 @@ private:
 
 	float poisonActiveTimer_ = 0.0f;
 	float poisonCoolTimer_ = 0.0f;
-
-	float connectionCheckTimer_ = 0.0f;
-	int connectedTankCount_ = 0;
-	bool isConnectedToTank_ = false;
 
 	float skillPowerRate_ = 1.0f;
 	float skillSpeedRate_ = 1.0f;

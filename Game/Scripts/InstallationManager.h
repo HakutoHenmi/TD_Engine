@@ -38,13 +38,13 @@ public:
 
 private:
 	GameScene* currentScene_ = nullptr;
-	ButtonData buttons_[7];
+	ButtonData buttons_[5];
 	int currentPage_ = 0;
 	static InstallationManager* instance_;
 
 	// 固定パス（ImGuiではなくコードで管理するための変数）
-	std::string texPaths_[7];
-	std::string prefabPaths_[7];
+	std::string texPaths_[5];
+	std::string prefabPaths_[5];
 
 	void EnsureButtonEntity(ButtonData& data, GameScene* scene);
 };

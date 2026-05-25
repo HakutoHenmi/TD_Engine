@@ -151,7 +151,6 @@ private:
     int lastViewMode_ = 0; // 0=Scene, 1=Game
 
     friend class EditorUI;
-    friend class PipeEditor;
     friend class EnemySpawnerEditor;
 
 
