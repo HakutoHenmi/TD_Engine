@@ -23,6 +23,11 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 	while (ShowCursor(TRUE) < 0);
 	prevCursorToggle_ = false;
 
+	// ★初期位置を保存
+	if (scene->GetRegistry().all_of<TransformComponent>(entity)) {
+		initialPos_ = scene->GetRegistry().get<TransformComponent>(entity).translate;
+	}
+
 	// ★追加: プレイヤーの3Dモデルを GLTF/GLB (sotai3.glb) に置き換え
 	auto* pRenderer = scene->GetRenderer();
 	if (pRenderer) {
@@ -93,8 +98,7 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 	auto& sTc = scene->GetRegistry().get_or_emplace<TransformComponent>(sword);
 	sTc.scale = { 1.0f, 1.0f, 1.0f }; // 剣サイズ
 
-	auto& sHierarchy = scene->GetRegistry().get_or_emplace<HierarchyComponent>(sword);
-	sHierarchy.parentId = entity; // プレイヤーの子にする
+	scene->SetParent(sword, entity); // ★修正: SetParent経由で親子関係を構築
 
 	auto& sTag = scene->GetRegistry().get_or_emplace<TagComponent>(sword);
 	sTag.tag = TagType::PlayerSword;
@@ -188,8 +192,7 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 	auto& gTc = scene->GetRegistry().get_or_emplace<TransformComponent>(gun);
 	gTc.scale = { 2.2f, 2.2f, 2.2f }; // ピストルを大きく表示
 
-	auto& gHierarchy = scene->GetRegistry().get_or_emplace<HierarchyComponent>(gun);
-	gHierarchy.parentId = entity;
+	scene->SetParent(gun, entity); // ★修正: SetParent経由で親子関係を構築
 
 	if (renderer) {
 		auto& gMr = scene->GetRegistry().get_or_emplace<MeshRendererComponent>(gun);
@@ -407,6 +410,18 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		// 戦闘フェーズ等から準備フェーズに戻った時、自動でカーソルを表示する
 		isCursorVisible_ = true;
 		while (ShowCursor(TRUE) < 0);
+
+		// ★追加: フェーズクリア(準備フェーズ移行)時に初期位置へワープし、飛行状態などもリセットする
+		auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
+		pTc.translate = initialPos_;
+		
+		if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
+			auto& rb = scene->GetRegistry().get<RigidbodyComponent>(entity);
+			rb.velocity = {0.0f, 0.0f, 0.0f};
+		}
+		isFlying_ = false;
+		flightPressure_ = maxFlightPressure_;
+		recoilVelocity_ = {0.0f, 0.0f, 0.0f};
 	}
 	s_wasPrep = isPrep;
 
@@ -677,6 +692,33 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))  scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = true;
 	}
 
+	// ★追加: 各ステージで世界の端から落ちないように見えない壁(座標クランプ)を実装
+	if (!isPrep && !isInsert) {
+		entt::entity floor = scene->FindObjectByName("Floor");
+		if (floor != entt::null && scene->GetRegistry().all_of<TransformComponent>(floor)) {
+			auto& fTc = scene->GetRegistry().get<TransformComponent>(floor);
+			// Floorのスケールを元にクランプ境界を計算。マージン(1.0f)を引いて落ちる前に止める。
+			float boundX = fTc.scale.x - 1.0f; 
+			float boundZ = fTc.scale.y - 1.0f; // Stage床はX軸に-90度回転しているので奥行きはscale.y
+			
+			auto& playerTc = scene->GetRegistry().get<TransformComponent>(entity);
+			float clampedX = std::clamp(playerTc.translate.x, fTc.translate.x - boundX, fTc.translate.x + boundX);
+			float clampedZ = std::clamp(playerTc.translate.z, fTc.translate.z - boundZ, fTc.translate.z + boundZ);
+			
+			// 座標がクランプされた場合＝壁にぶつかっているため、めり込み防止と慣性のリセット
+			if (playerTc.translate.x != clampedX || playerTc.translate.z != clampedZ) {
+				playerTc.translate.x = clampedX;
+				playerTc.translate.z = clampedZ;
+				
+				if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
+					auto& rb = scene->GetRegistry().get<RigidbodyComponent>(entity);
+					if (playerTc.translate.x == clampedX) rb.velocity.x = 0.0f;
+					if (playerTc.translate.z == clampedZ) rb.velocity.z = 0.0f;
+				}
+			}
+		}
+	}
+
 	// ★追加: 大剣の空中溜め攻撃時の浮遊判定のため、状態フラグを VariableComponent に設定する
 	{
 		auto& vc = scene->GetRegistry().get_or_emplace<VariableComponent>(entity);
@@ -776,56 +818,72 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	{
 		auto* uiRenderer = Engine::Renderer::GetInstance();
 		if (uiRenderer) {
-			// ---- 経験値バー ----
-			float progress = nextExperience_ > 0.0f ? (experience_ / nextExperience_) : 0.0f;
-			progress = std::clamp(progress, 0.0f, 1.0f);
+			// ---- HP＆経験値ゲージ (HPIN.png) ----
+			float hpProgress = 1.0f;
+			if (scene->GetRegistry().all_of<HealthComponent>(entity)) {
+				auto& hc = scene->GetRegistry().get<HealthComponent>(entity);
+				hpProgress = hc.maxHp > 0.0f ? (hc.hp / hc.maxHp) : 0.0f;
+			}
+			float expProgress = nextExperience_ > 0.0f ? (experience_ / nextExperience_) : 0.0f;
+			hpProgress = std::clamp(hpProgress, 0.0f, 1.0f);
+			expProgress = std::clamp(expProgress, 0.0f, 1.0f);
 
-			// 背景 (黒半透明)
-			Engine::Renderer::SdfUIDesc bgDesc{};
-			bgDesc.centerPx = {170.0f, 32.0f};
-			bgDesc.sizePx = {300.0f, 24.0f};
-			bgDesc.lineWidth = 0.0f;
-			bgDesc.glow = 0.0f;
-			bgDesc.color = {0.1f, 0.1f, 0.1f, 0.8f};
-			bgDesc.shape = 0;
-			bgDesc.round = 4.0f;
-			bgDesc.progress = 1.0f;
-			bgDesc.fill = 1.0f;
-			uiRenderer->DrawSDFUI(bgDesc);
-
-			// 経験値バー本体 (青系)
-			Engine::Renderer::SdfUIDesc barDesc{};
-			barDesc.centerPx = {170.0f, 32.0f};
-			barDesc.sizePx = {300.0f, 24.0f};
-			barDesc.lineWidth = 0.0f;
-			barDesc.glow = 2.0f;
-			barDesc.color = {0.2f, 0.6f, 1.0f, 1.0f};
-			barDesc.shape = 0;
-			barDesc.round = 4.0f;
-			barDesc.progress = progress;
-			barDesc.fill = 1.0f;
-			if (progress > 0.0f) {
-				uiRenderer->DrawSDFUI(barDesc);
+			static uint32_t s_hpinTex = 0;
+			if (s_hpinTex == 0) {
+				s_hpinTex = uiRenderer->LoadTexture2D("Resources/Textures/UI/HPIN.png");
 			}
 
-			// 外枠 (白)
-			Engine::Renderer::SdfUIDesc outlineDesc{};
-			outlineDesc.centerPx = {170.0f, 32.0f};
-			outlineDesc.sizePx = {300.0f, 24.0f};
-			outlineDesc.lineWidth = 2.0f;
-			outlineDesc.glow = 0.0f;
-			outlineDesc.color = {1.0f, 1.0f, 1.0f, 1.0f};
-			outlineDesc.shape = 0;
-			outlineDesc.round = 4.0f;
-			outlineDesc.progress = 1.0f;
-			outlineDesc.fill = 0.0f;
-			uiRenderer->DrawSDFUI(outlineDesc);
+			// HPIN.pngの元画像サイズ (1024x128) とスケール
+			float scale = 0.45f;
+			float gaugeW = 1024.0f * scale;
+			float gaugeH = 128.0f * scale;
+			float gaugeX = 20.0f;
+			float gaugeY = 20.0f;
+
+			// ピクセルシェーダー(SDFUI)で灰色のゲージ内を埋める (HP)
+			Engine::Renderer::SdfUIDesc hpDesc{};
+			// 少し長さを増やし、左端(X=145付近)を揃える (中心520, 幅750)
+			hpDesc.centerPx = {gaugeX + 520.0f * scale, gaugeY + 52.0f * scale};
+			hpDesc.sizePx = {750.0f * scale, 12.0f * scale};
+			hpDesc.lineWidth = 0.0f;
+			hpDesc.glow = 0.0f; // 枠からはみ出ないようにglowを0に
+			hpDesc.color = {0.8f, 0.2f, 0.2f, 1.0f}; // 赤色
+			hpDesc.shape = 0;
+			hpDesc.round = hpDesc.sizePx.y * 0.5f; // 端を完全な半円にする
+			hpDesc.progress = hpProgress;
+			hpDesc.fill = 1.0f;
+			if (hpProgress > 0.0f) uiRenderer->DrawSDFUI(hpDesc);
+
+			// ピクセルシェーダー(SDFUI)で灰色のゲージ内を埋める (経験値)
+			Engine::Renderer::SdfUIDesc expDesc{};
+			// HPゲージと長さを完全に一致させる (中心520, 幅750)
+			expDesc.centerPx = {gaugeX + 520.0f * scale, gaugeY + 76.0f * scale};
+			expDesc.sizePx = {750.0f * scale, 12.0f * scale};
+			expDesc.lineWidth = 0.0f;
+			expDesc.glow = 0.0f;
+			expDesc.color = {0.2f, 0.8f, 0.2f, 1.0f}; // 緑色
+			expDesc.shape = 0;
+			expDesc.round = expDesc.sizePx.y * 0.5f;
+			expDesc.progress = expProgress;
+			expDesc.fill = 1.0f;
+			if (expProgress > 0.0f) uiRenderer->DrawSDFUI(expDesc);
+
+			// 上からHPIN.pngを被せる(透過部分からゲージが見える)
+			Engine::Renderer::SpriteDesc hpinDesc{};
+			hpinDesc.x = gaugeX;
+			hpinDesc.y = gaugeY;
+			hpinDesc.w = gaugeW;
+			hpinDesc.h = gaugeH;
+			hpinDesc.pivotX = 0.0f;
+			hpinDesc.pivotY = 0.0f;
+			uiRenderer->DrawSprite(s_hpinTex, hpinDesc);
 
 			// テキスト (Lvと経験値)
 			char textBuf[64];
 			snprintf(textBuf, sizeof(textBuf), "Lv.%d   EXP: %.1f / %.1f", level_, experience_, nextExperience_);
-			uiRenderer->DrawString(textBuf, 32.0f, 26.0f, 0.5f, {0,0,0,1});
-			uiRenderer->DrawString(textBuf, 30.0f, 24.0f, 0.5f, {1,1,1,1});
+			// 画像の右下にテキストを配置
+			uiRenderer->DrawString(textBuf, gaugeX + 30.0f + 2.0f, gaugeY + gaugeH + 10.0f + 2.0f, 0.5f, {0,0,0,1});
+			uiRenderer->DrawString(textBuf, gaugeX + 30.0f, gaugeY + gaugeH + 10.0f, 0.5f, {1,1,1,1});
 
 			// ==== ★追加: ロックオンレティクル & 銃レティクル ====
 			if (playerType_ == PlayerType::Gun) {

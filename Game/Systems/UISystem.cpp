@@ -233,10 +233,17 @@ bool UISystem::WorldToScreenWithView(
 	DirectX::XMStoreFloat3(&sp, screenPos);
 
 	// デバッグ投影結果の妥当性チェック
-	DirectX::XMMATRIX vp = view * proj;
-	DirectX::XMVECTOR clipPos = DirectX::XMVector3TransformCoord(p, vp);
+	DirectX::XMMATRIX vp = DirectX::XMMatrixMultiply(view, proj);
+	DirectX::XMVECTOR clipPos = DirectX::XMVector3Transform(p, vp);
+	float cw = DirectX::XMVectorGetW(clipPos);
+	
+	// ★修正: w が 0 以下ならカメラの後ろなので無条件で非表示
+	if (cw <= 0.0f)
+		return false;
+
 	float cz = DirectX::XMVectorGetZ(clipPos);
-	if (cz < 0.0f || cz > 1.0f)
+	// DirectX (Left-Handed) では 0 <= z <= w が視界内
+	if (cz < 0.0f || cz > cw)
 		return false;
 
 	screenX = viewOffset.x + sp.x;
