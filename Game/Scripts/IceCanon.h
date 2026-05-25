@@ -24,7 +24,7 @@ private:
 	float attackInterval_ = 1.5f;
 	float attackTimer_ = 0.0f;
 
-	float attackRange_ = 25.0f;
+	float attackRange_ = 30.0f;
 
 	float damage_ = 2.0f;
 	float stopTime_ = 1.0f;

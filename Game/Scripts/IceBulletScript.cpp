@@ -110,7 +110,7 @@ void IceBulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	}
 
-if (hasTarget_) {
+	if (hasTarget_) {
 		if (!registry.valid(target_)) {
 			hasTarget_ = false;
 			target_ = entt::null;
@@ -148,14 +148,21 @@ if (hasTarget_) {
 		return;
 	}
 
-if (!hasTarget_) {
+	if (!hasTarget_) {
 		if (hasLastTargetPosition_) {
+
 			float directionX = lastTargetPosition_.x - bulletTransform.translate.x;
 			float directionY = lastTargetPosition_.y - bulletTransform.translate.y;
 			float directionZ = lastTargetPosition_.z - bulletTransform.translate.z;
 
 			float length = std::sqrt(directionX * directionX + directionY * directionY + directionZ * directionZ);
+			float moveDistance = speed_ * dt;
 
+			if (moveDistance >= length) {
+
+				scene->DestroyObject(static_cast<uint32_t>(entity));
+				return;
+			}
 			if (length <= 0.2f) {
 				scene->DestroyObject(static_cast<uint32_t>(entity));
 				return;
@@ -216,6 +223,16 @@ if (!hasTarget_) {
 
 	bulletTransform.rotate.y = yaw;
 	bulletTransform.rotate.x = pitch;
+
+	if (!hasTarget_) {
+
+		if (bulletTransform.translate.y <= -2.0f) {
+
+			scene->DestroyObject(static_cast<uint32_t>(entity));
+
+			return;
+		}
+	}
 }
 
 void IceBulletScript::OnDestroy(entt::entity /*entity*/, GameScene* scene) {

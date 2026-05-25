@@ -87,8 +87,11 @@ protected: // メンバ変数
 
 	float scanTimer_ = 0.0f;
 	float groundHeight_ = 0.0f;	// FlyTypeが地面の高さを取るため
+
 	float frozenParticleTimer_ = 0.0f; // 凍結状態時の冷気噴射タイマー
 	float poisonedParticleTimer_ = 0.0f; // 毒状態時の泡噴射タイマー
+
+	float frozenTimeSpeed_ = 1.0f; // 現在の移動速度
 };
 
 } // namespace Game

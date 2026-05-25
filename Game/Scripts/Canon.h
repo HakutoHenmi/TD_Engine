@@ -21,10 +21,10 @@ private:
 	
 	float idleSteamTimer_ = 0.0f; // 常時蒸気用タイマー
 	float rotationSpeed_ = 1.0f;
-	float attackRange_ = 15.0f;
+	float attackRange_ = 30.0f;
 	float attackInterval_ = 2.0f;
 	float currentAttackInterval_ = 2.0f;
-	float damage_ = 10.0f;
+	float damage_ = 20.0f;
 	float attackTimer_ = 0.0f;
 	float connectionCheckTimer_ = 0.0f;
 	bool isConnectedToTank_ = false;

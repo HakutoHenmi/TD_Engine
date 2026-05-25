@@ -1,4 +1,5 @@
 #include "InstallationManager.h"
+#include "TutorialScript.h"
 #include "Scenes/GameScene.h"
 #include "ObjectTypes.h"
 #include "PhaseSystemScript.h"
@@ -155,6 +156,34 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 
 		// フェーズに応じた表示・非表示の管理（ページ制限を廃止）
 		bool enabled = ((!scene->IsPlaying()) || (currentPhase == PhaseSystemScript::PreparationPhase));
+
+		// チュートリアル中の表示制御
+		if (auto* tutorial = TutorialScript::GetInstance()) {
+			auto step = tutorial->GetCurrentStep();
+
+			// ステップごとに許可するボタンを限定
+			if (step >= TutorialScript::TutorialStep::Step1_Greeting && step < TutorialScript::TutorialStep::Step15_EndExplanation) {
+				enabled = false; // 基本はすべて非表示
+
+				if (step == TutorialScript::TutorialStep::Step7_CannonInstall) {
+					if (btn.prefabPath == "Resources/Prefabs/Canon.prefab") enabled = true;
+				}
+				else if (step == TutorialScript::TutorialStep::Step8_TankInstall) {
+					if (btn.prefabPath == "Resources/Prefabs/BulletTank.prefab") enabled = true;
+				}
+				else if (step == TutorialScript::TutorialStep::Step9_PipeInstall) {
+					if (btn.prefabPath == "Resources/Prefabs/Pipe.prefab") enabled = true;
+				}
+				else if (step == TutorialScript::TutorialStep::Step10_DeleteIntro) {
+					if (!tutorial->IsStep10PlacedExtraTank()) {
+						if (btn.prefabPath == "Resources/Prefabs/BulletTank.prefab") enabled = true;
+					}
+					else {
+						if (btn.name == "DeleteButton") enabled = true;
+					}
+				}
+			}
+		}
 
 		if (registry.all_of<UIImageComponent>(btn.entity))
 			registry.get<UIImageComponent>(btn.entity).enabled = enabled;

@@ -322,7 +322,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		}
 
 		if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/Canon.prefab")) {
-			selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
+			selectedObjPath_ = "Resources/Prefabs/NewCannon.prefab";
 			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
 			if (selectedObjCost_ == 0) selectedObjCost_ = canonCost_;
 			isPlacementMode_ = true;
@@ -358,11 +358,11 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			selectedObjPath_ = "Resources/Prefabs/IceCanon.prefab";
 			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
 			if (selectedObjCost_ == 0) selectedObjCost_ = iceCanonCost_;
-			isPlacementMode_ = true;
-			isPipeSet_ = false;
-			isSellMode_ = false;
-			hasPipeStartPoint_ = false;
-			placementSelectionChangedThisFrame = true;
+		 isPlacementMode_ = true;
+		 isPipeSet_ = false;
+		 isSellMode_ = false;
+		 hasPipeStartPoint_ = false;
+		 placementSelectionChangedThisFrame = true;
 		}
 
 		// Xキーまたは「削除機能ボタン」クリックで削除(売却)モードへの切り替え
@@ -571,11 +571,11 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				nav.GenerateFlowField(tc.translate.x, tc.translate.z);
 			}
 
-			// 敵のスポーン地点の生成
 			currentPhase_++;
-			WaveManagement::SetWave(currentPhase_ - 1);
+			
+			WaveManagement::SetWave(currentPhase_-1);
 
-			// 戦闘中は絵画風エフェクトをオンにする
+			// 戦闘中は絵画風エフェクトをオンにする	
 			Engine::Renderer::GetInstance()->SetPostEffect("Painterly");
 
 		} else if (isPhase_ == PreparationPhase) {
@@ -834,8 +834,8 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 				const float dx = tc.translate.x - snappedHitPoint.x;
 				const float dz = tc.translate.z - snappedHitPoint.z;
 				if (std::abs(dx) < kBlockHalfExtent && std::abs(dz) < kBlockHalfExtent) {
-					isBlockedByOtherThanPipe = true;
-					break;
+				 isBlockedByOtherThanPipe = true;
+				 break;
 				}
 			}
 			const bool canPlaceStart = (!isBlockedByOtherThanPipe && (CoinCount >= selectedObjCost_));
@@ -1066,7 +1066,6 @@ void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vec
 	Engine::Vector4 planeColor = canPlace ? Engine::Vector4{0.0f, 1.0f, 0.0f, 0.4f} : Engine::Vector4{1.0f, 0.0f, 0.0f, 0.4f};
 	
 	// ダミーのテクスチャハンドルがあればそれを使う（なければプレビューの使い回しでもOKですが、まだロードされてないので白テクスチャを後で使う）
-	// ここではとりあえず 0 を渡しておき、あとで previewTextureHandle_ がロードされたら描画します
 
 	// 外枠の線を少し太く（多重に）描画して強調
 	Engine::Vector4 highlightLineColor = canPlace ? Engine::Vector4{0.0f, 1.0f, 0.0f, 1.0f} : Engine::Vector4{1.0f, 0.0f, 0.0f, 1.0f};
