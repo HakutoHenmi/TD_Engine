@@ -13,7 +13,21 @@
 #endif
 
 namespace Game {
+static float LerpAngle(float current, float target, float speed, float dt) {
+	float diff = target - current;
 
+	while (diff > 3.14159265f) {
+		diff -= 6.28318530f;
+	}
+
+	while (diff < -3.14159265f) {
+		diff += 6.28318530f;
+	}
+
+	current += diff * speed * dt;
+
+	return current;
+}
 static bool IsConnectedSphere(entt::registry& registry, entt::entity entityA, entt::entity entityB, float connectRange) {
 	if (!registry.valid(entityA) || !registry.valid(entityB))
 		return false;
@@ -151,7 +165,6 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 		attackTimer_ -= dt;
 	}
 
-	
 	if (!isConnectedToTank_) {
 		return;
 	}
@@ -294,8 +307,14 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 		return;
 	}
 
-	canonTransform.rotate.y = std::atan2(toTargetX, toTargetZ);
-	canonTransform.rotate.x = -std::atan2(toTargetY, distanceXZ);
+	float targetYaw = std::atan2(toTargetX, toTargetZ);
+	float targetPitch = -std::atan2(toTargetY, distanceXZ);
+
+	float rotateSmoothSpeed = 6.0f;
+
+	canonTransform.rotate.y = LerpAngle(canonTransform.rotate.y, targetYaw, rotateSmoothSpeed, dt);
+
+	canonTransform.rotate.x = LerpAngle(canonTransform.rotate.x, targetPitch, rotateSmoothSpeed, dt);
 
 	if (attackTimer_ > 0.0f) {
 		return;
@@ -546,6 +565,7 @@ void MissileCanonScript::UpdateBase(entt::entity entity, GameScene* scene) {
 
 	baseTransform.rotate = {0.0f, 0.0f, 0.0f};
 }
+
 REGISTER_SCRIPT(MissileCanonScript);
 
 } // namespace Game

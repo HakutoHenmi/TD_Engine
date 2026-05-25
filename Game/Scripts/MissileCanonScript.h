@@ -13,7 +13,7 @@ public:
 	void OnEditorUI() override;
 
 private:
-	float attackRange_ = 50.0f;
+	float attackRange_ = 30.0f;
 	float attackInterval_ = 3.0f;
 	float damage_ = 30.0f;
 	float explosionRadius_ = 5.0f;

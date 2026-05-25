@@ -21,7 +21,7 @@ private:
 
 private:
 	float poisonDamage_ = 3.0f;
-	float poisonRange_ = 6.0f;
+	float poisonRange_ = 10.0f;
 
 	float poisonActiveTime_ = 2.0f;
 	float poisonCoolTime_ = 3.0f;

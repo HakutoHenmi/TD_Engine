@@ -322,7 +322,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		}
 
 		if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/Canon.prefab")) {
-			selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
+			selectedObjPath_ = "Resources/Prefabs/NewCannon.prefab";
 			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
 			if (selectedObjCost_ == 0) selectedObjCost_ = canonCost_;
 			isPlacementMode_ = true;
