@@ -337,23 +337,23 @@ void SkillTree::ClearText(GameScene* scene) {
 
 	auto& registry = scene->GetRegistry();
 
-	if (registry.valid(titleTextEntity_)) {
+	if (registry.valid(titleTextEntity_) && registry.all_of<UITextComponent>(titleTextEntity_)) {
 		registry.get<UITextComponent>(titleTextEntity_).text = "";
 	}
 
-	if (registry.valid(costTextEntity_)) {
+	if (registry.valid(costTextEntity_) && registry.all_of<UITextComponent>(costTextEntity_)) {
 		registry.get<UITextComponent>(costTextEntity_).text = "";
 	}
 
-	if (registry.valid(descTextEntity_)) {
+	if (registry.valid(descTextEntity_) && registry.all_of<UITextComponent>(descTextEntity_)) {
 		registry.get<UITextComponent>(descTextEntity_).text = "";
 	}
 
-	if (registry.valid(statusTextEntity_)) {
+	if (registry.valid(statusTextEntity_) && registry.all_of<UITextComponent>(statusTextEntity_)) {
 		registry.get<UITextComponent>(statusTextEntity_).text = "";
 	}
 
-	if (registry.valid(pageTitleEntity_)) {
+	if (registry.valid(pageTitleEntity_) && registry.all_of<UITextComponent>(pageTitleEntity_)) {
 		registry.get<UITextComponent>(pageTitleEntity_).text = "";
 	}
 }

@@ -240,9 +240,11 @@ bool Model::Load(ID3D12Device* device, ID3D12GraphicsCommandList* cmd, const std
 		}
 		for (unsigned int f = 0; f < mesh->mNumFaces; ++f) {
 			aiFace& face = mesh->mFaces[f];
-			data_.indices.push_back(vertexOffset + face.mIndices[0]);
-			data_.indices.push_back(vertexOffset + face.mIndices[1]);
-			data_.indices.push_back(vertexOffset + face.mIndices[2]);
+			if (face.mNumIndices == 3) {
+				data_.indices.push_back(vertexOffset + face.mIndices[0]);
+				data_.indices.push_back(vertexOffset + face.mIndices[1]);
+				data_.indices.push_back(vertexOffset + face.mIndices[2]);
+			}
 		}
 		if (mesh->HasBones()) {
 			for (unsigned int i = 0; i < mesh->mNumBones; ++i) {

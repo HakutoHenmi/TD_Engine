@@ -48,9 +48,8 @@ public:
 				// Shiftダッシュ入力
 				pi.sprintRequested = input->Down(DIK_LSHIFT);
 
-				// ★追加: 準備フェーズ中は移動・攻撃等のキャラクターアクション入力をすべて無効化する（視点操作以外）
+				// ★追加: 準備フェーズ中はジャンプ・攻撃・ダッシュ等のキャラクターアクション入力を無効化する（移動・視点操作は許可）
 				if (PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase) {
-					pi.moveDir = {0.0f, 0.0f};
 					pi.jumpRequested = false;
 					pi.attackRequested = false;
 					pi.sprintRequested = false;
