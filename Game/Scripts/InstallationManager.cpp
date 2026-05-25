@@ -320,5 +320,6 @@ void InstallationManager::EnsureButtonEntity(ButtonData& data, GameScene* scene)
 }
 
 REGISTER_SCRIPT(InstallationManager);
+REGISTER_SCRIPT(InstallationButton);
 
 } // namespace Game

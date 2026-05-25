@@ -67,6 +67,7 @@ void ScriptEngine::Initialize() {
 	RegisterScript("HitDistortionScript", []() { return std::make_shared<HitDistortionScript>(); }); // ★追加
 	RegisterScript("MirrorShatterScript", []() { return std::make_shared<MirrorShatterScript>(); }); // ★追加
 	RegisterScript("InstallationManager", []() { return std::make_shared<InstallationManager>(); });
+	RegisterScript("InstallationButton", []() { return std::make_shared<InstallationButton>(); });
 	RegisterScript("PhaseTransition", []() { return std::make_shared<PhaseTransition>(); });
 	RegisterScript("WaveManagement", []() { return std::make_shared<WaveManagement>(); });
 	RegisterScript("SpaceShatterScript", []() { return std::make_shared<SpaceShatterScript>(); }); // ★追加
