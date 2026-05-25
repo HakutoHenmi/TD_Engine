@@ -95,13 +95,11 @@ const std::unordered_map<TutorialScript::TutorialStep, std::vector<std::string>>
     }},
     { TutorialScript::TutorialStep::Step15_EndExplanation, {
         "これでチュートリアルの説明は全て終了です！",
-        "ここからは自由にゲームを進めることができます。[SPACE]キーで始めましょう！"
+        "ここからは自由にゲームを進めることができます。[SPACE]キーで始めましょう！", 
+        "では自由に設置などしましょう"
     }},
-    { TutorialScript::TutorialStep::Step16_FreePlayPrep, {
+    { TutorialScript::TutorialStep::Step16_FreePlayBattle, {
         "準備フェーズです。自由に設備を配置したり強化したりできます。[SPACE]キーを押すと戦闘フェーズが始まります。"
-    }},
-    { TutorialScript::TutorialStep::Step17_FreePlayBattle, {
-        "戦闘フェーズです。敵を撃退し続けてください！一時停止（ESCキー）から終了できます。"
     }}
 };
 
@@ -278,7 +276,7 @@ void TutorialScript::EnterStep(TutorialStep step) {
         skillTree_.Close(nullptr);
     }
 
-    if (step == TutorialStep::Step12_PlayerAttack || step == TutorialStep::Step13_CombatPlay || step == TutorialStep::Step17_FreePlayBattle) {
+    if (step == TutorialStep::Step12_PlayerAttack || step == TutorialStep::Step13_CombatPlay || step == TutorialStep::Step16_FreePlayBattle) {
         RequestPhaseChange(PhaseSystemScript::BattlePhase);
     } else {
         RequestPhaseChange(PhaseSystemScript::PreparationPhase);
@@ -612,8 +610,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
                                          tutorialStep_ == TutorialStep::Step10_DeleteIntro ||
                                          tutorialStep_ == TutorialStep::Step13_CombatPlay ||
                                          tutorialStep_ == TutorialStep::Step14_SkillTree ||
-                                         tutorialStep_ == TutorialStep::Step16_FreePlayPrep ||
-                                         tutorialStep_ == TutorialStep::Step17_FreePlayBattle);
+                                         tutorialStep_ == TutorialStep::Step16_FreePlayBattle);
                     if (!isActionStep) {
                         int nextStepInt = static_cast<int>(tutorialStep_) + 1;
                         if (nextStepInt < static_cast<int>(TutorialStep::Count)) {
@@ -833,7 +830,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
         break;
     }
 
-    case TutorialStep::Step16_FreePlayPrep:
+    case TutorialStep::Step16_FreePlayBattle:
         if (phaseState_ == PhaseSystemScript::PreparationPhase && !isPhaseTransitioning_) {
             if (key1 || InstallationManager::IsButtonPressed("Resources/Prefabs/BulletTank.prefab")) {
                 selectedObjPath_ = "Resources/Prefabs/BulletTank.prefab";
@@ -866,13 +863,10 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
             }
 
             if (keySpace) {
-                EnterStep(TutorialStep::Step17_FreePlayBattle);
+                currentLineIndex_ = 0;
+                EnterStep(TutorialStep::Step16_FreePlayBattle);
             }
-        }
-        break;
-
-    case TutorialStep::Step17_FreePlayBattle:
-        if (phaseState_ == PhaseSystemScript::BattlePhase) {
+        } else if (phaseState_ == PhaseSystemScript::BattlePhase) {
             if (WaveManagement::IsWaveEnded()) {
                 WaveManagement::ResetState();
                 WaveManagement::SetWave(0);
@@ -944,7 +938,7 @@ void TutorialScript::UpdatePhaseTransition(GameScene* scene) {
                 nav.GenerateFlowField(tc.translate.x, tc.translate.z);
             }
 
-            if (tutorialStep_ == TutorialStep::Step13_CombatPlay || tutorialStep_ == TutorialStep::Step17_FreePlayBattle) {
+            if (tutorialStep_ == TutorialStep::Step13_CombatPlay || tutorialStep_ == TutorialStep::Step16_FreePlayBattle) {
                 WaveManagement::SetWave(0);
             }
         } else if (phaseState_ == PhaseSystemScript::PreparationPhase) {
