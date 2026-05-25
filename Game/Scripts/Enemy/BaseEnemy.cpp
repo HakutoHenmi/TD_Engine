@@ -63,6 +63,10 @@ void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
 		auto& vc = registry.get<VariableComponent>(entity);
 		float frozenTimer = vc.GetValue("FrozenTimer", 0.0f);
 		if (frozenTimer > 0.0f) {
+
+			frozenTimeSpeed_ *= 0.3f;
+		}
+		if (frozenTimer > 0.0f) {
 			vc.SetValue("FrozenTimer", frozenTimer - dt);
 
 			// 凍結中の青白い表現
@@ -412,7 +416,7 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float dt) {
 	if (registry.all_of<RigidbodyComponent>(entity)) {
 		auto& rb = registry.get<RigidbodyComponent>(entity);
 		// ★追加: バフによる移動速度の計算
-		float currentSpeed = speed_;
+		float currentSpeed = speed_ * frozenTimeSpeed_;
 		if (registry.all_of<VariableComponent>(entity)) {
 			auto& vc = registry.get<VariableComponent>(entity);
 			float buffTimer = vc.GetValue("SpeedBuffTimer", 0.0f);

@@ -90,6 +90,8 @@ protected: // メンバ変数
 
 	float frozenParticleTimer_ = 0.0f; // 凍結状態時の冷気噴射タイマー
 	float poisonedParticleTimer_ = 0.0f; // 毒状態時の泡噴射タイマー
+
+	float frozenTimeSpeed_ = 0.0f; // 現在の移動速度
 };
 
 } // namespace Game

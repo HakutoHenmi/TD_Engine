@@ -396,55 +396,98 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 	float attackRangeRateCanon = 1.0f;
 	float attackSpeedRateCanon = 1.0f;
 
-	// page1
+	// CanonPower
 	if (IsSkillUnlocked(1)) {
 		attackPowerRateCanon *= 1.10f;
 	}
 
+	// CanonSpeed
 	if (IsSkillUnlocked(2)) {
 		attackSpeedRateCanon *= 1.10f;
 	}
 
+	// CanonRange
 	if (IsSkillUnlocked(3)) {
 		attackRangeRateCanon *= 1.10f;
 	}
 
+	// CanonPower2
 	if (IsSkillUnlocked(4)) {
 		attackPowerRateCanon *= 1.15f;
 	}
 
+	// CanonAllUp
 	if (IsSkillUnlocked(5)) {
 		attackPowerRateCanon *= 1.05f;
 		attackSpeedRateCanon *= 1.05f;
 		attackRangeRateCanon *= 1.05f;
 	}
 
+	// CanonSpeed2
 	if (IsSkillUnlocked(6)) {
-		attackPowerRateCanon *= 1.10f;
 		attackSpeedRateCanon *= 1.10f;
+	}
+
+	// CanonCritical
+	if (IsSkillUnlocked(7)) {
+		attackPowerRateCanon *= 1.25f;
+	}
+
+	// CanonOverclock
+	if (IsSkillUnlocked(8)) {
+		attackSpeedRateCanon *= 1.20f;
+	}
+
+	// CanonMastery
+	if (IsSkillUnlocked(9)) {
+		attackPowerRateCanon *= 1.15f;
+		attackSpeedRateCanon *= 1.15f;
+		attackRangeRateCanon *= 1.15f;
 	}
 
 	// poisonTrap
 	float attackPowerRatePoison = 1.0f;
 	float attackRangeRatePoison = 1.0f;
+	float poisonDurationRate = 1.0f;
+	float poisonCooldownRate = 1.0f;
 
-	// page2
+	// PoisonPower
 	if (IsSkillUnlocked(101)) {
 		attackPowerRatePoison *= 1.50f;
 	}
 
+	// PoisonRange
 	if (IsSkillUnlocked(102)) {
 		attackRangeRatePoison *= 1.50f;
 	}
 
+	// PoisonAllUp
 	if (IsSkillUnlocked(103)) {
 		attackPowerRatePoison *= 1.20f;
 		attackRangeRatePoison *= 1.20f;
 	}
 
+	// PoisonDuration
+	if (IsSkillUnlocked(104)) {
+		poisonDurationRate *= 1.30f;
+	}
+
+	// PoisonCooldown
+	if (IsSkillUnlocked(105)) {
+		poisonCooldownRate *= 0.80f;
+	}
+
+	// PoisonMastery
+	if (IsSkillUnlocked(106)) {
+		attackPowerRatePoison *= 1.25f;
+		attackRangeRatePoison *= 1.25f;
+		poisonDurationRate *= 1.15f;
+	}
+
+	// Misiile
 	float attackPowerRateMisile = 1.0f;
 	float attackAreaRateMisile = 1.0f;
-
+	float missileCooldownRate = 1.0f;
 	// page3
 	if (IsSkillUnlocked(201)) {
 		attackPowerRateMisile *= 1.50f;
@@ -453,8 +496,28 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 		attackAreaRateMisile *= 1.50f;
 	}
 
+	// MissileAllUp
 	if (IsSkillUnlocked(203)) {
+		attackPowerRateMisile *= 1.15f;
+		attackAreaRateMisile *= 1.15f;
+		missileCooldownRate *= 0.90f;
 	}
+	// MissilePower2
+	if (IsSkillUnlocked(204)) {
+		attackPowerRateMisile *= 1.30f;
+	}
+
+	// MissileExplosion2
+	if (IsSkillUnlocked(205)) {
+		attackAreaRateMisile *= 1.30f;
+	}
+	// MissileMastery
+	if (IsSkillUnlocked(206)) {
+		attackPowerRateMisile *= 1.30f;
+		attackAreaRateMisile *= 1.30f;
+		missileCooldownRate *= 0.80f;
+	}
+
 	// IceCanon
 	float attackPowerRateIceCanon = 1.0f;
 	float attackRangeRateIceCanon = 1.0f;
@@ -469,6 +532,7 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 
 	if (IsSkillUnlocked(302)) {
 		attackRangeRateIceCanon *= 1.50f;
+		attackPowerRateIceCanon *= 1.20f;
 	}
 
 	if (IsSkillUnlocked(303)) {
@@ -484,7 +548,7 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 	}
 
 	if (IsSkillUnlocked(306)) {
-		attackPowerRateIceCanon *= 1.50f;
+		attackPowerRateIceCanon *= 2.50f;
 		attackRangeRateIceCanon *= 1.50f;
 		stopTimeRateIceCanon *= 1.50f;
 	}
@@ -592,10 +656,12 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 	// poisonTrap
 	SetVar(entity, scene, "AttackPowerRatePoison", attackPowerRatePoison);
 	SetVar(entity, scene, "AttackRangeRatePoison", attackRangeRatePoison);
-
+	SetVar(entity, scene, "PoisonDurationRate", poisonDurationRate);
+	SetVar(entity, scene, "PoisonCooldownRate", poisonCooldownRate);
 	// misile
 	SetVar(entity, scene, "AttackPowerRateMisile", attackPowerRateMisile);
 	SetVar(entity, scene, "AttackAreaRateMisile", attackAreaRateMisile);
+	SetVar(entity, scene, "MissileCooldownRate", missileCooldownRate);
 	// iceCanon
 	SetVar(entity, scene, "AttackPowerRateIceCanon", attackPowerRateIceCanon);
 	SetVar(entity, scene, "AttackRangeRateIceCanon", attackRangeRateIceCanon);

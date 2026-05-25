@@ -216,6 +216,17 @@ if (!hasTarget_) {
 
 	bulletTransform.rotate.y = yaw;
 	bulletTransform.rotate.x = pitch;
+
+if (!hasTarget_) {
+
+		if (bulletTransform.translate.y <= -2.0f) {
+
+			scene->DestroyObject(static_cast<uint32_t>(entity));
+
+			return;
+		}
+	}
+
 }
 
 void IceBulletScript::OnDestroy(entt::entity /*entity*/, GameScene* scene) {

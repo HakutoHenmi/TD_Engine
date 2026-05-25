@@ -36,8 +36,11 @@ private:
 	float skillPowerRate_ = 1.0f;
 	float skillSpeedRate_ = 1.0f;
 	float skillRangeRate_ = 1.0f;
-
+	float poisonDurationRate_ = 1.0f;
+	float poisonCooldownRate_ = 1.0f;
 	bool persistentVfxCreated_ = false;
+	float finalPoisonActiveTime_ = 5.0f;
+	float finalPoisonCoolTime_ = 5.0f;
 	entt::entity persistentGasVfx_ = entt::null;
 	float vfxDelayTimer_ = 0.0f;
 	void CreatePersistentVFX(entt::entity entity, GameScene* scene);
