@@ -40,7 +40,7 @@ private:
 	static int currentWave_;
 	static inline entt::entity managerEntity_ = static_cast<entt::entity>(entt::null);
 	static inline WaveManagement* instance_ = nullptr;
-	int previousWave_ = -1;
+	int previousWave_ = -2;
 
 	static inline bool isEnded_ = false;
 
@@ -56,6 +56,8 @@ private:
 	int currentWaveKilled_ = 0;
 	int lastAliveCount_ = 0;
 	int lastTotalSpawned_ = 0;
+
+	bool isWaveInitialized_ = false;
 };
 
 } // namespace Game

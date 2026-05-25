@@ -54,6 +54,7 @@ void WaveManagement::Start(entt::entity entity, GameScene* scene) {
 
 	currentWave_ = 0;
 	previousWave_ = -1;
+	isWaveInitialized_ = false;
 }
 
 void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/) {
@@ -219,22 +220,8 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 	}
 
 	if (currentWave_ != previousWave_) {
+		isWaveInitialized_ = false;
 		if (scene->IsPlaying()) {
-			// ウェーブ開始時の初期化
-			currentWaveMax_ = 0;
-			if (currentWave_ >= 0 && currentWave_ < static_cast<int>(enemySpawners_.size())) {
-				for (entt::entity e : enemySpawners_[currentWave_]) {
-					if (scene->GetRegistry().valid(e)) {
-						if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(e)) {
-							for (auto& entry : sc->scripts) {
-								if (entry.scriptPath == "EnemySpawnerScript" && entry.instance) {
-									currentWaveMax_ += static_cast<EnemySpawnerScript*>(entry.instance.get())->GetMaxCount();
-								}
-							}
-						}
-					}
-				}
-			}
 			currentWaveKilled_ = 0;
 			lastAliveCount_ = 0;
 			lastTotalSpawned_ = 0;
@@ -328,22 +315,65 @@ void WaveManagement::SpawnSpanner(int currentWave, GameScene* scene) {
 
 	if (currentWave < 0 || currentWave >= static_cast<int>(enemySpawners_.size())) return;
 
-	// 現在のウェーブのスポナーだけを有効化する
+	// 現在のウェーブのスポナーだけを有効化し、スクリプトを初期化する
 	for (entt::entity e : enemySpawners_[currentWave]) {
 		if (scene->GetRegistry().valid(e)) {
 			if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(e)) {
 				sc->enabled = true;
 				for (auto& entry : sc->scripts) {
-					if (entry.instance) {
-						entry.instance->Start(e, scene);
+					if (entry.scriptPath == "EnemySpawnerScript") {
+						if (!entry.instance) {
+							entry.instance = ScriptEngine::GetInstance()->CreateScript(entry.scriptPath);
+							if (entry.instance) {
+								entry.instance->DeserializeParameters(entry.parameterData);
+							}
+						}
+						if (entry.instance) {
+							entry.instance->Start(e, scene);
+						}
 					}
 				}
 			}
 		}
 	}
+
+	// スクリプト初期化後に敵数を計算する
+	if (scene->IsPlaying()) {
+		currentWaveMax_ = 0;
+		for (entt::entity e : enemySpawners_[currentWave]) {
+			if (scene->GetRegistry().valid(e)) {
+				if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(e)) {
+					for (auto& entry : sc->scripts) {
+						if (entry.scriptPath == "EnemySpawnerScript" && entry.instance) {
+							currentWaveMax_ += static_cast<EnemySpawnerScript*>(entry.instance.get())->GetMaxCount();
+						}
+					}
+				}
+			}
+		}
+		isWaveInitialized_ = true;
+	}
 }
 
-int WaveManagement::GetTotalMaxEnemies(GameScene* /*scene*/) {
+int WaveManagement::GetTotalMaxEnemies(GameScene* scene) {
+	// ウェーブが初期化されていない場合は再計算
+	if (!isWaveInitialized_ && scene && scene->IsPlaying()) {
+		currentWaveMax_ = 0;
+		if (currentWave_ >= 0 && currentWave_ < static_cast<int>(enemySpawners_.size())) {
+			for (entt::entity e : enemySpawners_[currentWave_]) {
+				if (scene->GetRegistry().valid(e)) {
+					if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(e)) {
+						for (auto& entry : sc->scripts) {
+							if (entry.scriptPath == "EnemySpawnerScript" && entry.instance) {
+								currentWaveMax_ += static_cast<EnemySpawnerScript*>(entry.instance.get())->GetMaxCount();
+							}
+						}
+					}
+				}
+			}
+		}
+		isWaveInitialized_ = true;
+	}
 	return currentWaveMax_;
 }
 
