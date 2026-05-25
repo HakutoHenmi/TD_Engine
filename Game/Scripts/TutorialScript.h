@@ -28,8 +28,7 @@ public:
 		Step13_CombatPlay,
 		Step14_SkillTree,
 		Step15_EndExplanation,
-		Step16_FreePlayPrep,
-		Step17_FreePlayBattle,
+		Step16_FreePlayBattle,
 		Count
 	};
 
