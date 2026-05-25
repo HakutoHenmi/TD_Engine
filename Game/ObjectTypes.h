@@ -70,6 +70,7 @@ struct NameComponent {
 
 struct HierarchyComponent {
 	entt::entity parentId = entt::null;
+	std::vector<entt::entity> children; // ★追加: 子オブジェクトのリスト
 };
 
 struct TransformComponent : public Component {
@@ -147,9 +148,9 @@ struct GpuMeshColliderComponent : public Component {
 	GpuMeshColliderComponent() { type = ComponentType::GpuMeshCollider; }
 };
 
-// ★追加: アニメーターコンポーネント
 struct AnimatorComponent : public Component {
 	std::string currentAnimation;
+	int currentAnimationIndex = -1; // ★追加: 文字列検索回避のためのインデックスキャッシュ
 	float time = 0.0f;
 	float speed = 1.0f;
 	bool isPlaying = false;
@@ -310,6 +311,7 @@ struct ParticleEmitterComponent : public Component {
 	Engine::ParticleEmitter emitter;
 	std::string assetPath = ""; // .particle ファイルのパス
 	bool isInitialized = false;
+	float originalEmitRate = -1.0f; // ★追加: 距離ベースLOD用の元データ保存
 
 	ParticleEmitterComponent() { type = ComponentType::ParticleEmitter; }
 };

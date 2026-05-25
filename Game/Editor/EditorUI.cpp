@@ -95,12 +95,12 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 
 		reg.get_or_emplace<EditorStateComponent>(entity).locked = obj.value("locked", false);
 		
-		auto& hc = reg.get_or_emplace<HierarchyComponent>(entity);
+		(void)reg.get_or_emplace<HierarchyComponent>(entity);
 		uint32_t savedParentId = obj.value("parentId", (uint32_t)entt::null);
 		if (savedParentId != (uint32_t)entt::null && idMap.find(savedParentId) != idMap.end()) {
-			hc.parentId = idMap[savedParentId];
+			scene->SetParent(entity, idMap[savedParentId]); // ★修正: SetParent経由で子リストも更新する
 		} else {
-			hc.parentId = entt::null;
+			scene->RemoveParent(entity);
 		}
 
 		if (obj.contains("components") && obj["components"].is_array()) {

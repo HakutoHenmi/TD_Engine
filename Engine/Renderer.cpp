@@ -707,28 +707,13 @@ void Renderer::EndFrame() {
 
 		list_->SetGraphicsRootSignature(rootSig3D_.Get());
 		
-		// ★最適化: 極細なシリンダーや小さなパイプ接続点はシャドウ描画から除外して描画オーバーヘッドを激減させる
-		auto isLightweightMesh = [&](MeshHandle mesh) -> bool {
-			for (const auto& pair : meshCache_) {
-				if (pair.second == mesh) {
-					const std::string& path = pair.first;
-					if (path.find("cylinder") != std::string::npos || path.find("Cylinder") != std::string::npos ||
-						path.find("ball.obj") != std::string::npos || path.find("Ball.obj") != std::string::npos) {
-						return true;
-					}
-					break;
-				}
-			}
-			return false;
-		};
-		
 		// Normal Shadow Pass
 		for (const auto& dc : drawCalls_) {
 			if (dc.isParticle || dc.shaderName == "Particle" || dc.shaderName == "ParticleAdditive" || dc.shaderName == "ProceduralSmoke" || dc.shaderName == "ProceduralSmokeAdditive" || dc.shaderName == "2D" || dc.shaderName == "Distortion" || dc.shaderName == "GlassShatter" || dc.shaderName == "Unlit") continue;
-			if (isLightweightMesh(dc.mesh)) continue; // ★スキップ最適化
 
 			auto* model = GetModel(dc.mesh);
 			if (!model) continue;
+			if (model->IsLightweight()) continue; // ★スキップ最適化
 
 			list_->SetPipelineState(dc.isSkinned ? shadowSkinPso_.Get() : shadowPso_.Get());
 			list_->SetGraphicsRootConstantBufferView(0, sCbAddr);
@@ -764,10 +749,10 @@ void Renderer::EndFrame() {
 		// Instanced Shadow Pass
 		for (const auto& idc : instancedDrawCalls_) {
 			if (idc.shaderName == "Particle" || idc.shaderName == "ParticleInstanced" || idc.shaderName == "ProceduralSmoke" || idc.shaderName == "ProceduralSmokeInstanced" || idc.shaderName == "2D" || idc.shaderName == "Distortion" || idc.shaderName == "GlassShatter") continue;
-			if (isLightweightMesh(idc.mesh)) continue; // ★スキップ最適化
 			
 			auto* model = GetModel(idc.mesh);
 			if (!model || idc.instances.empty()) continue;
+			if (model->IsLightweight()) continue; // ★スキップ最適化
 
 			list_->SetPipelineState(shadowInstancedPso_.Get());
 			list_->SetGraphicsRootSignature(rootSig3D_.Get());
