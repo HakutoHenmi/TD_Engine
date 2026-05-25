@@ -490,41 +490,100 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 	}
 	// page4
 	//   Player
-	float playerMoveSpeedRate = 1.5f;
+	// Player
+	float playerMoveSpeedRate = 1.0f;
 
-	float playerGunDamageRate = 1.5f;
+	float playerSwordAttackSpeedRate = 1.0f;
+	float playerGunAttackSpeedRate = 1.0f;
 
-	float playerMaxSteamRate = 1.5f;
-	// float playerSwordAttackSpeedRate = 1.5f;
-	// float playerGunAttackSpeedRate = 1.5f;
+	float playerSwordAttackPowerRate = 1.0f;
+	float playerGunAttackPowerRate = 1.0f;
 
-	// float playerSwordAttackPowerRate = 1.0f;
-	// float playerGunAttackPowerRate = 1.0f;
+	float playerMaxSteamPressureRate = 1.0f;
 
-	// float playerMaxSteamPressureRate = 1.0f;
+	float playerSwordSkillCooldownRate = 1.0f;
+	float playerGunSkillCooldownRate = 1.0f;
 
-	// float playerSwordSkillCooldownRate = 1.0f;
-	// float playerGunSkillCooldownRate = 1.0f;
-
-	// float playerSwordSkillAttackPowerRate = 1.0f;
-	// float playerGunSkillAttackPowerRate = 1.0f;
+	float playerSwordSkillAttackPowerRate = 1.0f;
+	float playerGunSkillAttackPowerRate = 1.0f;
 
 	if (IsSkillUnlocked(401)) {
-		//	playerMoveSpeedRate *= 1.20f;
+		playerGunAttackPowerRate *= 1.20f;
 	}
 
 	if (IsSkillUnlocked(402)) {
-		// playerGunDamageRate *= 1.30f;
+		playerSwordAttackPowerRate *= 1.20f;
 	}
 
 	if (IsSkillUnlocked(403)) {
-		// playerMaxSteamRate *= 1.30f;
+		playerMoveSpeedRate *= 1.10f;
+		playerGunAttackPowerRate *= 1.10f;
+		playerSwordAttackPowerRate *= 1.10f;
+		playerMaxSteamPressureRate *= 1.10f;
+	}
+
+	if (IsSkillUnlocked(404)) {
+		playerGunAttackPowerRate *= 1.25f;
+	}
+
+	if (IsSkillUnlocked(405)) {
+		playerSwordAttackPowerRate *= 1.25f;
+	}
+
+	if (IsSkillUnlocked(406)) {
+		playerMaxSteamPressureRate *= 0.85f;
+	}
+
+	if (IsSkillUnlocked(407)) {
+		playerGunAttackSpeedRate *= 1.15f;
+	}
+
+	if (IsSkillUnlocked(408)) {
+		playerSwordAttackSpeedRate *= 1.15f;
+	}
+
+	if (IsSkillUnlocked(409)) {
+		playerMoveSpeedRate *= 1.15f;
+	}
+
+	if (IsSkillUnlocked(410)) {
+		playerGunSkillCooldownRate *= 0.85f;
+	}
+
+	if (IsSkillUnlocked(411)) {
+		playerSwordSkillCooldownRate *= 0.85f;
+	}
+
+	if (IsSkillUnlocked(412)) {
+		playerMoveSpeedRate *= 1.10f;
+		playerGunAttackSpeedRate *= 1.10f;
+		playerSwordAttackSpeedRate *= 1.10f;
+	}
+
+	if (IsSkillUnlocked(413)) {
+		playerGunSkillAttackPowerRate *= 1.30f;
+	}
+
+	if (IsSkillUnlocked(414)) {
+		playerSwordSkillAttackPowerRate *= 1.50f;
 	}
 
 	// player
 	SetVar(entity, scene, "PlayerMoveSpeedRate", playerMoveSpeedRate);
-	SetVar(entity, scene, "PlayerGunDamageRate", playerGunDamageRate);
-	SetVar(entity, scene, "PlayerMaxSteamRate", playerMaxSteamRate);
+
+	SetVar(entity, scene, "PlayerSwordAttackSpeedRate", playerSwordAttackSpeedRate);
+	SetVar(entity, scene, "PlayerGunAttackSpeedRate", playerGunAttackSpeedRate);
+
+	SetVar(entity, scene, "PlayerSwordAttackPowerRate", playerSwordAttackPowerRate);
+	SetVar(entity, scene, "PlayerGunAttackPowerRate", playerGunAttackPowerRate);
+
+	SetVar(entity, scene, "PlayerMaxSteamPressureRate", playerMaxSteamPressureRate);
+
+	SetVar(entity, scene, "PlayerSwordSkillCooldownRate", playerSwordSkillCooldownRate);
+	SetVar(entity, scene, "PlayerGunSkillCooldownRate", playerGunSkillCooldownRate);
+
+	SetVar(entity, scene, "PlayerSwordSkillAttackPowerRate", playerSwordSkillAttackPowerRate);
+	SetVar(entity, scene, "PlayerGunSkillAttackPowerRate", playerGunSkillAttackPowerRate);
 
 	// canon
 	SetVar(entity, scene, "AttackPowerRateCanon", attackPowerRateCanon);

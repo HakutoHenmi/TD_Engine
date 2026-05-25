@@ -2,25 +2,26 @@
 #ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
 #endif
+#include "../Systems/UISystem.h"
+#include "BulletScript.h"
+#include "ExplosionAttackArea.h"
+#include "MirrorShatterScript.h"
 #include "ObjectTypes.h"
 #include "PhaseSystemScript.h"
-#include "BulletScript.h"
-#include "MirrorShatterScript.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
-#include "ExplosionAttackArea.h"
-#include "../Systems/UISystem.h"
-#include <cmath>
-#include <iostream>
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
+#include <iostream>
 
 namespace Game {
 
 void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 	// ★追加: シーン開始時は必ずカーソルを表示する
 	isCursorVisible_ = true;
-	while (ShowCursor(TRUE) < 0);
+	while (ShowCursor(TRUE) < 0)
+		;
 	prevCursorToggle_ = false;
 
 	// ★追加: プレイヤーの3Dモデルを GLTF/GLB (sotai3.glb) に置き換え
@@ -28,8 +29,8 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 	if (pRenderer) {
 		auto& mr = scene->GetRegistry().get_or_emplace<MeshRendererComponent>(entity);
 		mr.modelHandle = pRenderer->LoadObjMesh("Resources/Models/3Dmodel/player/sotai3.glb");
-		mr.textureHandle = 0; // ★修正: 0を指定してGLTF内包テクスチャを使用する
-		mr.shaderName = "ToonSkinning"; // スキニング対応トゥーンシェーダー
+		mr.textureHandle = 0;                // ★修正: 0を指定してGLTF内包テクスチャを使用する
+		mr.shaderName = "ToonSkinning";      // スキニング対応トゥーンシェーダー
 		mr.color = {1.0f, 1.0f, 1.0f, 1.0f}; // ★修正: Player.prefabの青色設定をリセットし、本来のテクスチャカラーを表示する
 		mr.enabled = true;
 	}
@@ -49,29 +50,29 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 	}
 	if (scene->GetRegistry().all_of<CharacterMovementComponent>(entity)) {
 		auto& cm = scene->GetRegistry().get<CharacterMovementComponent>(entity);
-		cm.heightOffset = 0.0f; // ★修正: 1.0fから0.0fへ変更。モデルの原点（足元）を地面に合わせるため
+		cm.heightOffset = 0.0f;    // ★修正: 1.0fから0.0fへ変更。モデルの原点（足元）を地面に合わせるため
 		cm.jumpPower = jumpPower_; // ★追加: ヘッダで定義されているジャンプ力(8.0f)を反映し、ジャンプを弱くする
-		cm.gravity = 28.0f; // ★キレのあるアクション用重力 (原神風)
-		cm.speed = 8.5f; // ★追加: プレイヤーの基本移動速度を上げる（デフォルトは5.0f）
+		cm.gravity = 28.0f;        // ★キレのあるアクション用重力 (原神風)
+		cm.speed = 8.5f;           // ★追加: プレイヤーの基本移動速度を上げる（デフォルトは5.0f）
 	}
-	
+
 	// プレイヤー自身のコライダーサイズを「見た目（2m立方体）」に合わせる
 	if (scene->GetRegistry().all_of<BoxColliderComponent>(entity)) {
 		auto& bc = scene->GetRegistry().get<BoxColliderComponent>(entity);
-		bc.size = { 2.0f, 2.0f, 2.0f };
-		bc.center = { 0.0f, 1.0f, 0.0f }; // ★追加: 足元原点に対応するため上へずらす
+		bc.size = {2.0f, 2.0f, 2.0f};
+		bc.center = {0.0f, 1.0f, 0.0f}; // ★追加: 足元原点に対応するため上へずらす
 	}
-	
+
 	// 食らい判定（Hurtbox）がなければ追加し、サイズとタグを設定する
 	if (!scene->GetRegistry().all_of<HurtboxComponent>(entity)) {
 		auto& hb = scene->GetRegistry().emplace<HurtboxComponent>(entity);
-		hb.size = { 2.0f, 2.0f, 2.0f };
-		hb.center = { 0.0f, 1.0f, 0.0f }; // ★追加: 足元原点対応
+		hb.size = {2.0f, 2.0f, 2.0f};
+		hb.center = {0.0f, 1.0f, 0.0f}; // ★追加: 足元原点対応
 		hb.tag = TagType::Player;
 	} else {
 		auto& hb = scene->GetRegistry().get<HurtboxComponent>(entity);
-		hb.size = { 2.0f, 2.0f, 2.0f };
-		hb.center = { 0.0f, 1.0f, 0.0f }; // ★追加: 足元原点対応
+		hb.size = {2.0f, 2.0f, 2.0f};
+		hb.center = {0.0f, 1.0f, 0.0f}; // ★追加: 足元原点対応
 		hb.tag = TagType::Player;
 	}
 
@@ -91,7 +92,7 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 
 	// 必須コンポーネントを確実に付与・更新
 	auto& sTc = scene->GetRegistry().get_or_emplace<TransformComponent>(sword);
-	sTc.scale = { 1.0f, 1.0f, 1.0f }; // 剣サイズ
+	sTc.scale = {1.0f, 1.0f, 1.0f}; // 剣サイズ
 
 	auto& sHierarchy = scene->GetRegistry().get_or_emplace<HierarchyComponent>(sword);
 	sHierarchy.parentId = entity; // プレイヤーの子にする
@@ -104,8 +105,8 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		auto& sMr = scene->GetRegistry().get_or_emplace<MeshRendererComponent>(sword);
 		sMr.modelHandle = renderer->LoadObjMesh("Resources/Models/3Dmodel/sword/ken.obj");
 		sMr.textureHandle = renderer->LoadTexture2D("Resources/Models/3Dmodel/sword/ken_tex.png"); // ★直接テクスチャをロードして適用
-		sMr.shaderName = "Toon"; // ★デフォルトからToonシェーダーに変更して輪郭と陰影をくっきり見やすく！
-		sMr.color = { 1.2f, 1.2f, 1.2f, 1.0f }; // ★少し輝度をブーストして暗いステージでも存在感を出す
+		sMr.shaderName = "Toon";                                                                   // ★デフォルトからToonシェーダーに変更して輪郭と陰影をくっきり見やすく！
+		sMr.color = {1.2f, 1.2f, 1.2f, 1.0f};                                                      // ★少し輝度をブーストして暗いステージでも存在感を出す
 		sMr.enabled = true;
 	}
 
@@ -118,28 +119,80 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		float bsz = 1.3f; // スケールアップに合わせて1.3に変更
 		if (index == 1) { // 横薙ぎ
 			clip.totalDuration = 0.7f;
-			clip.keyframes.push_back({0.00f, { 0.6f, 1.8f, 0.4f }, { 0.0f, 0.0f, -1.57f }, { 1.3f, 1.3f, bsz }}); // 始動: 真右(Yaw=0.0f)
-			clip.keyframes.push_back({0.25f, { 0.7f, 1.8f, 0.6f }, { 0.0f, -0.78f, -1.57f }, { 1.3f, 1.3f, bsz + 0.5f }}); // 右前(Yaw=-0.78f)
-			clip.keyframes.push_back({0.45f, { 0.0f, 1.8f, 1.2f }, { 0.0f, -1.57f, -1.57f }, { 1.3f, 1.3f, bsz + 1.2f }}); // 真前を通る(Yaw=-1.57f)
-			clip.keyframes.push_back({0.70f, {-0.6f, 1.8f, 0.4f }, { 0.0f, -3.14f, -1.57f }, { 1.3f, 1.3f, bsz }}); // 真左で終了(Yaw=-3.14f)、正面を通る右から左の180度に修正
-		} else if (index == 2) { // 振り下ろし
+			clip.keyframes.push_back({
+			    0.00f, {0.6f, 1.8f, 0.4f  },
+                 {0.0f, 0.0f, -1.57f},
+                 {1.3f, 1.3f, bsz   }
+            }); // 始動: 真右(Yaw=0.0f)
+			clip.keyframes.push_back({
+			    0.25f, {0.7f, 1.8f,   0.6f      },
+                 {0.0f, -0.78f, -1.57f    },
+                 {1.3f, 1.3f,   bsz + 0.5f}
+            }); // 右前(Yaw=-0.78f)
+			clip.keyframes.push_back({
+			    0.45f, {0.0f, 1.8f,   1.2f      },
+                 {0.0f, -1.57f, -1.57f    },
+                 {1.3f, 1.3f,   bsz + 1.2f}
+            }); // 真前を通る(Yaw=-1.57f)
+			clip.keyframes.push_back({
+			    0.70f, {-0.6f, 1.8f,   0.4f  },
+                 {0.0f,  -3.14f, -1.57f},
+                 {1.3f,  1.3f,   bsz   }
+            }); // 真左で終了(Yaw=-3.14f)、正面を通る右から左の180度に修正
+		} else if (index == 2) {                                                         // 振り下ろし
 			clip.totalDuration = 0.8f;
-			clip.keyframes.push_back({0.00f, { 0.0f, 4.5f, -1.0f }, { -1.5f + 1.57f, 0.0f, 0.0f }, { 1.3f, 1.3f, bsz }});
-			clip.keyframes.push_back({0.30f, { 0.0f, 4.8f, -0.5f }, { -1.8f + 1.57f, 0.0f, 0.0f }, { 1.3f, 1.3f, bsz }});
-			clip.keyframes.push_back({0.50f, { 0.0f, 1.5f, 3.5f }, { 0.5f + 1.57f, 0.0f, 0.0f }, { 1.3f, 1.3f, bsz + 1.5f }});
-			clip.keyframes.push_back({0.80f, { 0.0f, 1.2f, 2.8f }, { 0.8f + 1.57f, 0.0f, 0.0f }, { 1.3f, 1.3f, bsz }});
+			clip.keyframes.push_back({
+			    0.00f, {0.0f,          4.5f, -1.0f},
+                 {-1.5f + 1.57f, 0.0f, 0.0f },
+                 {1.3f,          1.3f, bsz  }
+            });
+			clip.keyframes.push_back({
+			    0.30f, {0.0f,          4.8f, -0.5f},
+                 {-1.8f + 1.57f, 0.0f, 0.0f },
+                 {1.3f,          1.3f, bsz  }
+            });
+			clip.keyframes.push_back({
+			    0.50f, {0.0f,         1.5f, 3.5f      },
+                 {0.5f + 1.57f, 0.0f, 0.0f      },
+                 {1.3f,         1.3f, bsz + 1.5f}
+            });
+			clip.keyframes.push_back({
+			    0.80f, {0.0f,         1.2f, 2.8f},
+                 {0.8f + 1.57f, 0.0f, 0.0f},
+                 {1.3f,         1.3f, bsz }
+            });
 		} else { // 飛翔大回転（前方に飛ばして戻す）
 			clip.totalDuration = 1.2f;
 			// 0.0s: 始動
-			clip.keyframes.push_back({0.00f, { 0.0f, 2.2f, 0.5f },  { 0.0f, 0.0f, 1.57f }, { 1.3f, 1.3f, bsz }});
+			clip.keyframes.push_back({
+			    0.00f, {0.0f, 2.2f, 0.5f },
+                 {0.0f, 0.0f, 1.57f},
+                 {1.3f, 1.3f, bsz  }
+            });
 			// 0.3s: 前方に射出開始 + 回転
-			clip.keyframes.push_back({0.30f, { 0.0f, 2.2f, 4.5f },  { 0.0f, 6.28f, 1.57f }, { 1.3f, 1.3f, bsz + 0.5f }});
+			clip.keyframes.push_back({
+			    0.30f, {0.0f, 2.2f,  4.5f      },
+                 {0.0f, 6.28f, 1.57f     },
+                 {1.3f, 1.3f,  bsz + 0.5f}
+            });
 			// 0.6s: 最遠地点で激しく回転 (Boomerang Peak)
-			clip.keyframes.push_back({0.60f, { 0.0f, 2.2f, 7.5f },  { 0.0f, 12.56f, 1.57f }, { 1.3f, 1.3f, bsz + 1.0f }});
+			clip.keyframes.push_back({
+			    0.60f, {0.0f, 2.2f,   7.5f      },
+                 {0.0f, 12.56f, 1.57f     },
+                 {1.3f, 1.3f,   bsz + 1.0f}
+            });
 			// 0.9s: 帰還開始
-			clip.keyframes.push_back({0.90f, { 0.0f, 2.2f, 3.5f },  { 0.0f, 18.84f, 1.57f }, { 1.3f, 1.3f, bsz + 0.5f }});
+			clip.keyframes.push_back({
+			    0.90f, {0.0f, 2.2f,   3.5f      },
+                 {0.0f, 18.84f, 1.57f     },
+                 {1.3f, 1.3f,   bsz + 0.5f}
+            });
 			// 1.2s: キャッチ
-			clip.keyframes.push_back({1.20f, { -1.0f, 1.8f, -0.5f }, { 0.0f, 20.41f, 1.57f }, { 1.3f, 1.3f, bsz }});
+			clip.keyframes.push_back({
+			    1.20f, {-1.0f, 1.8f,   -0.5f},
+                 {0.0f,  20.41f, 1.57f},
+                 {1.3f,  1.3f,   bsz  }
+            });
 		}
 		sMotion.clips[name] = clip;
 	};
@@ -156,26 +209,47 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		float bsz = 1.3f; // スケールアップに合わせて1.3に変更
 
 		// 0.0s: 溜め・溜め開放（身構える）
-		clip.keyframes.push_back({0.00f, { 0.0f, 1.5f, 0.0f }, { -0.5f + 1.57f, 0.0f, 0.0f }, { 1.3f, 1.3f, bsz }});
+		clip.keyframes.push_back({
+		    0.00f, {0.0f,          1.5f, 0.0f},
+             {-0.5f + 1.57f, 0.0f, 0.0f},
+             {1.3f,          1.3f, bsz }
+        });
 		// 0.2s: 跳躍開始（少し上へ、少し前へ）
-		clip.keyframes.push_back({0.20f, { 0.0f, 3.5f, 1.5f }, { -1.5f + 1.57f, 0.0f, 0.0f }, { 1.3f, 1.3f, bsz + 0.5f }});
+		clip.keyframes.push_back({
+		    0.20f, {0.0f,          3.5f, 1.5f      },
+             {-1.5f + 1.57f, 0.0f, 0.0f      },
+             {1.3f,          1.3f, bsz + 0.5f}
+        });
 		// 0.45s: 空中ピーク（最大限に振りかぶる）
-		clip.keyframes.push_back({0.45f, { 0.0f, 6.0f, 3.5f }, { -2.8f + 1.57f, 0.0f, 0.0f }, { 1.3f, 1.3f, bsz + 1.0f }});
+		clip.keyframes.push_back({
+		    0.45f, {0.0f,          6.0f, 3.5f      },
+             {-2.8f + 1.57f, 0.0f, 0.0f      },
+             {1.3f,          1.3f, bsz + 1.0f}
+        });
 		// 0.7s: 叩きつけ（最速で地面へ、前方に大きくリーチ）
-		clip.keyframes.push_back({0.70f, { 0.0f, 1.2f, 5.5f }, { 0.8f + 1.57f, 0.0f, 0.0f }, { 1.3f, 1.3f, bsz + 1.8f }});
+		clip.keyframes.push_back({
+		    0.70f, {0.0f,         1.2f, 5.5f      },
+             {0.8f + 1.57f, 0.0f, 0.0f      },
+             {1.3f,         1.3f, bsz + 1.8f}
+        });
 		// 1.1s: 着地硬直
-		clip.keyframes.push_back({1.10f, { 0.0f, 1.1f, 4.0f }, { 1.2f + 1.57f, 0.0f, 0.0f }, { 1.3f, 1.3f, bsz }});
-		
+		clip.keyframes.push_back({
+		    1.10f, {0.0f,         1.1f, 4.0f},
+             {1.2f + 1.57f, 0.0f, 0.0f},
+             {1.3f,         1.3f, bsz }
+        });
+
 		motion->clips[clip.name] = clip;
 	}
 
 	auto& sHb = scene->GetRegistry().get_or_emplace<HitboxComponent>(sword);
 	sHb.damage = 35.0f; // ★弱体化: 110.0f -> 35.0f (ワンパン防止)
 	sHb.tag = TagType::Sword;
-	sHb.size = { 6.0f, 4.0f, 2.5f };
-	sHb.center = { 0.0f, 1.2f, 1.2f }; // ★Y軸+1.2に変更
+	sHb.size = {6.0f, 4.0f, 2.5f};
+	sHb.center = {0.0f, 1.2f, 1.2f}; // ★Y軸+1.2に変更
 	sHb.enabled = true;
-	if (!isAttacking_) sHb.isActive = false;
+	if (!isAttacking_)
+		sHb.isActive = false;
 
 	// ---- 銃の初期化 ----
 	entt::entity gun = scene->FindObjectByName(gunName_);
@@ -186,7 +260,7 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 	scene->SetTag(gun, TagType::Player); // ★追加: RayCastの地形判定から除外するためプレイヤー属性を付与
 
 	auto& gTc = scene->GetRegistry().get_or_emplace<TransformComponent>(gun);
-	gTc.scale = { 2.2f, 2.2f, 2.2f }; // ピストルを大きく表示
+	gTc.scale = {2.2f, 2.2f, 2.2f}; // ピストルを大きく表示
 
 	auto& gHierarchy = scene->GetRegistry().get_or_emplace<HierarchyComponent>(gun);
 	gHierarchy.parentId = entity;
@@ -195,8 +269,8 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		auto& gMr = scene->GetRegistry().get_or_emplace<MeshRendererComponent>(gun);
 		gMr.modelHandle = renderer->LoadObjMesh("Resources/Models/3Dmodel/pistol/pistol.obj");
 		gMr.textureHandle = renderer->LoadTexture2D("Resources/Models/3Dmodel/pistol/pistol.png");
-		gMr.shaderName = "Toon"; // トゥーンシェーダーで輪郭と陰影をくっきり表示
-		gMr.color = { 1.0f, 1.0f, 1.0f, 1.0f }; // テクスチャ本来の色を表示するため白色に変更
+		gMr.shaderName = "Toon";              // トゥーンシェーダーで輪郭と陰影をくっきり表示
+		gMr.color = {1.0f, 1.0f, 1.0f, 1.0f}; // テクスチャ本来の色を表示するため白色に変更
 		gMr.enabled = true;
 	}
 
@@ -207,7 +281,8 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 
 void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (scene->GetRegistry().all_of<HealthComponent>(entity)) {
-		if (scene->GetRegistry().get<HealthComponent>(entity).isDead) return;
+		if (scene->GetRegistry().get<HealthComponent>(entity).isDead)
+			return;
 	}
 	ApplySkillEffects(entity, scene);
 	if (!isSubscribed_) {
@@ -223,14 +298,15 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			debugLastValue_ = amount;
 		});
 		scene->GetEventSystem().Subscribe("PlayerSwordHit", [this, scene](float) {
-			if (!scene || !scene->GetContext().camera) return;
+			if (!scene || !scene->GetContext().camera)
+				return;
 			auto* cam = scene->GetContext().camera;
 			if (comboCount_ <= 1) {
 				cam->StartShake(0.1f, 0.15f); // 弱
 			} else if (comboCount_ == 2) {
 				cam->StartShake(0.15f, 0.35f); // 中
 			} else {
-				cam->StartShake(0.2f, 0.6f);  // 強
+				cam->StartShake(0.2f, 0.6f); // 強
 			}
 		});
 		// ★追加: 強化弾ヒットイベント → 鏡割れエフェクト生成
@@ -251,8 +327,12 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 					float dx = tc.translate.x - pTc.translate.x;
 					float dy = (tc.translate.y + 1.0f) - (pTc.translate.y + 1.0f);
 					float dz = tc.translate.z - pTc.translate.z;
-					float len = std::sqrt(dx*dx + dy*dy + dz*dz);
-					if (len > 0.01f) { dx /= len; dy /= len; dz /= len; }
+					float len = std::sqrt(dx * dx + dy * dy + dz * dz);
+					if (len > 0.01f) {
+						dx /= len;
+						dy /= len;
+						dz /= len;
+					}
 					vc.SetValue("DirX", dx);
 					vc.SetValue("DirY", dy);
 					vc.SetValue("DirZ", dz);
@@ -262,14 +342,17 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 				// ★追加: 爆発攻撃範囲オブジェクトを生成して周囲の敵にダメージを与える
 				entt::entity explosionAttackArea = scene->CreateEntity("ExplosionAttackArea");
-				if (scene->GetRegistry().all_of<BoxColliderComponent>(explosionAttackArea)) scene->GetRegistry().remove<BoxColliderComponent>(explosionAttackArea);
-				if (scene->GetRegistry().all_of<HurtboxComponent>(explosionAttackArea)) scene->GetRegistry().remove<HurtboxComponent>(explosionAttackArea);
-				if (scene->GetRegistry().all_of<RigidbodyComponent>(explosionAttackArea)) scene->GetRegistry().remove<RigidbodyComponent>(explosionAttackArea);
+				if (scene->GetRegistry().all_of<BoxColliderComponent>(explosionAttackArea))
+					scene->GetRegistry().remove<BoxColliderComponent>(explosionAttackArea);
+				if (scene->GetRegistry().all_of<HurtboxComponent>(explosionAttackArea))
+					scene->GetRegistry().remove<HurtboxComponent>(explosionAttackArea);
+				if (scene->GetRegistry().all_of<RigidbodyComponent>(explosionAttackArea))
+					scene->GetRegistry().remove<RigidbodyComponent>(explosionAttackArea);
 
 				auto& expTc = scene->GetRegistry().get<TransformComponent>(explosionAttackArea);
 				expTc.translate = hitPos;
 				float expRad = 8.5f; // 爆発半径
-				expTc.scale = { expRad, expRad, expRad };
+				expTc.scale = {expRad, expRad, expRad};
 
 				auto& expSc = scene->GetRegistry().emplace<ScriptComponent>(explosionAttackArea);
 				expSc.scripts.push_back({"ExplosionAttackArea", "", std::make_shared<ExplosionAttackArea>(), false});
@@ -283,40 +366,44 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		});
 		// ★追加: プレイヤー被ダメージイベント
 		scene->GetEventSystem().Subscribe("PlayerTakeDamage", [this, entity, scene](float) {
-			if (!scene || !scene->GetContext().camera) return;
+			if (!scene || !scene->GetContext().camera)
+				return;
 			// 1. 強めのカメラシェイク
 			scene->GetContext().camera->StartShake(0.5f, 0.4f, 0.02f);
-			
+
 			// 2. ダメージ演出タイマーセット
 			damageEffectTimer_ = DAMAGE_EFFECT_DURATION;
-			
+
 			// 3. プレイヤーの無敵時間を延長（少し長めの1.0秒に設定）
 			if (scene->GetRegistry().all_of<HealthComponent>(entity)) {
 				auto& hc = scene->GetRegistry().get<HealthComponent>(entity);
-				hc.invincibleTime = 1.0f; 
+				hc.invincibleTime = 1.0f;
 			}
 		});
 		debugSubscribeCount_ += 1;
 		isSubscribed_ = true;
 	}
 
-    bool hasPhaseSystem = false;
+	bool hasPhaseSystem = false;
 	{
 		auto scView = scene->GetRegistry().view<ScriptComponent>();
 		for (auto e : scView) {
 			auto& sc = scView.get<ScriptComponent>(e);
 			for (auto& entry : sc.scripts) {
-              if (entry.scriptPath == "PhaseSystemScript" || entry.scriptPath == "TutorialScript") {
+				if (entry.scriptPath == "PhaseSystemScript" || entry.scriptPath == "TutorialScript") {
 					hasPhaseSystem = true;
 					break;
 				}
 			}
-			if (hasPhaseSystem) break;
+			if (hasPhaseSystem)
+				break;
 		}
 	}
 
-	if (skillCooldown_ > 0.0f) skillCooldown_ -= dt;
-	if (gunShootTimer_ > 0.0f) gunShootTimer_ -= dt;
+	if (skillCooldown_ > 0.0f)
+		skillCooldown_ -= dt;
+	if (gunShootTimer_ > 0.0f)
+		gunShootTimer_ -= dt;
 
 	// ★追加: ダメージ演出の更新
 	auto* renderer = scene->GetRenderer();
@@ -324,18 +411,19 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	if (damageEffectTimer_ > 0.0f) {
 		damageEffectTimer_ -= dt;
-		if (damageEffectTimer_ < 0.0f) damageEffectTimer_ = 0.0f;
-		
+		if (damageEffectTimer_ < 0.0f)
+			damageEffectTimer_ = 0.0f;
+
 		if (renderer) {
 			renderer->SetPostEffect("Rich"); // ★追加: 赤色ビネット対応の高品質シェーダーに切り替え
 			auto params = renderer->GetPostProcessParams();
 			float rate = damageEffectTimer_ / DAMAGE_EFFECT_DURATION; // 1.0 -> 0.0
-			
+
 			// ビネット強度 (最大1.5) を赤色ビネットに変更
 			params.damageVignette = rate * 1.5f;
 			// 色収差は廃止されたのでコメントアウト
 			// params.chromaShift = rate * 0.05f;
-			
+
 			renderer->SetPostProcessParams(params);
 			renderer->SetPostProcessEnabled(true);
 		}
@@ -346,7 +434,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			if (params.damageVignette > 0.0f) {
 				params.damageVignette = 0.0f;
 				renderer->SetPostProcessParams(params);
-				
+
 				// ダメージ終了の瞬間に元の絵画風ポストプロセスに戻す
 				renderer->SetPostEffect("Painterly");
 			}
@@ -357,14 +445,14 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	// 準備フェーズ(PreparationPhase)の時だけミニチュア風のピンボケ効果を有効化
 	if (renderer) {
 		renderer->SetPostProcessEnabled(true);
-		
+
 		auto params = renderer->GetPostProcessParams();
 		float targetDof = isPrep ? 0.3f : 0.0f; // ★Renderer.hに合わせた値
 		if (params.dofIntensity != targetDof) {
 			params.dofIntensity = targetDof;
 			renderer->SetPostProcessParams(params);
 		}
-		
+
 		// ★修正: 毎フレーム Rich で上書きするのではなく、ダメージを受けていない通常時は
 		// PhaseSystemScriptなどが設定したエフェクト（Painterly / Anime）を尊重するため、
 		// ここではSetPostEffectを呼ばないようにします。
@@ -406,7 +494,8 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (isPrep && !s_wasPrep) {
 		// 戦闘フェーズ等から準備フェーズに戻った時、自動でカーソルを表示する
 		isCursorVisible_ = true;
-		while (ShowCursor(TRUE) < 0);
+		while (ShowCursor(TRUE) < 0)
+			;
 	}
 	s_wasPrep = isPrep;
 
@@ -416,9 +505,11 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		if (currentCursorToggle && !prevCursorToggle_) {
 			isCursorVisible_ = !isCursorVisible_;
 			if (isCursorVisible_) {
-				while (ShowCursor(TRUE) < 0);
+				while (ShowCursor(TRUE) < 0)
+					;
 			} else {
-				while (ShowCursor(FALSE) >= 0);
+				while (ShowCursor(FALSE) >= 0)
+					;
 			}
 		}
 		prevCursorToggle_ = currentCursorToggle;
@@ -426,7 +517,8 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		// 準備フェーズ以外は強制的に非表示
 		if (isCursorVisible_) {
 			isCursorVisible_ = false;
-			while (ShowCursor(FALSE) >= 0);
+			while (ShowCursor(FALSE) >= 0)
+				;
 		}
 		prevCursorToggle_ = false;
 	}
@@ -437,9 +529,9 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		if (hwnd) {
 			RECT rect;
 			GetClientRect(hwnd, &rect);
-			POINT center = { (rect.right - rect.left) / 2, (rect.bottom - rect.top) / 2 };
+			POINT center = {(rect.right - rect.left) / 2, (rect.bottom - rect.top) / 2};
 			ClientToScreen(hwnd, &center);
-			
+
 			POINT current;
 			if (GetCursorPos(&current)) {
 				// 画面中心からずれている場合のみSetCursorPosを呼ぶ
@@ -449,7 +541,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			}
 		}
 	}
-	
+
 	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
 
 	if (!isPrep && !isInsert) {
@@ -458,7 +550,8 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		if (currentDashKeyDown && !prevDashKeyDown_ && playerType_ == PlayerType::Sword) {
 			if (steamPressure_ > 0.0f && !isRecharging_) { // ★少しでもあれば発動可能に
 				steamPressure_ -= DASH_COST;
-				if (steamPressure_ < 0.0f) steamPressure_ = 0.0f; // リチャージ判定へ
+				if (steamPressure_ < 0.0f)
+					steamPressure_ = 0.0f; // リチャージ判定へ
 
 				float dx = 0.0f, dz = 0.0f;
 				if (scene->GetRegistry().all_of<PlayerInputComponent>(entity)) {
@@ -483,7 +576,8 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 				float len = std::sqrt(dx * dx + dz * dz);
 				if (len > 0.001f) {
-					dx /= len; dz /= len;
+					dx /= len;
+					dz /= len;
 					if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
 						auto& rb = scene->GetRegistry().get<RigidbodyComponent>(entity);
 						rb.velocity.x = dx * DASH_POWER;
@@ -507,7 +601,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 						// 少しだけ横にずらして「ツインスラスター」感を出す
 						float offsetX = (i == 0 ? -0.4f : 0.4f);
-						float sideX = -dz * offsetX; 
+						float sideX = -dz * offsetX;
 						float sideZ = dx * offsetX;
 						bTc.translate.x += sideX;
 						bTc.translate.z += sideZ;
@@ -525,7 +619,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 						bVc.SetValue("Count", 40.0f);
 
 						auto& bSc = scene->GetRegistry().emplace<ScriptComponent>(boostVfx);
-						bSc.scripts.push_back({ "SpaceShatterScript", "", nullptr });
+						bSc.scripts.push_back({"SpaceShatterScript", "", nullptr});
 					}
 
 					// ★追加: ブースト発動時のカメラシェイク (弱体化)
@@ -540,7 +634,6 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		// ★ジャンプ開始時の反動Yリセットはもう不要（rbに統合したため）
 
 		// ★CharacterMovementSystem に完全に移動処理を委譲したため、独自の raycast 移動・壁判定・減衰処理は削除
-
 
 		// ★追加: 飛行システム
 		bool isGrounded = (pTc.translate.y <= scene->GetHeightAt(pTc.translate.x, pTc.translate.z, pTc.translate.y + 1.0f) + 1.1f);
@@ -577,7 +670,8 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 							auto& rb = scene->GetRegistry().get<RigidbodyComponent>(entity);
 							rb.velocity.y += 60.0f * dt; // 上昇推力
 							if (pTc.translate.y - groundY > MAX_FLIGHT_HEIGHT) {
-								if (rb.velocity.y > 0.0f) rb.velocity.y *= 0.5f; 
+								if (rb.velocity.y > 0.0f)
+									rb.velocity.y *= 0.5f;
 							}
 						}
 					}
@@ -590,7 +684,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 						flightVfxTimer = 0.0f;
 						entt::entity boostVfx = scene->CreateEntity("FlightSteam");
 						auto& bTc = scene->GetRegistry().get<TransformComponent>(boostVfx);
-						bTc.translate = { pTc.translate.x, pTc.translate.y, pTc.translate.z };
+						bTc.translate = {pTc.translate.x, pTc.translate.y, pTc.translate.z};
 						scene->SetTag(boostVfx, TagType::VFX);
 						auto& bVc = scene->GetRegistry().emplace<VariableComponent>(boostVfx);
 						bVc.SetValue("NormalY", -1.0f);
@@ -600,7 +694,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 						bVc.SetValue("Count", 25.0f);
 						bVc.SetValue("IsFlight", 1.0f);
 						auto& bSc = scene->GetRegistry().emplace<ScriptComponent>(boostVfx);
-						bSc.scripts.push_back({ "SpaceShatterScript", "", nullptr });
+						bSc.scripts.push_back({"SpaceShatterScript", "", nullptr});
 					}
 				}
 			}
@@ -618,12 +712,13 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 				rb.useGravity = true;
 			}
 		}
-
 	}
 
 	if (isPrep || isInsert) {
-		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) scene->GetRegistry().get<CameraTargetComponent>(entity).enabled = false;
-		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))  scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = false;
+		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity))
+			scene->GetRegistry().get<CameraTargetComponent>(entity).enabled = false;
+		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))
+			scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = false;
 
 		// ★追加: 準備フェーズ中は物理的な滑りや慣性を完全に殺し、一切歩かない（動かない）ようにする
 		if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
@@ -646,14 +741,18 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			UpdateGun(entity, scene, dt);
 		}
 
+
+		 maxSteam = maxSteamPressure_ * playerMaxSteamPressureRate_;
+
+
 		// ★追加: 蒸気圧リチャージ処理 (モードに関わらず共通で実行)
 		if (isRecharging_) {
 			rechargeTimer_ -= dt;
 			// リチャージ中は徐々に蒸気圧が回復する
-			float rechargeRate = maxSteamPressure_ / RECHARGE_TIME;
+			float rechargeRate = maxSteam / RECHARGE_TIME;
 			steamPressure_ += rechargeRate * dt;
-			if (steamPressure_ >= maxSteamPressure_) {
-				steamPressure_ = maxSteamPressure_;
+			if (steamPressure_ >= maxSteam) {
+				steamPressure_ = maxSteam;
 				isRecharging_ = false;
 				rechargeTimer_ = 0.0f;
 			}
@@ -668,13 +767,16 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 		// ★追加: 圧力ゲージの描画 (リチャージ中、銃モード、消費中、スキル中、または戦闘フェーズなら表示)
 		bool isBattle = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::BattlePhase);
-		bool shouldShowGauge = (playerType_ == PlayerType::Gun) || isRecharging_ || (steamPressure_ < maxSteamPressure_) || isSkillActive_ || isBattle || isFlying_ || (flightPressure_ < maxFlightPressure_);
+		bool shouldShowGauge =
+		    (playerType_ == PlayerType::Gun) || isRecharging_ || (steamPressure_ < maxSteam) || isSkillActive_ || isBattle || isFlying_ || (flightPressure_ < maxFlightPressure_);
 		if (shouldShowGauge) {
 			DrawPressureGauge(scene);
 		}
 
-		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) scene->GetRegistry().get<CameraTargetComponent>(entity).enabled = true;
-		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))  scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = true;
+		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity))
+			scene->GetRegistry().get<CameraTargetComponent>(entity).enabled = true;
+		if (scene->GetRegistry().all_of<PlayerInputComponent>(entity))
+			scene->GetRegistry().get<PlayerInputComponent>(entity).enabled = true;
 	}
 
 	// ★追加: 大剣の空中溜め攻撃時の浮遊判定のため、状態フラグを VariableComponent に設定する
@@ -712,7 +814,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		// 1. 攻撃モーション (剣)
 		if (playerType_ == PlayerType::Sword && isAttacking_) {
 			loop = false;
-			speed = 2.5f; // ★攻撃モーションを早めてキビキビと反応させる
+			speed = 2.5f * playerSwordAttackSpeedRate_; // ★攻撃モーションを早めてキビキビと反応させる
 			if (comboCount_ == 1) {
 				nextAnim = "凪払い";
 			} else if (comboCount_ == 2) {
@@ -824,8 +926,8 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			// テキスト (Lvと経験値)
 			char textBuf[64];
 			snprintf(textBuf, sizeof(textBuf), "Lv.%d   EXP: %.1f / %.1f", level_, experience_, nextExperience_);
-			uiRenderer->DrawString(textBuf, 32.0f, 26.0f, 0.5f, {0,0,0,1});
-			uiRenderer->DrawString(textBuf, 30.0f, 24.0f, 0.5f, {1,1,1,1});
+			uiRenderer->DrawString(textBuf, 32.0f, 26.0f, 0.5f, {0, 0, 0, 1});
+			uiRenderer->DrawString(textBuf, 30.0f, 24.0f, 0.5f, {1, 1, 1, 1});
 
 			// ==== ★追加: ロックオンレティクル & 銃レティクル ====
 			if (playerType_ == PlayerType::Gun) {
@@ -869,7 +971,6 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 							dotDesc.progress = 1.0f;
 							dotDesc.fill = 1.0f;
 							uiRenderer->DrawSDFUI(dotDesc);
-
 						}
 					}
 				}
@@ -882,50 +983,42 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 					float alpha = mf.life / mf.maxLife;
 					float size = 0.3f + (1.0f - alpha) * 0.5f;
 					// 十字のフラッシュ
-					uiRenderer->DrawLine3D(
-						{mf.pos.x - size, mf.pos.y, mf.pos.z},
-						{mf.pos.x + size, mf.pos.y, mf.pos.z},
-						{1.0f, 0.9f, 0.3f, alpha});
-					uiRenderer->DrawLine3D(
-						{mf.pos.x, mf.pos.y - size, mf.pos.z},
-						{mf.pos.x, mf.pos.y + size, mf.pos.z},
-						{1.0f, 0.9f, 0.3f, alpha});
-					uiRenderer->DrawLine3D(
-						{mf.pos.x, mf.pos.y, mf.pos.z - size},
-						{mf.pos.x, mf.pos.y, mf.pos.z + size},
-						{1.0f, 0.9f, 0.3f, alpha});
+					uiRenderer->DrawLine3D({mf.pos.x - size, mf.pos.y, mf.pos.z}, {mf.pos.x + size, mf.pos.y, mf.pos.z}, {1.0f, 0.9f, 0.3f, alpha});
+					uiRenderer->DrawLine3D({mf.pos.x, mf.pos.y - size, mf.pos.z}, {mf.pos.x, mf.pos.y + size, mf.pos.z}, {1.0f, 0.9f, 0.3f, alpha});
+					uiRenderer->DrawLine3D({mf.pos.x, mf.pos.y, mf.pos.z - size}, {mf.pos.x, mf.pos.y, mf.pos.z + size}, {1.0f, 0.9f, 0.3f, alpha});
 				}
 			}
-			while (!muzzleFlashes_.empty() && muzzleFlashes_.front().life <= 0) muzzleFlashes_.pop_front();
+			while (!muzzleFlashes_.empty() && muzzleFlashes_.front().life <= 0)
+				muzzleFlashes_.pop_front();
 
 			// ==== ★追加: クリスタル飛散エフェクト描画 ====
 			// (ユーザー要望により、古い青い線のクリスタルは描画しない)
 			/*
 			for (auto& cp : crystalParticles_) {
-				cp.life -= dt;
-				cp.pos.x += cp.velocity.x * dt;
-				cp.pos.y += cp.velocity.y * dt;
-				cp.pos.z += cp.velocity.z * dt;
-				cp.velocity.y -= 8.0f * dt;
-				cp.rot += cp.rotSpeed * dt;
-				if (cp.life > 0.0f) {
-					float alpha = (cp.life / cp.maxLife);
-					float s = cp.size;
-					float c = std::cos(cp.rot);
-					float sn = std::sin(cp.rot);
-					Engine::Vector3 top    = {cp.pos.x + sn * s, cp.pos.y + c * s, cp.pos.z};
-					Engine::Vector3 right  = {cp.pos.x + c * s, cp.pos.y - sn * s, cp.pos.z + s * 0.3f};
-					Engine::Vector3 bottom = {cp.pos.x - sn * s, cp.pos.y - c * s, cp.pos.z};
-					Engine::Vector3 left   = {cp.pos.x - c * s, cp.pos.y + sn * s, cp.pos.z - s * 0.3f};
-					Engine::Vector4 col = {cp.color.x, cp.color.y, cp.color.z, alpha * cp.color.w};
-					uiRenderer->DrawLine3D(top, right, col, true);
-					uiRenderer->DrawLine3D(right, bottom, col, true);
-					uiRenderer->DrawLine3D(bottom, left, col, true);
-					uiRenderer->DrawLine3D(left, top, col, true);
-					Engine::Vector4 colInner = {cp.color.x * 1.2f, cp.color.y * 1.2f, cp.color.z * 1.2f, alpha * 0.6f};
-					uiRenderer->DrawLine3D(top, bottom, colInner, true);
-					uiRenderer->DrawLine3D(left, right, colInner, true);
-				}
+			    cp.life -= dt;
+			    cp.pos.x += cp.velocity.x * dt;
+			    cp.pos.y += cp.velocity.y * dt;
+			    cp.pos.z += cp.velocity.z * dt;
+			    cp.velocity.y -= 8.0f * dt;
+			    cp.rot += cp.rotSpeed * dt;
+			    if (cp.life > 0.0f) {
+			        float alpha = (cp.life / cp.maxLife);
+			        float s = cp.size;
+			        float c = std::cos(cp.rot);
+			        float sn = std::sin(cp.rot);
+			        Engine::Vector3 top    = {cp.pos.x + sn * s, cp.pos.y + c * s, cp.pos.z};
+			        Engine::Vector3 right  = {cp.pos.x + c * s, cp.pos.y - sn * s, cp.pos.z + s * 0.3f};
+			        Engine::Vector3 bottom = {cp.pos.x - sn * s, cp.pos.y - c * s, cp.pos.z};
+			        Engine::Vector3 left   = {cp.pos.x - c * s, cp.pos.y + sn * s, cp.pos.z - s * 0.3f};
+			        Engine::Vector4 col = {cp.color.x, cp.color.y, cp.color.z, alpha * cp.color.w};
+			        uiRenderer->DrawLine3D(top, right, col, true);
+			        uiRenderer->DrawLine3D(right, bottom, col, true);
+			        uiRenderer->DrawLine3D(bottom, left, col, true);
+			        uiRenderer->DrawLine3D(left, top, col, true);
+			        Engine::Vector4 colInner = {cp.color.x * 1.2f, cp.color.y * 1.2f, cp.color.z * 1.2f, alpha * 0.6f};
+			        uiRenderer->DrawLine3D(top, bottom, colInner, true);
+			        uiRenderer->DrawLine3D(left, right, colInner, true);
+			    }
 			}
 			while (!crystalParticles_.empty() && crystalParticles_.front().life <= 0) crystalParticles_.pop_front();
 			*/
@@ -941,13 +1034,11 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 				if (sc.life > 0.0f) {
 					float alpha = sc.life / 0.6f;
 					Engine::Vector4 shellColor = {0.9f, 0.7f, 0.2f, alpha};
-					uiRenderer->DrawLine3D(
-						{sc.pos.x, sc.pos.y, sc.pos.z},
-						{sc.pos.x, sc.pos.y + 0.08f, sc.pos.z},
-						shellColor);
+					uiRenderer->DrawLine3D({sc.pos.x, sc.pos.y, sc.pos.z}, {sc.pos.x, sc.pos.y + 0.08f, sc.pos.z}, shellColor);
 				}
 			}
-			while (!shellCasings_.empty() && shellCasings_.front().life <= 0) shellCasings_.pop_front();
+			while (!shellCasings_.empty() && shellCasings_.front().life <= 0)
+				shellCasings_.pop_front();
 
 			// ==== ★追加: スキルバフ中のUI表示 ====
 			if (isSkillActive_ && playerType_ == PlayerType::Gun) {
@@ -986,9 +1077,10 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 }
 
 void PlayerScript::UpdateMovement(entt::entity entity, GameScene* scene, float /*dt*/) {
-	if (!scene->GetRegistry().all_of<PlayerInputComponent>(entity)) return;
+	if (!scene->GetRegistry().all_of<PlayerInputComponent>(entity))
+		return;
 	auto& input = scene->GetRegistry().get<PlayerInputComponent>(entity);
-	
+
 	if (gunComboAnimTimer_ > 0.0f) {
 		input.moveDir.x = 0.0f;
 		input.moveDir.y = 0.0f;
@@ -1011,7 +1103,7 @@ void PlayerScript::UpdateMovement(entt::entity entity, GameScene* scene, float /
 	if (isFlying_ && playerType_ == PlayerType::Gun) {
 		speedMul *= 3.0f; // ★3倍に（ベース速度に対して適用されるため非常に速くなります）
 	}
-	
+
 	// ★追加: TPS視点として、Gunモード時かつエイム・射撃・チャージ中のみカメラの向きを向かせる（地上限定）
 	if (playerType_ == PlayerType::Gun && !isFlying_ && (isAiming_ || gunShootTimer_ > 0.0f || isCharging_)) {
 		auto* camera = &scene->GetCamera();
@@ -1028,15 +1120,16 @@ void PlayerScript::UpdateMovement(entt::entity entity, GameScene* scene, float /
 	if (scene->GetRegistry().all_of<CharacterMovementComponent>(entity)) {
 		auto& cm = scene->GetRegistry().get<CharacterMovementComponent>(entity);
 		static float baseSpeed = 0.0f;
-		if (baseSpeed == 0.0f) baseSpeed = cm.speed;
-		
-		cm.speed = baseSpeed * speedMul;
+		if (baseSpeed == 0.0f)
+			baseSpeed = cm.speed;
+
+		cm.speed = baseSpeed * speedMul * playerMoveSpeedRate_;
 	}
 }
 
 void PlayerScript::UpdateAttack(entt::entity entity, GameScene* scene, float dt) {
 	bool currentAttackKeyDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
-	
+
 	// ★追加: 大剣の溜め攻撃ロジック
 	if (playerType_ == PlayerType::Sword && !isRecharging_) {
 		if (currentAttackKeyDown) {
@@ -1044,7 +1137,7 @@ void PlayerScript::UpdateAttack(entt::entity entity, GameScene* scene, float dt)
 				isSwordCharging_ = true;
 				swordChargeTime_ = 0.0f;
 			}
-			
+
 			if (isSwordCharging_) {
 				swordChargeTime_ += dt;
 				// 溜め中の蒸気エフェクト
@@ -1073,7 +1166,8 @@ void PlayerScript::UpdateAttack(entt::entity entity, GameScene* scene, float dt)
 				if (swordChargeTime_ >= 0.35f && (steamPressure_ > 0.0f || isSkillActive_)) { // ★少しでもあれば発動可能
 					// ★溜め攻撃発動！
 					steamPressure_ -= SWORD_CHARGE_COST;
-					if (steamPressure_ < 0.0f) steamPressure_ = 0.0f;
+					if (steamPressure_ < 0.0f)
+						steamPressure_ = 0.0f;
 
 					isAttacking_ = true;
 					comboCount_ = 0; // 0は溜め攻撃用
@@ -1081,7 +1175,7 @@ void PlayerScript::UpdateAttack(entt::entity entity, GameScene* scene, float dt)
 					if (sword != entt::null) {
 						auto& motion = scene->GetRegistry().get<MotionComponent>(sword);
 						motion.PlayAnimation("SwordChargeAttack");
-						
+
 						// ★前方にジャンプする推進力を与える
 						auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
 						float dx = std::sin(pTc.rotate.y);
@@ -1107,12 +1201,14 @@ void PlayerScript::UpdateAttack(entt::entity entity, GameScene* scene, float dt)
 	}
 
 	if (currentAttackKeyDown && !prevAttackKeyDown_) {
-		if (!isSwordCharging_) attackQueued_ = true;
+		if (!isSwordCharging_)
+			attackQueued_ = true;
 	}
 	prevAttackKeyDown_ = currentAttackKeyDown;
 
 	entt::entity sword = scene->FindObjectByName(swordName_);
-	if (sword == entt::null) return;
+	if (sword == entt::null)
+		return;
 
 	auto& motion = scene->GetRegistry().get<MotionComponent>(sword);
 
@@ -1151,16 +1247,25 @@ void PlayerScript::UpdateAttack(entt::entity entity, GameScene* scene, float dt)
 
 void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float dt) {
 	entt::entity sword = scene->FindObjectByName(swordName_);
-	if (sword == entt::null) return;
+	if (sword == entt::null)
+		return;
+	if (auto* hb = scene->GetRegistry().try_get<HitboxComponent>(sword)) {
+		float swordDamage = 35.0f * playerSwordAttackPowerRate_;
 
+		if (isSkillActive_) {
+			swordDamage *= playerSwordSkillAttackPowerRate_;
+		}
+
+		hb->damage = swordDamage;
+	}
 	auto& swordTc = scene->GetRegistry().get<TransformComponent>(sword);
-	
+
 	if (!isAttacking_) {
 		// 非攻撃時は常に背中に背負う配置にする
-		swordTc.translate = { 1.5f, 4.8f, -1.5f }; // ★さらに微調整で右へ動かすため、Xを1.5fに変更
+		swordTc.translate = {1.5f, 4.8f, -1.5f}; // ★さらに微調整で右へ動かすため、Xを1.5fに変更
 		// Y軸回転を90度にしたことで逆になった傾きを正すため, X軸の回転を 30度 に変更
-		swordTc.rotate = { DirectX::XMConvertToRadians(30.0f), DirectX::XMConvertToRadians(90.0f), DirectX::XMConvertToRadians(180.0f) };
-		swordTc.scale = { 1.3f, 1.3f, 1.3f }; // ★剣サイズを1.3倍に拡大
+		swordTc.rotate = {DirectX::XMConvertToRadians(30.0f), DirectX::XMConvertToRadians(90.0f), DirectX::XMConvertToRadians(180.0f)};
+		swordTc.scale = {1.3f, 1.3f, 1.3f}; // ★剣サイズを1.3倍に拡大
 
 		// ★MotionSystemによる待機中のスケール＆座標リセットを防ぐため、再生クリップを空にする
 		if (auto* motion = scene->GetRegistry().try_get<MotionComponent>(sword)) {
@@ -1189,25 +1294,25 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 					static float lastImpactTime = -1.0f;
 					if (t >= 0.7f && t < 0.8f && lastImpactTime < 0.0f) {
 						lastImpactTime = t;
-						
+
 						// ワールド座標を取得
 						Engine::Matrix4x4 worldMat = scene->GetWorldMatrix((int)sword);
-						Engine::Vector3 worldPos = { worldMat.m[3][0], worldMat.m[3][1], worldMat.m[3][2] };
+						Engine::Vector3 worldPos = {worldMat.m[3][0], worldMat.m[3][1], worldMat.m[3][2]};
 						float groundY = scene->GetHeightAt(worldPos.x, worldPos.z, worldPos.y + 1.0f);
 
 						// 1. 地面が歪む巨大な衝撃波 (SpaceShatter)
 						entt::entity impactVfx = scene->CreateEntity("GroundSmash_VFX");
 						auto& iTc = scene->GetRegistry().get<TransformComponent>(impactVfx);
-						iTc.translate = { worldPos.x, groundY + 0.1f, worldPos.z };
+						iTc.translate = {worldPos.x, groundY + 0.1f, worldPos.z};
 						scene->SetTag(impactVfx, TagType::VFX);
 
 						auto& iVc = scene->GetRegistry().emplace<VariableComponent>(impactVfx);
 						iVc.SetValue("NormalY", 1.0f);
-						iVc.SetValue("Radius", 25.0f);     // 巨大な歪み
+						iVc.SetValue("Radius", 25.0f); // 巨大な歪み
 						iVc.SetValue("Duration", 0.9f);
 						iVc.SetValue("ScatterMode", 0.0f);
 						iVc.SetValue("ScatterSpeed", 35.0f);
-						iVc.SetValue("Count", 120.0f);      // 密度高め
+						iVc.SetValue("Count", 120.0f); // 密度高め
 						auto& iSc = scene->GetRegistry().emplace<ScriptComponent>(impactVfx);
 						iSc.scripts.push_back({"SpaceShatterScript", "", nullptr});
 
@@ -1232,8 +1337,14 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 						aTc.translate = iTc.translate;
 						auto& aHb = scene->GetRegistry().emplace<HitboxComponent>(aoe);
 						aHb.isActive = true;
-						aHb.damage = 80.0f; // ★弱体化: 250.0f -> 80.0f (範囲強攻撃としてのバランス調整)
-						aHb.size = { 18.0f, 5.0f, 18.0f };
+						float chargeAttackDamage = 80.0f * playerSwordAttackPowerRate_;
+
+						if (isSkillActive_) {
+							chargeAttackDamage *= playerSwordSkillAttackPowerRate_;
+						}
+
+						aHb.damage = chargeAttackDamage; // ★弱体化: 250.0f -> 80.0f (範囲強攻撃としてのバランス調整)
+						aHb.size = {18.0f, 5.0f, 18.0f};
 						aHb.tag = TagType::Sword;
 						scene->DestroyObject((uint32_t)aoe);
 
@@ -1241,7 +1352,8 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 							camera->StartShake(0.5f, 0.8f, 0.04f); // 激しい揺れ
 						}
 					}
-					if (t < 0.1f) lastImpactTime = -1.0f; // リセット
+					if (t < 0.1f)
+						lastImpactTime = -1.0f; // リセット
 				}
 			}
 		} else {
@@ -1261,31 +1373,34 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 		auto& sMr = scene->GetRegistry().get<MeshRendererComponent>(sword);
 		if (isAttacking_) {
 			// 攻撃中は青白く美しく発光（HDRによるブルーム効果で光り溢れます）
-			sMr.color = { 1.5f, 2.2f, 3.2f, 1.0f }; 
+			sMr.color = {1.5f, 2.2f, 3.2f, 1.0f};
 		} else {
 			// 通常時はToonかつほんのり微発光
-			sMr.color = { 1.2f, 1.2f, 1.2f, 1.0f };
+			sMr.color = {1.2f, 1.2f, 1.2f, 1.0f};
 		}
 	}
 
 	if (isAttacking_ && hitboxActive) {
 		Engine::Matrix4x4 worldMat = scene->GetWorldMatrix((int)sword);
 		DirectX::XMMATRIX m = DirectX::XMLoadFloat4x4(reinterpret_cast<DirectX::XMFLOAT4X4*>(&worldMat));
-		float bladeLen = 3.2f; // ★大剣の長さに合わせる
-		DirectX::XMVECTOR basePos = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(0, -bladeLen*0.1f, 0, 1), m); // 大剣モデル本来の長手方向であるY軸を使用
-		DirectX::XMVECTOR tipPos = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(0, bladeLen*0.9f, 0, 1), m);
+		float bladeLen = 3.2f;                                                                                            // ★大剣の長さに合わせる
+		DirectX::XMVECTOR basePos = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(0, -bladeLen * 0.1f, 0, 1), m); // 大剣モデル本来の長手方向であるY軸を使用
+		DirectX::XMVECTOR tipPos = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(0, bladeLen * 0.9f, 0, 1), m);
 
 		TrailPoint tp;
 		DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&tp.base), basePos);
 		DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&tp.tip), tipPos);
-		tp.life = 0.5f;     // ★重さを出すため軌跡を少し長く残す
+		tp.life = 0.5f; // ★重さを出すため軌跡を少し長く残す
 		tp.maxLife = 0.5f;
 		trailPoints_.push_back(tp);
-		if (trailPoints_.size() > 80) trailPoints_.pop_front();
+		if (trailPoints_.size() > 80)
+			trailPoints_.pop_front();
 	}
 
-	for (auto& tp : trailPoints_) tp.life -= dt;
-	while (!trailPoints_.empty() && trailPoints_.front().life <= 0) trailPoints_.pop_front();
+	for (auto& tp : trailPoints_)
+		tp.life -= dt;
+	while (!trailPoints_.empty() && trailPoints_.front().life <= 0)
+		trailPoints_.pop_front();
 
 	auto* renderer = scene->GetRenderer();
 	if (renderer && trailPoints_.size() >= 2) {
@@ -1293,16 +1408,16 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 			float alpha = trailPoints_[i].life / trailPoints_[i].maxLife;
 			Engine::Vector4 col = {0.2f, 0.6f, 1.0f, alpha * 0.95f};
 			// 少しずらした線を追加して「厚み」を出す
-			Engine::Vector3 tip1 = trailPoints_[i-1].tip;
+			Engine::Vector3 tip1 = trailPoints_[i - 1].tip;
 			Engine::Vector3 tip2 = trailPoints_[i].tip;
-			Engine::Vector3 base1 = trailPoints_[i-1].base;
+			Engine::Vector3 base1 = trailPoints_[i - 1].base;
 			Engine::Vector3 base2 = trailPoints_[i].base;
 
 			renderer->DrawLine3D(tip1, tip2, col, true);
 			renderer->DrawLine3D(base1, base2, col, true);
 			renderer->DrawLine3D(tip1, base1, col, true);
 
-			Engine::Vector3 off = { 0.0f, 0.03f, 0.0f };
+			Engine::Vector3 off = {0.0f, 0.03f, 0.0f};
 			renderer->DrawLine3D(tip1 + off, tip2 + off, col, true);
 			renderer->DrawLine3D(base1 + off, base2 + off, col, true);
 			renderer->DrawLine3D(tip1 - off, tip2 - off, col, true);
@@ -1313,51 +1428,54 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 
 void PlayerScript::UpdateGun(entt::entity entity, GameScene* scene, float /*dt*/) {
 	entt::entity gun = scene->FindObjectByName(gunName_);
-	if (gun == entt::null) return;
+	if (gun == entt::null)
+		return;
 
 	auto& gunTc = scene->GetRegistry().get<TransformComponent>(gun);
-	
+
 	// ★追加：ガンナーモードの時のみ銃を表示する
 	if (auto* mr = scene->GetRegistry().try_get<MeshRendererComponent>(gun)) {
 		mr->enabled = (playerType_ == PlayerType::Gun);
 	}
-	
+
 	if (isAiming_) {
 		// エイム時：しっかり構える（平行に、少し低く）
-		gunTc.translate = { 0.6f, 2.0f, 2.0f }; // ★Z軸(前方向)を+1.0して前に出す
-		gunTc.rotate = { 0.0f, 0.0f, 0.0f };
+		gunTc.translate = {0.6f, 2.0f, 2.0f}; // ★Z軸(前方向)を+1.0して前に出す
+		gunTc.rotate = {0.0f, 0.0f, 0.0f};
 	} else {
 		// 非エイム時：腰だめ（平行に、もっと低く）
-		gunTc.translate = { 0.8f, 1.7f, 1.8f }; // ★Z軸(前方向)を+1.2して前に出す
-		gunTc.rotate = { 0.0f, 0.0f, 0.0f }; // 地面と平行に
+		gunTc.translate = {0.8f, 1.7f, 1.8f}; // ★Z軸(前方向)を+1.2して前に出す
+		gunTc.rotate = {0.0f, 0.0f, 0.0f};    // 地面と平行に
 	}
 
 	// ★追加: 飛行中でロックしている敵がいる場合は、銃口だけ敵の方を向かせる
 	if (isFlying_ && lockedEnemy_ != entt::null && scene->GetRegistry().valid(lockedEnemy_)) {
 		auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
 		auto& eTc = scene->GetRegistry().get<TransformComponent>(lockedEnemy_);
-		
+
 		float dx = eTc.translate.x - pTc.translate.x;
 		float dy = (eTc.translate.y + 1.0f) - (pTc.translate.y + 1.0f); // 敵の胸を狙う (銃の高さは概ね+1.0f)
 		float dz = eTc.translate.z - pTc.translate.z;
-		
-		float distXZ = std::sqrt(dx*dx + dz*dz);
+
+		float distXZ = std::sqrt(dx * dx + dz * dz);
 		float targetYaw = std::atan2(dx, dz);
 		float targetPitch = std::atan2(-dy, distXZ);
-		
+
 		// 銃はプレイヤーの子なので、プレイヤーの回転を打ち消す（ローカルYaw）
 		float localYaw = targetYaw - pTc.rotate.y;
-		while (localYaw >  DirectX::XM_PI) localYaw -= DirectX::XM_2PI;
-		while (localYaw < -DirectX::XM_PI) localYaw += DirectX::XM_2PI;
+		while (localYaw > DirectX::XM_PI)
+			localYaw -= DirectX::XM_2PI;
+		while (localYaw < -DirectX::XM_PI)
+			localYaw += DirectX::XM_2PI;
 
 		// 360度自然に構えるために、銃のローカル座標も旋回させる（プレイヤーを中心に公転）
 		float offsetX = 0.8f;
-		float offsetY = 1.7f; 
+		float offsetY = 1.7f;
 		float offsetZ = 1.8f; // ★Z軸を前に出してめり込み防止
-		
+
 		float cy = std::cos(localYaw);
 		float sy = std::sin(localYaw);
-		
+
 		// 右手(X=0.8)を基準に回転させる
 		gunTc.translate.x = offsetX * cy + offsetZ * sy;
 		gunTc.translate.y = offsetY;
@@ -1365,14 +1483,16 @@ void PlayerScript::UpdateGun(entt::entity entity, GameScene* scene, float /*dt*/
 
 		// スムーズな回転補間（360度滑らかに追従）
 		float diffYaw = localYaw - gunTc.rotate.y;
-		while (diffYaw >  DirectX::XM_PI) diffYaw -= DirectX::XM_2PI;
-		while (diffYaw < -DirectX::XM_PI) diffYaw += DirectX::XM_2PI;
-		
+		while (diffYaw > DirectX::XM_PI)
+			diffYaw -= DirectX::XM_2PI;
+		while (diffYaw < -DirectX::XM_PI)
+			diffYaw += DirectX::XM_2PI;
+
 		gunTc.rotate.y += diffYaw * 0.2f; // Lerp
 		gunTc.rotate.x = targetPitch;
 	}
 
-	gunTc.scale = { 2.2f, 2.2f, 2.2f }; // ピストルのアスペクト比を維持しつつ大きく表示
+	gunTc.scale = {2.2f, 2.2f, 2.2f}; // ピストルのアスペクト比を維持しつつ大きく表示
 }
 
 void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float dt) {
@@ -1402,7 +1522,7 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 					float dx = eTc.x - pTc.translate.x;
 					float dy = eTc.y - pTc.translate.y;
 					float dz = eTc.z - pTc.translate.z;
-					float distSq = dx*dx + dy*dy + dz*dz;
+					float distSq = dx * dx + dy * dy + dz * dz;
 					if (distSq < minDist * minDist) {
 						minDist = std::sqrt(distSq);
 						bestEnemy = e;
@@ -1416,7 +1536,7 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 		// (銃口のみが敵を追う処理は UpdateGun にて実装済み)
 	} else {
 		lockedEnemy_ = entt::null;
-		
+
 		// 地上ではカメラ方向または移動方向を向く
 		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) {
 			auto& ct = scene->GetRegistry().get<CameraTargetComponent>(entity);
@@ -1428,8 +1548,10 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 					float dz = eTc.translate.z - pTc.translate.z;
 					float targetYaw = std::atan2(dx, dz);
 					float diff = targetYaw - pTc.rotate.y;
-					while (diff >  DirectX::XM_PI) diff -= DirectX::XM_2PI;
-					while (diff < -DirectX::XM_PI) diff += DirectX::XM_2PI;
+					while (diff > DirectX::XM_PI)
+						diff -= DirectX::XM_2PI;
+					while (diff < -DirectX::XM_PI)
+						diff += DirectX::XM_2PI;
 					pTc.rotate.y += diff * std::min(1.0f, 30.0f * dt);
 				}
 			}
@@ -1437,7 +1559,6 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 	}
 
 	// ★反動後退の物理更新 (Updateへ移動)
-
 
 	// ★チャージショット処理
 	if (currentAttackKeyDown && gunShootTimer_ <= 0.0f) {
@@ -1517,7 +1638,8 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 		if (chargeTime_ >= CHARGE_TIME_MIN && (isSkillActive_ || steamPressure_ > 0.0f)) {
 			// ★チャージショット発射！
 			ShootChargeShot(entity, scene);
-			if (!isSkillActive_) steamPressure_ -= cCost;
+			if (!isSkillActive_)
+				steamPressure_ -= cCost;
 
 			// 反動後退
 			float forwardX = std::sin(pTc.rotate.y);
@@ -1526,22 +1648,47 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 			recoilVelocity_.x = -forwardX * recoilPower;
 			recoilVelocity_.z = -forwardZ * recoilPower;
 
-			gunShootTimer_ = isFlying_ ? 0.25f : 0.5f; // ★飛行中は連射レート2倍
+			float chargeShotInterval = 0.5f;
+
+			if (isFlying_) {
+				chargeShotInterval = 0.25f;
+			}
+
+			float gunAttackSpeedRate = playerGunAttackSpeedRate_;
+
+			if (gunAttackSpeedRate <= 0.0f) {
+				gunAttackSpeedRate = 1.0f;
+			}
+
+			gunShootTimer_ = chargeShotInterval / gunAttackSpeedRate;
 		} else if (isSkillActive_ || steamPressure_ > 0.0f) {
 			// 通常射撃（短押し）- 残量に関わらず撃てる
 			ShootGun(entity, scene);
-			if (!isSkillActive_) steamPressure_ -= nCost;
-			gunShootTimer_ = isFlying_ ? 0.12f : 0.3f; // ★飛行中は連射レート2.5倍
+			if (!isSkillActive_)
+				steamPressure_ -= nCost;
+			float normalShotInterval = 0.3f;
+
+			if (isFlying_) {
+				normalShotInterval = 0.12f;
+			}
+
+			float gunAttackSpeedRate = playerGunAttackSpeedRate_;
+
+			if (gunAttackSpeedRate <= 0.0f) {
+				gunAttackSpeedRate = 1.0f;
+			}
+
+			gunShootTimer_ = normalShotInterval / gunAttackSpeedRate;
 		}
 
 		chargeTime_ = 0.0f;
 
 		// 圧力がなくなったらリチャージ開始 (Updateの共通処理へ移動)
-
 	}
 
 	// クールダウン
-	if (gunShootTimer_ > 0.0f) gunShootTimer_ -= dt;
+	if (gunShootTimer_ > 0.0f)
+		gunShootTimer_ -= dt;
 
 	prevAttackKeyDown_ = currentAttackKeyDown;
 }
@@ -1549,8 +1696,12 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 void PlayerScript::ShootChargeShot(entt::entity entity, GameScene* scene) {
 	float baseDamage = 45.0f; // ★復元: 22.0f -> 45.0f
 	float chargeMul = chargeTime_ / CHARGE_TIME_MAX;
-	float damage = baseDamage * (0.5f + chargeMul * 0.5f);
-	if (isSkillActive_) damage *= SKILL_DAMAGE_MULTIPLIER;
+	float damage = baseDamage * playerGunAttackPowerRate_ * (0.5f + chargeMul * 0.5f);
+
+	if (isSkillActive_) {
+		damage *= SKILL_DAMAGE_MULTIPLIER;
+		damage *= playerGunSkillAttackPowerRate_;
+	}
 
 	SpawnBullet(entity, scene, 0.0f, 0.0f, damage, 3.0f, true, true);
 
@@ -1600,23 +1751,54 @@ void PlayerScript::ShootChargeShot(entt::entity entity, GameScene* scene) {
 
 void PlayerScript::DrawPressureGauge(GameScene* scene) {
 	auto* renderer = scene->GetRenderer();
-	if (!renderer) return;
+	if (!renderer)
+		return;
 
 	// ===== 1. 基本設定 =====
 	float gaugeX = (float)Engine::WindowDX::kW * 0.5f;
 	float gaugeY = (float)Engine::WindowDX::kH - 140.0f;
-	float R = 85.0f; 
-	float pressureRatio = std::clamp(steamPressure_ / maxSteamPressure_, 0.0f, 1.0f);
-	float startAngle = DirectX::XM_PI * 0.75f; 
+	float R = 85.0f;
+	float pressureRatio = std::clamp(steamPressure_ / maxSteam, 0.0f, 1.0f);
+	float startAngle = DirectX::XM_PI * 0.75f;
 	float totalAngle = DirectX::XM_PI * 1.5f;
 
 	// ===== 2. 背景・ベゼル =====
-	renderer->DrawSDFUI({ {gaugeX + 3, gaugeY + 3}, {R + 8, R + 8}, 0, 6.0f, {0,0,0,0.3f}, 1, 0, 0, 1 });
-	renderer->DrawSDFUI({ {gaugeX, gaugeY}, {R + 6, R + 6}, 0, 0, {0.25f, 0.18f, 0.06f, 1.0f}, 1, 0, 0, 1 });
-	renderer->DrawSDFUI({ {gaugeX, gaugeY}, {R + 4, R + 4}, 1.5f, 0, {0.85f, 0.75f, 0.4f, 1.0f}, 1, 0, 0 });
-	renderer->DrawSDFUI({ {gaugeX, gaugeY}, {R + 1, R + 1}, 1.0f, 0, {0.2f, 0.15f, 0.05f, 0.8f}, 1, 0, 0 });
-	renderer->DrawSDFUI({ {gaugeX, gaugeY}, {R - 4, R - 4}, 0, 0, {0.96f, 0.94f, 0.88f, 1.0f}, 1, 0, 0, 1 });
-	renderer->DrawSDFUI({ {gaugeX, gaugeY}, {R - 5, R - 5}, 8.0f, 4.0f, {0.3f, 0.2f, 0.1f, 0.15f}, 1, 0, 0 });
+	renderer->DrawSDFUI({
+	    {gaugeX + 3, gaugeY + 3},
+        {R + 8, R + 8},
+        0, 6.0f, {0, 0, 0, 0.3f},
+        1, 0, 0, 1
+    });
+	renderer->DrawSDFUI({
+	    {gaugeX, gaugeY},
+        {R + 6, R + 6},
+        0, 0, {0.25f, 0.18f, 0.06f, 1.0f},
+        1, 0, 0, 1
+    });
+	renderer->DrawSDFUI({
+	    {gaugeX, gaugeY},
+        {R + 4, R + 4},
+        1.5f, 0, {0.85f, 0.75f, 0.4f, 1.0f},
+        1, 0, 0
+    });
+	renderer->DrawSDFUI({
+	    {gaugeX, gaugeY},
+        {R + 1, R + 1},
+        1.0f, 0, {0.2f, 0.15f, 0.05f, 0.8f},
+        1, 0, 0
+    });
+	renderer->DrawSDFUI({
+	    {gaugeX, gaugeY},
+        {R - 4, R - 4},
+        0, 0, {0.96f, 0.94f, 0.88f, 1.0f},
+        1, 0, 0, 1
+    });
+	renderer->DrawSDFUI({
+	    {gaugeX, gaugeY},
+        {R - 5, R - 5},
+        8.0f, 4.0f, {0.3f, 0.2f, 0.1f, 0.15f},
+        1, 0, 0
+    });
 
 	// ===== 3. リベット =====
 	float rivetR = R + 3.0f;
@@ -1624,8 +1806,18 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 		float angle = DirectX::XM_PIDIV4 + DirectX::XM_PIDIV2 * (float)i;
 		float rx = gaugeX + std::cos(angle) * rivetR;
 		float ry = gaugeY + std::sin(angle) * rivetR;
-		renderer->DrawSDFUI({ {rx, ry}, {3.0f, 3.0f}, 0, 0, {0.6f, 0.5f, 0.2f, 1.0f}, 1, 0, 0, 1 });
-		renderer->DrawSDFUI({ {rx - 0.5f, ry - 0.5f}, {1.0f, 1.0f}, 0, 0, {1, 1, 1, 0.3f}, 1, 0, 0, 1 });
+		renderer->DrawSDFUI({
+		    {rx, ry},
+            {3.0f, 3.0f},
+            0, 0, {0.6f, 0.5f, 0.2f, 1.0f},
+            1, 0, 0, 1
+        });
+		renderer->DrawSDFUI({
+		    {rx - 0.5f, ry - 0.5f},
+            {1.0f, 1.0f},
+            0, 0, {1, 1, 1, 0.3f},
+            1, 0, 0, 1
+        });
 	}
 
 	// ===== 4. 危険ゾーン（赤いドット）=====
@@ -1637,9 +1829,11 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 			float angle = startAngle + t * totalAngle;
 			float dotSize = 3.5f;
 			renderer->DrawSDFUI({
-				{ gaugeX + std::cos(angle) * zoneR, gaugeY + std::sin(angle) * zoneR },
-				{ dotSize, dotSize }, 0, 0, {0.8f, 0.1f, 0.05f, 0.6f}, 1, 0, 0, 1
-			});
+			    {gaugeX + std::cos(angle) * zoneR, gaugeY + std::sin(angle) * zoneR},
+                {dotSize, dotSize},
+                0, 0, {0.8f, 0.1f, 0.05f, 0.6f},
+                1, 0, 0, 1
+            });
 		}
 	}
 
@@ -1648,25 +1842,27 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 		float angle = startAngle + (float)i / 50.0f * totalAngle;
 		bool isMajor = (i % 10 == 0);
 		bool isMid = (i % 5 == 0);
-		float dotSize = isMajor ? 4.8f : (isMid ? 3.2f : 1.6f); 
-		float tickR = R - 10.0f; 
+		float dotSize = isMajor ? 4.8f : (isMid ? 3.2f : 1.6f);
+		float tickR = R - 10.0f;
 		float alpha = isMajor ? 1.0f : (isMid ? 0.7f : 0.35f);
 		renderer->DrawSDFUI({
-			{ gaugeX + std::cos(angle) * tickR, gaugeY + std::sin(angle) * tickR },
-			{ dotSize, dotSize }, 0, 0, {0.15f, 0.1f, 0.05f, alpha}, 1, 0, 0, 1
-		});
+		    {gaugeX + std::cos(angle) * tickR, gaugeY + std::sin(angle) * tickR},
+            {dotSize, dotSize},
+            0, 0, {0.15f, 0.1f, 0.05f, alpha},
+            1, 0, 0, 1
+        });
 	}
 
 	// ===== 6. 漢字数字ラベル（縦書き対応）=====
-	const char* kanjiLabels[] = { (const char*)u8"零", (const char*)u8"五十", (const char*)u8"百" };
+	const char* kanjiLabels[] = {(const char*)u8"零", (const char*)u8"五十", (const char*)u8"百"};
 	float labelSteps[] = {0.0f, 0.5f, 1.0f};
 	for (int i = 0; i < 3; ++i) {
 		float angle = startAngle + labelSteps[i] * totalAngle;
-		float labelR = R - 30.0f; 
+		float labelR = R - 30.0f;
 		float sx = gaugeX + std::cos(angle) * labelR;
 		float sy = gaugeY + std::sin(angle) * labelR;
 		float fontSize = 0.45f;
-		
+
 		// 縦書き描画ロジック（簡易版）
 		std::vector<std::string> chars;
 		if (i == 1) { // "五十"
@@ -1687,7 +1883,7 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 
 	// ===== 7. 中央ラベル（圧力計 - 軸の下側に配置）=====
 	{
-		const char* titleChars[] = { (const char*)u8"圧", (const char*)u8"力", (const char*)u8"計" };
+		const char* titleChars[] = {(const char*)u8"圧", (const char*)u8"力", (const char*)u8"計"};
 		float fontSize = 0.28f;
 		float startY = gaugeY + R * 0.15f; // 軸の下側に移動
 		for (int i = 0; i < 3; ++i) {
@@ -1698,15 +1894,16 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 
 	// ===== 8. 針 & カウンターウェイト（微細な振動を追加）=====
 	float currentAngle = startAngle + pressureRatio * totalAngle;
-	
+
 	// プルプルした振動（ジッター）の計算
 	{
 		float time = (float)GetTickCount64() * 0.001f;
-		float jitterBase = std::sin(time * 60.0f) * 0.012f; // 高速なサイン波
+		float jitterBase = std::sin(time * 60.0f) * 0.012f;           // 高速なサイン波
 		jitterBase += (float(rand() % 100) / 100.0f - 0.5f) * 0.008f; // 不規則なノイズ
-		
+
 		float jitterIntensity = 0.4f + pressureRatio * 0.6f; // 圧力が高いほど震える
-		if (isSkillActive_) jitterIntensity *= 2.2f;         // スキル中はさらに激しく
+		if (isSkillActive_)
+			jitterIntensity *= 2.2f; // スキル中はさらに激しく
 
 		// ★チャージ中の暴力的な揺れを追加
 		if (isCharging_) {
@@ -1715,38 +1912,53 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 			jitterBase += (float(rand() % 100) / 100.0f - 0.5f) * 0.15f * cRatio;
 			jitterIntensity += cRatio * 2.0f;
 		}
-		
+
 		currentAngle += jitterBase * jitterIntensity;
 	}
-	
+
 	float cLen = 14.0f;
 	float cAngle = currentAngle + DirectX::XM_PI;
 	Engine::Renderer::SdfUIDesc counter;
-	counter.centerPx = { gaugeX + std::cos(cAngle) * (cLen * 0.5f), gaugeY + std::sin(cAngle) * (cLen * 0.5f) };
-	counter.sizePx = { cLen, 4.5f };
+	counter.centerPx = {gaugeX + std::cos(cAngle) * (cLen * 0.5f), gaugeY + std::sin(cAngle) * (cLen * 0.5f)};
+	counter.sizePx = {cLen, 4.5f};
 	counter.shape = 0;
 	counter.rotateRad = -cAngle;
-	counter.color = { 0.12f, 0.1f, 0.06f, 1.0f };
+	counter.color = {0.12f, 0.1f, 0.06f, 1.0f};
 	counter.fill = 1.0f;
 	renderer->DrawSDFUI(counter);
 
 	float nLen = R * 0.9f;
 	Engine::Renderer::SdfUIDesc needle;
-	needle.centerPx = { gaugeX + std::cos(currentAngle) * (nLen * 0.5f), gaugeY + std::sin(currentAngle) * (nLen * 0.5f) };
-	needle.sizePx = { nLen, 3.2f };
+	needle.centerPx = {gaugeX + std::cos(currentAngle) * (nLen * 0.5f), gaugeY + std::sin(currentAngle) * (nLen * 0.5f)};
+	needle.sizePx = {nLen, 3.2f};
 	needle.shape = 0;
 	needle.rotateRad = -currentAngle;
 	needle.color = isRecharging_ ? Engine::Vector4{0.9f, 0.1f, 0.1f, 1.0f} : Engine::Vector4{0.12f, 0.1f, 0.06f, 1.0f};
 	needle.fill = 1.0f;
 	renderer->DrawSDFUI(needle);
 
-	renderer->DrawSDFUI({ {gaugeX, gaugeY}, {12, 12}, 0, 0, {0.22f, 0.16f, 0.06f, 1.0f}, 1, 0, 0, 1 });
-	renderer->DrawSDFUI({ {gaugeX, gaugeY}, {8, 8}, 0, 0, {0.6f, 0.5f, 0.25f, 1.0f}, 1, 0, 0, 1 });
+	renderer->DrawSDFUI({
+	    {gaugeX, gaugeY},
+        {12, 12},
+        0, 0, {0.22f, 0.16f, 0.06f, 1.0f},
+        1, 0, 0, 1
+    });
+	renderer->DrawSDFUI({
+	    {gaugeX, gaugeY},
+        {8, 8},
+        0, 0, {0.6f, 0.5f, 0.25f, 1.0f},
+        1, 0, 0, 1
+    });
 
 	// ===== 9. 特殊演出 =====
 	if (isSkillActive_) {
 		float p = std::sin(skillDuration_ * 12.0f) * 0.5f + 0.5f;
-		renderer->DrawSDFUI({ {gaugeX, gaugeY}, {R + 6, R + 6}, 2.0f, 10.0f, {0.2f, 0.8f, 1.0f, 0.2f + p * 0.4f}, 1, 0, 0 });
+		renderer->DrawSDFUI({
+		    {gaugeX, gaugeY},
+            {R + 6, R + 6},
+            2.0f, 10.0f, {0.2f, 0.8f, 1.0f, 0.2f + p * 0.4f},
+            1, 0, 0
+        });
 		renderer->DrawString("OVERCLOCK", gaugeX - 55, gaugeY + R + 15, 0.4f, {0.3f, 0.9f, 1.0f, 1.0f});
 	} else if (isRecharging_) {
 		float b = std::sin(rechargeTimer_ * 10.0f) * 0.5f + 0.5f;
@@ -1757,13 +1969,23 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 	if (playerType_ == PlayerType::Gun) {
 		float flightGaugeX = gaugeX + 150.0f; // メイン圧力計の右側
 		float flightGaugeY = gaugeY + 30.0f;  // 少し下
-		float fR = 55.0f; // 少し小さめ
+		float fR = 55.0f;                     // 少し小さめ
 		float fRatio = std::clamp(flightPressure_ / maxFlightPressure_, 0.0f, 1.0f);
-		
+
 		// 背景
-		renderer->DrawSDFUI({ {flightGaugeX, flightGaugeY}, {fR + 4, fR + 4}, 0, 0, {0.1f, 0.2f, 0.3f, 1.0f}, 1, 0, 0, 1 });
-		renderer->DrawSDFUI({ {flightGaugeX, flightGaugeY}, {fR - 2, fR - 2}, 0, 0, {0.85f, 0.9f, 0.95f, 1.0f}, 1, 0, 0, 1 });
-		
+		renderer->DrawSDFUI({
+		    {flightGaugeX, flightGaugeY},
+            {fR + 4, fR + 4},
+            0, 0, {0.1f, 0.2f, 0.3f, 1.0f},
+            1, 0, 0, 1
+        });
+		renderer->DrawSDFUI({
+		    {flightGaugeX, flightGaugeY},
+            {fR - 2, fR - 2},
+            0, 0, {0.85f, 0.9f, 0.95f, 1.0f},
+            1, 0, 0, 1
+        });
+
 		// 針の微細な振動（飛行中のみ）
 		float fAngle = startAngle + fRatio * totalAngle;
 		if (isFlying_) {
@@ -1773,8 +1995,8 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 
 		float fLen = fR * 0.85f;
 		Engine::Renderer::SdfUIDesc fNeedle;
-		fNeedle.centerPx = { flightGaugeX + std::cos(fAngle) * (fLen * 0.5f), flightGaugeY + std::sin(fAngle) * (fLen * 0.5f) };
-		fNeedle.sizePx = { fLen, 2.5f };
+		fNeedle.centerPx = {flightGaugeX + std::cos(fAngle) * (fLen * 0.5f), flightGaugeY + std::sin(fAngle) * (fLen * 0.5f)};
+		fNeedle.sizePx = {fLen, 2.5f};
 		fNeedle.shape = 0;
 		fNeedle.rotateRad = -fAngle;
 		fNeedle.color = {0.1f, 0.2f, 0.5f, 1.0f};
@@ -1782,10 +2004,15 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 		renderer->DrawSDFUI(fNeedle);
 
 		// センターピン
-		renderer->DrawSDFUI({ {flightGaugeX, flightGaugeY}, {8, 8}, 0, 0, {0.1f, 0.2f, 0.3f, 1.0f}, 1, 0, 0, 1 });
+		renderer->DrawSDFUI({
+		    {flightGaugeX, flightGaugeY},
+            {8, 8},
+            0, 0, {0.1f, 0.2f, 0.3f, 1.0f},
+            1, 0, 0, 1
+        });
 
 		// ラベル
-		const char* fTitle[] = { (const char*)u8"飛", (const char*)u8"行" };
+		const char* fTitle[] = {(const char*)u8"飛", (const char*)u8"行"};
 		for (int i = 0; i < 2; ++i) {
 			float tw = renderer->MeasureTextWidth(fTitle[i], 0.25f);
 			renderer->DrawString(fTitle[i], flightGaugeX - tw * 0.5f, flightGaugeY + fR * 0.2f + i * 12.0f, 0.25f, {0.1f, 0.2f, 0.3f, 0.8f});
@@ -1795,7 +2022,8 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 
 void PlayerScript::DrawReticle(entt::entity playerEntity, GameScene* scene) {
 	auto* renderer = Engine::Renderer::GetInstance();
-	if (!renderer) return;
+	if (!renderer)
+		return;
 
 	// ===== 1. 表示位置の決定 =====
 	float cx = (float)Engine::WindowDX::kW * 0.5f;
@@ -1839,7 +2067,7 @@ void PlayerScript::DrawReticle(entt::entity playerEntity, GameScene* scene) {
 	float jitterY = 0.0f;
 	{
 		float jitterIntensity = 0.0f;
-		
+
 		if (isRecharging_) {
 			jitterIntensity = 3.5f; // オーバーヒート時は激しくガタガタ
 		} else if (isCharging_) {
@@ -1862,7 +2090,7 @@ void PlayerScript::DrawReticle(entt::entity playerEntity, GameScene* scene) {
 	if (isRecharging_) {
 		float b = std::sin((float)GetTickCount64() * 0.015f) * 0.5f + 0.5f;
 		Engine::Vector4 warnColor = {1.0f, 0.2f, 0.1f, 0.4f + b * 0.6f};
-		
+
 		renderer->DrawString("OVERHEAT", rx - 38.0f, ry - currentR - 22.0f, 0.35f, warnColor);
 		renderer->DrawString("RECHARGING", rx - 48.0f, ry + currentR + 10.0f, 0.35f, warnColor);
 
@@ -1930,7 +2158,7 @@ void PlayerScript::DrawReticle(entt::entity playerEntity, GameScene* scene) {
 	if (isCharging_) {
 		float cRatio = std::clamp<float>(chargeTime_ / CHARGE_TIME_MAX, 0.0f, 1.0f);
 		Engine::Vector4 chargeColor = {1.0f, 0.45f + cRatio * 0.55f, 0.1f, 0.9f}; // オレンジから黄色に変化
-		
+
 		Engine::Renderer::SdfUIDesc desc{};
 		desc.centerPx = {rx, ry};
 		desc.sizePx = {currentR + 6.0f, currentR + 6.0f};
@@ -1942,7 +2170,7 @@ void PlayerScript::DrawReticle(entt::entity playerEntity, GameScene* scene) {
 		desc.inner = 0.0f;
 		desc.rotateRad = 0.0f;
 		desc.progress = cRatio; // チャージ進捗を適用！
-		desc.fill = 0.0f;      // ★Outline
+		desc.fill = 0.0f;       // ★Outline
 		renderer->DrawSDFUI(desc);
 	}
 
@@ -1950,7 +2178,7 @@ void PlayerScript::DrawReticle(entt::entity playerEntity, GameScene* scene) {
 	float crossLen = 8.0f;
 	float crossOffset = 5.0f + recoilOffset * 0.2f;
 	float crossThickness = 2.5f;
-	
+
 	// 上
 	{
 		Engine::Renderer::SdfUIDesc desc{};
@@ -2036,7 +2264,12 @@ void PlayerScript::DrawReticle(entt::entity playerEntity, GameScene* scene) {
 
 void PlayerScript::ShootGun(entt::entity entity, GameScene* scene) {
 	float baseDamage = 15.0f; // ★復元: 8.0f -> 15.0f
-	float damage = isSkillActive_ ? baseDamage * SKILL_DAMAGE_MULTIPLIER : baseDamage;
+	float damage = baseDamage * playerGunAttackPowerRate_;
+
+	if (isSkillActive_) {
+		damage *= SKILL_DAMAGE_MULTIPLIER;
+		damage *= playerGunSkillAttackPowerRate_;
+	}
 	SpawnBullet(entity, scene, 0.0f, 0.0f, damage, 2.0f, isSkillActive_, false);
 
 	// ★空間割れマズルエフェクト（銃口の前に小規模なガラス割れを生成）
@@ -2077,31 +2310,32 @@ void PlayerScript::ShootGun(entt::entity entity, GameScene* scene) {
 	mvc.SetValue("NormalX", fwdX);
 	mvc.SetValue("NormalY", fwdY);
 	mvc.SetValue("NormalZ", fwdZ);
-	mvc.SetValue("Radius", 3.0f);             // 拡大
-	mvc.SetValue("Duration", 0.5f);           // 素早く消える
-	mvc.SetValue("ScatterMode", 0.0f);        // マズルモード
-	mvc.SetValue("ScatterDelay", 0.0f);       // 即座に噴射
-	mvc.SetValue("ScatterSpeed", 12.0f);      // 勢いよく
+	mvc.SetValue("Radius", 3.0f);        // 拡大
+	mvc.SetValue("Duration", 0.5f);      // 素早く消える
+	mvc.SetValue("ScatterMode", 0.0f);   // マズルモード
+	mvc.SetValue("ScatterDelay", 0.0f);  // 即座に噴射
+	mvc.SetValue("ScatterSpeed", 12.0f); // 勢いよく
 
 	auto& msc = scene->GetRegistry().emplace<ScriptComponent>(muzzleVfx);
 	msc.scripts.push_back({"SpaceShatterScript", "", nullptr});
 }
 
 void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spreadYaw, float spreadPitch, float damage, float lifeTime, bool enhanced, bool explode) {
-	if (!scene->GetRegistry().all_of<TransformComponent>(entity)) return;
+	if (!scene->GetRegistry().all_of<TransformComponent>(entity))
+		return;
 	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
 
 	entt::entity bullet = scene->GetRegistry().create();
 	scene->GetRegistry().emplace<TagComponent>(bullet).tag = TagType::Bullet;
-	
+
 	auto& bTc = scene->GetRegistry().emplace<TransformComponent>(bullet);
 	bTc.translate = pTc.translate;
 	bTc.translate.y += 1.0f; // 腰か胸の高さ
-	
+
 	bTc.rotate = pTc.rotate;
 	bTc.rotate.y += spreadYaw;
 	bTc.rotate.x += spreadPitch;
-	
+
 	// ★追加: ターゲットロック中のオートエイム（地上・空中問わずロック中ならそちらを向く）
 	entt::entity targetToAim = entt::null;
 	if (!isFlying_ && scene->GetRegistry().all_of<CameraTargetComponent>(entity)) {
@@ -2116,8 +2350,8 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 		float dx = eTc.translate.x - bTc.translate.x;
 		float dy = (eTc.translate.y + 1.0f) - bTc.translate.y; // 敵の胸を狙う
 		float dz = eTc.translate.z - bTc.translate.z;
-		
-		float distXZ = std::sqrt(dx*dx + dz*dz);
+
+		float distXZ = std::sqrt(dx * dx + dz * dz);
 		float yaw = std::atan2(dx, dz);
 		float pitch = std::atan2(-dy, distXZ);
 
@@ -2141,14 +2375,13 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 	if (homingTarget != entt::null) {
 		auto& bVc = scene->GetRegistry().get_or_emplace<VariableComponent>(bullet);
 		bVc.SetValue("HasTarget", 1.0f);
-		
+
 		uint32_t targetId = static_cast<uint32_t>(homingTarget);
 		bVc.SetValue("TargetHigh", static_cast<float>(targetId >> 16));
 		bVc.SetValue("TargetLow", static_cast<float>(targetId & 0xFFFF));
-		
+
 		bVc.SetValue("Speed", enhanced ? 120.0f : 80.0f);
 	}
-
 
 	float cosX = std::cos(bTc.rotate.x);
 	float moveX = std::sin(bTc.rotate.y) * cosX;
@@ -2173,13 +2406,13 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 	if (camera && playerType_ == PlayerType::Gun && !isFlying_ && targetToAim == entt::null) {
 		Engine::Vector3 camRot = camera->GetRotation();
 		Engine::Vector3 camPos = camera->GetPosition();
-		
+
 		// カメラの前方ベクトルを計算
 		float cy = std::cos(camRot.y);
 		float sy = std::sin(camRot.y);
 		float cp = std::cos(camRot.x);
 		float sp = std::sin(camRot.x);
-		Engine::Vector3 camFwd = { sy * cp, -sp, cy * cp };
+		Engine::Vector3 camFwd = {sy * cp, -sp, cy * cp};
 
 		// レイキャストで目標地点を特定 (最大200m)
 		float hitDist = 0.0f;
@@ -2200,14 +2433,14 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 		float dx = targetPoint.x - bTc.translate.x;
 		float dy = targetPoint.y - bTc.translate.y;
 		float dz = targetPoint.z - bTc.translate.z;
-		
-		float distXZ = std::sqrt(dx*dx + dz*dz);
+
+		float distXZ = std::sqrt(dx * dx + dz * dz);
 		float yaw = std::atan2(dx, dz);
 		float pitch = std::atan2(-dy, distXZ);
 
 		bTc.rotate.y = yaw + spreadYaw;
 		bTc.rotate.x = pitch + spreadPitch;
-		
+
 		moveX = std::sin(bTc.rotate.y) * std::cos(bTc.rotate.x);
 		moveY = -std::sin(bTc.rotate.x);
 		moveZ = std::cos(bTc.rotate.y) * std::cos(bTc.rotate.x);
@@ -2225,7 +2458,7 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 		bTc.rotate.x = fPitch + spreadPitch;
 	}
 
-	bTc.scale = { 0.2f, 0.2f, 0.6f };
+	bTc.scale = {0.2f, 0.2f, 0.6f};
 
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
@@ -2239,7 +2472,7 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 	hb.isActive = true;
 	hb.damage = damage;
 	hb.tag = TagType::Bullet;
-	hb.size = { 1.0f, 1.0f, 1.0f };
+	hb.size = {1.0f, 1.0f, 1.0f};
 
 	auto& sc = scene->GetRegistry().emplace<ScriptComponent>(bullet);
 	sc.scripts.push_back({"BulletScript", "", nullptr});
@@ -2256,17 +2489,17 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 		entt::entity muzzleShatter = scene->CreateEntity("MuzzleShatter_VFX");
 		auto& msTc = scene->GetRegistry().get<TransformComponent>(muzzleShatter);
 		msTc.translate = bTc.translate; // 銃口位置
-		
+
 		auto& msVc = scene->GetRegistry().emplace<VariableComponent>(muzzleShatter);
 		msVc.SetValue("NormalX", moveX);
 		msVc.SetValue("NormalY", moveY);
 		msVc.SetValue("NormalZ", moveZ);
-		msVc.SetValue("Radius", 2.8f);            // ★スチームの迫力を出すため拡大
-		msVc.SetValue("Count", 35.0f); 
-		msVc.SetValue("Duration", 0.6f);          // ★少し長めに残る
-		msVc.SetValue("ScatterMode", 0.0f);       // ★射撃（マズル）モードに設定
-		msVc.SetValue("ScatterDelay", 0.15f);     // ★綺麗な状態を長く(0.15秒)
-		msVc.SetValue("ScatterSpeed", 1.5f);      // ★飛びすぎないように調整
+		msVc.SetValue("Radius", 2.8f); // ★スチームの迫力を出すため拡大
+		msVc.SetValue("Count", 35.0f);
+		msVc.SetValue("Duration", 0.6f);      // ★少し長めに残る
+		msVc.SetValue("ScatterMode", 0.0f);   // ★射撃（マズル）モードに設定
+		msVc.SetValue("ScatterDelay", 0.15f); // ★綺麗な状態を長く(0.15秒)
+		msVc.SetValue("ScatterSpeed", 1.5f);  // ★飛びすぎないように調整
 
 		auto& msSc = scene->GetRegistry().emplace<ScriptComponent>(muzzleShatter);
 		msSc.scripts.push_back({"SpaceShatterScript", "", nullptr});
@@ -2275,10 +2508,11 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 	// ★追加: マズルフラッシュ生成（疑似ライト）
 	MuzzleFlash flash;
 	flash.pos = bTc.translate; // 弾のスポーン位置（銃口付近）
-	flash.life = 0.06f; // 一瞬だけ光る
+	flash.life = 0.06f;        // 一瞬だけ光る
 	flash.maxLife = 0.06f;
 	muzzleFlashes_.push_back(flash);
-	if (muzzleFlashes_.size() > 30) muzzleFlashes_.pop_front();
+	if (muzzleFlashes_.size() > 30)
+		muzzleFlashes_.pop_front();
 
 	// ★追加: 薬莢生成
 	ShellCasing shell;
@@ -2292,7 +2526,8 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 	shell.velocity.z = shellRightZ * 3.0f + ((rand() % 100 / 100.0f - 0.5f) * 1.0f);
 	shell.life = 0.6f;
 	shellCasings_.push_back(shell);
-	if (shellCasings_.size() > 30) shellCasings_.pop_front();
+	if (shellCasings_.size() > 30)
+		shellCasings_.pop_front();
 }
 
 void PlayerScript::SpawnCrystalBurst(const DirectX::XMFLOAT3& pos, int count, bool enhanced) {
@@ -2317,7 +2552,8 @@ void PlayerScript::SpawnCrystalBurst(const DirectX::XMFLOAT3& pos, int count, bo
 			cp.color = {0.5f + (rand() % 100 / 100.0f) * 0.3f, 0.7f + (rand() % 100 / 100.0f) * 0.3f, 0.9f + (rand() % 100 / 100.0f) * 0.1f, 1.0f};
 		}
 		crystalParticles_.push_back(cp);
-		if (crystalParticles_.size() > 100) crystalParticles_.pop_front();
+		if (crystalParticles_.size() > 100)
+			crystalParticles_.pop_front();
 	}
 }
 
@@ -2345,15 +2581,16 @@ void PlayerScript::SwitchPlayerType(entt::entity /*entity*/, GameScene* scene) {
 }
 
 void PlayerScript::ExecuteSkill(entt::entity entity, GameScene* scene) {
-	if (skillCooldown_ > 0.0f) return;
+	if (skillCooldown_ > 0.0f)
+		return;
 
 	if (playerType_ == PlayerType::Sword) {
-		skillCooldown_ = 20.0f;
-		
+		skillCooldown_ = 20.0f / playerSwordSkillCooldownRate_;
+
 		auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
 		entt::entity wave = scene->GetRegistry().create();
 		scene->GetRegistry().emplace<TagComponent>(wave).tag = TagType::PlayerSword; // ★プレイヤーの剣攻撃として判定
-		
+
 		auto& wTc = scene->GetRegistry().emplace<TransformComponent>(wave);
 		wTc.translate = pTc.translate;
 		wTc.translate.y += 1.0f;
@@ -2363,40 +2600,40 @@ void PlayerScript::ExecuteSkill(entt::entity entity, GameScene* scene) {
 		float moveZ = std::cos(wTc.rotate.y);
 		wTc.translate.x += moveX * 2.5f;
 		wTc.translate.z += moveZ * 2.5f;
-		
-		wTc.scale = { 12.0f, 0.2f, 2.0f }; // 超横広な衝撃波（次元斬）
+
+		wTc.scale = {12.0f, 0.2f, 2.0f}; // 超横広な衝撃波（次元斬）
 
 		auto* renderer = scene->GetRenderer();
 		if (renderer) {
 			auto& mr = scene->GetRegistry().emplace<MeshRendererComponent>(wave);
 			mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
 			mr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-			mr.color = { 0.1f, 0.8f, 1.0f, 0.8f }; // 青白い光
+			mr.color = {0.1f, 0.8f, 1.0f, 0.8f}; // 青白い光
 		}
 
 		auto& hb = scene->GetRegistry().emplace<HitboxComponent>(wave);
 		hb.isActive = true;
-		hb.damage = 60.0f; // ★弱体化: 150.0f -> 60.0f (次元斬スキル用)
+		hb.damage = 60.0f;             // ★弱体化: 150.0f -> 60.0f (次元斬スキル用)
 		hb.tag = TagType::PlayerSword; // ★プレイヤーの剣攻撃として判定
-		hb.size = { 12.0f, 1.0f, 2.0f };
+		hb.size = {12.0f, 1.0f, 2.0f};
 
 		auto& sc = scene->GetRegistry().emplace<ScriptComponent>(wave);
 		sc.scripts.push_back({"BulletScript", "", nullptr});
-		
+
 		entt::entity sword = scene->FindObjectByName(swordName_);
 		if (sword != entt::null && scene->GetRegistry().all_of<MotionComponent>(sword)) {
 			auto& motion = scene->GetRegistry().get<MotionComponent>(sword);
 			motion.PlayAnimation("Combo2"); // 振り下ろすモーション
-			isAttacking_ = true; 
+			isAttacking_ = true;
 		}
 		std::cout << "Executed Sword Skill: Dimension Wave\n";
 	} else {
 		// ★銃スキル: 移動速度UP + ダメージUP + エフェクト強化バフ
-		skillCooldown_ = SKILL_COOLDOWN_TIME;
+		skillCooldown_ = SKILL_COOLDOWN_TIME / playerGunSkillCooldownRate_;
 		isSkillActive_ = true;
 		skillDuration_ = SKILL_MAX_DURATION;
-		steamPressure_ = maxSteamPressure_; // ★オーバークロック発動時に圧力を100まで戻す
-		isRecharging_ = false; // リチャージ状態も強制解除
+		steamPressure_ = maxSteam; // ★オーバークロック発動時に圧力を100まで戻す
+		isRecharging_ = false;              // リチャージ状態も強制解除
 		std::cout << "Gun Skill Activated: Crystal Enhancement!\n";
 	}
 }
@@ -2440,12 +2677,22 @@ void PlayerScript::ApplySkillEffects(entt::entity entity, GameScene* scene) {
 	if (gm == entt::null) {
 		return;
 	}
+	playerMoveSpeedRate_ = GetVar(gm, scene, "PlayerMoveSpeedRate", 1.0f); // ★移動速度の変数を取得
 
-	playerMoveSpeedRate_ = GetVar(gm, scene, "PlayerMoveSpeedRate", 1.0f);
+	playerSwordAttackSpeedRate_ = GetVar(gm, scene, "PlayerSwordAttackSpeedRate", 1.0f); // ★剣攻撃速度の変数を取得
+	playerGunAttackSpeedRate_ = GetVar(gm, scene, "PlayerGunAttackSpeedRate", 1.0f);     // ★銃攻撃速度の変数を取得
 
-	playerGunDamageRate_ = GetVar(gm, scene, "PlayerGunDamageRate", 1.0f);
+	playerSwordAttackPowerRate_ = GetVar(gm, scene, "PlayerSwordAttackPowerRate", 1.0f); // 攻撃力の変数を取得
 
-	playerMaxSteamRate_ = GetVar(gm, scene, "PlayerMaxSteamRate", 1.0f);
+	playerGunAttackPowerRate_ = GetVar(gm, scene, "PlayerGunAttackPowerRate", 1.0f);// 銃の攻撃力の変数を取得
+
+	playerMaxSteamPressureRate_ = GetVar(gm, scene, "PlayerMaxSteamPressureRate", 1.0f);//スチーム圧力の変数を取得
+
+	playerSwordSkillCooldownRate_ = GetVar(gm, scene, "PlayerSwordSkillCooldownRate", 1.0f);//クールダウンの変数を取得
+	playerGunSkillCooldownRate_ = GetVar(gm, scene, "PlayerGunSkillCooldownRate", 1.0f);// 銃スキルのクールダウン
+
+	playerSwordSkillAttackPowerRate_ = GetVar(gm, scene, "PlayerSwordSkillAttackPowerRate", 1.0f);// スキルの攻撃力の変数を取得
+	playerGunSkillAttackPowerRate_ = GetVar(gm, scene, "PlayerGunSkillAttackPowerRate", 1.0f);
 }
 void PlayerScript::DrawUI(entt::entity /*entity*/, GameScene* /*scene*/) {
 	// ※注意: DrawUI は Renderer::EndFrame の後（ImGuiフェーズ）に呼び出されるため、

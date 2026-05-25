@@ -149,7 +149,7 @@ private:
 	static constexpr float RECHARGE_TIME = 2.5f;        // リチャージにかかる時間
 	static constexpr float NORMAL_SHOT_COST = 15.0f;    // 通常射撃の圧力コスト
 	static constexpr float CHARGE_SHOT_COST = 45.0f;    // チャージショットの圧力コスト
-
+	float maxSteam = 0.0f;                              // ★追加: スキルで増加する最大蒸気圧の量を管理する変数
 	// ★追加: 飛行システム (別圧力計)
 	float flightPressure_ = 100.0f;
 	float maxFlightPressure_ = 100.0f;
@@ -189,8 +189,20 @@ private:
 
 	//スキル
 	float playerMoveSpeedRate_ = 1.0f;
-	float playerGunDamageRate_ = 1.0f;
-	float playerMaxSteamRate_ = 1.0f;
+
+	float playerSwordAttackSpeedRate_ = 1.0f;
+	float playerGunAttackSpeedRate_ = 1.0f;
+
+	float playerSwordAttackPowerRate_ = 1.0f;
+	float playerGunAttackPowerRate_ = 1.0f;
+
+	float playerMaxSteamPressureRate_ = 1.0f;
+
+	float playerSwordSkillCooldownRate_ = 1.0f;
+	float playerGunSkillCooldownRate_ = 1.0f;
+
+	float playerSwordSkillAttackPowerRate_ = 1.0f;
+	float playerGunSkillAttackPowerRate_ = 1.0f;
 };
 
 } // namespace Game
