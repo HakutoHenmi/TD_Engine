@@ -14,6 +14,20 @@ enum EnemyCategory {
 	Other
 };
 
+// エネミーそれぞれが持つ戦術のロール
+enum EnemyRole {
+	Tank,
+	Attacker,
+	Ranged,
+};
+
+// 戦術の状態
+enum TacticalState {
+	Advancing,
+	WaitingForTank,
+	Engaging,
+};
+
 //敵の挙動になる基底クラス
 namespace Game {
 
@@ -87,6 +101,12 @@ protected: // メンバ変数
 
 	float scanTimer_ = 0.0f;
 	float groundHeight_ = 0.0f;	// FlyTypeが地面の高さを取るため
+
+	//戦術面
+	EnemyRole role_ = EnemyRole::Attacker;	// 初期値はアタッカー
+	TacticalState tacticalState_ = TacticalState::Advancing;	// 初期値は進軍
+	float waitTimer_ = 0.0f;
+	float maxWaitTimer_ = 8.0f;	// 最大待機時間
 	float frozenParticleTimer_ = 0.0f; // 凍結状態時の冷気噴射タイマー
 	float poisonedParticleTimer_ = 0.0f; // 毒状態時の泡噴射タイマー
 };
