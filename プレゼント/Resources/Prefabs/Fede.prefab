@@ -1,0 +1,18 @@
+{
+  "prefab":
+    {
+      "id": 1048595,
+      "parentId": 4294967295,
+      "name": "Fede",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Script", "enabled": true, "scripts": [{"path": "PhaseTransition", "param": "{\"fadeDuration\":0.3499999940395355}"}]},
+        {"type": "Tag", "enabled": true, "tag": "Core"},
+        {"type": "RectTransform", "enabled": true, "pos": [0,0], "size": [1978,1092], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/white1x1.png", "color": [0,0,0,0], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10}
+      ]
+    }
+}

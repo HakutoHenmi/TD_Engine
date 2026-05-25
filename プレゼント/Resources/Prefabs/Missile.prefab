@@ -1,0 +1,16 @@
+{
+  "prefab":
+    {
+      "id": 1048604,
+      "parentId": 4294967295,
+      "name": "Missile",
+      "locked": false,
+      "translate": [-48.0502, 0, -32.2465],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Misiile.obj", "texturePath": "Resources/Textures/Misiile.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "MissileCanonScript", "param": ""}]}
+      ]
+    }
+}

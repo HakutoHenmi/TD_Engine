@@ -1,0 +1,16 @@
+{
+  "prefab":
+    {
+      "id": 4194307,
+      "parentId": 4294967295,
+      "name": "Car",
+      "locked": false,
+      "translate": [-69.3409, 0, -1.31049],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/Car/Car.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "GpuMeshCollider", "enabled": true, "meshPath": "Resources/Models/Car/Car.obj", "isTrigger": false}
+      ]
+    }
+}
