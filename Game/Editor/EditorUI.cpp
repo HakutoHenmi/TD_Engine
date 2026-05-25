@@ -2600,21 +2600,19 @@ void EditorUI::ShowInspector(GameScene* scene) {
 
 							if (!entry.instance && !entry.scriptPath.empty()) {
 								entry.instance = ScriptEngine::GetInstance()->CreateScript(entry.scriptPath);
-								if (entry.instance) {
-									char logBuf[1024];
-									sprintf_s(logBuf, "[EditorUI] Inspector: Created instance for %s, Restoring params: %s\n", entry.scriptPath.c_str(), entry.parameterData.c_str());
-									OutputDebugStringA(logBuf);
-									
-									// パラメータが空でなければデシリアライズ
+									if (entry.instance) {
+										std::string logMsg = "[EditorUI] Inspector: Created instance for " + entry.scriptPath + ", Restoring params: " + entry.parameterData + "\n";
+										OutputDebugStringA(logMsg.c_str());
+										
+										// パラメータが空でなければデシリアライズ
 									if (!entry.parameterData.empty()) {
 										entry.instance->DeserializeParameters(entry.parameterData);
 									}
 								} else if (entry.instance) {
 									// パラメータが空の場合は初期状態をセット
 									entry.parameterData = entry.instance->SerializeParameters();
-									char logBuf[1024];
-									sprintf_s(logBuf, "[EditorUI] Inspector: Creating instance for %s, Param was empty, setting default: %s\n", entry.scriptPath.c_str(), entry.parameterData.c_str());
-									OutputDebugStringA(logBuf);
+									std::string logMsg = "[EditorUI] Inspector: Creating instance for " + entry.scriptPath + ", Param was empty, setting default: " + entry.parameterData + "\n";
+									OutputDebugStringA(logMsg.c_str());
 								}
 							}
 
@@ -2642,9 +2640,8 @@ void EditorUI::ShowInspector(GameScene* scene) {
 
 									if (shouldUpdate) {
 										entry.parameterData = newParams;
-										char logBuf[1024];
-										sprintf_s(logBuf, "[EditorUI] Parameter Changed: %s -> %s\n", oldParams.c_str(), newParams.c_str());
-										OutputDebugStringA(logBuf);
+										std::string logMsg = "[EditorUI] Parameter Changed: " + oldParams + " -> " + newParams + "\n";
+										OutputDebugStringA(logMsg.c_str());
 									}
 								}
 								ImGui::PopID();

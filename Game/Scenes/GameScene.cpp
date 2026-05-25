@@ -1622,9 +1622,8 @@ void GameScene::SetIsPlaying(bool play) {
 					std::string oldParam = entry.parameterData;
 					entry.parameterData = entry.instance->SerializeParameters();
 					if (entry.parameterData != oldParam) {
-						char logBuf[2048];
-						sprintf_s(logBuf, "[GameScene] Script synced: %s from %s to %s\n", entry.scriptPath.c_str(), oldParam.c_str(), entry.parameterData.c_str());
-						OutputDebugStringA(logBuf);
+						std::string logMsg = "[GameScene] Script synced: " + entry.scriptPath + " from " + oldParam + " to " + entry.parameterData + "\n";
+						OutputDebugStringA(logMsg.c_str());
 					}
 				}
 			}

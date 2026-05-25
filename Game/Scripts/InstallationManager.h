@@ -49,4 +49,11 @@ private:
 	void EnsureButtonEntity(ButtonData& data, GameScene* scene);
 };
 
+// 互換性維持のためのダミースクリプト
+class InstallationButton : public IScript {
+public:
+	void Start(entt::entity, GameScene*) override {}
+	void Update(entt::entity, GameScene*, float) override {}
+};
+
 } // namespace Game
