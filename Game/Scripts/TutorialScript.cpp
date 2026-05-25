@@ -200,6 +200,7 @@ void TutorialScript::Start(entt::entity entity, GameScene* scene) {
     instance_ = this;
     tutorialStep_ = TutorialStep::Step1_Greeting;
     currentLineIndex_ = 0;
+    PhaseSystemScript::ResetPhaseCount();
     phaseState_ = PhaseSystemScript::PreparationPhase;
     nextPhaseState_ = PhaseSystemScript::PreparationPhase;
     isPhaseTransitioning_ = false;
