@@ -60,19 +60,19 @@ const std::unordered_map<TutorialScript::TutorialStep, std::vector<std::string>>
     }},
     { TutorialScript::TutorialStep::Step7_CannonInstall, {
         "まずは敵を迎撃するための『大砲』を設置します。\n[SPACE]キーで進みます。",
-        "3キーを押すか、大砲のアイコンをクリックして設置したい場所に配置してください。"
+        "大砲のアイコンをクリックして設置したい場所に配置してください。"
     }},
     { TutorialScript::TutorialStep::Step8_TankInstall, {
         "次に、\n大砲を動かすためのエネルギー源『タンク』を設置します。\n[SPACE]キーで進みます。",
-        "1キーを押すか、タンクのアイコンをクリックして大砲の近くに配置してください。"
+        "タンクのアイコンをクリックして大砲の近くに配置してください。"
     }},
     { TutorialScript::TutorialStep::Step9_PipeInstall, {
         "タンクから大砲にエネルギーを届けるため、\n『パイプ』を繋ぎましょう。\n[SPACE]キーで進みます。",
-        "2キーを押すか、パイプのアイコンをクリックして、タンクの緑色の接続点から大砲に向けてパイプを伸ばして設置してください。"
+        "パイプのアイコンをクリックして、タンクの緑色の接続点から大砲に向けてパイプを伸ばして設置してください。"
     }},
     { TutorialScript::TutorialStep::Step10_DeleteIntro, {
         "練習として、\nもう一つ余分にタンク（1キー）を適当に設置してみましょう。\n[SPACE]キーで進みます。",
-        "設置できました！それではXキーを押すか、\n左下の『削除ボタン』をクリックして、\n設置したタンクをクリックして削除してください。\n[SPACE]キーで進みます。",
+        "設置できました！\n左下の『削除ボタン』をクリックして、\n設置したタンクをクリックして削除してください。\n[SPACE]キーで進みます。",
         "削除できました！\n[SPACE]キーで次へ進みます。"
     }},
     { TutorialScript::TutorialStep::Step11_BattleTransition, {
