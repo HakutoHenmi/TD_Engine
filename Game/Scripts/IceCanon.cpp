@@ -9,10 +9,6 @@
 #include <vector>
 namespace Game {
 
-
-
-
-
 void IceCanon::Start(entt::entity entity, GameScene* scene) {
 	attackTimer_ = 0.0f;
 	persistentVfxCreated_ = false;
@@ -21,20 +17,20 @@ void IceCanon::Start(entt::entity entity, GameScene* scene) {
 	persistentCrystalVfx_ = entt::null;
 
 	auto& registry = scene->GetRegistry();
-	
+
 	// 霜の降りたビジュアル表現：マテリアルカラーを青白く発光させる（HDRカラー）
 	if (registry.all_of<MeshRendererComponent>(entity)) {
 		auto& mr = registry.get<MeshRendererComponent>(entity);
-		mr.color = { 1.5f, 2.5f, 4.0f, 1.0f }; // 1.0以上の値でブルームを誘発
+		mr.color = {1.5f, 2.5f, 4.0f, 1.0f}; // 1.0以上の値でブルームを誘発
 	}
 
 	// タワー周囲の接地面を青く照らす
 	if (!registry.all_of<PointLightComponent>(entity)) {
 		auto& pl = registry.emplace<PointLightComponent>(entity);
-		pl.color = { 0.2f, 0.6f, 1.0f };
+		pl.color = {0.2f, 0.6f, 1.0f};
 		pl.intensity = 4.0f;
 		pl.range = 7.0f;
-		pl.offset = { 0.0f, 1.5f, 0.0f }; // ★ ライトを少し上にオフセット
+		pl.offset = {0.0f, 1.5f, 0.0f}; // ★ ライトを少し上にオフセット
 		pl.enabled = true;
 	}
 
@@ -67,7 +63,6 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	}
 
-
 	if (!registry.all_of<TransformComponent>(entity)) {
 		return;
 	}
@@ -95,8 +90,6 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 			}
 		}
 	}
-
-
 
 	attackTimer_ -= dt;
 	if (attackTimer_ > 0.0f) {
@@ -154,7 +147,7 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 				float dx = pTrans.translate.x - cTrans.translate.x;
 				float dy = pTrans.translate.y - cTrans.translate.y;
 				float dz = pTrans.translate.z - cTrans.translate.z;
-				float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+				float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
 
 				if (dist <= buff.buffRadius) {
 					buff.isBuffed = true;
@@ -180,8 +173,6 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 		if (!registry.valid(other)) {
 			continue;
 		}
-
-
 
 		if (!registry.all_of<TransformComponent>(other)) {
 			continue;
@@ -229,7 +220,7 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 		bulletTransform.translate.x += std::cos(angle) * flowerRadius;
 		bulletTransform.translate.z += std::sin(angle) * flowerRadius;
 
-	     float targetDirectionX = targetTransform.translate.x - bulletTransform.translate.x;
+		float targetDirectionX = targetTransform.translate.x - bulletTransform.translate.x;
 		float targetDirectionY = targetTransform.translate.y - bulletTransform.translate.y;
 		float targetDirectionZ = targetTransform.translate.z - bulletTransform.translate.z;
 
@@ -239,10 +230,10 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 
 		float targetPitch = std::atan2(-targetDirectionY, targetLengthXZ);
 
+		bulletTransform.rotate = canonTransform.rotate;
+
 		bulletTransform.rotate.y = targetYaw;
 		bulletTransform.rotate.x = targetPitch;
-		bulletTransform.rotate = canonTransform.rotate;
-		
 
 		bulletTransform.scale = {0.3f, 0.3f, 0.3f};
 
@@ -275,11 +266,7 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 			float firePitch = -0.35f;
 			float fireCosX = std::cos(firePitch);
 			float fireSinX = std::sin(firePitch);
-			DirectX::XMFLOAT3 fireDir = {
-				std::sin(fireYaw) * fireCosX,
-				-fireSinX,
-				std::cos(fireYaw) * fireCosX
-			};
+			DirectX::XMFLOAT3 fireDir = {std::sin(fireYaw) * fireCosX, -fireSinX, std::cos(fireYaw) * fireCosX};
 
 			DirectX::XMFLOAT3 muzzlePos = canonTransform.translate;
 			muzzlePos.y += 1.0f;
@@ -303,15 +290,15 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 			pecBlast.emitter.params.shapeAngle = 0.45f;
 			pecBlast.emitter.params.lifeTime = 0.5f;
 			pecBlast.emitter.params.lifeTimeVariance = 0.15f;
-			pecBlast.emitter.params.startVelocity = { fireDir.x * 12.0f, fireDir.y * 12.0f, fireDir.z * 12.0f };
-			pecBlast.emitter.params.velocityVariance = { 3.0f, 3.0f, 3.0f };
+			pecBlast.emitter.params.startVelocity = {fireDir.x * 12.0f, fireDir.y * 12.0f, fireDir.z * 12.0f};
+			pecBlast.emitter.params.velocityVariance = {3.0f, 3.0f, 3.0f};
 			pecBlast.emitter.params.damping = 0.4f;
-			pecBlast.emitter.params.startColor = { 0.5f, 0.8f, 1.0f, 0.8f };
-			pecBlast.emitter.params.endColor = { 0.8f, 0.95f, 1.0f, 0.0f };
-			pecBlast.emitter.params.startSize = { 0.5f, 0.5f, 0.5f };
-			pecBlast.emitter.params.endSize = { 2.4f, 2.4f, 2.4f };
+			pecBlast.emitter.params.startColor = {0.5f, 0.8f, 1.0f, 0.8f};
+			pecBlast.emitter.params.endColor = {0.8f, 0.95f, 1.0f, 0.0f};
+			pecBlast.emitter.params.startSize = {0.5f, 0.5f, 0.5f};
+			pecBlast.emitter.params.endSize = {2.4f, 2.4f, 2.4f};
 			pecBlast.emitter.params.isAdditive = true;
-			pecBlast.emitter.params.position = { muzzlePos.x, muzzlePos.y, muzzlePos.z };
+			pecBlast.emitter.params.position = {muzzlePos.x, muzzlePos.y, muzzlePos.z};
 
 			pecBlast.emitter.Initialize(*renderer, "IceBlast_Emitter");
 			pecBlast.isInitialized = true;
@@ -319,7 +306,7 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 
 			// スクリプトと寿命
 			auto& scBlast = registry.emplace<ScriptComponent>(blastVfx);
-			scBlast.scripts.push_back({ "BulletScript", "", nullptr });
+			scBlast.scripts.push_back({"BulletScript", "", nullptr});
 			auto& vcBlast = registry.emplace<VariableComponent>(blastVfx);
 			vcBlast.SetValue("Speed", 0.0f);
 			vcBlast.SetValue("MaxLifeTime", 0.8f);
@@ -339,15 +326,15 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 			pecShard.emitter.params.shapeAngle = 0.3f;
 			pecShard.emitter.params.lifeTime = 0.7f;
 			pecShard.emitter.params.lifeTimeVariance = 0.2f;
-			pecShard.emitter.params.startVelocity = { fireDir.x * 15.0f, fireDir.y * 15.0f, fireDir.z * 15.0f };
-			pecShard.emitter.params.velocityVariance = { 4.0f, 4.0f, 4.0f };
+			pecShard.emitter.params.startVelocity = {fireDir.x * 15.0f, fireDir.y * 15.0f, fireDir.z * 15.0f};
+			pecShard.emitter.params.velocityVariance = {4.0f, 4.0f, 4.0f};
 			pecShard.emitter.params.damping = 0.6f;
-			pecShard.emitter.params.startColor = { 0.8f, 0.95f, 1.0f, 1.8f };
-			pecShard.emitter.params.endColor = { 0.3f, 0.7f, 1.0f, 0.0f };
-			pecShard.emitter.params.startSize = { 0.25f, 0.25f, 0.25f };
-			pecShard.emitter.params.endSize = { 0.03f, 0.03f, 0.03f };
+			pecShard.emitter.params.startColor = {0.8f, 0.95f, 1.0f, 1.8f};
+			pecShard.emitter.params.endColor = {0.3f, 0.7f, 1.0f, 0.0f};
+			pecShard.emitter.params.startSize = {0.25f, 0.25f, 0.25f};
+			pecShard.emitter.params.endSize = {0.03f, 0.03f, 0.03f};
 			pecShard.emitter.params.isAdditive = true;
-			pecShard.emitter.params.position = { muzzlePos.x, muzzlePos.y, muzzlePos.z };
+			pecShard.emitter.params.position = {muzzlePos.x, muzzlePos.y, muzzlePos.z};
 
 			pecShard.emitter.Initialize(*renderer, "IceShard_Emitter");
 			pecShard.isInitialized = true;
@@ -355,7 +342,7 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 
 			// スクリプトと寿命
 			auto& scShard = registry.emplace<ScriptComponent>(shardVfx);
-			scShard.scripts.push_back({ "BulletScript", "", nullptr });
+			scShard.scripts.push_back({"BulletScript", "", nullptr});
 			auto& vcShard = registry.emplace<VariableComponent>(shardVfx);
 			vcShard.SetValue("Speed", 0.0f);
 			vcShard.SetValue("MaxLifeTime", 1.0f);
@@ -366,7 +353,8 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 }
 
 void IceCanon::OnDestroy(entt::entity /*entity*/, GameScene* scene) {
-	if (!scene) return;
+	if (!scene)
+		return;
 	auto& registry = scene->GetRegistry();
 
 	if (persistentVfxCreated_) {
@@ -383,10 +371,12 @@ void IceCanon::OnDestroy(entt::entity /*entity*/, GameScene* scene) {
 }
 
 void IceCanon::CreatePersistentVFX(entt::entity entity, GameScene* scene) {
-	if (!scene || persistentVfxCreated_) return;
+	if (!scene || persistentVfxCreated_)
+		return;
 	auto& registry = scene->GetRegistry();
 	Engine::Renderer* renderer = scene->GetRenderer();
-	if (!renderer) return;
+	if (!renderer)
+		return;
 
 	auto& canonTransform = registry.get<TransformComponent>(entity);
 	DirectX::XMFLOAT3 basePos = canonTransform.translate;
@@ -408,15 +398,15 @@ void IceCanon::CreatePersistentVFX(entt::entity entity, GameScene* scene) {
 	pecMist.emitter.params.lifeTimeVariance = 0.5f;
 	pecMist.emitter.params.startVelocity = {0.0f, -0.8f, 0.0f}; // ゆっくり下へ
 	pecMist.emitter.params.velocityVariance = {0.4f, 0.15f, 0.4f};
-	pecMist.emitter.params.acceleration = {0.0f, -0.4f, 0.0f};  // 下向き加速
+	pecMist.emitter.params.acceleration = {0.0f, -0.4f, 0.0f}; // 下向き加速
 	pecMist.emitter.params.damping = 0.1f;
 	pecMist.emitter.params.startColor = {0.55f, 0.85f, 1.0f, 0.35f}; // 青白い冷気
 	pecMist.emitter.params.endColor = {0.8f, 0.95f, 1.0f, 0.0f};
 	pecMist.emitter.params.startSize = {0.8f, 0.8f, 0.8f};
 	pecMist.emitter.params.endSize = {2.2f, 2.2f, 2.2f};
 	pecMist.emitter.params.isAdditive = true;
-	pecMist.emitter.params.position = { mTrans.translate.x, mTrans.translate.y, mTrans.translate.z };
-	
+	pecMist.emitter.params.position = {mTrans.translate.x, mTrans.translate.y, mTrans.translate.z};
+
 	pecMist.emitter.Initialize(*renderer, "IceMist");
 	pecMist.isInitialized = true;
 
@@ -445,7 +435,7 @@ void IceCanon::CreatePersistentVFX(entt::entity entity, GameScene* scene) {
 	pecCrystal.emitter.params.angularVelocity = {1.0f, 2.0f, 1.0f};
 	pecCrystal.emitter.params.angularVelocityVariance = {2.0f, 2.0f, 2.0f};
 	pecCrystal.emitter.params.isAdditive = true;
-	pecCrystal.emitter.params.position = { cTrans.translate.x, cTrans.translate.y, cTrans.translate.z };
+	pecCrystal.emitter.params.position = {cTrans.translate.x, cTrans.translate.y, cTrans.translate.z};
 
 	pecCrystal.emitter.Initialize(*renderer, "IceCrystal");
 	pecCrystal.isInitialized = true;
