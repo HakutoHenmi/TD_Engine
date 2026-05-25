@@ -47,7 +47,7 @@ const std::unordered_map<TutorialScript::TutorialStep, std::vector<std::string>>
     }},
     { TutorialScript::TutorialStep::Step4_PhaseIntro, {
         "このゲームは、\n『準備フェーズ』と『戦闘フェーズ』を\n交互に繰り返します。",
-       "準備フェーズで設備を整え、\戦闘フェーズで敵を迎撃しましょう。[SPACE]キーで進みます。"
+       "準備フェーズで設備を整え、\n戦闘フェーズで敵を迎撃しましょう。[SPACE]キーで進みます。"
     }},
     { TutorialScript::TutorialStep::Step5_CameraControl, {
         "カメラの操作方法について説明します。",
