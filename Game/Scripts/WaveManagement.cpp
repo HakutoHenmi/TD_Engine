@@ -77,19 +77,19 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 	if (renderer && (isEditorMode || isPrepOrBattle)) {
 		for (size_t wi = 0; wi < enemySpawners_.size(); ++wi) {
 			// ゲームプレイ中は現在の（次に来る）ウェーブのものだけ表示する
-			if (!isEditorMode) {
-				int targetWave = 0;
-				auto phase = PhaseSystemScript::IsPhase();
-				if (phase == PhaseSystemScript::PreparationPhase) {
-					targetWave = PhaseSystemScript::GetCurrentPhase();
-				} else if (phase == PhaseSystemScript::BattlePhase) {
-					targetWave = PhaseSystemScript::GetCurrentPhase() - 1;
-				}
+				if (!isEditorMode) {
+					int targetWave = 0;
+					auto phase = PhaseSystemScript::IsPhase();
+					if (phase == PhaseSystemScript::PreparationPhase) {
+						targetWave = PhaseSystemScript::GetCurrentPhase();
+					} else if (phase == PhaseSystemScript::BattlePhase) {
+						targetWave = PhaseSystemScript::GetCurrentPhase();
+					}
 
-				if (static_cast<int>(wi) != targetWave) {
-					continue;
+					if (static_cast<int>(wi) != targetWave) {
+						continue;
+					}
 				}
-			}
 
 			for (entt::entity spawnerEntity : enemySpawners_[wi]) {
 				if (scene->GetRegistry().valid(spawnerEntity)) {
