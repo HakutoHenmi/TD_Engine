@@ -571,13 +571,9 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				nav.GenerateFlowField(tc.translate.x, tc.translate.z);
 			}
 
-			// ★修正: preIsPhase_が準備フェーズから来たかチェックして、初めてのみ++する
-			if (preIsPhase_ == PreparationPhase) {
-				// 準備→戦闘への遷移（新しいウェーブ開始）
-				currentPhase_++;
-			}
+			currentPhase_++;
 			
-			WaveManagement::SetWave(currentPhase_);  // ★修正: currentPhase_-1ではなく、currentPhase_を使用
+			WaveManagement::SetWave(currentPhase_-1);
 
 			// 戦闘中は絵画風エフェクトをオンにする	
 			Engine::Renderer::GetInstance()->SetPostEffect("Painterly");
