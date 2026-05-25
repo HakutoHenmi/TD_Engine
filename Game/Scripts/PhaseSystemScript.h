@@ -53,6 +53,7 @@ public:
 	}
 
 	static int GetCurrentPhase() { return currentPhase_; }
+	static void ResetPhaseCount() { currentPhase_ = 0; }
 
 private:
 	inline static PhaseState isPhase_ = PreparationPhase;
