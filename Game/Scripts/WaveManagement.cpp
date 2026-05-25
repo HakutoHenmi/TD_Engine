@@ -83,7 +83,7 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 					if (phase == PhaseSystemScript::PreparationPhase) {
 						targetWave = PhaseSystemScript::GetCurrentPhase();
 					} else if (phase == PhaseSystemScript::BattlePhase) {
-						targetWave = PhaseSystemScript::GetCurrentPhase();
+						targetWave = currentWave_;
 					}
 
 					if (static_cast<int>(wi) != targetWave) {
