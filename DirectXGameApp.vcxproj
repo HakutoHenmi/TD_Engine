@@ -179,6 +179,7 @@ exit /b 0
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Game\Scripts\Enemy\Sandbag.cpp" />
     <ClCompile Include="Game\Scripts\ExplosionAttackArea.cpp" />
     <ClCompile Include="Game\Scripts\InstallationButton.cpp" />
     <ClCompile Include="Game\Editor\EditorUI.cpp" />
@@ -229,6 +230,7 @@ exit /b 0
   <ItemGroup>
     <ClInclude Include="Game\Scripts\Enemy\Enemies.h" />
     <ClInclude Include="Game\Scripts\Canon.h" />
+    <ClInclude Include="Game\Scripts\Enemy\Sandbag.h" />
     <ClInclude Include="Game\Scripts\ExplosionAttackArea.h" />
     <ClInclude Include="Game\Scripts\InstallationButton.h" />
     <ClInclude Include="Game\Editor\EditorUI.h" />
