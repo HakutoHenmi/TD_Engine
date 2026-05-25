@@ -163,6 +163,8 @@ private:
 	static constexpr float DASH_COST = 20.0f;           // スチーム・ブーストのコスト
 	static constexpr float DASH_POWER = 155.0f;         // スチーム・ブーストの推進力 (さらにもう少しだけ伸ばす調整)
 
+	DirectX::XMFLOAT3 initialPos_ = {0, 0, 0}; // ★フェーズクリア時に戻るための初期位置
+
 	// ★追加: チャージショット
 	bool isCharging_ = false;            // チャージ中か
 	float chargeTime_ = 0.0f;            // 現在のチャージ時間
@@ -187,7 +189,7 @@ private:
 	void DrawReticle(entt::entity playerEntity, GameScene* scene);
 
 
-	//スキル
+	// Skills
 	float playerMoveSpeedRate_ = 1.0f;
 
 	float playerSwordAttackSpeedRate_ = 1.0f;

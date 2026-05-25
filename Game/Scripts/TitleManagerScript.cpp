@@ -149,7 +149,7 @@ void TitleManagerScript::DeserializeParameters(const std::string& data) { (void)
 // フォールバック: UIが存在しない場合に自動生成
 // =============================================
 
-entt::entity TitleManagerScript::CreateTitleButton(entt::registry& reg, const std::string& text, float yPos, entt::entity parent) {
+entt::entity TitleManagerScript::CreateTitleButton(GameScene* scene, entt::registry& reg, const std::string& text, float yPos, entt::entity parent) {
 	auto entity = reg.create();
 	auto& rect = reg.emplace<RectTransformComponent>(entity);
 	rect.pos = {0.0f, yPos};
@@ -159,7 +159,7 @@ entt::entity TitleManagerScript::CreateTitleButton(entt::registry& reg, const st
 	rect.enabled = true;
 
 	if (parent != entt::null) {
-		reg.emplace<HierarchyComponent>(entity, parent);
+		scene->SetParent(entity, parent); // ★修正: SetParentを使用する
 	}
 
 	auto& btn = reg.emplace<UIButtonComponent>(entity);
@@ -194,20 +194,20 @@ void TitleManagerScript::CreateFallbackUI(GameScene* scene) {
 	reg.emplace<NameComponent>(titleText, "TitleText");
 	auto& titleRect = reg.emplace<RectTransformComponent>(titleText);
 	titleRect.pos = {50.0f, -150.0f};
-	reg.emplace<HierarchyComponent>(titleText, mainParent);
+	scene->SetParent(titleText, mainParent); // ★修正
 	auto& txt = reg.emplace<UITextComponent>(titleText);
 	txt.text = "Engine Project"; // ★文字変更
 	txt.fontSize = 80.0f;
 	txt.color = {1.0f, 0.8f, 0.2f, 1.0f};
 
 	// ボタン生成
-	auto btnStart_ = CreateTitleButton(reg, "Start Game", 0.0f, mainParent);
+	auto btnStart_ = CreateTitleButton(scene, reg, "Start Game", 0.0f, mainParent);
 	reg.emplace<NameComponent>(btnStart_, "Btn_Start");
 
-	auto btnSettings_ = CreateTitleButton(reg, "Settings", 80.0f, mainParent);
+	auto btnSettings_ = CreateTitleButton(scene, reg, "Settings", 80.0f, mainParent);
 	reg.emplace<NameComponent>(btnSettings_, "Btn_Settings");
 
-	auto btnExit_ = CreateTitleButton(reg, "Exit", 160.0f, mainParent);
+	auto btnExit_ = CreateTitleButton(scene, reg, "Exit", 160.0f, mainParent);
 	reg.emplace<NameComponent>(btnExit_, "Btn_Exit");
 
 	// 設定メニュー
@@ -224,13 +224,13 @@ void TitleManagerScript::CreateFallbackUI(GameScene* scene) {
 	reg.emplace<NameComponent>(settingsTitle, "SettingsTitle");
 	auto& stRect = reg.emplace<RectTransformComponent>(settingsTitle);
 	stRect.pos = {50.0f, -150.0f};
-	reg.emplace<HierarchyComponent>(settingsTitle, settingsParent);
+	scene->SetParent(settingsTitle, settingsParent); // ★修正
 	auto& stTxt = reg.emplace<UITextComponent>(settingsTitle);
 	stTxt.text = "Settings";
 	stTxt.fontSize = 80.0f;
 
 	// フルスクリーン
-	auto btnFullscreen_ = CreateTitleButton(reg, "Fullscreen: OFF", 0.0f, settingsParent);
+	auto btnFullscreen_ = CreateTitleButton(scene, reg, "Fullscreen: OFF", 0.0f, settingsParent);
 	reg.emplace<NameComponent>(btnFullscreen_, "Btn_Fullscreen");
 
 	// BGM
@@ -238,17 +238,17 @@ void TitleManagerScript::CreateFallbackUI(GameScene* scene) {
 	reg.emplace<NameComponent>(bgmLabel, "Text_BGM");
 	auto& bgmRect = reg.emplace<RectTransformComponent>(bgmLabel);
 	bgmRect.pos = {0.0f, 80.0f};
-	reg.emplace<HierarchyComponent>(bgmLabel, settingsParent);
+	scene->SetParent(bgmLabel, settingsParent); // ★修正
 	auto& bgmTxt = reg.emplace<UITextComponent>(bgmLabel);
 	bgmTxt.text = "BGM Volume";
 	bgmTxt.fontSize = 32.0f;
 
-	auto btnBGMMinus_ = CreateTitleButton(reg, "-", 80.0f, settingsParent);
+	auto btnBGMMinus_ = CreateTitleButton(scene, reg, "-", 80.0f, settingsParent);
 	reg.emplace<NameComponent>(btnBGMMinus_, "Btn_BGMMinus");
 	reg.get<RectTransformComponent>(btnBGMMinus_).size = {60.0f, 60.0f};
 	reg.get<RectTransformComponent>(btnBGMMinus_).pos = {310.0f, 80.0f};
 
-	auto btnBGMPlus_ = CreateTitleButton(reg, "+", 80.0f, settingsParent);
+	auto btnBGMPlus_ = CreateTitleButton(scene, reg, "+", 80.0f, settingsParent);
 	reg.emplace<NameComponent>(btnBGMPlus_, "Btn_BGMPlus");
 	reg.get<RectTransformComponent>(btnBGMPlus_).size = {60.0f, 60.0f};
 	reg.get<RectTransformComponent>(btnBGMPlus_).pos = {380.0f, 80.0f};
@@ -258,23 +258,23 @@ void TitleManagerScript::CreateFallbackUI(GameScene* scene) {
 	reg.emplace<NameComponent>(seLabel, "Text_SE");
 	auto& seRect = reg.emplace<RectTransformComponent>(seLabel);
 	seRect.pos = {0.0f, 160.0f};
-	reg.emplace<HierarchyComponent>(seLabel, settingsParent);
+	scene->SetParent(seLabel, settingsParent); // ★修正
 	auto& seTxt = reg.emplace<UITextComponent>(seLabel);
 	seTxt.text = "SE Volume";
 	seTxt.fontSize = 32.0f;
 
-	auto btnSEMinus_ = CreateTitleButton(reg, "-", 160.0f, settingsParent);
+	auto btnSEMinus_ = CreateTitleButton(scene, reg, "-", 160.0f, settingsParent);
 	reg.emplace<NameComponent>(btnSEMinus_, "Btn_SEMinus");
 	reg.get<RectTransformComponent>(btnSEMinus_).size = {60.0f, 60.0f};
 	reg.get<RectTransformComponent>(btnSEMinus_).pos = {310.0f, 160.0f};
 
-	auto btnSEPlus_ = CreateTitleButton(reg, "+", 160.0f, settingsParent);
+	auto btnSEPlus_ = CreateTitleButton(scene, reg, "+", 160.0f, settingsParent);
 	reg.emplace<NameComponent>(btnSEPlus_, "Btn_SEPlus");
 	reg.get<RectTransformComponent>(btnSEPlus_).size = {60.0f, 60.0f};
 	reg.get<RectTransformComponent>(btnSEPlus_).pos = {380.0f, 160.0f};
 
 	// 戻るボタン
-	auto btnBack_ = CreateTitleButton(reg, "Back", 260.0f, settingsParent);
+	auto btnBack_ = CreateTitleButton(scene, reg, "Back", 260.0f, settingsParent);
 	reg.emplace<NameComponent>(btnBack_, "Btn_Back");
 }
 

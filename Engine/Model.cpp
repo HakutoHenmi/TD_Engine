@@ -204,6 +204,14 @@ ComPtr<ID3D12Resource> Model::UploadTextureData(ID3D12Resource* tex, const Direc
 }
 
 bool Model::Load(ID3D12Device* device, ID3D12GraphicsCommandList* cmd, const std::string& objPath) {
+	// ★追加: パス文字列から軽量メッシュ判定を行いキャッシュする
+	if (objPath.find("cylinder") != std::string::npos || objPath.find("Cylinder") != std::string::npos ||
+		objPath.find("ball.obj") != std::string::npos || objPath.find("Ball.obj") != std::string::npos) {
+		m_isLightweight = true;
+	} else {
+		m_isLightweight = false;
+	}
+
 	// Use wide string path to read file into memory for Assimp (Windows Unicode support)
 	std::wstring wpath = PathUtils::FromUTF8(objPath);
 	std::ifstream fileStream(wpath, std::ios::binary | std::ios::ate);

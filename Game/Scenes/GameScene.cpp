@@ -388,28 +388,30 @@ void GameScene::Update() {
 	{
 	ScopedTimer _tagTimer(profiler_.frameStats.tagSyncMs);
 	if (!pendingTagRemoved_.empty() || !pendingTagSync_.empty()) {
-		// 1. 削除・変更予定のエンティティを全キャッシュから取り除く
-		std::vector<entt::entity> toRemove = std::move(pendingTagRemoved_);
-		// pendingTagSync に入っているものは「タグが変わる」可能性があるので、一旦古いキャッシュから消しておく
-		for (auto e : pendingTagSync_) {
-			toRemove.push_back(e);
-		}
+		// ★最適化: 削除対象を unordered_set にまとめ、各ベクターに対して std::remove_if で一括削除(O(N))する
+		std::unordered_set<entt::entity> removeSet;
+		for (auto e : pendingTagRemoved_) removeSet.insert(e);
+		for (auto e : pendingTagSync_) removeSet.insert(e); // タグが変わる可能性があるので一旦消す
 
-		for (auto e : toRemove) {
+		if (!removeSet.empty()) {
 			for (auto& pair : tagCache_) {
 				auto& vec = pair.second;
-				// すべてのタグリストから、そのエンティティを削除
-				vec.erase(std::remove(vec.begin(), vec.end(), e), vec.end());
+				if (vec.empty()) continue;
+				vec.erase(std::remove_if(vec.begin(), vec.end(), [&](entt::entity e) {
+					return removeSet.find(e) != removeSet.end();
+				}), vec.end());
 			}
 		}
 
-		// 2. 最新のタグで同期
-		std::vector<entt::entity> toSync = std::move(pendingTagSync_);
-		for (auto e : toSync) {
+		// 新しいタグで同期
+		for (auto e : pendingTagSync_) {
 			if (registry_.valid(e)) {
 				SyncTag(e);
 			}
 		}
+
+		pendingTagRemoved_.clear();
+		pendingTagSync_.clear();
 	}
 	}
 
@@ -529,18 +531,29 @@ void GameScene::Update() {
 					auto* m = renderer_->GetModel(meshWrapper.modelHandle);
 					if (m) {
 						const auto& data = m->GetData();
-						for (const auto& a : data.animations) {
-							if (a.name == anim.currentAnimation) {
-								float durationInFrames = (a.duration / a.ticksPerSecond) * 60.0f;
-								if (anim.time > durationInFrames) {
-									if (anim.loop)
-										anim.time = std::fmod(anim.time, durationInFrames);
-									else {
-										anim.time = durationInFrames;
-										anim.isPlaying = false;
-									}
+						// キャッシュが無効、またはアニメーション名が変更された場合は再検索
+						if (anim.currentAnimationIndex < 0 || anim.currentAnimationIndex >= (int)data.animations.size() || 
+							data.animations[anim.currentAnimationIndex].name != anim.currentAnimation) {
+							
+							anim.currentAnimationIndex = -1;
+							for (int j = 0; j < (int)data.animations.size(); ++j) {
+								if (data.animations[j].name == anim.currentAnimation) {
+									anim.currentAnimationIndex = j;
+									break;
 								}
-								break;
+							}
+						}
+
+						if (anim.currentAnimationIndex >= 0) {
+							const auto& a = data.animations[anim.currentAnimationIndex];
+							float durationInFrames = (a.duration / a.ticksPerSecond) * 60.0f;
+							if (anim.time > durationInFrames) {
+								if (anim.loop)
+									anim.time = std::fmod(anim.time, durationInFrames);
+								else {
+									anim.time = durationInFrames;
+									anim.isPlaying = false;
+								}
 							}
 						}
 					}
@@ -690,6 +703,27 @@ void GameScene::Update() {
 			pe.isInitialized = true;
 		}
 
+		// ★追加: 初回に元の発生量を記憶
+		if (pe.originalEmitRate < 0.0f) {
+			pe.originalEmitRate = pe.emitter.params.emitRate;
+		}
+
+		// ★追加: 距離ベースのLOD (Level of Detail) とリッチ化
+		Engine::Vector3 camPos = camera_.GetPosition();
+		float distSq = (tc.translate.x - camPos.x) * (tc.translate.x - camPos.x) + 
+					   (tc.translate.y - camPos.y) * (tc.translate.y - camPos.y) + 
+					   (tc.translate.z - camPos.z) * (tc.translate.z - camPos.z);
+
+		if (distSq < 400.0f) { // 距離20未満（目の前）
+			// 目の前のエフェクトは元の2倍の発生量にして超リッチにする！
+			pe.emitter.params.emitRate = pe.originalEmitRate * 2.0f;
+		} else if (distSq > 3600.0f) { // 距離60以上（遠距離）
+			// 遠くのエフェクトは発生量を約30%に減らして負荷を大幅に下げる
+			pe.emitter.params.emitRate = pe.originalEmitRate * 0.33f;
+		} else {
+			pe.emitter.params.emitRate = pe.originalEmitRate;
+		}
+
 		pe.emitter.params.position = {tc.translate.x, tc.translate.y, tc.translate.z};
 		pe.emitter.Update(dt);
 
@@ -717,6 +751,41 @@ entt::entity GameScene::CreateEntity(const std::string& name) {
 	return entity;
 }
 
+// ★追加: 親子関係の設定
+void GameScene::SetParent(entt::entity child, entt::entity parent) {
+	if (!registry_.valid(child)) return;
+	
+	RemoveParent(child);
+
+	if (!registry_.valid(parent)) return;
+
+	auto& hcChild = registry_.get_or_emplace<HierarchyComponent>(child);
+	hcChild.parentId = parent;
+
+	auto& hcParent = registry_.get_or_emplace<HierarchyComponent>(parent);
+	if (std::find(hcParent.children.begin(), hcParent.children.end(), child) == hcParent.children.end()) {
+		hcParent.children.push_back(child);
+	}
+}
+
+// ★追加: 親子関係の解除
+void GameScene::RemoveParent(entt::entity child) {
+	if (!registry_.valid(child)) return;
+	if (!registry_.all_of<HierarchyComponent>(child)) return;
+
+	auto& hcChild = registry_.get<HierarchyComponent>(child);
+	entt::entity oldParent = hcChild.parentId;
+	
+	if (registry_.valid(oldParent) && registry_.all_of<HierarchyComponent>(oldParent)) {
+		auto& hcParent = registry_.get<HierarchyComponent>(oldParent);
+		hcParent.children.erase(
+			std::remove(hcParent.children.begin(), hcParent.children.end(), child),
+			hcParent.children.end()
+		);
+	}
+	hcChild.parentId = entt::null;
+}
+
 // ★追加: IDでオブジェクトを検索し、破棄フラグを立てる
 void GameScene::DestroyObject(uint32_t id) {
 	std::lock_guard<std::recursive_mutex> lock(spawnMutex_);
@@ -726,28 +795,35 @@ void GameScene::DestroyObject(uint32_t id) {
 	std::vector<entt::entity> toDestroy;
 	toDestroy.push_back(entity);
 
-	// 子Entityを再帰的に探索するためのキュー
+	// ★最適化: 子Entityを再帰的に探索するためのキュー（childrenリストを使用）
 	std::vector<entt::entity> queue;
 	queue.push_back(entity);
 
 	size_t head = 0;
 	while (head < queue.size()) {
-		entt::entity parent = queue[head++];
-		auto view = registry_.view<HierarchyComponent>();
-		for (auto child : view) {
-			if (view.get<HierarchyComponent>(child).parentId == parent) {
-				toDestroy.push_back(child);
-				queue.push_back(child);
+		entt::entity current = queue[head++];
+		if (registry_.all_of<HierarchyComponent>(current)) {
+			const auto& hc = registry_.get<HierarchyComponent>(current);
+			for (auto child : hc.children) {
+				if (registry_.valid(child)) {
+					toDestroy.push_back(child);
+					queue.push_back(child);
+				}
 			}
 		}
 	}
 
 	// 収集したすべての親子エンティティを安全に破棄待ちリストに登録
 	for (auto e : toDestroy) {
-		pendingDestroys_.push_back(e);
+		RemoveParent(e); // ★親のchildrenリストから削除
+		if (registry_.all_of<EditorStateComponent>(e)) {
+			registry_.get<EditorStateComponent>(e).isPendingDestroy = true;
+		}
+		if (std::find(pendingDestroys_.begin(), pendingDestroys_.end(), e) == pendingDestroys_.end()) {
+			pendingDestroys_.push_back(e);
+		}
 	}
 }
-
 
 // ★追加: 名前でオブジェクトを検索
 entt::entity GameScene::FindObjectByName(const std::string& name) {
@@ -797,13 +873,14 @@ float GameScene::GetHeightAt(float x, float z, float startY, uint32_t excludeId)
 			}
 
 			if (modelHandle != 0) {
-				staticTerrainEntities_.push_back(entity);
+				staticTerrainEntities_.push_back({entity, modelHandle});
 			}
 		}
 		staticTerrainDirty_ = false;
 	}
 
-	for (auto entity : staticTerrainEntities_) {
+	for (const auto& info : staticTerrainEntities_) {
+		entt::entity entity = info.entity;
 		if (excludeId != 0 && static_cast<uint32_t>(entity) == excludeId)
 			continue;
 
@@ -812,19 +889,7 @@ float GameScene::GetHeightAt(float x, float z, float startY, uint32_t excludeId)
 			continue;
 		}
 
-		uint32_t modelHandle = 0;
-		if (registry_.all_of<GpuMeshColliderComponent>(entity)) {
-			auto& mc = registry_.get<GpuMeshColliderComponent>(entity);
-			if (mc.enabled)
-				modelHandle = mc.meshHandle;
-		} else if (registry_.all_of<MeshRendererComponent>(entity)) {
-			auto& mr = registry_.get<MeshRendererComponent>(entity);
-			if (mr.enabled)
-				modelHandle = mr.modelHandle;
-		}
-
-		if (modelHandle == 0)
-			continue;
+		uint32_t modelHandle = info.modelHandle;
 
 		auto* model = renderer_->GetModel(modelHandle);
 		if (!model)
@@ -901,13 +966,14 @@ bool GameScene::RayCast(const Engine::Vector3& origin, const Engine::Vector3& di
 			}
 
 			if (modelHandle != 0) {
-				staticTerrainEntities_.push_back(entity);
+				staticTerrainEntities_.push_back({entity, modelHandle});
 			}
 		}
 		staticTerrainDirty_ = false;
 	}
 
-	for (auto entity : staticTerrainEntities_) {
+	for (const auto& info : staticTerrainEntities_) {
+		entt::entity entity = info.entity;
 		if (excludeId != 0 && static_cast<uint32_t>(entity) == excludeId)
 			continue;
 
@@ -916,19 +982,7 @@ bool GameScene::RayCast(const Engine::Vector3& origin, const Engine::Vector3& di
 			continue;
 		}
 
-		uint32_t modelHandle = 0;
-		if (registry_.all_of<GpuMeshColliderComponent>(entity)) {
-			auto& mc = registry_.get<GpuMeshColliderComponent>(entity);
-			if (mc.enabled)
-				modelHandle = mc.meshHandle;
-		} else if (registry_.all_of<MeshRendererComponent>(entity)) {
-			auto& mr = registry_.get<MeshRendererComponent>(entity);
-			if (mr.enabled)
-				modelHandle = mr.modelHandle;
-		}
-
-		if (modelHandle == 0)
-			continue;
+		uint32_t modelHandle = info.modelHandle;
 
 		auto* model = renderer_->GetModel(modelHandle);
 		if (!model)
@@ -984,9 +1038,13 @@ Engine::Matrix4x4 GameScene::GetWorldMatrixRecursive(entt::entity e, int depth) 
 	if (depth > 32)
 		return Engine::Matrix4x4::Identity();
 
-	auto it = matrixCache_.find(e);
-	if (it != matrixCache_.end())
-		return it->second;
+	uint32_t index = static_cast<uint32_t>(e) & 0xFFFFF; // Entity IDからバージョン部分を除いたインデックス
+	if (index >= matrixCache_.size()) {
+		matrixCache_.resize(index + 1024); // 余裕を持ってリサイズ
+	}
+	if (matrixCache_[index].frameCount == matrixFrameCount_) {
+		return matrixCache_[index].matrix; // キャッシュヒット (O(1))
+	}
 
 	if (!registry_.valid(e) || !registry_.all_of<TransformComponent>(e))
 		return Engine::Matrix4x4::Identity();
@@ -1000,7 +1058,7 @@ Engine::Matrix4x4 GameScene::GetWorldMatrixRecursive(entt::entity e, int depth) 
 			world = Engine::Matrix4x4::Multiply(local, GetWorldMatrixRecursive(hc.parentId, depth + 1));
 		}
 	}
-	matrixCache_[e] = world;
+	matrixCache_[index] = { world, matrixFrameCount_ };
 	return world;
 }
 
@@ -1094,10 +1152,11 @@ void GameScene::Draw() {
 		Engine::Matrix4x4 world = this->GetWorldMatrix(static_cast<int>(entity));
 		
 		bool shouldCull = true;
+		bool isEffect = false;
 		if (mr.shaderName == "Distortion" || mr.shaderName == "GlassShatter" || mr.shaderName == "ProceduralSmoke" || mr.shaderName == "ProceduralSmokeInstanced") {
-			shouldCull = false; // エフェクト系は常に描画
+			isEffect = true;
 		} else if (registry_.try_get<TagComponent>(entity) && registry_.get<TagComponent>(entity).tag == TagType::VFX) {
-			shouldCull = false;
+			isEffect = true;
 		} else if (auto* nc = registry_.try_get<NameComponent>(entity)) {
 			// ★追加: 巨大なステージ・地形・スカイボックスなどはカリング対象外にし、視点角度による突然の消失を防ぐ
 			if (nc->name == "Ground" || nc->name == "Terrain" || nc->name == "SkyBox" || nc->name == "Skybox" || nc->name == "Stage") {
@@ -1105,9 +1164,35 @@ void GameScene::Draw() {
 			}
 		}
 
-		if (shouldCull && !IsEntityVisibleInFrustum(frustum, renderer_, registry_, entity, mr.modelHandle, world)) {
-			++culledCount;
-			continue;
+		if (shouldCull) {
+			if (isEffect) {
+				// ★ステップ1: エフェクト専用の動的カリング判定
+				auto* model = renderer_->GetModel(mr.modelHandle);
+				if (model) {
+					float scaleX = std::sqrt(world.m[0][0]*world.m[0][0] + world.m[0][1]*world.m[0][1] + world.m[0][2]*world.m[0][2]);
+					float scaleY = std::sqrt(world.m[1][0]*world.m[1][0] + world.m[1][1]*world.m[1][1] + world.m[1][2]*world.m[1][2]);
+					float scaleZ = std::sqrt(world.m[2][0]*world.m[2][0] + world.m[2][1]*world.m[2][1] + world.m[2][2]*world.m[2][2]);
+					float maxScale = std::max({scaleX, scaleY, scaleZ});
+
+					float baseRadius = std::max({
+						std::abs(model->GetData().max.x - model->GetData().min.x),
+						std::abs(model->GetData().max.y - model->GetData().min.y),
+						std::abs(model->GetData().max.z - model->GetData().min.z)
+					}) * 0.5f;
+
+					float radius = baseRadius * maxScale * 2.5f; // エフェクトは広がるため2.5倍の余裕を持たせる
+
+					if (!frustum.IntersectsLocalAABB(world, {-radius, -radius, -radius}, {radius, radius, radius})) {
+						++culledCount;
+						continue;
+					}
+				}
+			} else {
+				if (!IsEntityVisibleInFrustum(frustum, renderer_, registry_, entity, mr.modelHandle, world)) {
+					++culledCount;
+					continue;
+				}
+			}
 		}
 		sortedEntities.push_back(entity);
 	}
@@ -1221,12 +1306,40 @@ void GameScene::Draw() {
 	auto peView = registry_.view<ParticleEmitterComponent>();
 	peView.each([&](auto entity, ParticleEmitterComponent& pe) {
 		if (pe.enabled) {
-			// ★追加: 簡易カリング判定
+			// ★ステップ2: パーティクルの正確なカリング判定
 			if (auto* tc = registry_.try_get<TransformComponent>(entity)) {
 				Engine::Matrix4x4 world = GetWorldMatrix(static_cast<int>(entity));
-				float radius = 40.0f; // パーティクルの広がりをカバーする半径
+				
+				// スケールから実際の広がりを推定
+				float scaleX = std::sqrt(world.m[0][0]*world.m[0][0] + world.m[0][1]*world.m[0][1] + world.m[0][2]*world.m[0][2]);
+				float scaleY = std::sqrt(world.m[1][0]*world.m[1][0] + world.m[1][1]*world.m[1][1] + world.m[1][2]*world.m[1][2]);
+				float scaleZ = std::sqrt(world.m[2][0]*world.m[2][0] + world.m[2][1]*world.m[2][1] + world.m[2][2]*world.m[2][2]);
+				float maxScale = std::max({scaleX, scaleY, scaleZ});
+
+				// パラメータ（寿命と速度）から最大飛距離を計算して正確な半径を作成
+				float maxVelMag = std::abs(pe.emitter.params.startVelocity.x) + std::abs(pe.emitter.params.startVelocity.y) + std::abs(pe.emitter.params.startVelocity.z) +
+								  std::abs(pe.emitter.params.velocityVariance.x) + std::abs(pe.emitter.params.velocityVariance.y) + std::abs(pe.emitter.params.velocityVariance.z);
+				float maxLife = pe.emitter.params.lifeTime + pe.emitter.params.lifeTimeVariance;
+				float maxDist = maxVelMag * maxLife;
+				
+				// スケールと初速度を掛け合わせた正確な半径（最低5.0は確保）
+				float radius = std::max(5.0f, maxDist) * maxScale * 1.5f; 
+				if (radius > 150.0f) radius = 150.0f; // 異常な値へのセーフティ
+
 				if (!pFrustum.IntersectsLocalAABB(world, {-radius, -radius, -radius}, {radius, radius, radius})) {
-					return; // カメラ範囲外なら描画をスキップ (GPUフィルレートを大幅に節約)
+					return; // カメラ範囲外なら描画をスキップ 
+				}
+
+				// 距離ベース描画スキップ (極端に遠すぎる小さなエフェクトは描画自体をサボる)
+				Engine::Vector3 camPos = camera_.GetPosition();
+				Engine::Vector3 emitterPos = {world.m[3][0], world.m[3][1], world.m[3][2]};
+				float distSq = (emitterPos.x - camPos.x)*(emitterPos.x - camPos.x) + 
+				               (emitterPos.y - camPos.y)*(emitterPos.y - camPos.y) + 
+				               (emitterPos.z - camPos.z)*(emitterPos.z - camPos.z);
+				
+				// 距離が80以上 (80*80 = 6400) 離れていて、かつ小規模なエフェクトなら描画しない
+				if (distSq > 6400.0f && radius < 20.0f) {
+					return;
 				}
 			}
 			pe.emitter.Draw(camera_);
