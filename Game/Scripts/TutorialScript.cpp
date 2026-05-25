@@ -79,7 +79,7 @@ const std::unordered_map<TutorialScript::TutorialStep, std::vector<std::string>>
         "防衛の準備が整いました。いよいよ戦闘フェーズへ移行します。",
         "[SPACE]キーを押して、戦闘を開始しましょう！"
     }},
-    { TutorialScript::TutorialStep::Step12_PlayerAttack, {
+    { TutorialScript::TutorialStep::Step12_PlayerAttack, {//nextTimerの時間を参照して、数行に分けて表示する
         "戦闘フェーズが始まりました！プレイヤー自身も攻撃が可能です。",
         "マウス左クリックで通常射撃を行い、Eキーで強力なスキル攻撃を放ちます。",
         "敵を倒してみましょう！[SPACE]キーで進みます。"
@@ -88,9 +88,9 @@ const std::unordered_map<TutorialScript::TutorialStep, std::vector<std::string>>
         "さあ、やってくる敵を大砲とプレイヤーの攻撃で全て撃退しましょう！"
     }},
     { TutorialScript::TutorialStep::Step14_SkillTree, {
-        "敵を倒してレベルアップしました！能力を強化しましょう。\nNキーを押してスキルツリーを開いてください。",
-        "スキルツリーが開きました。矢印キーか画面端のボタンでページを切り替えて、好きなスキルを1つ強化してください。",
-        "強化が完了しました！",
+        "敵を倒してレベルアップしました！能力を強化しましょう。\nNキーを押してスキルツリーを開いてください。", // Nを押すと次の行に進む
+        "スキルツリーが開きました。矢印キーか画面端のボタンでページを切り替えて、好きなスキルを1つ強化してください。",//強化すると進む
+        "強化が完了しました！",//Nで閉じると進む
         "これでチュートリアルは終了ですが、ゲームはここからが本番です！"
     }},
     { TutorialScript::TutorialStep::Step15_EndExplanation, {
@@ -278,7 +278,7 @@ void TutorialScript::EnterStep(TutorialStep step) {
         skillTree_.Close(nullptr);
     }
 
-    if (step == TutorialStep::Step11_BattleTransition || step == TutorialStep::Step12_PlayerAttack || step == TutorialStep::Step13_CombatPlay || step == TutorialStep::Step17_FreePlayBattle) {
+    if (step == TutorialStep::Step12_PlayerAttack || step == TutorialStep::Step13_CombatPlay || step == TutorialStep::Step17_FreePlayBattle) {
         RequestPhaseChange(PhaseSystemScript::BattlePhase);
     } else {
         RequestPhaseChange(PhaseSystemScript::PreparationPhase);
@@ -584,7 +584,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
         }
     }
 
-    // Text progression by SPACE key
+     // Text progression by SPACE key
     auto textIt = kTutorialTexts.find(tutorialStep_);
     if (textIt != kTutorialTexts.end()) {
         const auto& lines = textIt->second;
@@ -593,6 +593,9 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
                 if (step10_placedExtraTank_ && step10_deletedTank_ && currentLineIndex_ == 2) {
                     EnterStep(TutorialStep::Step11_BattleTransition);
                 }
+            }
+            else if (tutorialStep_ == TutorialStep::Step12_PlayerAttack) {
+                // Step12はSPACEキーに反応しない（自動的に3秒後に進む）
             }
             else if (tutorialStep_ == TutorialStep::Step14_SkillTree) {
                 if (step14_upgraded_ && currentLineIndex_ == 3) {
@@ -740,13 +743,22 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
         }
         break;
 
-    case TutorialStep::Step12_PlayerAttack:
-        // 3秒で自動的にStep13に進む
+    case TutorialStep::Step12_PlayerAttack: {
+        // 3秒ごとに説明文の行を進める
         autoProceedTimer_ += dt;
-        if (autoProceedTimer_ >= 3.0f) {
-            EnterStep(TutorialStep::Step13_CombatPlay);
+        if (autoProceedTimer_ >= nextTimer_) {
+            autoProceedTimer_ = 0.0f;
+            const auto& lines = kTutorialTexts.at(tutorialStep_);
+            if (currentLineIndex_ < static_cast<int>(lines.size()) - 1) {
+                // 次の行へ進む
+                currentLineIndex_++;
+            } else {
+                // すべての行が終わったのでStep13へ進む
+                EnterStep(TutorialStep::Step13_CombatPlay);
+            }
         }
         break;
+    }
 
     case TutorialStep::Step13_CombatPlay:
         if (phaseState_ == PhaseSystemScript::BattlePhase) {

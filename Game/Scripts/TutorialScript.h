@@ -108,6 +108,8 @@ private:
 
 	// 削除モード
 	bool isSellMode_ = false;
+
+	float nextTimer_ = 3.0f; // 自動で次のステップに進むまでの時間（秒）
 };
 
 } // namespace Game
