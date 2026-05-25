@@ -64,7 +64,7 @@ void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
 		float frozenTimer = vc.GetValue("FrozenTimer", 0.0f);
 		if (frozenTimer > 0.0f) {
 
-			frozenTimeSpeed_ *= 0.3f;
+			//frozenTimeSpeed_ *= 0.3f;
 		}
 		if (frozenTimer > 0.0f) {
 			vc.SetValue("FrozenTimer", frozenTimer - dt);
