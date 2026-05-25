@@ -740,8 +740,24 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float /*dt*/)
         break;
 
     case TutorialStep::Step13_CombatPlay:
-        if (phaseState_ == PhaseSystemScript::PreparationPhase) {
-            EnterStep(TutorialStep::Step14_SkillTree);
+        if (phaseState_ == PhaseSystemScript::BattlePhase) {
+            // Check if all enemies are defeated
+            auto waveManagerEntity = WaveManagement::GetManagerEntity();
+            if (scene->GetRegistry().valid(waveManagerEntity)) {
+                if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(waveManagerEntity)) {
+                    for (auto& entry : sc->scripts) {
+                        if (entry.scriptPath == "WaveManagement" && entry.instance) {
+                            auto* wm = static_cast<WaveManagement*>(entry.instance.get());
+                            int remainingEnemies = wm->GetTotalRemainingEnemies(scene);
+                            if (remainingEnemies <= 0) {
+                                // All enemies defeated, transition to preparation phase
+                                EnterStep(TutorialStep::Step14_SkillTree);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
         }
         break;
 
