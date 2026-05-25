@@ -229,12 +229,20 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 		bulletTransform.translate.x += std::cos(angle) * flowerRadius;
 		bulletTransform.translate.z += std::sin(angle) * flowerRadius;
 
-		float directionX = std::cos(angle);
-		float directionZ = std::sin(angle);
+	     float targetDirectionX = targetTransform.translate.x - bulletTransform.translate.x;
+		float targetDirectionY = targetTransform.translate.y - bulletTransform.translate.y;
+		float targetDirectionZ = targetTransform.translate.z - bulletTransform.translate.z;
 
+		float targetYaw = std::atan2(targetDirectionX, targetDirectionZ);
+
+		float targetLengthXZ = std::sqrt(targetDirectionX * targetDirectionX + targetDirectionZ * targetDirectionZ);
+
+		float targetPitch = std::atan2(-targetDirectionY, targetLengthXZ);
+
+		bulletTransform.rotate.y = targetYaw;
+		bulletTransform.rotate.x = targetPitch;
 		bulletTransform.rotate = canonTransform.rotate;
-		bulletTransform.rotate.y = std::atan2(directionX, directionZ);
-		bulletTransform.rotate.x = -0.35f;
+		
 
 		bulletTransform.scale = {0.3f, 0.3f, 0.3f};
 
