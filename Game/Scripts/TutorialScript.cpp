@@ -552,7 +552,7 @@ void TutorialScript::UpdateSellMode(GameScene* scene) {
 }
 
 // 毎フレームの更新処理。チュートリアルのステップ進行判定やキー入力の処理を一括して行う
-void TutorialScript::Update(entt::entity entity, GameScene* scene, float /*dt*/) {
+void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
     auto* input = Engine::Input::GetInstance();
     if (!scene || !input)
         return;
@@ -737,6 +737,14 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float /*dt*/)
     case TutorialStep::Step11_BattleTransition:
         if (keySpace && currentLineIndex_ == static_cast<int>(kTutorialTexts.at(tutorialStep_).size()) - 1) {
             EnterStep(TutorialStep::Step12_PlayerAttack);
+        }
+        break;
+
+    case TutorialStep::Step12_PlayerAttack:
+        // 3秒で自動的にStep13に進む
+        autoProceedTimer_ += dt;
+        if (autoProceedTimer_ >= 3.0f) {
+            EnterStep(TutorialStep::Step13_CombatPlay);
         }
         break;
 
