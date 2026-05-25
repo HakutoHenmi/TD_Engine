@@ -595,7 +595,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float /*dt*/)
                 }
             }
             else if (tutorialStep_ == TutorialStep::Step14_SkillTree) {
-                if (step14_pageSwitched_ && step14_upgraded_ && currentLineIndex_ == 2) {
+                if (step14_upgraded_ && currentLineIndex_ == 3) {
                     EnterStep(TutorialStep::Step15_EndExplanation);
                 }
             }
@@ -770,8 +770,12 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float /*dt*/)
         UpdateSkillTree(entity, scene, keyNTrigger);
 
         if (!skillTree_.IsOpen()) {
-            // SkillTree が閉じられた
-            currentLineIndex_ = 3;
+            // SkillTree が閉じられた場合、スキルが強化されていれば行4に進む
+            if (step14_upgraded_) {
+                currentLineIndex_ = 3;
+            } else {
+                currentLineIndex_ = 0;
+            }
         } else {
             // SkillTree が開いている
             if (input->IsMouseTrigger(0)) {
