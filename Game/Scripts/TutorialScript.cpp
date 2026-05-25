@@ -34,24 +34,24 @@ namespace {
 // 簡単に文言や行数を変更できます。SPACEキーで次の行に進みます。
 const std::unordered_map<TutorialScript::TutorialStep, std::vector<std::string>> kTutorialTexts = {
     { TutorialScript::TutorialStep::Step1_Greeting, {
-        "こんにちは！このゲームのチュートリアルへようこそ。",
+        "こんにちは！\nこのゲームのチュートリアルへようこそ。",
         "防衛戦の基本を説明します。[SPACE]キーで読み進めてください。",
     }},
     { TutorialScript::TutorialStep::Step2_CoreIntro, {
-        "まずはこちら、青い『コア』です。敵はこれを破壊しにきます。",
+        "まずはこちら、\n青い『コア』です。敵はこれを破壊しにきます。",
         "コアを守り切ることがあなたの目的です。[SPACE]キーで進みます。"
     }},
     { TutorialScript::TutorialStep::Step3_SpawnerIntro, {
-        "次に、あちらに見えるのが『敵のスポナー』です。",
-        "戦闘フェーズになると、ここから敵が出現します。[SPACE]キーで進みます。"
+        "次に、あちらに見えるのが\n『敵のスポナー』です。",
+        "戦闘フェーズになると、\nここから敵が出現します。[SPACE]キーで進みます。"
     }},
     { TutorialScript::TutorialStep::Step4_PhaseIntro, {
-        "このゲームは、『準備フェーズ』と『戦闘フェーズ』を交互に繰り返します。",
-        "準備フェーズで設備を整え、戦闘フェーズで敵を迎撃しましょう。[SPACE]キーで進みます。"
+        "このゲームは、\n『準備フェーズ』と『戦闘フェーズ』を\n交互に繰り返します。",
+        "準備フェーズで設備を整え、\戦闘フェーズで敵を迎撃しましょう。[SPACE]キーで進みます。"
     }},
     { TutorialScript::TutorialStep::Step5_CameraControl, {
         "カメラの操作方法について説明します。",
-        "マウスホイールでズーム、マウス右ドラッグでカメラを回転できます。",
+        "WASDで移動、マウス右ドラッグでカメラを回転できます。",
         "操作を確認したら、[SPACE]キーで次へ進みましょう。"
     }},
     { TutorialScript::TutorialStep::Step6_FacilityIntro, {

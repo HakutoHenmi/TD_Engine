@@ -162,7 +162,7 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 			auto step = tutorial->GetCurrentStep();
 
 			// ステップごとに許可するボタンを限定
-			if (step >= TutorialScript::TutorialStep::Step1_Greeting && step <= TutorialScript::TutorialStep::Step15_EndExplanation) {
+			if (step >= TutorialScript::TutorialStep::Step1_Greeting && step < TutorialScript::TutorialStep::Step15_EndExplanation) {
 				enabled = false; // 基本はすべて非表示
 
 				if (step == TutorialScript::TutorialStep::Step7_CannonInstall) {
