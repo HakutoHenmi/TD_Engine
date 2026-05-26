@@ -221,12 +221,14 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			// Nキーでスキルツリーの開閉
 			if (keyN && !preKeyN_) {
 				skillTree_.Toggle(scene);
+				
+
 			}
 
 			// スキルツリーが開いている間はスキルツリーの更新のみ
 			if (skillTree_.IsOpen()) {
 				SetVar(entity, scene, "IsSkillTreeOpen", 1.0f);
-
+				PhaseSystemScript::isSkillTreeOpen_ = true;
 				float mx = 0.0f;
 				float my = 0.0f;
 				float tW = (float)Engine::WindowDX::kW;
@@ -253,7 +255,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				preKeyN_ = keyN;
 				return;
 			}
-
+			PhaseSystemScript::isSkillTreeOpen_ = false;
 			SetVar(entity, scene, "IsSkillTreeOpen", 0.0f);
 		}
 
