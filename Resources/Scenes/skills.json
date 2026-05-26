@@ -433,7 +433,7 @@
       "unlocked": false,
       "gridX": 0.0,
       "gridY": 2.0,
-      "description": "銃の攻撃力がさらに上がります。",
+      "description": "プレイヤーのバフ範囲が広がります",
       "pageId": 4
     },
     {

@@ -571,6 +571,8 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 	float playerSwordSkillAttackPowerRate = 1.0f;
 	float playerGunSkillAttackPowerRate = 1.0f;
 
+	float buffRadiusRate = 1.0f;
+
 	if (IsSkillUnlocked(401)) {
 		playerGunAttackPowerRate *= 1.20f;
 	}
@@ -587,7 +589,7 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 	}
 
 	if (IsSkillUnlocked(404)) {
-		playerGunAttackPowerRate *= 1.25f;
+		buffRadiusRate *= 1.5f;
 	}
 
 	if (IsSkillUnlocked(405)) {
@@ -649,6 +651,7 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 	SetVar(entity, scene, "PlayerSwordSkillAttackPowerRate", playerSwordSkillAttackPowerRate);
 	SetVar(entity, scene, "PlayerGunSkillAttackPowerRate", playerGunSkillAttackPowerRate);
 
+	SetVar(entity, scene, "PlayerBuffRangeRate", buffRadiusRate);
 	// canon
 	SetVar(entity, scene, "AttackPowerRateCanon", attackPowerRateCanon);
 	SetVar(entity, scene, "AttackSpeedRateCanon", attackSpeedRateCanon);
