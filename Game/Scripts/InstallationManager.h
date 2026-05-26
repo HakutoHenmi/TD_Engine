@@ -37,7 +37,8 @@ public:
 	static bool IsManagedButton(entt::entity entity);
 
 private:
-
+	uint32_t panelTexture_;
+	entt::entity descriptionTextEntity_ = entt::null;
 	GameScene* currentScene_ = nullptr;
 	ButtonData buttons_[5];
 	int currentPage_ = 0;
