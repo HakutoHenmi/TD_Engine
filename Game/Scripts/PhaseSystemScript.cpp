@@ -111,9 +111,7 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 		preIsPhase_ = PreparationPhase;
 	}
 
-	if (scene->GetRegistry().all_of<UITextComponent>(entity))
-		scene->GetRegistry().get<UITextComponent>(entity).text = std::to_string(CoinCount);
-
+	
 	currentPhase_ = 0;
 	CoinCount = StartCoinCount_;
 
@@ -164,6 +162,9 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 			isSellMode_ = false;
 		} catch (...) {}
 	});
+
+	if (scene->GetRegistry().all_of<UITextComponent>(entity))
+		scene->GetRegistry().get<UITextComponent>(entity).text = std::to_string(CoinCount);
 }
 
 void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) {
