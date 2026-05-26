@@ -8,6 +8,7 @@
 #include "Scenes/GameScene.h"
 
 #include "../PhaseSystemScript.h"
+#include "../TutorialScript.h"
 
 namespace Game {
 
@@ -56,6 +57,9 @@ void BaseEnemy::Start(entt::entity entity, GameScene* scene) {
 }
 
 void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
+	if (auto* tutorial = TutorialScript::GetInstance(); tutorial && tutorial->IsEnemyTimeStopped()) {
+		return;
+	}
 	auto& registry = scene->GetRegistry();
 
 	// --- 凍結状態時のビジュアル＆冷気エフェクト ---

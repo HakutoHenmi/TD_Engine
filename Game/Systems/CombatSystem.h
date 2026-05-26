@@ -3,6 +3,7 @@
 #include "../Engine/Time/TimeManager.h" 
 #include "../Engine/QuadTree.h"
 #include "../Scripts/HitDistortionScript.h"
+#include "../Scripts/TutorialScript.h"
 #include "GameScene.h"
 
 namespace Game {
@@ -108,6 +109,10 @@ public:
 					if (aTag == TagType::EnemyBullet && dTag == TagType::Enemy) skipDamage = true;
 					// ★ミサイル/弾がCanonタグ（タワー）に当たらないようにする
 					if ((aTag == TagType::Bullet || aTag == TagType::EnemyBullet) && dTag == TagType::Canon) skipDamage = true;
+					// ★タワー（防衛設備）は無敵にする
+					if (dTag == TagType::Canon || dTag == TagType::Cannon || dTag == TagType::IceCanon || dTag == TagType::PipeCannon || dTag == TagType::Defender || dTag == TagType::Missile || dTag == TagType::Poison) {
+						skipDamage = true;
+					}
 					if (skipDamage) continue;
 
 					if (registry.all_of<HealthComponent>(defenderEntity)) {
@@ -143,6 +148,7 @@ public:
 									} else {
 										float overflowDamage = effectiveShieldDamage - hc.shieldHp;
 										hc.shieldHp = 0.0f; // シールド破壊
+										if (auto* tutorial = TutorialScript::GetInstance()) tutorial->IncrementBrokenShieldCount();
 										// 残りのダメージを本体用の係数に変換して適用
 										damageToApply = (overflowDamage / shieldDamageRate) * hpDamageRate;
 									}

@@ -8,9 +8,11 @@
 #include <filesystem>
 #include <shellapi.h>
 #include <string>
+#include <mmsystem.h> // ★追加: timeBeginPeriod用
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "winmm.lib") // ★追加
 
 // ImGuiのメッセージハンドラ
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -86,6 +88,9 @@ bool WindowDX::Initialize(HINSTANCE hInst, int cmdShow, HWND& outHwnd) {
 	if (!InitDX_())
 		return false;
 
+	// ★追加: Sleepの精度を1msにする
+	timeBeginPeriod(1);
+
 	vp_.TopLeftX = 0;
 	vp_.TopLeftY = 0;
 	vp_.Width = (float)kW;
@@ -121,9 +126,9 @@ void WindowDX::EndFrame() {
 	ID3D12CommandList* lists[] = {list_.Get()};
 	que_->ExecuteCommandLists(1, lists);
 
-	// ★VSYNCを有効化 (60FPS固定)
+	// ★VSYNCを無効化（ノートPC環境での強制的な30FPS低下を防ぐため）
 	auto startPresent = std::chrono::high_resolution_clock::now();
-	swap_->Present(1, 0); // 第1引数 1 で垂直同期ON
+	swap_->Present(0, 0); // 第1引数 0 で垂直同期OFF
 	auto endPresent = std::chrono::high_resolution_clock::now();
 	lastPresentMs_ = std::chrono::duration<float, std::milli>(endPresent - startPresent).count();
 
@@ -134,9 +139,25 @@ void WindowDX::EndFrame() {
 
 	fi_ = swap_->GetCurrentBackBufferIndex();
 
-	// ★プログラム側の手動フレームレート制限（空回りループ）は削除し、
-	// swap_->Present(1, 0) によるグラフィックボード側のVSyncに完全に任せる
-	lastFrameTime_ = std::chrono::steady_clock::now();
+	// ★手動フレームレート制限 (60FPS固定)
+	// VSyncがオフの環境（ウィンドウモードなど）でもゲームスピードが速くならないように制御
+	using namespace std::chrono;
+	time_point<steady_clock> targetTime = lastFrameTime_ + microseconds(1000000 / 60);
+	time_point<steady_clock> now = steady_clock::now();
+	
+	if (now < targetTime) {
+		// CPU使用率を下げるためのSleep
+		auto sleepMs = duration_cast<milliseconds>(targetTime - now).count() - 1;
+		if (sleepMs > 0) {
+			Sleep(static_cast<DWORD>(sleepMs));
+		}
+		// 残りのわずかな時間はスピンロックで高精度に待機
+		while (steady_clock::now() < targetTime) {
+			std::this_thread::yield();
+		}
+	}
+	
+	lastFrameTime_ = steady_clock::now();
 }
 
 void WindowDX::WaitGPU() {
@@ -192,6 +213,8 @@ void WindowDX::Shutdown() {
 		CloseHandle(fev_);
 		fev_ = nullptr;
 	}
+
+	timeEndPeriod(1); // ★追加: タイマー精度の復元
 
 	depth_.Reset();
 	for (auto& b : back_)

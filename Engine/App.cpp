@@ -112,6 +112,8 @@ void App::Run() {
 
 void App::Shutdown() {
 	Logger::Log("App shutdown.");
+	dx_.WaitIdle(); // ★追加: シャットダウン処理の一番最初でGPUの完了を待つ
+
 	Logger::Shutdown();
 	JobSystem::Shutdown();
 #ifdef USE_IMGUI
@@ -119,7 +121,6 @@ void App::Shutdown() {
 #endif
 	audio_.Shutdown();
 	input_.Shutdown();
-	dx_.WaitIdle();
 	dx_.Shutdown();
 }
 

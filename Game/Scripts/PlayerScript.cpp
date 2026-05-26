@@ -10,6 +10,7 @@
 #include "PhaseSystemScript.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
+#include "TutorialScript.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -389,6 +390,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 
 	bool hasPhaseSystem = false;
+	entt::entity gmEntity = entt::null;
 	{
 		auto scView = scene->GetRegistry().view<ScriptComponent>();
 		for (auto e : scView) {
@@ -396,6 +398,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			for (auto& entry : sc.scripts) {
 				if (entry.scriptPath == "PhaseSystemScript" || entry.scriptPath == "TutorialScript") {
 					hasPhaseSystem = true;
+					gmEntity = e;
 					break;
 				}
 			}
@@ -413,33 +416,38 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	// ★追加: 設備へのバフ効果範囲の視覚化
 	auto* renderer = scene->GetRenderer();
 	if (renderer && scene->GetRegistry().all_of<TransformComponent>(entity)) {
-		auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
-		const int segments = 48;
-		for (int i = 0; i < segments; ++i) {
-			float theta1 = (2.0f * 3.14159265f * i) / segments;
-			float theta2 = (2.0f * 3.14159265f * (i + 1)) / segments;
-			Engine::Vector3 p1 = {pTc.translate.x + currentBuffRadius * std::cos(theta1), pTc.translate.y + 0.15f, pTc.translate.z + currentBuffRadius * std::sin(theta1)};
-			Engine::Vector3 p2 = {pTc.translate.x + currentBuffRadius * std::cos(theta2), pTc.translate.y + 0.15f, pTc.translate.z + currentBuffRadius * std::sin(theta2)};
-			// 発光する黄緑色のラインでオーラ範囲を描画
-			renderer->DrawLine3D(p1, p2, {0.6f, 1.0f, 0.2f, 1.0f}, true);
+		bool showAura = true;
+		if (auto* tutorial = TutorialScript::GetInstance(); tutorial && !tutorial->IsAuraEnabled()) {
+			showAura = false;
 		}
 
-		// ★追加: バフ中のタワーへのエネルギー線を描画 (案1)
-		auto viewBuff = scene->GetRegistry().view<BuffComponent, TransformComponent>();
-		for (auto e : viewBuff) {
-			auto& buff = viewBuff.get<BuffComponent>(e);
-			if (buff.isBuffed) {
-				auto& tTc = viewBuff.get<TransformComponent>(e);
-				// プレイヤーの胸辺りからタワーの少し高めの位置へ線を引く
-				Engine::Vector3 pCenter = {pTc.translate.x, pTc.translate.y + 1.0f, pTc.translate.z};
-				Engine::Vector3 tCenter = {tTc.translate.x, tTc.translate.y + 1.5f, tTc.translate.z};
+		if (showAura) {
+			auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
+			const int segments = 48;
+			for (int i = 0; i < segments; ++i) {
+				float theta1 = (2.0f * 3.14159265f * i) / segments;
+				float theta2 = (2.0f * 3.14159265f * (i + 1)) / segments;
+				Engine::Vector3 p1 = {pTc.translate.x + buffRadius_ * std::cos(theta1), pTc.translate.y + 0.15f, pTc.translate.z + buffRadius_ * std::sin(theta1)};
+				Engine::Vector3 p2 = {pTc.translate.x + buffRadius_ * std::cos(theta2), pTc.translate.y + 0.15f, pTc.translate.z + buffRadius_ * std::sin(theta2)};
+				// 発光する黄緑色のラインでオーラ範囲を描画
+				renderer->DrawLine3D(p1, p2, {0.6f, 1.0f, 0.2f, 1.0f}, true);
+			}
 
-				// 少し線を太く/光って見せるため、微小なオフセットをつけて複数本描画
-				renderer->DrawLine3D(pCenter, tCenter, {0.5f, 1.0f, 0.2f, 1.0f}, true);
-				Engine::Vector3 o1 = {tCenter.x + 0.05f, tCenter.y, tCenter.z + 0.05f};
-				renderer->DrawLine3D(pCenter, o1, {0.5f, 1.0f, 0.2f, 0.6f}, true);
-				Engine::Vector3 o2 = {tCenter.x - 0.05f, tCenter.y, tCenter.z - 0.05f};
-				renderer->DrawLine3D(pCenter, o2, {0.5f, 1.0f, 0.2f, 0.6f}, true);
+			// ★追加: バフ中のタワーへのエネルギー線を描画 (案1)
+			auto viewBuff = scene->GetRegistry().view<BuffComponent, TransformComponent>();
+			for (auto [e, buff, tTc] : viewBuff.each()) {
+				if (buff.isBuffed) {
+					// プレイヤーの胸辺りからタワーの少し高めの位置へ線を引く
+					Engine::Vector3 pCenter = {pTc.translate.x, pTc.translate.y + 1.0f, pTc.translate.z};
+					Engine::Vector3 tCenter = {tTc.translate.x, tTc.translate.y + 1.5f, tTc.translate.z};
+					
+					// 少し線を太く/光って見せるため、微小なオフセットをつけて複数本描画
+					renderer->DrawLine3D(pCenter, tCenter, {0.5f, 1.0f, 0.2f, 1.0f}, true);
+					Engine::Vector3 o1 = {tCenter.x + 0.05f, tCenter.y, tCenter.z + 0.05f};
+					renderer->DrawLine3D(pCenter, o1, {0.5f, 1.0f, 0.2f, 0.6f}, true);
+					Engine::Vector3 o2 = {tCenter.x - 0.05f, tCenter.y, tCenter.z - 0.05f};
+					renderer->DrawLine3D(pCenter, o2, {0.5f, 1.0f, 0.2f, 0.6f}, true);
+				}
 			}
 		}
 	}
@@ -1023,8 +1031,13 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			uiRenderer->DrawString(textBuf, gaugeX + 30.0f + 2.0f, gaugeY + gaugeH + 10.0f + 2.0f, 0.5f, {0, 0, 0, 1});
 			uiRenderer->DrawString(textBuf, gaugeX + 30.0f, gaugeY + gaugeH + 10.0f, 0.5f, {1, 1, 1, 1});
 
+			float isSkillTreeOpen = 0.0f;
+			if (gmEntity != entt::null) {
+				isSkillTreeOpen = GetVar(gmEntity, scene, "IsSkillTreeOpen", 0.0f);
+			}
+
 			// ==== ★追加: ロックオンレティクル & 銃レティクル ====
-			if (playerType_ == PlayerType::Gun) {
+			if (playerType_ == PlayerType::Gun && isSkillTreeOpen < 0.5f && !isCursorVisible_) {
 				DrawReticle(entity, scene);
 			} else if (scene && scene->GetRegistry().all_of<CameraTargetComponent>(entity)) {
 				auto& ct = scene->GetRegistry().get<CameraTargetComponent>(entity);
@@ -1174,6 +1187,16 @@ void PlayerScript::UpdateMovement(entt::entity entity, GameScene* scene, float /
 	if (!scene->GetRegistry().all_of<PlayerInputComponent>(entity))
 		return;
 	auto& input = scene->GetRegistry().get<PlayerInputComponent>(entity);
+
+	entt::entity gmEntity = scene->FindObjectByName("GameManager");
+	if (gmEntity != entt::null) {
+		float isLevelUpPhase = GetVar(gmEntity, scene, "IsLevelUpPhase", 0.0f);
+		if (isLevelUpPhase > 0.5f) {
+			input.moveDir.x = 0.0f;
+			input.moveDir.y = 0.0f;
+			return;
+		}
+	}
 
 	if (gunComboAnimTimer_ > 0.0f) {
 		input.moveDir.x = 0.0f;

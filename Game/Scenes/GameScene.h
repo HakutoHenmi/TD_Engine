@@ -54,6 +54,7 @@ public:
 	void SetIsPlaying(bool play);
 	const std::string& GetSceneSnapshot() const { return sceneSnapshot_; } // ★追加: プレイ開始時のクリーンな状態を取得
 	Engine::Renderer* GetRenderer() const { return renderer_; }
+	Engine::WindowDX* GetWindow() const { return dx_; }
 	Engine::Matrix4x4 GetWorldMatrix(int index) const; 
 	Engine::Matrix4x4 GetWorldMatrixRecursive(entt::entity entity, int depth) const;
 	Engine::Camera& GetCamera() { return camera_; }

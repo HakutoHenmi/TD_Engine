@@ -3,6 +3,7 @@
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
 #include "ScriptUtils.h"
+#include "TutorialScript.h"
 
 #include <cmath>
 #include <unordered_set>
@@ -149,19 +150,25 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 
 		auto players = scene->GetEntitiesByTag(TagType::Player);
 		if (!players.empty() && registry.valid(players[0])) {
-			if (registry.all_of<TransformComponent>(players[0])) {
-				auto& pTrans = registry.get<TransformComponent>(players[0]);
-				auto& cTrans = registry.get<TransformComponent>(entity);
-				float dx = pTrans.translate.x - cTrans.translate.x;
-				float dy = pTrans.translate.y - cTrans.translate.y;
-				float dz = pTrans.translate.z - cTrans.translate.z;
-				float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+			bool auraEnabled = true;
+			if (auto* tutorial = TutorialScript::GetInstance(); tutorial && !tutorial->IsAuraEnabled()) {
+				auraEnabled = false;
+			}
+			if (auraEnabled) {
+				if (registry.all_of<TransformComponent>(players[0])) {
+					auto& pTrans = registry.get<TransformComponent>(players[0]);
+					auto& cTrans = registry.get<TransformComponent>(entity);
+					float dx = pTrans.translate.x - cTrans.translate.x;
+					float dy = pTrans.translate.y - cTrans.translate.y;
+					float dz = pTrans.translate.z - cTrans.translate.z;
+					float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
 
-				if (dist <= buff.buffRadius) {
-					buff.isBuffed = true;
-					// アイスキャノンのバフ効果：弾数増加、フリーズ時間延長
-					bulletCount += 3;
-					currentStopTime *= 1.5f;
+					if (dist <= buff.buffRadius) {
+						buff.isBuffed = true;
+						// アイスキャノンのバフ効果：弾数増加、フリーズ時間延長
+						bulletCount += 3;
+						currentStopTime *= 1.5f;
+					}
 				}
 			}
 		}

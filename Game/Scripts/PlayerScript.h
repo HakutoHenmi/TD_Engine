@@ -19,6 +19,9 @@ public:
 	void DrawUI(entt::entity entity, GameScene* scene) override;
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
 
+	enum class PlayerType { Sword, Gun };
+	PlayerType GetPlayerType() const { return playerType_; }
+
 private:
 	float speed_ = 7.0f; // ★復元: 5.0f -> 7.0f (快適な機動力へ)
 	float jumpPower_ = 15.0f;
@@ -30,7 +33,6 @@ private:
 	SheatheState sheatheState_ = SheatheState::Back;
 
 	// ★追加: プレイヤータイプと銃関連
-	enum class PlayerType { Sword, Gun };
 	PlayerType playerType_ = PlayerType::Sword;
 	bool isAiming_ = false;
 	float skillCooldown_ = 0.0f;
