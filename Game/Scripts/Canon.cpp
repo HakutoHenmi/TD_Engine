@@ -191,16 +191,32 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 		currentTarget_ = entt::null;
 	}
 	if (currentTarget_ != entt::null) {
-		TransformComponent& currentTargetTransform = registry.get<TransformComponent>(currentTarget_);
 
-		float diffX = currentTargetTransform.translate.x - canonTransform.translate.x;
-		float diffY = currentTargetTransform.translate.y - canonTransform.translate.y;
-		float diffZ = currentTargetTransform.translate.z - canonTransform.translate.z;
-
-		float distanceToCurrentTarget = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
-
-		if (distanceToCurrentTarget > currentRange) {
+		if (!registry.valid(currentTarget_)) {
 			currentTarget_ = entt::null;
+		}
+
+		if (currentTarget_ != entt::null) {
+			if (!registry.all_of<TransformComponent>(currentTarget_)) {
+				currentTarget_ = entt::null;
+			}
+		}
+
+		if (currentTarget_ != entt::null) {
+
+			TransformComponent& currentTargetTransform = registry.get<TransformComponent>(currentTarget_);
+
+			float diffX = currentTargetTransform.translate.x - canonTransform.translate.x;
+
+			float diffY = currentTargetTransform.translate.y - canonTransform.translate.y;
+
+			float diffZ = currentTargetTransform.translate.z - canonTransform.translate.z;
+
+			float distanceToCurrentTarget = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
+
+			if (distanceToCurrentTarget > currentRange) {
+				currentTarget_ = entt::null;
+			}
 		}
 	}
 	if (currentTarget_ == entt::null) {
@@ -366,7 +382,18 @@ if (attackTimer_ > 0.0f) {
 	// 地面が光る演出（PointLightComponent）は完全に削除しました。
 }
 
-void Canon::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
+void Canon::OnDestroy(entt::entity entity, GameScene* scene) {
+	(void)entity; // 未使用警告回避baws
+	if (!scene) {
+		return;
+	}
+
+	entt::registry& registry = scene->GetRegistry();
+
+	if (registry.valid(baseEntity_)) {
+		registry.destroy(baseEntity_);
+	}
+}
 
 void Canon::OnEditorUI() {
 #if defined(USE_IMGUI) && !defined(NDEBUG)
