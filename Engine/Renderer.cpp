@@ -952,6 +952,10 @@ void Renderer::EndFrame() {
 			// フォグ色
 			float fogColorR, fogColorG, fogColorB;
 			float pad0;
+			// モードボーダー
+			float prepModeBorder;
+			float deleteModeBorder;
+			float pad1[2];
 		};
 #ifdef _MSC_VER
 #pragma warning(pop)
@@ -979,6 +983,8 @@ void Renderer::EndFrame() {
 		cb.fogColorR = ppParams_.fogColor.x;
 		cb.fogColorG = ppParams_.fogColor.y;
 		cb.fogColorB = ppParams_.fogColor.z;
+		cb.prepModeBorder = ppParams_.prepModeBorder;
+		cb.deleteModeBorder = ppParams_.deleteModeBorder;
 
 		const uint32_t off = upload_[fi].Allocate(sizeof(CBPost), 256);
 		if (off != UINT32_MAX) {
@@ -2680,12 +2686,12 @@ void Renderer::DrawSkinnedMesh(MeshHandle meshH, TextureHandle texH, const Matri
 }
 
 void Renderer::DrawSprite(TextureHandle texH, const SpriteDesc& s) {
-	if (texH == 0 || texH >= textures_.size()) return;
+	if (texH >= textures_.size()) return;
 	spriteDrawCalls_.push_back({ texH, s });
 }
 
 void Renderer::DrawSpriteAdditive(TextureHandle texH, const SpriteDesc& s) {
-	if (texH == 0 || texH >= textures_.size()) return;
+	if (texH >= textures_.size()) return;
 	SpriteDesc additiveDesc = s;
 	additiveDesc.additive = true;
 	spriteDrawCalls_.push_back({ texH, additiveDesc });

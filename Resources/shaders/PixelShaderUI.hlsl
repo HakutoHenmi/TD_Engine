@@ -189,11 +189,20 @@ float4 mainPS(PSIn i) : SV_TARGET
         return sparkCol;
     }
 
-    // 左から右へのプログレス(クリッピング)処理
+    // プログレス(クリッピング)処理
     if (uProgress >= 0.0 && uProgress <= 1.0) {
-        float width = (uShape == 0) ? uSizePx.x : uSizePx.x * 2.0;
-        float t = (p.x + width * 0.5) / width;
-        innerMask *= step(t, uProgress);
+        if (uShape == 1 || uShape == 2) {
+            // 円・三日月の場合は扇形(角度)クリッピング (上から時計回り)
+            float angle = atan2(p.x, -p.y);
+            if (angle < 0.0) angle += 6.283185307f;
+            float t = angle / 6.283185307f;
+            innerMask *= step(t, uProgress);
+        } else {
+            // 左から右への直線プログレス
+            float width = (uShape == 0) ? uSizePx.x : uSizePx.x * 2.0;
+            float t = (p.x + width * 0.5) / width;
+            innerMask *= step(t, uProgress);
+        }
     }
 
     return drawLineGlow(d, uLineWidth, uGlow, uColor, innerMask, uFill);

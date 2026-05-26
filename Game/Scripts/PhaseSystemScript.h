@@ -70,6 +70,7 @@ private:
 	bool isPlacementMode_ = false;
 	bool isPhaseTransitioning_ = false;
 	bool isFadeFinished_ = false;
+	bool isTutorialScene_ = false; // シーンがチュートリアルかどうかを保持するフラグ
 
 	std::string selectedObjPath_ = "Resources/Models/cube/cube.obj";
 	std::string previewModelPath = "";
@@ -102,6 +103,7 @@ private:
 	bool isInsertInitialized_ = false;
 	entt::entity skipPromptUI_ = entt::null;
 	entt::entity skipProgressUI_ = entt::null;
+	entt::entity skipProgressBgUI_ = entt::null;
 	DirectX::XMFLOAT3 originalCameraPos_ = {0.0f, 0.0f, 0.0f};
 	DirectX::XMFLOAT3 originalCameraRot_ = {0.0f, 0.0f, 0.0f};
 
@@ -112,8 +114,13 @@ private:
 	void UpdateSkipUIProgress(GameScene* scene);
 	void EndInsertPhase(GameScene* scene);
 
+	// バトル開始ホールド用
+	float battleStartHoldTime_ = 0.0f;
+
 public:
 	static bool isSkillTreeOpen_; // スキルツリーが開いているかどうかを管理する静的変数
+
+	virtual void DrawUI(entt::entity entity, GameScene* scene) override;
 };
 
 } // namespace Game

@@ -334,17 +334,7 @@ void UISystem::RenderNodeWithRect(entt::entity entity, entt::registry& registry,
 	if (registry.all_of<UIImageComponent>(entity)) {
 		auto& img = registry.get<UIImageComponent>(entity);
 		if (img.enabled) {
-			// ★追加: ボタンの場合は白い枠線を描画
-			if (registry.all_of<UIButtonComponent>(entity)) {
-				Engine::Renderer::SpriteDesc border;
-				border.x = wr.x - 2.0f;
-				border.y = wr.y - 2.0f;
-				border.w = wr.w + 4.0f;
-				border.h = wr.h + 4.0f;
-				border.color = {1.0f, 1.0f, 1.0f, 1.0f};
-				border.layer = img.layer;            // ★追加: レイヤー引き継ぎ
-				ctx.renderer->DrawSprite(0, border); // 0番テクスチャはRenderer初期化時に生成された白色
-			}
+
 
 			DirectX::XMFLOAT4 finalColor = {img.color.x * buttonColor.x, img.color.y * buttonColor.y, img.color.z * buttonColor.z, img.color.w * buttonColor.w};
 			if (img.is9Slice) {

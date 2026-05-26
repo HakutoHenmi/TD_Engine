@@ -7,7 +7,7 @@ cbuffer CBPost : register(b0) {
     float gTime;
     float gNoiseStrength;
     float gDistortion;
-    float gChromaShift;
+    float gDamageVignette; // chromaShift->damageVignette
     float gVignette;
     float gScanline;
     float gSan;
@@ -15,6 +15,29 @@ cbuffer CBPost : register(b0) {
     float gDofFocusDistance;
     float gDofFocusRange;
     float gDofIntensity;
+
+    // フォグパラメータ
+    float gFogDensity;
+    float gFogStart;
+    float gFogEnd;
+    float gFogHeightFalloff;
+
+    // カメラ・FXAA
+    float gNearPlane;
+    float gFarPlane;
+    float gFxaaEnabled;
+    float gExposure;
+
+    // フォグ色
+    float gFogColorR;
+    float gFogColorG;
+    float gFogColorB;
+    float gPad0;
+
+    // モードボーダー
+    float gPrepModeBorder;
+    float gDeleteModeBorder;
+    float2 gPad2;
 };
 
 // 乱数生成
@@ -144,6 +167,30 @@ float4 main(float4 svpos : SV_POSITION, float2 uv : TEXCOORD0) : SV_TARGET {
     float2 centerOffset = uv - 0.5;
     float vig = saturate(1.0 - dot(centerOffset, centerOffset) * 1.2);
     baseColor *= lerp(0.8, 1.0, vig);
+
+    // 6. UIボーダー (準備フェーズ・削除モード用)
+    if (gPrepModeBorder > 0.5) {
+        float borderThickness = 0.015; // 縁の太さ
+        float2 texSize = float2(1920.0, 1080.0);
+        float2 aspect = float2(1.0, texSize.y / texSize.x);
+        
+        float2 absUv = abs(uv - 0.5) * 2.0; 
+        
+        if (absUv.x > 1.0 - borderThickness || absUv.y > 1.0 - borderThickness / aspect.y) {
+            if (gDeleteModeBorder > 0.5) {
+                // 赤いシマシマ模様 (斜め)
+                float stripe = sin((uv.x + uv.y) * 200.0 - gTime * 10.0);
+                if (stripe > 0.0) {
+                    baseColor = float3(1.0, 0.1, 0.1);
+                } else {
+                    baseColor = float3(0.7, 0.05, 0.05);
+                }
+            } else {
+                // 準備フェーズの通常の枠
+                baseColor = float3(0.05, 0.05, 0.08); // 黒っぽい色
+            }
+        }
+    }
 
     return float4(baseColor, 1.0);
 }

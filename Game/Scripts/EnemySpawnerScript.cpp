@@ -133,8 +133,13 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 			break;
 		}
 		case SpawnPattern::Point:
-		default:
+		default: {
+			float rAngle = (static_cast<float>(rand()) / RAND_MAX) * 2.0f * static_cast<float>(M_PI);
+			float rDist = (static_cast<float>(rand()) / RAND_MAX) * 0.5f;
+			spawnPos.x += cosf(rAngle) * rDist;
+			spawnPos.z += sinf(rAngle) * rDist;
 			break;
+		}
 		}
 
 		entt::entity enemy = scene->GetRegistry().create();

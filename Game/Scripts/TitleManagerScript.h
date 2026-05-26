@@ -23,12 +23,13 @@ public:
 
 private:
 	// メニュー状態
-	enum class MenuState { Main, Settings };
+	enum class MenuState { Main, Settings, Credits };
 	MenuState state_ = MenuState::Main;
 
 	// UIエンティティ参照
 	entt::entity btnStart_ = entt::null;
 	entt::entity btnSettings_ = entt::null;
+	entt::entity btnCredits_ = entt::null;
 	entt::entity btnExit_ = entt::null;
 
 	// Settings
@@ -42,8 +43,12 @@ private:
 	entt::entity textBGM_ = entt::null;
 	entt::entity textSE_ = entt::null;
 
+	// Credits
+	entt::entity btnCreditsBack_ = entt::null;
+
 	std::vector<entt::entity> mainEntities_;
 	std::vector<entt::entity> settingsEntities_;
+	std::vector<entt::entity> creditsEntities_;
 
 	bool uiInitialized_ = false;
 };

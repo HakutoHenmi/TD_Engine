@@ -104,6 +104,12 @@ void InstallationManager::Start(entt::entity /*entity*/, GameScene* scene) {
 	text.outlineEnabled = true;
 }
 
+void InstallationManager::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
+	if (instance_ == this) {
+		instance_ = nullptr;
+	}
+}
+
 void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, float dt) {
 	(void)dt;
 	if (!scene)
@@ -145,11 +151,20 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 		btn.pos.y = 400.0f;
 
 		bool isTutorialSoloButton = false;
-		if (auto* tutorial = TutorialScript::GetInstance()) {
-			auto step = tutorial->GetCurrentStep();
-			if (step == TutorialScript::TutorialStep::Step6_CannonInstall ||
-				step == TutorialScript::TutorialStep::Step7_DeleteIntro) {
-				isTutorialSoloButton = true;
+		{
+			bool isTutScene = false;
+			if (scene) {
+				const auto& path = scene->GetStagePath();
+				if (path.find("Tutorial") != std::string::npos || path.find("tutorial") != std::string::npos) isTutScene = true;
+			}
+			if (isTutScene) {
+				if (auto* tutorial = TutorialScript::GetInstance()) {
+					auto step = tutorial->GetCurrentStep();
+					if (step == TutorialScript::TutorialStep::Step6_CannonInstall ||
+						step == TutorialScript::TutorialStep::Step7_DeleteIntro) {
+						isTutorialSoloButton = true;
+					}
+				}
 			}
 		}
 
@@ -179,12 +194,21 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 			}
 			// ★追加: チュートリアルで注目させるボタンを光らせる
 			bool isHighlighted = false;
-			if (auto* tutorial = TutorialScript::GetInstance()) {
-				auto step = tutorial->GetCurrentStep();
-				if (step == TutorialScript::TutorialStep::Step6_CannonInstall && btn.name == "CannonButton") {
-					isHighlighted = true;
-				} else if (step == TutorialScript::TutorialStep::Step7_DeleteIntro && btn.name == "DeleteButton") {
-					isHighlighted = true;
+			{
+				bool isTutScene = false;
+				if (scene) {
+					const auto& path = scene->GetStagePath();
+					if (path.find("Tutorial") != std::string::npos || path.find("tutorial") != std::string::npos) isTutScene = true;
+				}
+				if (isTutScene) {
+					if (auto* tutorial = TutorialScript::GetInstance()) {
+						auto step = tutorial->GetCurrentStep();
+						if (step == TutorialScript::TutorialStep::Step6_CannonInstall && btn.name == "CannonButton") {
+							isHighlighted = true;
+						} else if (step == TutorialScript::TutorialStep::Step7_DeleteIntro && btn.name == "DeleteButton") {
+							isHighlighted = true;
+						}
+					}
 				}
 			}
 
@@ -212,19 +236,28 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 		if (PhaseSystemScript::isSkillTreeOpen_) {
 			enabled = false;
 		}
-		// チュートリアル中の表示制御
-		if (auto* tutorial = TutorialScript::GetInstance()) {
-			auto step = tutorial->GetCurrentStep();
+		// チュートリアル中の表示制御 (チュートリアルシーンでのみ適用)
+		{
+			bool isTutScene = false;
+			if (scene) {
+				const auto& path = scene->GetStagePath();
+				if (path.find("Tutorial") != std::string::npos || path.find("tutorial") != std::string::npos) isTutScene = true;
+			}
+			if (isTutScene) {
+				if (auto* tutorial = TutorialScript::GetInstance()) {
+					auto step = tutorial->GetCurrentStep();
 
-			// ステップごとに許可するボタンを限定
-			if (step >= TutorialScript::TutorialStep::Step1_Greeting && step < TutorialScript::TutorialStep::Step14_EndExplanation) {
-				enabled = false; // 基本はすべて非表示
-				if (step == TutorialScript::TutorialStep::Step6_CannonInstall) {
-					if (btn.prefabPath == "Resources/Prefabs/Canon.prefab") enabled = true;
-				}
-				else if (step == TutorialScript::TutorialStep::Step7_DeleteIntro) {
-					if (btn.prefabPath == "Resources/Prefabs/Canon.prefab") enabled = true;
-					if (btn.name == "DeleteButton") enabled = true;
+					// ステップごとに許可するボタンを限定
+					if (step >= TutorialScript::TutorialStep::Step1_Greeting && step < TutorialScript::TutorialStep::Step14_EndExplanation) {
+						enabled = false; // 基本はすべて非表示
+						if (step == TutorialScript::TutorialStep::Step6_CannonInstall) {
+							if (btn.prefabPath == "Resources/Prefabs/Canon.prefab") enabled = true;
+						}
+						else if (step == TutorialScript::TutorialStep::Step7_DeleteIntro) {
+							if (btn.prefabPath == "Resources/Prefabs/Canon.prefab") enabled = true;
+							if (btn.name == "DeleteButton") enabled = true;
+						}
+					}
 				}
 			}
 		}
