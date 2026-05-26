@@ -187,6 +187,29 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 		if (registry.all_of<RectTransformComponent>(btn.entity))
 			registry.get<RectTransformComponent>(btn.entity).enabled = enabled;
 	}
+	isDescriptionVisible_ = false;
+
+	for (int i = 0; i < 5; i++) {
+
+		auto& btn = buttons_[i];
+
+		if (!registry.valid(btn.entity)) {
+			continue;
+		}
+
+		if (!registry.all_of<UIButtonComponent>(btn.entity)) {
+			continue;
+		}
+
+		UIButtonComponent& button = registry.get<UIButtonComponent>(btn.entity);
+
+		if (button.isHovered) {
+
+			isDescriptionVisible_ = true;
+			hoveredButtonIndex_ = i;
+			break;
+		}
+	}
 }
 
 void InstallationManager::Draw(entt::entity /*entity*/, GameScene* /*scene*/) {
@@ -195,8 +218,36 @@ void InstallationManager::Draw(entt::entity /*entity*/, GameScene* /*scene*/) {
 }
 
 void InstallationManager::DrawUI(entt::entity /*entity*/, GameScene* scene) {
-	(void)scene;
-	// ページ情報の表示を削除
+
+	if (!scene) {
+		return;
+	}
+
+	auto* renderer = scene->GetRenderer();
+
+	if (!renderer) {
+		return;
+	}
+
+	float targetX = -500.0f;
+
+	if (isDescriptionVisible_) {
+		targetX = 0.0f;
+	}
+
+	descriptionPanelX_ += (targetX - descriptionPanelX_) * 0.1f;
+
+	Engine::Renderer::SpriteDesc panel;
+
+	panel.x = descriptionPanelX_;
+	panel.y = 100.0f;
+
+	panel.w = 400.0f;
+	panel.h = 500.0f;
+
+	panel.color = {0.1f, 0.1f, 0.1f, 0.9f};
+
+	renderer->DrawSprite(0, panel);
 }
 
 void InstallationManager::OnEditorUI() {
