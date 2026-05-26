@@ -111,6 +111,9 @@ private:
 	void CreateSkipUI(GameScene* scene);
 	void UpdateSkipUIProgress(GameScene* scene);
 	void EndInsertPhase(GameScene* scene);
+
+public:
+	static bool isSkillTreeOpen_; // スキルツリーが開いているかどうかを管理する静的変数
 };
 
 } // namespace Game

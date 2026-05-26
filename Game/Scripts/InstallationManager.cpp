@@ -156,8 +156,13 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 		}
 
 		// フェーズに応じた表示・非表示の管理（ページ制限を廃止）
-		bool enabled = ((!scene->IsPlaying()) || (currentPhase == PhaseSystemScript::PreparationPhase));
 
+
+
+		bool enabled = ((!scene->IsPlaying()) || (currentPhase == PhaseSystemScript::PreparationPhase));
+		if (PhaseSystemScript::isSkillTreeOpen_) {
+			enabled = false;
+		}
 		// チュートリアル中の表示制御
 		if (auto* tutorial = TutorialScript::GetInstance()) {
 			auto step = tutorial->GetCurrentStep();

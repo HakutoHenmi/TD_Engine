@@ -208,6 +208,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		// Nキーでスキルツリーの開閉
 		if (keyN && !preKeyN_) {
 			skillTree_.Toggle(scene);
+			isSkillTreeOpen_ = !isSkillTreeOpen_;
 		}
 
 // スキルツリーが開いている間はスキルツリーの更新のみ
@@ -1305,7 +1306,7 @@ void PhaseSystemScript::EndInsertPhase(GameScene* scene) {
 
 	isInsertInitialized_ = false;
 }
-
+bool Game::PhaseSystemScript::isSkillTreeOpen_ = false;
 REGISTER_SCRIPT(PhaseSystemScript);
 
 } // namespace Game

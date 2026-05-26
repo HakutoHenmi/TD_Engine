@@ -55,5 +55,5 @@ public:
 	void Start(entt::entity, GameScene*) override {}
 	void Update(entt::entity, GameScene*, float) override {}
 };
-
+//bool isSkillTreeOpen_ = false;
 } // namespace Game
