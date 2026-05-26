@@ -13,7 +13,6 @@
 
 #include "Audio.h"
 #include <tuple> // 追加
-#include "PipeEditor.h"
 #include "EnemySpawnerEditor.h"
 #include "SceneManager.h"
 #include "WindowDX.h"
@@ -95,12 +94,12 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 
 		reg.get_or_emplace<EditorStateComponent>(entity).locked = obj.value("locked", false);
 		
-		auto& hc = reg.get_or_emplace<HierarchyComponent>(entity);
+		(void)reg.get_or_emplace<HierarchyComponent>(entity);
 		uint32_t savedParentId = obj.value("parentId", (uint32_t)entt::null);
 		if (savedParentId != (uint32_t)entt::null && idMap.find(savedParentId) != idMap.end()) {
-			hc.parentId = idMap[savedParentId];
+			scene->SetParent(entity, idMap[savedParentId]); // ★修正: SetParent経由で子リストも更新する
 		} else {
-			hc.parentId = entt::null;
+			scene->RemoveParent(entity);
 		}
 
 		if (obj.contains("components") && obj["components"].is_array()) {
@@ -419,7 +418,6 @@ static int uiHoveredHandle = -1;
 static ImVec2 gameImageMin = {};
 static ImVec2 gameImageMax = {};
 
-static PipeEditor s_pipeEditor;
 static EnemySpawnerEditor s_spawnerEditor;
 static uint32_t nextObjectId = 1;
 EditorUI::Icons EditorUI::s_icons;
@@ -1357,10 +1355,6 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Tools")) {
-			static bool pipeOpen = false;
-			if (ImGui::MenuItem("Pipe Mode", nullptr, &pipeOpen)) {
-				s_pipeEditor.SetPipeMode(pipeOpen);
-			}
 			static bool spawnerOpen = false;
 			if (ImGui::MenuItem("Enemy Spawner", nullptr, &spawnerOpen)) {
 				s_spawnerEditor.SetSpawnerMode(spawnerOpen);
@@ -1370,7 +1364,6 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 		
 		// Tool Specific UI (Snaps etc)
 		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-		s_pipeEditor.DrawUI();
 		s_spawnerEditor.DrawUI();
 		ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
 		
@@ -1514,7 +1507,6 @@ void EditorUI::Show(Engine::Renderer* renderer, GameScene* gameScene) {
 	gctx.useOverrideMouse = true;
 
 	// Tool Editors Update & Draw (Overlays) - 画像の上にオーバーレイとして描画
-	s_pipeEditor.UpdateAndDraw(gameScene, renderer, gameImageMin, gameImageMax, renderW, renderH);
 	s_spawnerEditor.UpdateAndDraw(gameScene, renderer, gameImageMin, gameImageMax, renderW, renderH);
 	
 	// Project to Scene Drop

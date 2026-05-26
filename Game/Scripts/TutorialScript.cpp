@@ -1,5 +1,6 @@
 #include "ObjectTypes.h"
 #include "TutorialScript.h"
+#include "../Systems/UISystem.h"
 #include "../../Engine/Input.h"
 #include "../../Engine/PathUtils.h"
 #include "../../Engine/SceneManager.h"
@@ -26,10 +27,86 @@ using json = nlohmann::json;
 
 namespace Game {
 
+TutorialScript* TutorialScript::instance_ = nullptr;
+
 namespace {
+// チュートリアルの各ステップにおけるテキストガイドの内容
+// 簡単に文言や行数を変更できます。SPACEキーで次の行に進みます。
+const std::unordered_map<TutorialScript::TutorialStep, std::vector<std::string>> kTutorialTexts = {
+    { TutorialScript::TutorialStep::Step1_Greeting, {
+        "こんにちは！\nこのゲームのチュートリアルへようこそ。",
+        "防衛戦の基本を説明します。\n[SPACE]キーで読み進めてください。",
+    }},
+    { TutorialScript::TutorialStep::Step2_CoreIntro, {
+        "まずはこちら、\n青い『コア』です。\n敵はこれを破壊しにきます。",
+        "コアを守り切ることがあなたの目的です。\n[SPACE]キーで進みます。"
+    }},
+    { TutorialScript::TutorialStep::Step3_SpawnerIntro, {
+        "次に、あちらに見えるのが\n『敵のスポナー』です。",
+        "戦闘フェーズになると、\nここから敵が出現します。\n[SPACE]キーで進みます。"
+    }},
+    { TutorialScript::TutorialStep::Step4_PhaseIntro, {
+        "このゲームは、\n『準備フェーズ』と『戦闘フェーズ』を\n交互に繰り返します。\n[SPACE]キーで進みます。",
+       "準備フェーズで設備を整え、\n戦闘フェーズで敵を迎撃しましょう。\n[SPACE]キーで進みます。"
+    }},
+    { TutorialScript::TutorialStep::Step5_CameraControl, {
+        "カメラの操作方法について説明します。\n[SPACE]キーで進みます。",
+        "WASDで移動、マウス右ドラッグでカメラを回転できます。\n[SPACE]キーで進みます。",
+        "操作を確認したら、[SPACE]キーで次へ進みましょう。\n[SPACE]キーで進みます。"
+    }},
+    { TutorialScript::TutorialStep::Step6_FacilityIntro, {
+        "それでは、\n防衛施設の設置について学びましょう。\n[SPACE]キーで進みます。",
+        "画面下のアイコンをクリックすることで選択できます。\n[SPACE]キーで進みます。"
+    }},
+    { TutorialScript::TutorialStep::Step7_CannonInstall, {
+        "まずは敵を迎撃するための『大砲』を設置します。\n[SPACE]キーで進みます。",
+        "大砲のアイコンをクリックして設置したい場所に配置してください。"
+    }},
+    //{ TutorialScript::TutorialStep::Step8_TankInstall, {
+    //    "次に、\n大砲を動かすためのエネルギー源『タンク』を設置します。\n[SPACE]キーで進みます。",
+    //    "タンクのアイコンをクリックして大砲の近くに配置してください。"
+    //}},
+    //{ TutorialScript::TutorialStep::Step9_PipeInstall, {
+    //    "タンクから大砲にエネルギーを届けるため、\n『パイプ』を繋ぎましょう。\n[SPACE]キーで進みます。",
+    //    "パイプのアイコンをクリックして、タンクの緑色の接続点から大砲に向けてパイプを伸ばして設置してください。"
+    //}},
+    //{ TutorialScript::TutorialStep::Step10_DeleteIntro, {
+    //    "練習として、\nもう一つ余分にタンク（1キー）を適当に設置してみましょう。\n[SPACE]キーで進みます。",
+    //    "設置できました！\n左下の『削除ボタン』をクリックして、\n設置したタンクをクリックして削除してください。\n[SPACE]キーで進みます。",
+    //    "削除できました！\n[SPACE]キーで次へ進みます。"
+    //}},
+    { TutorialScript::TutorialStep::Step9_BattleTransition, {
+        "防衛の準備が整いました。\nいよいよ戦闘フェーズへ移行します。\n[SPACE]キーで進みます。",
+        "[SPACE]キーを押して、\n戦闘を開始しましょう！"
+    }},
+    { TutorialScript::TutorialStep::Step10_PlayerAttack, {//nextTimerの時間を参照して、数行に分けて表示する
+        "戦闘フェーズが始まりました！\nプレイヤー自身も攻撃が可能です。",
+        "マウス左クリックで通常射撃を行い、\nEキーで強力なスキル攻撃を放ちます。",
+        "敵を倒してみましょう！\n[SPACE]キーで進みます。"
+    }},
+    { TutorialScript::TutorialStep::Step11_CombatPlay, {
+        "さあ、やってくる敵を大砲とプレイヤーの攻撃で全て撃退しましょう！"
+    }},
+    { TutorialScript::TutorialStep::Step12_SkillTree, {
+        "敵を倒してレベルアップしました！能力を強化しましょう。\nNキーを押してスキルツリーを開いてください。", // Nを押すと次の行に進む
+        "スキルツリーが開きました。\n矢印キーか画面端のボタンでページを切り替えて、\n好きなスキルを1つ強化してください。",//強化すると進む
+        "強化が完了しました！",//Nで閉じると進む
+        "これでチュートリアルは終了ですが、\nゲームはここからが本番です！\n[SPACE]キーで進みます。"
+    }},
+    { TutorialScript::TutorialStep::Step13_EndExplanation, {
+        "これでチュートリアルの説明は全て終了です！\n[SPACE]キーで進みます。",
+        "ここからは自由にゲームを進めることができます。\n[SPACE]キーで進みます。", 
+        "ではここで練習しましょう\n[SPACE]キーで進みます。"
+    }},
+    { TutorialScript::TutorialStep::Step14_FreePlayBattle, {
+        "ESCでポーズが開けます。\nそこからチュートリアルを終了できます。\n[SPACE]キーで進みます。"
+    }}
+};
+
 // 2x2のグリッドに値をスナップさせる（2の倍数に丸める）
 float SnapTo2x2Grid(float value) { return std::floor(value / 2.0f) * 2.0f; }
 
+// マウスカーソルが施設設置用のボタン（UI）の上にあるかどうかを判定する
 bool IsPointerOverInstallationButton(GameScene* scene) {
     if (!scene)
         return false;
@@ -52,54 +129,7 @@ bool IsPointerOverInstallationButton(GameScene* scene) {
     return false;
 }
 
-// 指定された始点から終点までのパイプの配置経路を2x2グリッドに沿って計算し、ポイントのリストを返す
-std::vector<Engine::Vector3> BuildPipePathPoints(const Engine::Vector3& start, const Engine::Vector3& end) {
-    std::vector<Engine::Vector3> points;
 
-    const int x0 = static_cast<int>(SnapTo2x2Grid(start.x));
-    const int z0 = static_cast<int>(SnapTo2x2Grid(start.z));
-    const int x1 = static_cast<int>(SnapTo2x2Grid(end.x));
-    const int z1 = static_cast<int>(SnapTo2x2Grid(end.z));
-    constexpr int kStep = 2;
-
-    const float y = end.y;
-    points.push_back({static_cast<float>(x0), y, static_cast<float>(z0)});
-
-    int x = x0;
-    int z = z0;
-    const int stepX = (x1 > x0) ? kStep : -kStep;
-    const int stepZ = (z1 > z0) ? kStep : -kStep;
-    const int totalX = std::abs((x1 - x0) / kStep);
-    const int totalZ = std::abs((z1 - z0) / kStep);
-
-    int movedX = 0;
-    int movedZ = 0;
-    while (movedX < totalX || movedZ < totalZ) {
-        const bool canMoveX = movedX < totalX;
-        const bool canMoveZ = movedZ < totalZ;
-
-        bool moveX = false;
-        if (canMoveX && canMoveZ) {
-            const int nextXScore = (movedX + 1) * totalZ;
-            const int nextZScore = (movedZ + 1) * totalX;
-            moveX = nextXScore <= nextZScore;
-        } else {
-            moveX = canMoveX;
-        }
-
-        if (moveX) {
-            x += stepX;
-            ++movedX;
-        } else {
-            z += stepZ;
-            ++movedZ;
-        }
-
-        points.push_back({static_cast<float>(x), y, static_cast<float>(z)});
-    }
-
-    return points;
-}
 
 // 指定された座標と範囲内にある施設（大砲やタンク）を検索し、エンティティを返す
 entt::entity GetFacilityInRange(GameScene* scene, float x, float z, float range = 2.5f) {
@@ -120,20 +150,28 @@ entt::entity GetFacilityInRange(GameScene* scene, float x, float z, float range 
 
 // チュートリアルスクリプトの初期化処理。フェーズや変数の初期化、スキルツリーの読み込みなどを行う
 void TutorialScript::Start(entt::entity entity, GameScene* scene) {
-    tutorialStep_ = TutorialStep::Preparation1;
+    instance_ = this;
+    tutorialStep_ = TutorialStep::Step1_Greeting;
+    currentLineIndex_ = 0;
+    PhaseSystemScript::ResetPhaseCount();
     phaseState_ = PhaseSystemScript::PreparationPhase;
     nextPhaseState_ = PhaseSystemScript::PreparationPhase;
     isPhaseTransitioning_ = false;
     isFadeFinished_ = false;
     isPlacementMode_ = false;
-    isPipeSet_ = false;
-    hasPipeStartPoint_ = false;
-    hasPlacedTank_ = false;
-    hasPlacedPipe_ = false;
     hasPlacedCannon_ = false;
     hasOpenedSkillTreeInGuide_ = false;
     preKeyN_ = false;
     stepGuideShown_ = false;
+    isSellMode_ = false;
+
+    // サブ状態のリセット
+    step8_placedExtraCannon_ = false;
+    step8_deletedCannon_ = false;
+    step12_pageSwitched_ = false;
+    step12_upgraded_ = false;
+    step12_initialSP_ = 0;
+
     PhaseSystemScript::ForcePhaseState(phaseState_);
     if (auto* renderer = Engine::Renderer::GetInstance()) {
         skillTree_.SetUIContext(renderer, (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH, 0.0f, 0.0f);
@@ -148,98 +186,53 @@ void TutorialScript::Start(entt::entity entity, GameScene* scene) {
             try {
                 json data = json::parse(dataStr);
                 selectedObjPath_ = data.value("prefab", "");
-                isPipeSet_ = data.value("isPipe", false);
                 isPlacementMode_ = true;
-                hasPipeStartPoint_ = false;
             } catch (...) {}
         });
     }
 }
 
-// チュートリアルの指定されたステップへ移行し、必要な状態やフラグをリセット・設定する
+// チュートリアルの指定されたステップに移行し、必要な初期状態のセットアップやフェーズ切り替えを行う
 void TutorialScript::EnterStep(TutorialStep step) {
     tutorialStep_ = step;
     stepGuideShown_ = false;
     isPlacementMode_ = false;
-    isPipeSet_ = false;
-    hasPipeStartPoint_ = false;
     autoProceedTimer_ = 0.0f;
+    currentLineIndex_ = 0;
 
-    if (step == TutorialStep::InstallCannonGuide1 || step == TutorialStep::InstallCannonGuide2 || step == TutorialStep::InstallCannonGuide3) {
-        hasPlacedTank_ = false;
-        hasPlacedPipe_ = false;
+    if (step == TutorialStep::Step7_CannonInstall) {
         hasPlacedCannon_ = false;
     }
-
-    if (step == TutorialStep::SkillTreeGuide1 || step == TutorialStep::SkillTreeGuide2 || step == TutorialStep::SkillTreeGuide3) {
-        hasOpenedSkillTreeInGuide_ = false;
-        // 注意: scene が EnterStep に渡されていないため、null を渡すか、
-        // もしくはここではテキストクリアが不要なためそのまま。
+    if (step == TutorialStep::Step8_DeleteIntro) {
+        step8_placedExtraCannon_ = false;
+        step8_deletedCannon_ = false;
+        hasPlacedCannon_ = false;
+        isSellMode_ = false;
+    }
+    if (step == TutorialStep::Step12_SkillTree) {
+        step12_pageSwitched_ = false;
+        step12_upgraded_ = false;
+        step12_initialSP_ = skillTree_.GetSkillPoints();
         skillTree_.Close(nullptr);
     }
 
-    if (step == TutorialStep::Preparation1 || step == TutorialStep::Preparation2 || step == TutorialStep::Preparation3 || 
-        step == TutorialStep::PlayerMoveGuide1 || step == TutorialStep::PlayerMoveGuide2 || step == TutorialStep::PlayerMoveGuide3 ||
-        step == TutorialStep::InstallCannonGuide1 || step == TutorialStep::InstallCannonGuide2 || step == TutorialStep::InstallCannonGuide3 || 
-        step == TutorialStep::InstallTankGuide1 || step == TutorialStep::InstallTankGuide2 || step == TutorialStep::InstallTankGuide3 || 
-        step == TutorialStep::InstallPipeGuide1 || step == TutorialStep::InstallPipeGuide2 || step == TutorialStep::InstallPipeGuide3 || 
-        step == TutorialStep::SkillTreeGuide1 || step == TutorialStep::SkillTreeGuide2 || step == TutorialStep::SkillTreeGuide3) {
-        RequestPhaseChange(PhaseSystemScript::PreparationPhase);
-    } else {
+    if (step == TutorialStep::Step10_PlayerAttack || step == TutorialStep::Step11_CombatPlay || step == TutorialStep::Step14_FreePlayBattle) {
         RequestPhaseChange(PhaseSystemScript::BattlePhase);
+    } else {
+        RequestPhaseChange(PhaseSystemScript::PreparationPhase);
     }
 }
 
-// 現在のチュートリアルステップに応じたガイドテキストをUIに表示する
+// 現在のステップをログ出力などの形でガイド表示する（ステップごとに1回のみ）
 void TutorialScript::ShowStepGuide() {
     if (stepGuideShown_)
         return;
 
-    switch (tutorialStep_) {
-    case TutorialStep::Preparation1:
-    case TutorialStep::Preparation2:
-    case TutorialStep::Preparation3:
-        EditorUI::Log("Tutorial: 準備フェーズです。Spaceで次の説明へ進みます。");
-        break;
-    case TutorialStep::InstallCannonGuide1:
-    case TutorialStep::InstallCannonGuide2:
-    case TutorialStep::InstallCannonGuide3:
-        EditorUI::Log("Tutorial: 大砲の設置説明。大砲を1つ設置してください。(3キー)");
-        break;
-	case TutorialStep::PlayerMoveGuide1:
-	case TutorialStep::PlayerMoveGuide2:
-	case TutorialStep::PlayerMoveGuide3:
-		EditorUI::Log("Tutorial: プレイヤー操作説明です。");
-		break;
-    case TutorialStep::InstallTankGuide1:
-    case TutorialStep::InstallTankGuide2:
-    case TutorialStep::InstallTankGuide3:
-        EditorUI::Log("Tutorial: タンクの設置説明。弾丸タンクを1つ設置してください。(1キー)");
-        break;
-    case TutorialStep::InstallPipeGuide1:
-    case TutorialStep::InstallPipeGuide2:
-    case TutorialStep::InstallPipeGuide3:
-        EditorUI::Log("Tutorial: パイプの設置説明。タンクの緑の位置から大砲へパイプを繋いでください。(2キー)");
-        break;
-    case TutorialStep::FirstBattle1:
-    case TutorialStep::FirstBattle2:
-    case TutorialStep::FirstBattle3:
-        EditorUI::Log("Tutorial: 戦闘フェーズです。ウェーブ終了後にスキルツリー説明へ進みます。(Pキーでも進行可)");
-        break;
-    case TutorialStep::SkillTreeGuide1:
-    case TutorialStep::SkillTreeGuide2:
-    case TutorialStep::SkillTreeGuide3:
-        EditorUI::Log("Tutorial: スキルツリー説明。Nで開いて確認後、Spaceで最終戦闘へ進みます。");
-        break;
-	case TutorialStep::Finish:
-        EditorUI::Log("Tutorial: 最終");
-        break;
-    }
-
+    EditorUI::Log("Tutorial Step: " + std::to_string(static_cast<int>(tutorialStep_)));
     stepGuideShown_ = true;
 }
 
-// スキルツリーのUIの表示トグルや、開いている場合の入力およびマウス状態のアップデート処理を行う
+// スキルツリーのUIの表示切り替えや中身の更新処理を行う
 void TutorialScript::UpdateSkillTree(entt::entity entity, GameScene* scene, bool& outKeyN) {
     auto* input = Engine::Input::GetInstance();
     if (!input || !scene)
@@ -279,22 +272,234 @@ void TutorialScript::UpdateSkillTree(entt::entity entity, GameScene* scene, bool
     }
 }
 
-// 毎フレーム呼ばれる更新処理。入力の監視、チュートリアルステップの進行チェック、オブジェクトの設置モード制御などを行う
+// 指定されたエンティティを中心とした床面に3Dのハイライトの円を描画する
+void TutorialScript::Draw3DHighlight(GameScene* scene, entt::entity entity, const Engine::Vector4& color, float radius) {
+    if (!scene || entity == entt::null || !scene->GetRegistry().valid(entity)) return;
+    auto* renderer = scene->GetRenderer();
+    if (!renderer) return;
+    auto* tc = scene->GetRegistry().try_get<TransformComponent>(entity);
+    if (!tc) return;
+
+    DirectX::XMFLOAT3 pos = tc->translate;
+    constexpr int kSegments = 36;
+    float time = (float)GetTickCount64() / 1000.0f;
+    float alpha = 0.5f + 0.5f * std::sin(time * 5.0f);
+    Engine::Vector4 c = { color.x, color.y, color.z, color.w * alpha };
+
+    for (int j = 0; j < 3; ++j) {
+        float r = radius + j * 0.5f;
+        for (int i = 0; i < kSegments; ++i) {
+            float theta1 = (i * 2.0f * 3.1415926f) / kSegments;
+            float theta2 = ((i + 1) * 2.0f * 3.1415926f) / kSegments;
+            Engine::Vector3 p1 = { pos.x + std::cos(theta1) * r, pos.y + 0.1f, pos.z + std::sin(theta1) * r };
+            Engine::Vector3 p2 = { pos.x + std::cos(theta2) * r, pos.y + 0.1f, pos.z + std::sin(theta2) * r };
+            renderer->DrawLine3D(p1, p2, c, true);
+        }
+    }
+}
+
+// チュートリアルのステップに応じて、コアやスポナーなどの注目させたいオブジェクトにハイライトを描画する
+void TutorialScript::DrawHighlights(GameScene* scene) {
+    if (!scene) return;
+    auto* renderer = scene->GetRenderer();
+    if (!renderer) return;
+
+    float time = (float)GetTickCount64() / 1000.0f;
+
+    if (tutorialStep_ == TutorialStep::Step2_CoreIntro) {
+        auto core = scene->FindObjectByName("Core");
+        if (scene->GetRegistry().valid(core)) {
+            Draw3DHighlight(scene, core, { 0.2f, 0.6f, 1.0f, 1.0f }, 4.0f);
+        }
+    }
+
+    // スポナーのガイド（Step 3 または 戦闘フェーズ中）
+    const bool isBattlePhase = (phaseState_ == PhaseSystemScript::BattlePhase);
+    if (tutorialStep_ == TutorialStep::Step3_SpawnerIntro || isBattlePhase) {
+        auto& registry = scene->GetRegistry();
+        registry.view<NameComponent, TransformComponent>().each([&](entt::entity entity, const NameComponent& nc, const TransformComponent& tc) {
+            if (nc.name.find("Spawner") != std::string::npos && 
+                (!registry.all_of<HierarchyComponent>(entity) || registry.get<HierarchyComponent>(entity).parentId == entt::null)) {
+
+                // Step 3 の時だけ足元をハイライト
+                if (tutorialStep_ == TutorialStep::Step3_SpawnerIntro) {
+                    Draw3DHighlight(scene, entity, { 1.0f, 0.2f, 0.2f, 1.0f }, 3.0f);
+                }
+
+                auto& camera = scene->GetCamera();
+                DirectX::XMMATRIX view = camera.View();
+                Engine::Vector3 camPos = camera.GetPosition();
+                
+                float sdx = tc.translate.x - camPos.x;
+                float sdz = tc.translate.z - camPos.z;
+                float distance = std::sqrt(sdx * sdx + sdz * sdz);
+
+                if (distance >= 30.0f) {
+                    DirectX::XMMATRIX invView = DirectX::XMMatrixInverse(nullptr, view);
+                    DirectX::XMVECTOR camForwardVec = invView.r[2];
+                    DirectX::XMFLOAT3 camForward;
+                    DirectX::XMStoreFloat3(&camForward, camForwardVec);
+
+                    float camAngle = std::atan2(camForward.z, camForward.x);
+                    float spawnerAngle = std::atan2(sdz, sdx);
+
+                    float angleDiff = spawnerAngle - camAngle;
+                    const float PI_VAL = 3.1415926535f;
+                    while (angleDiff < -PI_VAL) angleDiff += 2.0f * PI_VAL;
+                    while (angleDiff > PI_VAL) angleDiff -= 2.0f * PI_VAL;
+
+                    float margin = (float)Engine::WindowDX::kW * 0.1f;
+                    float startX = margin;
+                    float endX = (float)Engine::WindowDX::kW - margin;
+                    float barWidth = endX - startX;
+
+                    float t = (PI_VAL - angleDiff) / (2.0f * PI_VAL);
+                    float targetX = startX + t * barWidth;
+                    float targetY = 50.0f;
+
+                    Engine::Renderer::SdfUIDesc desc;
+                    desc.centerPx = { targetX, targetY };
+                    desc.sizePx = { 70.0f + 10.0f * std::sin(time * 10.0f), 70.0f + 10.0f * std::sin(time * 10.0f) };
+                    desc.lineWidth = 4.0f;
+                    desc.color = { 1.0f, 0.2f, 0.2f, 1.0f };
+                    desc.shape = 1;
+                    desc.fill = 0.0f;
+                    desc.glow = 1.0f;
+                    desc.additive = true;
+                    renderer->DrawSDFUI(desc);
+                }
+            }
+        });
+    }
+}
+
+// 施設の売却（削除）モードの切り替えおよび、削除対象のハイライト表示・クリックによる削除処理を行う
+void TutorialScript::UpdateSellMode(GameScene* scene) {
+    if (!scene) return;
+    auto* input = Engine::Input::GetInstance();
+    if (!input) return;
+    auto* renderer = scene->GetRenderer();
+    if (!renderer) return;
+
+    const bool keyX = input->Trigger(DIK_X) || (GetAsyncKeyState('X') & 0x8001);
+    if (keyX || InstallationManager::IsButtonPressedByName("DeleteButton")) {
+        isSellMode_ = !isSellMode_;
+        isPlacementMode_ = false;
+        EditorUI::Log(isSellMode_ ? "Tutorial: Sell Mode Activated" : "Tutorial: Sell Mode Deactivated");
+    }
+
+    if (!isSellMode_) return;
+
+    Engine::Vector3 hitPoint{};
+    if (TryGetTerrainHitPoint(scene, hitPoint)) {
+        float localX = 0, localY = 0;
+        float tW = 0, tH = 0;
+#if defined(USE_IMGUI) && !defined(NDEBUG)
+        ImVec2 mousePos = ImGui::GetMousePos();
+        ImVec2 gameMin = EditorUI::GetGameImageMin();
+        ImVec2 gameMax = EditorUI::GetGameImageMax();
+        tW = gameMax.x - gameMin.x;
+        tH = gameMax.y - gameMin.y;
+        localX = mousePos.x - gameMin.x;
+        localY = mousePos.y - gameMin.y;
+#else
+        input->GetMousePos(localX, localY);
+        tW = (float)Engine::WindowDX::kW;
+        tH = (float)Engine::WindowDX::kH;
+#endif
+
+        auto& camera = scene->GetCamera();
+        DirectX::XMMATRIX view = camera.View();
+        DirectX::XMMATRIX proj = camera.Proj();
+
+        DirectX::XMVECTOR rayOrig, rayDir;
+        EditorUI::ScreenToWorldRay(localX, localY, tW, tH, view, proj, rayOrig, rayDir);
+
+        float bestDist = FLT_MAX;
+        entt::entity hoverEntity = entt::null;
+
+        auto& registry = scene->GetRegistry();
+        registry.view<NameComponent, TransformComponent>().each([&](entt::entity entity, const NameComponent& nc, const TransformComponent& tc) {
+            if (nc.name.find("Terrain") != std::string::npos ||
+                nc.name.find("Floor") != std::string::npos ||
+                nc.name.find("Ground") != std::string::npos ||
+                nc.name.find("Stage") != std::string::npos ||
+                nc.name.find("Plane") != std::string::npos ||
+                nc.name.find("Core") != std::string::npos ||
+                nc.name.find("Player") != std::string::npos ||
+                nc.name.find("PhysicsSystem") != std::string::npos) {
+                return;
+            }
+
+            Engine::Model* model = nullptr;
+            if (registry.all_of<GpuMeshColliderComponent>(entity)) {
+                auto& gmc = registry.get<GpuMeshColliderComponent>(entity);
+                if (gmc.meshHandle != 0) {
+                    model = renderer->GetModel(gmc.meshHandle);
+                }
+            }
+            if (!model && registry.all_of<MeshRendererComponent>(entity)) {
+                auto& mr = registry.get<MeshRendererComponent>(entity);
+                if (mr.modelHandle != 0) {
+                    model = renderer->GetModel(mr.modelHandle);
+                }
+            }
+
+            if (!model) return;
+
+            float d;
+            Engine::Vector3 hp;
+            if (model->RayCast(rayOrig, rayDir, tc.ToMatrix(), d, hp) && d < bestDist) {
+                bestDist = d;
+                hoverEntity = entity;
+            }
+        });
+
+        if (hoverEntity != entt::null) {
+            auto* tc = registry.try_get<TransformComponent>(hoverEntity);
+            if (tc) {
+                Engine::Vector3 minP = { tc->translate.x - tc->scale.x, tc->translate.y, tc->translate.z - tc->scale.z };
+                Engine::Vector3 maxP = { tc->translate.x + tc->scale.x, tc->translate.y + tc->scale.y * 2.0f, tc->translate.z + tc->scale.z };
+                
+                renderer->DrawLine3D({minP.x, minP.y, minP.z}, {maxP.x, minP.y, minP.z}, {1, 0, 0, 1}, true);
+                renderer->DrawLine3D({maxP.x, minP.y, minP.z}, {maxP.x, minP.y, maxP.z}, {1, 0, 0, 1}, true);
+                renderer->DrawLine3D({maxP.x, minP.y, maxP.z}, {minP.x, minP.y, maxP.z}, {1, 0, 0, 1}, true);
+                renderer->DrawLine3D({minP.x, minP.y, maxP.z}, {minP.x, minP.y, minP.z}, {1, 0, 0, 1}, true);
+
+                renderer->DrawLine3D({minP.x, maxP.y, minP.z}, {maxP.x, maxP.y, minP.z}, {1, 0, 0, 1}, true);
+                renderer->DrawLine3D({maxP.x, maxP.y, minP.z}, {maxP.x, maxP.y, maxP.z}, {1, 0, 0, 1}, true);
+                renderer->DrawLine3D({maxP.x, maxP.y, maxP.z}, {minP.x, maxP.y, maxP.z}, {1, 0, 0, 1}, true);
+                renderer->DrawLine3D({minP.x, maxP.y, maxP.z}, {minP.x, maxP.y, minP.z}, {1, 0, 0, 1}, true);
+
+                renderer->DrawLine3D({minP.x, minP.y, minP.z}, {minP.x, maxP.y, minP.z}, {1, 0, 0, 1}, true);
+                renderer->DrawLine3D({maxP.x, minP.y, minP.z}, {maxP.x, maxP.y, minP.z}, {1, 0, 0, 1}, true);
+                renderer->DrawLine3D({maxP.x, minP.y, maxP.z}, {maxP.x, maxP.y, maxP.z}, {1, 0, 0, 1}, true);
+                renderer->DrawLine3D({minP.x, minP.y, maxP.z}, {minP.x, maxP.y, maxP.z}, {1, 0, 0, 1}, true);
+            }
+
+            if (input->IsMouseTrigger(0)) {
+                scene->DestroyObject(static_cast<uint32_t>(hoverEntity));
+                isSellMode_ = false;
+                step8_deletedCannon_ = true;
+                EditorUI::Log("Tutorial: Object deleted successfully");
+            }
+        }
+    }
+}
+
+// 毎フレームの更新処理。チュートリアルのステップ進行判定やキー入力の処理を一括して行う
 void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
     auto* input = Engine::Input::GetInstance();
     if (!scene || !input)
         return;
 
     ShowStepGuide();
-	ShowGuideText(entity, scene);
+    ShowGuideText(entity, scene);
+    DrawHighlights(scene);
 
-    const bool key1 = input->Trigger(DIK_1) || (GetAsyncKeyState('1') & 0x8001);
-    const bool key2 = input->Trigger(DIK_2) || (GetAsyncKeyState('2') & 0x8001);
+
     const bool key3 = input->Trigger(DIK_3) || (GetAsyncKeyState('3') & 0x8001);
-    bool keyP = false;
-#ifndef NDEBUG
-    keyP = input->Trigger(DIK_P) || (GetAsyncKeyState('P') & 0x8001);
-#endif
+
     static bool prevKeySpace = false;
     const bool currentRawSpace = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
     const bool keySpace = input->Trigger(DIK_SPACE) || (currentRawSpace && !prevKeySpace);
@@ -303,205 +508,251 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
     bool placementSelectionChangedThisFrame = false;
     const bool clickedInstallationButtonThisFrame = input->IsMouseTrigger(0) && IsPointerOverInstallationButton(scene);
 
-    if ((tutorialStep_ == TutorialStep::FirstBattle1 || tutorialStep_ == TutorialStep::FirstBattle2 || tutorialStep_ == TutorialStep::FirstBattle3) && 
-        phaseState_ == PhaseSystemScript::BattlePhase && PhaseSystemScript::GetRequestedPhase() == PhaseSystemScript::PreparationPhase) {
-        EnterStep(TutorialStep::SkillTreeGuide1);
+    // Keep Core fully healed during Steps 1 to 15 to prevent game over
+    if (static_cast<int>(tutorialStep_) <= static_cast<int>(TutorialStep::Step13_EndExplanation)) {
+        auto core = scene->FindObjectByName("Core");
+        if (scene->GetRegistry().valid(core)) {
+            if (auto* hc = scene->GetRegistry().try_get<HealthComponent>(core)) {
+                hc->hp = hc->maxHp;
+                hc->isDead = false;
+            }
+        }
+    }
+
+     // Text progression by SPACE key
+    auto textIt = kTutorialTexts.find(tutorialStep_);
+    if (textIt != kTutorialTexts.end()) {
+        const auto& lines = textIt->second;
+        if (keySpace) {
+            if (tutorialStep_ == TutorialStep::Step8_DeleteIntro) {
+                if (step8_deletedCannon_ && currentLineIndex_ == 2) {
+                    EnterStep(TutorialStep::Step9_BattleTransition);
+                }
+            }
+            else if (tutorialStep_ == TutorialStep::Step10_PlayerAttack) {
+                // Step10はSPACEキーに反応しない（自動的に3秒後に進む）
+            }
+            else if (tutorialStep_ == TutorialStep::Step12_SkillTree) {
+                if (step12_upgraded_ && currentLineIndex_ == 3) {
+                    EnterStep(TutorialStep::Step13_EndExplanation);
+                }
+            }
+            else {
+                if (currentLineIndex_ < static_cast<int>(lines.size()) - 1) {
+                    currentLineIndex_++;
+                } else {
+                    bool isActionStep = (tutorialStep_ == TutorialStep::Step7_CannonInstall ||
+                                         tutorialStep_ == TutorialStep::Step8_DeleteIntro ||
+                                         tutorialStep_ == TutorialStep::Step11_CombatPlay ||
+                                         tutorialStep_ == TutorialStep::Step12_SkillTree ||
+                                         tutorialStep_ == TutorialStep::Step14_FreePlayBattle);
+                    if (!isActionStep) {
+                        int nextStepInt = static_cast<int>(tutorialStep_) + 1;
+                        if (nextStepInt < static_cast<int>(TutorialStep::Count)) {
+                            EnterStep(static_cast<TutorialStep>(nextStepInt));
+                        }
+                    }
+                }
+            }
+        }
     }
 
     switch (tutorialStep_) {
-    case TutorialStep::Preparation1:
-        if (keySpace) EnterStep(TutorialStep::Preparation2);
-        break;
-    case TutorialStep::Preparation2:
-        if (keySpace) EnterStep(TutorialStep::Preparation3);
-        break;
-    case TutorialStep::Preparation3:
-		if (keySpace)
-			EnterStep(TutorialStep::PlayerMoveGuide1);
-        break;
-	case TutorialStep::PlayerMoveGuide1:
-		if (keySpace)
-			EnterStep(TutorialStep::PlayerMoveGuide2);
-		break;
-
-	case TutorialStep::PlayerMoveGuide2:
-		if (keySpace)
-			EnterStep(TutorialStep::PlayerMoveGuide3);
-		break;
-
-	case TutorialStep::PlayerMoveGuide3:
-		if (keySpace)
-			EnterStep(TutorialStep::InstallCannonGuide1);
-		break;
-    case TutorialStep::InstallCannonGuide1:
-        if (keySpace) EnterStep(TutorialStep::InstallCannonGuide2);
-        break;
-    case TutorialStep::InstallCannonGuide2:
-        if (keySpace) EnterStep(TutorialStep::InstallCannonGuide3);
-        break;
-    case TutorialStep::InstallCannonGuide3:
+    case TutorialStep::Step7_CannonInstall:
         if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
             break;
 
         if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/Canon.prefab")) {
             selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
             isPlacementMode_ = true;
-            isPipeSet_ = false;
-            hasPipeStartPoint_ = false;
             placementSelectionChangedThisFrame = true;
         }
 
         if (input->IsMouseTrigger(1) && isPlacementMode_) {
-            if (isPipeSet_ && hasPipeStartPoint_) {
-                hasPipeStartPoint_ = false;
-            } else {
-                isPlacementMode_ = false;
-                isPipeSet_ = false;
-                hasPipeStartPoint_ = false;
-            }
+            isPlacementMode_ = false;
         }
 
         if (!placementSelectionChangedThisFrame && !clickedInstallationButtonThisFrame) {
             Installation(scene, selectedObjPath_);
         }
+
         if (hasPlacedCannon_) {
-            EnterStep(TutorialStep::InstallTankGuide1);
+            EnterStep(TutorialStep::Step8_DeleteIntro);
         }
         break;
 
-    case TutorialStep::InstallTankGuide1:
-        if (keySpace) EnterStep(TutorialStep::InstallTankGuide2);
-        break;
-    case TutorialStep::InstallTankGuide2:
-        if (keySpace) EnterStep(TutorialStep::InstallTankGuide3);
-        break;
-    case TutorialStep::InstallTankGuide3:
+    case TutorialStep::Step8_DeleteIntro:
         if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
             break;
 
-        if (key1 || InstallationManager::IsButtonPressed("Resources/Prefabs/BulletTank.prefab")) {
-            selectedObjPath_ = "Resources/Prefabs/BulletTank.prefab";
-            isPlacementMode_ = true;
-            isPipeSet_ = false;
-            hasPipeStartPoint_ = false;
-            placementSelectionChangedThisFrame = true;
-        }
-
-        if (input->IsMouseTrigger(1) && isPlacementMode_) {
-            if (isPipeSet_ && hasPipeStartPoint_) {
-                hasPipeStartPoint_ = false;
-            } else {
+        if (!step8_placedExtraCannon_) {
+            currentLineIndex_ = 0;
+            if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/Canon.prefab")) {
+                selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
+                isPlacementMode_ = true;
+                placementSelectionChangedThisFrame = true;
+            }
+            if (!placementSelectionChangedThisFrame && !clickedInstallationButtonThisFrame) {
+                Installation(scene, selectedObjPath_);
+            }
+            if (hasPlacedCannon_) {
+                step8_placedExtraCannon_ = true;
+                hasPlacedCannon_ = false;
                 isPlacementMode_ = false;
-                isPipeSet_ = false;
-                hasPipeStartPoint_ = false;
+            }
+        } else if (!step8_deletedCannon_) {
+            currentLineIndex_ = 1;
+            UpdateSellMode(scene);
+        } else {
+            currentLineIndex_ = 2;
+            isSellMode_ = false;
+        }
+        break;
+
+    case TutorialStep::Step9_BattleTransition:
+        if (keySpace && currentLineIndex_ == static_cast<int>(kTutorialTexts.at(tutorialStep_).size()) - 1) {
+            EnterStep(TutorialStep::Step10_PlayerAttack);
+        }
+        break;
+
+    case TutorialStep::Step10_PlayerAttack: {
+        // 3秒ごとに説明文の行を進める
+        autoProceedTimer_ += dt;
+        if (autoProceedTimer_ >= nextTimer_) {
+            autoProceedTimer_ = 0.0f;
+            const auto& lines = kTutorialTexts.at(tutorialStep_);
+            if (currentLineIndex_ < static_cast<int>(lines.size()) - 1) {
+                // 次の行へ進む
+                currentLineIndex_++;
+            } else {
+                // すべての行が終わったのでStep11へ進む
+                EnterStep(TutorialStep::Step11_CombatPlay);
             }
         }
+        break;
+    }
 
-        if (!placementSelectionChangedThisFrame && !clickedInstallationButtonThisFrame) {
-            Installation(scene, selectedObjPath_);
-        }
-        if (hasPlacedTank_) {
-            EnterStep(TutorialStep::InstallPipeGuide1);
+    case TutorialStep::Step11_CombatPlay:
+        if (phaseState_ == PhaseSystemScript::BattlePhase) {
+            // Check if all enemies are defeated
+            auto waveManagerEntity = WaveManagement::GetManagerEntity();
+            if (scene->GetRegistry().valid(waveManagerEntity)) {
+                if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(waveManagerEntity)) {
+                    for (auto& entry : sc->scripts) {
+                        if (entry.scriptPath == "WaveManagement" && entry.instance) {
+                            auto* wm = static_cast<WaveManagement*>(entry.instance.get());
+                            int remainingEnemies = wm->GetTotalRemainingEnemies(scene);
+                            if (remainingEnemies <= 0) {
+                                // All enemies defeated, transition to preparation phase
+                                EnterStep(TutorialStep::Step12_SkillTree);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
         }
         break;
 
-    case TutorialStep::InstallPipeGuide1:
-        if (keySpace) EnterStep(TutorialStep::InstallPipeGuide2);
-        break;
-    case TutorialStep::InstallPipeGuide2:
-        if (keySpace) EnterStep(TutorialStep::InstallPipeGuide3);
-        break;
-    case TutorialStep::InstallPipeGuide3:
+    case TutorialStep::Step12_SkillTree: {
         if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
             break;
 
-        if (key2 || InstallationManager::IsButtonPressed("Resources/Prefabs/Pipe.prefab")) {
-            selectedObjPath_ = "Resources/Prefabs/Pipe.prefab";
-            isPipeSet_ = true;
-            isPlacementMode_ = true;
-            hasPipeStartPoint_ = false;
-            placementSelectionChangedThisFrame = true;
-        }
+        bool keyNTrigger = false;
+        UpdateSkillTree(entity, scene, keyNTrigger);
 
-        if (input->IsMouseTrigger(1) && isPlacementMode_) {
-            if (isPipeSet_ && hasPipeStartPoint_) {
-                hasPipeStartPoint_ = false;
+        if (!skillTree_.IsOpen()) {
+            // SkillTree が閉じられた場合、スキルが強化されていれば行4に進む
+            if (step12_upgraded_) {
+                currentLineIndex_ = 3;
             } else {
-                isPlacementMode_ = false;
-                isPipeSet_ = false;
-                hasPipeStartPoint_ = false;
+                currentLineIndex_ = 0;
+            }
+        } else {
+            // SkillTree が開いている
+            if (input->IsMouseTrigger(0)) {
+                float mx = 0, my = 0;
+                input->GetMousePos(mx, my);
+#if defined(USE_IMGUI) && !defined(NDEBUG)
+                ImVec2 mousePos = ImGui::GetMousePos();
+                ImVec2 gameMin = EditorUI::GetGameImageMin();
+                ImVec2 gameMax = EditorUI::GetGameImageMax();
+                float viewW = gameMax.x - gameMin.x;
+                float viewH = gameMax.y - gameMin.y;
+                if (viewW > 0 && viewH > 0) {
+                    mx = (mousePos.x - gameMin.x) * ((float)Engine::WindowDX::kW / viewW);
+                    my = (mousePos.y - gameMin.y) * ((float)Engine::WindowDX::kH / viewH);
+                }
+#endif
+                if ((mx >= 100.0f && mx <= 180.0f && my >= 520.0f && my <= 570.0f) ||
+                    (mx >= 1000.0f && mx <= 1080.0f && my >= 520.0f && my <= 570.0f)) {
+                    step12_pageSwitched_ = true;
+                }
+            }
+
+            if (skillTree_.GetSkillPoints() < step12_initialSP_) {
+                // スキルを強化した
+                step12_upgraded_ = true;
+                currentLineIndex_ = 2;
+            } else if (keyNTrigger) {
+                // Nを押した
+                currentLineIndex_ = 1;
+            } else {
+                currentLineIndex_ = 0;
             }
         }
+        preKeyN_ = keyNTrigger;
+        break;
+    }
 
-        if (!placementSelectionChangedThisFrame && !clickedInstallationButtonThisFrame) {
-            Installation(scene, selectedObjPath_);
-        }
-        if (hasPlacedPipe_) {
+    case TutorialStep::Step14_FreePlayBattle:
+        if (phaseState_ == PhaseSystemScript::PreparationPhase && !isPhaseTransitioning_) {
+            if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/Canon.prefab")) {
+                selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
+                isPlacementMode_ = true;
+                placementSelectionChangedThisFrame = true;
+            }
+
+            if (input->IsMouseTrigger(1) && isPlacementMode_) {
+                isPlacementMode_ = false;
+            }
+
+            if (!placementSelectionChangedThisFrame && !clickedInstallationButtonThisFrame) {
+                Installation(scene, selectedObjPath_);
+            }
+
             if (keySpace) {
-                EnterStep(TutorialStep::FirstBattle1);
+                currentLineIndex_ = 0;
+                EnterStep(TutorialStep::Step14_FreePlayBattle);
+            }
+        } else if (phaseState_ == PhaseSystemScript::BattlePhase) {
+            if (WaveManagement::IsWaveEnded()) {
+                WaveManagement::ResetState();
+                WaveManagement::SetWave(0);
+
+                auto waveManagerEntity = WaveManagement::GetManagerEntity();
+                if (scene->GetRegistry().valid(waveManagerEntity)) {
+                    if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(waveManagerEntity)) {
+                        for (auto& entry : sc->scripts) {
+                            if (entry.scriptPath == "WaveManagement" && entry.instance) {
+                                auto* wm = static_cast<WaveManagement*>(entry.instance.get());
+                                wm->SpawnSpanner(0, scene);
+                            }
+                        }
+                    }
+                }
+                EditorUI::Log("Tutorial: Infinite loop respawning Wave 0 enemies!");
             }
         }
         break;
-
-    case TutorialStep::FirstBattle1:
-        autoProceedTimer_ += dt;
-        if (autoProceedTimer_ >= 2.0f) EnterStep(TutorialStep::FirstBattle2);
+    default:
         break;
-    case TutorialStep::FirstBattle2:
-        autoProceedTimer_ += dt;
-        if (autoProceedTimer_ >= 2.0f) EnterStep(TutorialStep::FirstBattle3);
-        break;
-    case TutorialStep::FirstBattle3:
-        if (keyP) {
-            EnterStep(TutorialStep::SkillTreeGuide1);
-        }
-        break;
-
-    case TutorialStep::SkillTreeGuide1: {
-        if (keySpace) EnterStep(TutorialStep::SkillTreeGuide2);
-        break;
-    }
-    case TutorialStep::SkillTreeGuide2: {
-        if (keySpace) EnterStep(TutorialStep::SkillTreeGuide3);
-        break;
-    }
-    case TutorialStep::SkillTreeGuide3: {
-        if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
-            break;
-
-        bool keyN = false;
-        UpdateSkillTree(entity, scene, keyN);
-        if (hasOpenedSkillTreeInGuide_ && keySpace) {
-            skillTree_.Close(scene);
-			EnterStep(TutorialStep::Finish);
-        }
-        preKeyN_ = keyN;
-        break;
-    }
-
-    case TutorialStep::Finish:
-        skillTree_.Close(scene);
-        if (scene) {
-			// 次のシーン（リザルト画面）に引き継ぐためのパラメータを作成します
-            Engine::SceneParameters res;
-            res.isWin = true;
-            res.score = 99999;
-            res.clearTime = 0.0f;
-            ResultManagerScript::pendingOriginalScene = scene->GetStagePath();
-			// シーンマネージャーを使って、パラメータと共に「Result」シーンへの切り替えを要求します
-            Engine::SceneManager::GetInstance()->RequestChange("Result", res);
-        }
-        break;
-    }
-
-    if (tutorialStep_ != TutorialStep::SkillTreeGuide1 && tutorialStep_ != TutorialStep::SkillTreeGuide2 && tutorialStep_ != TutorialStep::SkillTreeGuide3) {
-        preKeyN_ = false;
     }
 
     UpdatePhaseTransition(scene);
 }
 
-// フェーズ変更（準備フェーズ・戦闘フェーズなど）のリクエストを出し、フェード演出の準備を行う
+// 準備フェーズと戦闘フェーズの間で状態を切り替えるよう要求する（フェード遷移を開始する）
 void TutorialScript::RequestPhaseChange(PhaseSystemScript::PhaseState nextPhase) {
     if (phaseState_ == PhaseSystemScript::Transition || isPhaseTransitioning_)
         return;
@@ -519,7 +770,7 @@ void TutorialScript::RequestPhaseChange(PhaseSystemScript::PhaseState nextPhase)
     }
 }
 
-// フェーズ切り替えのトランジション（フェード等）の更新処理と、切り替え完了後のウェーブ設定や経路探索マップ更新等の処理を行う
+// フェーズ遷移中の処理を更新し、フェード完了タイミングで実際のフェーズ状態切り替えを適用する
 void TutorialScript::UpdatePhaseTransition(GameScene* scene) {
     if (!isPhaseTransitioning_)
         return;
@@ -546,9 +797,8 @@ void TutorialScript::UpdatePhaseTransition(GameScene* scene) {
                 nav.GenerateFlowField(tc.translate.x, tc.translate.z);
             }
 
-            if (tutorialStep_ == TutorialStep::FirstBattle1 || tutorialStep_ == TutorialStep::FirstBattle2 || tutorialStep_ == TutorialStep::FirstBattle3) {
+            if (tutorialStep_ == TutorialStep::Step11_CombatPlay || tutorialStep_ == TutorialStep::Step14_FreePlayBattle) {
                 WaveManagement::SetWave(0);
-			} else if (tutorialStep_ == TutorialStep::Finish) {
             }
         } else if (phaseState_ == PhaseSystemScript::PreparationPhase) {
             WaveManagement::SetWave(-1);
@@ -556,99 +806,21 @@ void TutorialScript::UpdatePhaseTransition(GameScene* scene) {
     }
 }
 
+// 現在のチュートリアルステップに基づくテキストをUIテキストコンポーネントに適用する
 void TutorialScript::ShowGuideText(entt::entity entity, GameScene* scene) {
+    if (!scene) return;
+    auto& registry = scene->GetRegistry();
+    if (!registry.all_of<UITextComponent>(entity)) return;
 
-	switch (tutorialStep_) {
-	case TutorialStep::Preparation1:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "チュートリアルです。\nESCでポーズを開き中断できます\nSPACE:次へ";
-		break;
-	case TutorialStep::Preparation2:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "ゲームは準備フェーズと戦闘フェーズで構成されます。\nSPACE:次へ";
-		break;
-	case TutorialStep::Preparation3:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "準備ができたら、防衛の準備を始めましょう。\nSPACE:次へ";
-		break;
-	case TutorialStep::PlayerMoveGuide1:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "WASDでプレイヤーを移動できます,マウスで照準を動かせます。\nSPACE:次へ";
-		break;
+    auto& uiText = registry.get<UITextComponent>(entity);
 
-	case TutorialStep::PlayerMoveGuide2:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "左クリックで攻撃できます。,Eキーでスキルを打てます。\nSPACE:次へ";
-		break;
-
-	case TutorialStep::PlayerMoveGuide3:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "考え中\nSPACE:次へ";
-		break;
-	case TutorialStep::InstallCannonGuide1:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "設置についてです。\n設置にはお金を使います\n今回は無償で行います\nSPACE:次へ";
-		break;
-	case TutorialStep::InstallCannonGuide2:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "まずキャノンを設置しましょう。\nSPACE:次へ";
-		break;
-	case TutorialStep::InstallCannonGuide3:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "アイコンをタップして設置したい場所に置こう\n";
-		break;
-
-	case TutorialStep::InstallTankGuide1:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "キャノンには動力源が必要です。\nSPACE:次へ";
-		break;
-	case TutorialStep::InstallTankGuide2:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "タンクを設置してエネルギーを供給しましょう\nSPACE:次へ";
-		break;
-	case TutorialStep::InstallTankGuide3:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "タンクを設置しよう！\n";
-		break;
-
-	case TutorialStep::InstallPipeGuide1:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "タンクとキャノンを繋ぐ必要があります。\nSPACE:次へ";
-		break;
-	case TutorialStep::InstallPipeGuide2:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "動力を送るために\nSPACE:次へ";
-		break;
-	case TutorialStep::InstallPipeGuide3:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "パイプを設置しましょう。\n（タンクの緑の位置から大砲へ）";
-		break;
-
-	case TutorialStep::FirstBattle1:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "いよいよ敵がやってきます。";
-		break;
-	case TutorialStep::FirstBattle2:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "後ろの青いコアを敵から守ろう。";
-		break;
-	case TutorialStep::FirstBattle3:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "敵を倒すと経験値とお金が落ちます。";
-		break;
-    case TutorialStep::SkillTreeGuide1:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "戦闘で得た経験値を使って強くなろう。\nSPACE:次へ";
-		break;
-    case TutorialStep::SkillTreeGuide2:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "スキルツリーを開いて強化を行います。\nSPACE:次へ";
-		break;
-    case TutorialStep::SkillTreeGuide3:
-		if (scene->GetRegistry().all_of<UITextComponent>(entity))
-			scene->GetRegistry().get<UITextComponent>(entity).text = "Nキーでスキルツリーを開いてね！\nSPACEを押したらチュートリアル終了。";
-		break;
-	}
+    auto it = kTutorialTexts.find(tutorialStep_);
+    if (it != kTutorialTexts.end()) {
+        const auto& lines = it->second;
+        if (currentLineIndex_ >= 0 && currentLineIndex_ < static_cast<int>(lines.size())) {
+            uiText.text = lines[currentLineIndex_];
+        }
+    }
 }
 
 // 施設やパイプを設置する処理。座標のグリッドスナップや設置条件の判定、プレビュー描画を行う
@@ -669,124 +841,7 @@ void TutorialScript::Installation(GameScene* scene, const std::string& objPath) 
     snappedHitPoint.x = SnapTo2x2Grid(snappedHitPoint.x);
     snappedHitPoint.z = SnapTo2x2Grid(snappedHitPoint.z);
 
-    if (isPipeSet_) {
-        snappedHitPoint.x = SnapTo2x2Grid(snappedHitPoint.x);
-        snappedHitPoint.z = SnapTo2x2Grid(snappedHitPoint.z);
 
-        if (!hasPipeStartPoint_) {
-            const bool withinFacility = (GetFacilityInRange(scene, snappedHitPoint.x, snappedHitPoint.z) != entt::null);
-            
-            // ★重複排除＆利便性向上: スタート地点の座標は、すでにパイプがあるマスであっても選択できるようにする
-            // ただし、大砲やタンクなどの他の施設がある場合はブロックする
-            bool isBlockedByOtherThanPipe = false;
-            constexpr float kBlockHalfExtent = 2.0f;
-            auto& registry = scene->GetRegistry();
-            for (auto entity : registry.view<TransformComponent>()) {
-                if (!registry.any_of<MeshRendererComponent, BoxColliderComponent, GpuMeshColliderComponent>(entity)) continue;
-                if (registry.all_of<TagComponent>(entity) && registry.get<TagComponent>(entity).tag == TagType::Pipe) {
-                    continue; // パイプはスタート地点の重ね合わせを許可
-                }
-                if (registry.all_of<NameComponent>(entity)) {
-                    const auto& nc = registry.get<NameComponent>(entity);
-                    if ((nc.name.find("Terrain") != std::string::npos) || (nc.name.find("Floor") != std::string::npos) || (nc.name.find("Ground") != std::string::npos) ||
-                        (nc.name.find("Stage") != std::string::npos) || (nc.name.find("Plane") != std::string::npos)) {
-                        continue; // 地形もスルー
-                    }
-                }
-                if (registry.all_of<TagComponent>(entity) && registry.get<TagComponent>(entity).tag == TagType::Wall) {
-                    continue; // 壁もスルー
-                }
-
-                const auto& tc = registry.get<TransformComponent>(entity);
-                const float dx = tc.translate.x - snappedHitPoint.x;
-                const float dz = tc.translate.z - snappedHitPoint.z;
-                if (std::abs(dx) < kBlockHalfExtent && std::abs(dz) < kBlockHalfExtent) {
-                    isBlockedByOtherThanPipe = true;
-                    break;
-                }
-            }
-
-            const bool canPlaceStart = !isBlockedByOtherThanPipe && withinFacility;
-            DrawPlacementPreview(scene, snappedHitPoint, objPath, canPlaceStart);
-
-            if (input->IsMouseTrigger(0) && canPlaceStart) {
-                pipeStartX_ = snappedHitPoint.x;
-                pipeStartY_ = snappedHitPoint.y;
-                pipeStartZ_ = snappedHitPoint.z;
-                hasPipeStartPoint_ = true;
-            }
-            return;
-        }
-
-        Engine::Vector3 startPoint{pipeStartX_, pipeStartY_, pipeStartZ_};
-        auto pathPoints = BuildPipePathPoints(startPoint, snappedHitPoint);
-        bool canPlaceAll = !pathPoints.empty();
-
-        entt::entity startFacility = GetFacilityInRange(scene, pipeStartX_, pipeStartZ_);
-        entt::entity endFacility = GetFacilityInRange(scene, snappedHitPoint.x, snappedHitPoint.z);
-        bool validFacilityDrop = (endFacility != entt::null && endFacility != startFacility);
-
-        if (!validFacilityDrop) {
-            canPlaceAll = false;
-        }
-
-        for (const auto& p : pathPoints) {
-            const bool canPlacePoint = !IsPlacementBlocked(scene, p);
-            DrawPlacementPreview(scene, p, objPath, canPlacePoint && validFacilityDrop);
-            if (!canPlacePoint) {
-                canPlaceAll = false;
-            }
-        }
-
-        // パイプ間の接続ラインを描画
-        auto* pipeRenderer = scene->GetRenderer();
-        if (pipeRenderer && pathPoints.size() >= 2) {
-            for (size_t i = 0; i + 1 < pathPoints.size(); ++i) {
-                Engine::Vector3 p1 = {pathPoints[i].x, pathPoints[i].y + 0.5f, pathPoints[i].z};
-				Engine::Vector3 p2 = {pathPoints[i+1].x, pathPoints[i+1].y + 0.5f, pathPoints[i+1].z};
-                Engine::Vector4 lineColor = canPlaceAll ? Engine::Vector4{0.6f, 1.0f, 0.6f, 1.0f} : Engine::Vector4{1.0f, 0.3f, 0.3f, 1.0f};
-                pipeRenderer->DrawLine3D(p1, p2, lineColor, true);
-            }
-        }
-
-        if (input->IsMouseTrigger(0)) {
-            if (canPlaceAll) {
-                // ★重複配置の排除最適化★
-                // 実際に新しく配置するポイント（すでに同座標にパイプがある場所は除外）をフィルタリング
-                std::vector<Engine::Vector3> actualPlacePoints;
-                actualPlacePoints.reserve(pathPoints.size());
-
-                auto& registry = scene->GetRegistry();
-                for (const auto& p : pathPoints) {
-                    bool alreadyExists = false;
-                    constexpr float kBlockHalfExtent = 1.0f; // 完全重なりを検知するための狭い範囲
-                    for (auto entity : registry.view<TransformComponent>()) {
-                        if (!registry.any_of<MeshRendererComponent>(entity)) continue;
-                        if (registry.all_of<TagComponent>(entity) && registry.get<TagComponent>(entity).tag == TagType::Pipe) {
-                            const auto& tc = registry.get<TransformComponent>(entity);
-                            const float dx = tc.translate.x - p.x;
-                            const float dz = tc.translate.z - p.z;
-							if (std::abs(dx) < kBlockHalfExtent && std::abs(dz) < kBlockHalfExtent) {
-                                alreadyExists = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (!alreadyExists) {
-                        actualPlacePoints.push_back(p);
-                    }
-                }
-
-                for (const auto& p : actualPlacePoints) {
-                    SpawnPlacedObject(scene, p, objPath);
-                }
-                isPlacementMode_ = false;
-                isPipeSet_ = false;
-            }
-            hasPipeStartPoint_ = false;
-        }
-        return;
-    }
 
     const bool canPlace = !IsPlacementBlocked(scene, snappedHitPoint);
     DrawPlacementPreview(scene, snappedHitPoint, objPath, canPlace);
@@ -1065,8 +1120,6 @@ void TutorialScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector3& 
             }
         }
 
-        if (objPath.find("BulletTank") != std::string::npos) hasPlacedTank_ = true;
-        if (objPath.find("Pipe") != std::string::npos) hasPlacedPipe_ = true;
         if (objPath.find("Canon") != std::string::npos) hasPlacedCannon_ = true;
 
         return;
@@ -1093,13 +1146,12 @@ void TutorialScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector3& 
     mr.texturePath = "Resources/Textures/white1x1.png";
     mr.shaderName = "Toon";
 
-    if (objPath.find("BulletTank") != std::string::npos) hasPlacedTank_ = true;
-    if (objPath.find("Pipe") != std::string::npos) hasPlacedPipe_ = true;
     if (objPath.find("Canon") != std::string::npos) hasPlacedCannon_ = true;
 }
 
 // スクリプト破棄時の処理。スキルツリーを閉じ、フェーズを初期状態にリセットする
 void TutorialScript::OnDestroy(entt::entity /*entity*/, GameScene* scene) {
+    if (instance_ == this) instance_ = nullptr;
     skillTree_.Close(scene);
     PhaseSystemScript::ForcePhaseState(PhaseSystemScript::PreparationPhase);
 }

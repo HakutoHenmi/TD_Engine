@@ -12,7 +12,7 @@ namespace Game {
 class TitleManagerScript : public IScript {
 public:
 	static void CreateFallbackUI(GameScene* scene);
-	static entt::entity CreateTitleButton(entt::registry& reg, const std::string& text, float yPos, entt::entity parent);
+	static entt::entity CreateTitleButton(GameScene* scene, entt::registry& reg, const std::string& text, float yPos, entt::entity parent);
 
 	void Start(entt::entity entity, GameScene* scene) override;
 	void Update(entt::entity entity, GameScene* scene, float dt) override;

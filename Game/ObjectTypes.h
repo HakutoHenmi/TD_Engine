@@ -52,8 +52,8 @@ enum class ComponentType {
 	River, // ★追加: 川コンポーネント
 	Variable, // ★追加: 汎用変数
 	WorldSpaceUI, // ★追加: ワールド空間UI
-	Motion // ★追加: モーションエディタ用
-
+	Motion, // ★追加: モーションエディタ用
+	Buff // ★追加: プレイヤーからのバフ効果
 };
 struct Component { 
 	ComponentType type = ComponentType::MeshRenderer; 
@@ -70,6 +70,7 @@ struct NameComponent {
 
 struct HierarchyComponent {
 	entt::entity parentId = entt::null;
+	std::vector<entt::entity> children; // ★追加: 子オブジェクトのリスト
 };
 
 struct TransformComponent : public Component {
@@ -147,9 +148,9 @@ struct GpuMeshColliderComponent : public Component {
 	GpuMeshColliderComponent() { type = ComponentType::GpuMeshCollider; }
 };
 
-// ★追加: アニメーターコンポーネント
 struct AnimatorComponent : public Component {
 	std::string currentAnimation;
+	int currentAnimationIndex = -1; // ★追加: 文字列検索回避のためのインデックスキャッシュ
 	float time = 0.0f;
 	float speed = 1.0f;
 	bool isPlaying = false;
@@ -310,6 +311,7 @@ struct ParticleEmitterComponent : public Component {
 	Engine::ParticleEmitter emitter;
 	std::string assetPath = ""; // .particle ファイルのパス
 	bool isInitialized = false;
+	float originalEmitRate = -1.0f; // ★追加: 距離ベースLOD用の元データ保存
 
 	ParticleEmitterComponent() { type = ComponentType::ParticleEmitter; }
 };
@@ -385,6 +387,8 @@ struct HurtboxComponent : public Component {
 struct HealthComponent : public Component {
 	float hp = 100.0f;               // 現在の体力
 	float maxHp = 100.0f;            // 最大体力
+	float shieldHp = 100.0f;         // ★変更: シールド体力（プレイヤーが数回殴って割れるバランス）
+	float maxShieldHp = 100.0f;      // ★変更: 最大シールド体力
 	float stamina = 100.0f;          // スタミナ
 	float maxStamina = 100.0f;       // 最大スタミナ
 	float invincibleTime = 0.0f;     // 残り無敵時間（ゼロ以上なら無敵）
@@ -505,6 +509,15 @@ struct VariableComponent : public Component {
 	void SetString(const std::string& key, const std::string& val) {
 		strings[key] = val;
 	}
+};
+
+// ★追加: 設備に対するバフ効果コンポーネント
+struct BuffComponent : public Component {
+	bool isBuffed = false;
+	float buffMultiplier = 1.5f; // バフによる倍率（攻撃速度向上など）
+	float buffRadius = 8.0f;    // この設備がバフを受け取れるプレイヤーからの距離（視覚化用にも使用）
+	
+	BuffComponent() { type = ComponentType::Buff; }
 };
 
 // ★追加: モーションエディタ用コンポーネント

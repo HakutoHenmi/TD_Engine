@@ -15,7 +15,7 @@
     {
       "id": 1,
       "name": "CanonPower",
-      "icon": "Attack",
+      "icon": "CanonButtonSkill",
       "cost": 1,
       "parentId": 0,
       "unlocked": false,
@@ -27,7 +27,7 @@
     {
       "id": 2,
       "name": "CanonSpeed",
-      "icon": "AttackSpeed",
+      "icon": "CanonButtonSkill",
       "cost": 1,
       "parentId": 0,
       "unlocked": false,
@@ -39,7 +39,7 @@
     {
       "id": 3,
       "name": "CanonRange",
-      "icon": "AllUp",
+      "icon": "CanonButtonSkill",
       "cost": 1,
       "parentId": 0,
       "unlocked": false,
@@ -51,7 +51,7 @@
     {
       "id": 4,
       "name": "CanonPower2",
-      "icon": "Power",
+      "icon": "CanonButtonSkill",
       "cost": 1,
       "parentId": 1,
       "unlocked": false,
@@ -63,7 +63,7 @@
     {
       "id": 5,
       "name": "CanonAllUp",
-      "icon": "AllUp",
+      "icon": "CanonButtonSkill",
       "cost": 1,
       "parentId": 3,
       "unlocked": false,
@@ -75,7 +75,7 @@
     {
       "id": 6,
       "name": "CanonSpeed2",
-      "icon": "Speed",
+      "icon": "CanonButtonSkill",
       "cost": 1,
       "parentId": 2,
       "unlocked": false,
@@ -87,7 +87,7 @@
     {
       "id": 7,
       "name": "CanonCritical",
-      "icon": "Power",
+      "icon": "CanonButtonSkill",
       "cost": 2,
       "parentId": 4,
       "unlocked": false,
@@ -99,7 +99,7 @@
     {
       "id": 8,
       "name": "CanonOverclock",
-      "icon": "Speed",
+      "icon": "CanonButtonSkill",
       "cost": 2,
       "parentId": 6,
       "unlocked": false,
@@ -111,7 +111,7 @@
     {
       "id": 9,
       "name": "CanonMastery",
-      "icon": "AllUp",
+      "icon": "CanonButtonSkill",
       "cost": 3,
       "parentId": 5,
       "unlocked": false,
@@ -121,90 +121,90 @@
       "pageId": 0
     },
 
-    {
-      "id": 100,
-      "name": "PoisonBase",
-      "icon": "Base2",
-      "cost": 0,
-      "parentId": -1,
-      "unlocked": true,
-      "gridX": 2.0,
-      "gridY": 0.0,
-      "description": "毒トラップの基本性能",
-      "pageId": 1
-    },
-    {
-      "id": 101,
-      "name": "PoisonPower",
-      "icon": "Attack",
-      "cost": 1,
-      "parentId": 100,
-      "unlocked": false,
-      "gridX": 0.0,
-      "gridY": 1.0,
-      "description": "毒トラップの攻撃力が上がります。",
-      "pageId": 1
-    },
-    {
-      "id": 102,
-      "name": "PoisonRange",
-      "icon": "AttackSpeed",
-      "cost": 1,
-      "parentId": 100,
-      "unlocked": false,
-      "gridX": 4.0,
-      "gridY": 1.0,
-      "description": "毒トラップの攻撃範囲が広がります。",
-      "pageId": 1
-    },
-    {
-      "id": 103,
-      "name": "PoisonAllUp",
-      "icon": "AllUp",
-      "cost": 1,
-      "parentId": 100,
-      "unlocked": false,
-      "gridX": 2.0,
-      "gridY": 1.0,
-      "description": "毒トラップの総合性能が上がります。",
-      "pageId": 1
-    },
-    {
-      "id": 104,
-      "name": "PoisonDamage2",
-      "icon": "Power",
-      "cost": 1,
-      "parentId": 101,
-      "unlocked": false,
-      "gridX": 0.0,
-      "gridY": 2.0,
-      "description": "毒ダメージがさらに上がります。",
-      "pageId": 1
-    },
-    {
-      "id": 105,
-      "name": "PoisonArea2",
-      "icon": "AllUp",
-      "cost": 1,
-      "parentId": 102,
-      "unlocked": false,
-      "gridX": 4.0,
-      "gridY": 2.0,
-      "description": "毒の範囲がさらに広がります。",
-      "pageId": 1
-    },
-    {
-      "id": 106,
-      "name": "PoisonMastery",
-      "icon": "AllUp",
-      "cost": 2,
-      "parentId": 103,
-      "unlocked": false,
-      "gridX": 2.0,
-      "gridY": 3.0,
-      "description": "毒トラップの性能が大きく上がります。",
-      "pageId": 1
-    },
+{
+  "id": 100,
+  "name": "PoisonBase",
+  "icon": "Base2",
+  "cost": 0,
+  "parentId": -1,
+  "unlocked": true,
+  "gridX": 2.0,
+  "gridY": 0.0,
+  "description": "毒トラップの基本性能",
+  "pageId": 1
+},
+{
+  "id": 101,
+  "name": "PoisonPower",
+  "icon": "PoisonButtonSkill",
+  "cost": 1,
+  "parentId": 100,
+  "unlocked": false,
+  "gridX": 0.0,
+  "gridY": 1.0,
+  "description": "毒トラップの攻撃力が大きく上がります。",
+  "pageId": 1
+},
+{
+  "id": 102,
+  "name": "PoisonRange",
+  "icon": "PoisonButtonSkill",
+  "cost": 1,
+  "parentId": 100,
+  "unlocked": false,
+  "gridX": 4.0,
+  "gridY": 1.0,
+  "description": "毒トラップの攻撃範囲が大きく広がります。",
+  "pageId": 1
+},
+{
+  "id": 103,
+  "name": "PoisonAllUp",
+  "icon": "PoisonButtonSkill",
+  "cost": 1,
+  "parentId": 100,
+  "unlocked": false,
+  "gridX": 2.0,
+  "gridY": 1.0,
+  "description": "毒トラップの攻撃力と範囲が上がります。",
+  "pageId": 1
+},
+{
+  "id": 104,
+  "name": "PoisonDuration",
+  "icon": "PoisonButtonSkill",
+  "cost": 1,
+  "parentId": 101,
+  "unlocked": false,
+  "gridX": 0.0,
+  "gridY": 2.0,
+  "description": "毒の持続時間が長くなります。",
+  "pageId": 1
+},
+{
+  "id": 105,
+  "name": "PoisonCooldown",
+  "icon": "PoisonButtonSkill",
+  "cost": 1,
+  "parentId": 102,
+  "unlocked": false,
+  "gridX": 4.0,
+  "gridY": 2.0,
+  "description": "毒トラップのクールタイムが短くなります。",
+  "pageId": 1
+},
+{
+  "id": 106,
+  "name": "PoisonMastery",
+  "icon": "PoisonButtonSkill",
+  "cost": 2,
+  "parentId": 103,
+  "unlocked": false,
+  "gridX": 2.0,
+  "gridY": 3.0,
+  "description": "毒トラップの全性能が大きく強化されます。",
+  "pageId": 1
+},
 
     {
       "id": 200,
@@ -221,7 +221,7 @@
     {
       "id": 201,
       "name": "MissilePower",
-      "icon": "Attack",
+      "icon": "MisileButtonSkill",
       "cost": 1,
       "parentId": 200,
       "unlocked": false,
@@ -233,7 +233,7 @@
     {
       "id": 202,
       "name": "MissileExplosion",
-      "icon": "AttackSpeed",
+      "icon": "MisileButtonSkill",
       "cost": 1,
       "parentId": 200,
       "unlocked": false,
@@ -245,7 +245,7 @@
     {
       "id": 203,
       "name": "MissileAllUp",
-      "icon": "AllUp",
+      "icon": "MisileButtonSkill",
       "cost": 1,
       "parentId": 200,
       "unlocked": false,
@@ -257,7 +257,7 @@
     {
       "id": 204,
       "name": "MissilePower2",
-      "icon": "Power",
+      "icon": "MisileButtonSkill",
       "cost": 1,
       "parentId": 201,
       "unlocked": false,
@@ -269,7 +269,7 @@
     {
       "id": 205,
       "name": "MissileExplosion2",
-      "icon": "AllUp",
+      "icon": "MisileButtonSkill",
       "cost": 1,
       "parentId": 202,
       "unlocked": false,
@@ -281,7 +281,7 @@
     {
       "id": 206,
       "name": "MissileMastery",
-      "icon": "AllUp",
+      "icon": "MisileButtonSkill",
       "cost": 2,
       "parentId": 203,
       "unlocked": false,
@@ -306,7 +306,7 @@
     {
       "id": 301,
       "name": "IcePower",
-      "icon": "Attack",
+      "icon": "IceCanonSkill",
       "cost": 1,
       "parentId": 300,
       "unlocked": false,
@@ -318,7 +318,7 @@
     {
       "id": 302,
       "name": "IceRange",
-      "icon": "AttackSpeed",
+      "icon": "IceCanonSkill",
       "cost": 1,
       "parentId": 300,
       "unlocked": false,
@@ -330,7 +330,7 @@
     {
       "id": 303,
       "name": "IceStopTime",
-      "icon": "AllUp",
+      "icon": "IceCanonSkill",
       "cost": 1,
       "parentId": 300,
       "unlocked": false,
@@ -342,7 +342,7 @@
     {
       "id": 304,
       "name": "IceBulletCount",
-      "icon": "Power",
+      "icon": "IceCanonSkill",
       "cost": 1,
       "parentId": 301,
       "unlocked": false,
@@ -354,7 +354,7 @@
     {
       "id": 305,
       "name": "IceAttackSpeed",
-      "icon": "Speed",
+      "icon": "IceCanonSkill",
       "cost": 1,
       "parentId": 302,
       "unlocked": false,
@@ -366,7 +366,7 @@
     {
       "id": 306,
       "name": "IceMastery",
-      "icon": "AllUp",
+      "icon": "IceCanonSkill",
       "cost": 2,
       "parentId": 303,
       "unlocked": false,
@@ -391,7 +391,7 @@
     {
       "id": 401,
       "name": "GunAttack",
-      "icon": "GunAttack",
+      "icon": "PlayerButtonSkill",
       "cost": 1,
       "parentId": 400,
       "unlocked": false,
@@ -403,7 +403,7 @@
     {
       "id": 402,
       "name": "SwordAttack",
-      "icon": "SwordAttack",
+      "icon": "PlayerButtonSkill",
       "cost": 1,
       "parentId": 400,
       "unlocked": false,
@@ -415,7 +415,7 @@
     {
       "id": 403,
       "name": "PlayerAllUp",
-      "icon": "AllUp",
+      "icon": "PlayerButtonSkill",
       "cost": 1,
       "parentId": 400,
       "unlocked": false,
@@ -427,7 +427,7 @@
     {
       "id": 404,
       "name": "GunAttack2",
-      "icon": "GunAttack",
+      "icon": "PlayerButtonSkill",
       "cost": 1,
       "parentId": 401,
       "unlocked": false,
@@ -439,7 +439,7 @@
     {
       "id": 405,
       "name": "SwordAttack2",
-      "icon": "SwordAttack",
+      "icon": "PlayerButtonSkill",
       "cost": 1,
       "parentId": 402,
       "unlocked": false,
@@ -451,7 +451,7 @@
     {
       "id": 406,
       "name": "SteamCostDown",
-      "icon": "SteamPressure",
+      "icon": "PlayerButtonSkill",
       "cost": 1,
       "parentId": 403,
       "unlocked": false,
@@ -463,7 +463,7 @@
     {
       "id": 407,
       "name": "GunAttackSpeed",
-      "icon": "GunAttackSpeed",
+      "icon": "PlayerButtonSkill",
       "cost": 1,
       "parentId": 404,
       "unlocked": false,
@@ -475,7 +475,7 @@
     {
       "id": 408,
       "name": "SwordAttackSpeed",
-      "icon": "SwordAttackSpeed",
+      "icon": "PlayerButtonSkill",
       "cost": 1,
       "parentId": 405,
       "unlocked": false,
@@ -487,7 +487,7 @@
     {
       "id": 409,
       "name": "MoveSpeed",
-      "icon": "MoveSpeed",
+      "icon": "PlayerButtonSkill",
       "cost": 1,
       "parentId": 406,
       "unlocked": false,
@@ -499,7 +499,7 @@
     {
       "id": 410,
       "name": "GunSkillCooldown",
-      "icon": "GunSkillCooldown",
+      "icon": "PlayerButtonSkill",
       "cost": 1,
       "parentId": 407,
       "unlocked": false,
@@ -511,7 +511,7 @@
     {
       "id": 411,
       "name": "SwordSkillCooldown",
-      "icon": "SwordSkillCooldown",
+      "icon": "PlayerButtonSkill",
       "cost": 1,
       "parentId": 408,
       "unlocked": false,
@@ -523,7 +523,7 @@
     {
       "id": 412,
       "name": "PlayerSpeedBoost",
-      "icon": "Speed",
+      "icon": "PlayerButtonSkill",
       "cost": 1,
       "parentId": 409,
       "unlocked": false,
@@ -535,7 +535,7 @@
     {
       "id": 413,
       "name": "GunSkillPower",
-      "icon": "GunSkillPower",
+      "icon": "PlayerButtonSkill",
       "cost": 1,
       "parentId": 410,
       "unlocked": false,
@@ -547,7 +547,7 @@
     {
       "id": 414,
       "name": "SwordSkillPower",
-      "icon": "SwordSkillPower",
+      "icon": "PlayerButtonSkill",
       "cost": 1,
       "parentId": 411,
       "unlocked": false,

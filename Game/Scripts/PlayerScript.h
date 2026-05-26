@@ -149,7 +149,7 @@ private:
 	static constexpr float RECHARGE_TIME = 2.5f;        // リチャージにかかる時間
 	static constexpr float NORMAL_SHOT_COST = 15.0f;    // 通常射撃の圧力コスト
 	static constexpr float CHARGE_SHOT_COST = 45.0f;    // チャージショットの圧力コスト
-
+	float maxSteam = 0.0f;                              // ★追加: スキルで増加する最大蒸気圧の量を管理する変数
 	// ★追加: 飛行システム (別圧力計)
 	float flightPressure_ = 100.0f;
 	float maxFlightPressure_ = 100.0f;
@@ -162,6 +162,8 @@ private:
 	static constexpr float CHARGE_TIME_MIN = 0.35f;     // チャージショット判定の最低時間
 	static constexpr float DASH_COST = 20.0f;           // スチーム・ブーストのコスト
 	static constexpr float DASH_POWER = 155.0f;         // スチーム・ブーストの推進力 (さらにもう少しだけ伸ばす調整)
+
+	DirectX::XMFLOAT3 initialPos_ = {0, 0, 0}; // ★フェーズクリア時に戻るための初期位置
 
 	// ★追加: チャージショット
 	bool isCharging_ = false;            // チャージ中か
@@ -187,10 +189,25 @@ private:
 	void DrawReticle(entt::entity playerEntity, GameScene* scene);
 
 
-	//スキル
+	// Skills
 	float playerMoveSpeedRate_ = 1.0f;
-	float playerGunDamageRate_ = 1.0f;
-	float playerMaxSteamRate_ = 1.0f;
+
+	float playerSwordAttackSpeedRate_ = 1.0f;
+	float playerGunAttackSpeedRate_ = 1.0f;
+
+	float playerSwordAttackPowerRate_ = 1.0f;
+	float playerGunAttackPowerRate_ = 1.0f;
+
+	float playerMaxSteamPressureRate_ = 1.0f;
+
+	float playerSwordSkillCooldownRate_ = 1.0f;
+	float playerGunSkillCooldownRate_ = 1.0f;
+
+	float playerSwordSkillAttackPowerRate_ = 1.0f;
+	float playerGunSkillAttackPowerRate_ = 1.0f;
+
+	// ★追加: プレイヤーから設備へのバフ付与範囲
+	float buffRadius_ = 8.0f;
 };
 
 } // namespace Game

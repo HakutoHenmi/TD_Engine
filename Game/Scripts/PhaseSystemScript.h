@@ -53,6 +53,7 @@ public:
 	}
 
 	static int GetCurrentPhase() { return currentPhase_; }
+	static void ResetPhaseCount() { currentPhase_ = 0; }
 
 private:
 	inline static PhaseState isPhase_ = PreparationPhase;
@@ -78,20 +79,10 @@ private:
 
 	bool isSellMode_ = false;       // 追加: 売却（削除）モード
 
-	// 施設の値段
-	int tankCost_ = 100;
-	int pipeCost_ = 5;
 	int canonCost_ = 150;
 	int missileCost_ = 200;
 	int poisonCost_ = 120;
 	int iceCanonCost_ = 250;
-
-	// パイプ専用
-	bool isPipeSet_ = false;
-	bool hasPipeStartPoint_ = false;
-	float pipeStartX_ = 0.0f;
-	float pipeStartY_ = 0.0f;
-	float pipeStartZ_ = 0.0f;
 
 	int selectedObjCost_ = 0; // 追加
 	int currentInstallationCost_ = 0; // 現在の設置コスト

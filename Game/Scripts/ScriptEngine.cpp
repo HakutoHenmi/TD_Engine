@@ -12,9 +12,7 @@
 #include "Canon.h"
 // ★追加: リリースビルドでリンク漏れ防止のため全スクリプトをinclude
 #include "BulletScript.h"
-#include "BulletTank.h"
 #include "TowerScript.h"
-#include "PipeScript.h"
 #include "KamikazeEnemyScript.h"
 #include "ExperienceOrbScript.h"
 #include "ExperienceMiner.h"
@@ -56,9 +54,7 @@ void ScriptEngine::Initialize() {
 	RegisterScript("Canon", []() { return std::make_shared<Canon>(); });
 	// ★追加: 不足していたスクリプトの明示登録
 	RegisterScript("BulletScript", []() { return std::make_shared<BulletScript>(); });
-	RegisterScript("BulletTank", []() { return std::make_shared<BulletTank>(); });
 	RegisterScript("TowerScript", []() { return std::make_shared<TowerScript>(); });
-	RegisterScript("PipeScript", []() { return std::make_shared<PipeScript>(); });
 	RegisterScript("KamikazeEnemyScript", []() { return std::make_shared<KamikazeEnemyScript>(); });
 	RegisterScript("ExperienceOrbScript", []() { return std::make_shared<ExperienceOrbScript>(); });
 	RegisterScript("ExperienceMiner", []() { return std::make_shared<ExperienceMiner>(); });

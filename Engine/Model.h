@@ -123,6 +123,7 @@ public:
 	const ModelData& GetData() const { return data_; }
 	UINT GetVertexCount() const { return static_cast<UINT>(data_.vertices.size()); }
 	uint32_t GetIndexCount() const { return indexCount_; } // 追加
+	bool IsLightweight() const { return m_isLightweight; } // ★追加: 軽量メッシュ判定
 
 	const D3D12_VERTEX_BUFFER_VIEW& GetVBV() const { return vbv_; }
 	const D3D12_INDEX_BUFFER_VIEW& GetIBV() const { return ibv_; } // 追加
@@ -179,6 +180,7 @@ private:
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc_{};
 	D3D12_GPU_DESCRIPTOR_HANDLE srvGpu_{};
 	bool hasTexture_ = false;
+	bool m_isLightweight = false; // ★追加: シャドウパス軽量化フラグ
 };
 
 } // namespace Engine

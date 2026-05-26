@@ -12,6 +12,7 @@
 #include "../Systems/UISystem.h" // ★追加: ポーズメニュー用
 #include <mutex>
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include "../../externals/entt/entt.hpp"
 #include "../../Engine/ParticleEmitter.h"
@@ -38,6 +39,10 @@ public:
 	entt::entity CreateEntity(const std::string& name = "New Object");
 	// ★追加: オブジェクトをIDで破棄保留にする
 	void DestroyObject(uint32_t id);
+
+	// ★追加: 親子関係を構築・解除するメソッド
+	void SetParent(entt::entity child, entt::entity parent);
+	void RemoveParent(entt::entity child);
 
     entt::registry& GetRegistry() { return registry_; }
     const entt::registry& GetRegistry() const { return registry_; }
@@ -112,12 +117,20 @@ private:
 	void OnScriptDestroyed(entt::registry& reg, entt::entity entity); // ★追加
 
 	// 行列計算キャッシュ (FPS向上用)
-	mutable std::unordered_map<entt::entity, Engine::Matrix4x4> matrixCache_;
-	mutable uint64_t matrixFrameCount_ = 0;
-	void ClearMatrixCache() const { matrixCache_.clear(); matrixFrameCount_++; }
+	struct MatrixCacheEntry {
+		Engine::Matrix4x4 matrix;
+		uint64_t frameCount = 0;
+	};
+	mutable std::vector<MatrixCacheEntry> matrixCache_;
+	mutable uint64_t matrixFrameCount_ = 1;
+	void ClearMatrixCache() const { matrixFrameCount_++; }
 
 	// ★追加: 地形レイキャスト高速化用キャッシュ
-	mutable std::vector<entt::entity> staticTerrainEntities_;
+	struct TerrainCacheInfo {
+		entt::entity entity;
+		uint32_t modelHandle;
+	};
+	mutable std::vector<TerrainCacheInfo> staticTerrainEntities_;
 	mutable bool staticTerrainDirty_ = true;
 
 	std::string sceneSnapshot_; // ★追加: Play開始時のシリアライズ文字列
@@ -138,7 +151,6 @@ private:
     int lastViewMode_ = 0; // 0=Scene, 1=Game
 
     friend class EditorUI;
-    friend class PipeEditor;
     friend class EnemySpawnerEditor;
 
 

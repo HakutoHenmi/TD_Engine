@@ -27,91 +27,7 @@ static bool HasTag(entt::registry& registry, entt::entity entity, TagType tagNam
 	return registry.get<TagComponent>(entity).tag == tagName;
 }
 
-static bool IsConnectedSphere(entt::registry& registry, entt::entity a, entt::entity b, float connectRange) {
-	if (!registry.valid(a) || !registry.valid(b)) return false;
-	if (!registry.all_of<TransformComponent>(a) || !registry.all_of<TransformComponent>(b)) return false;
 
-	const TransformComponent& transformA = registry.get<TransformComponent>(a);
-	const TransformComponent& transformB = registry.get<TransformComponent>(b);
-
-	float diffX = transformB.translate.x - transformA.translate.x;
-	float diffY = transformB.translate.y - transformA.translate.y;
-	float diffZ = transformB.translate.z - transformA.translate.z;
-
-	float connectRangeSq = connectRange * connectRange;
-	float dist3DSq = diffX * diffX + diffY * diffY + diffZ * diffZ;
-
-	if (dist3DSq <= connectRangeSq) {
-		return true;
-	}
-
-	float distXZSq = diffX * diffX + diffZ * diffZ;
-	float heightDifference = std::abs(diffY);
-
-	if (heightDifference >= 0.1f) {
-		if (distXZSq <= connectRangeSq) {
-			return true;
-		}
-	}
-
-	return false;
-}
-
-static void CollectConnectedBulletTanks(
-    entt::registry& registry, entt::entity currentPipe, std::unordered_set<entt::entity>& visitedPipes, std::unordered_set<entt::entity>& foundTanks, const std::vector<entt::entity>& allPipes,
-    const std::vector<entt::entity>& allTanks, float connectRange) {
-	visitedPipes.insert(currentPipe);
-
-	for (entt::entity tank : allTanks) {
-		if (IsConnectedSphere(registry, currentPipe, tank, connectRange)) {
-			foundTanks.insert(tank);
-		}
-	}
-
-	for (entt::entity otherPipe : allPipes) {
-		if (otherPipe == currentPipe) {
-			continue;
-		}
-
-		if (visitedPipes.count(otherPipe) > 0) {
-			continue;
-		}
-
-		if (!IsConnectedSphere(registry, currentPipe, otherPipe, connectRange)) {
-			continue;
-		}
-
-		CollectConnectedBulletTanks(registry, otherPipe, visitedPipes, foundTanks, allPipes, allTanks, connectRange);
-	}
-}
-
-static void CollectConnectedCanons(
-    entt::registry& registry, entt::entity currentPipe, std::unordered_set<entt::entity>& visitedPipes, std::unordered_set<entt::entity>& foundCanons, const std::vector<entt::entity>& allPipes,
-    const std::vector<entt::entity>& allCanons, float connectRange) {
-	visitedPipes.insert(currentPipe);
-
-	for (entt::entity canon : allCanons) {
-		if (IsConnectedSphere(registry, currentPipe, canon, connectRange)) {
-			foundCanons.insert(canon);
-		}
-	}
-
-	for (entt::entity otherPipe : allPipes) {
-		if (otherPipe == currentPipe) {
-			continue;
-		}
-
-		if (visitedPipes.count(otherPipe) > 0) {
-			continue;
-		}
-
-		if (!IsConnectedSphere(registry, currentPipe, otherPipe, connectRange)) {
-			continue;
-		}
-
-		CollectConnectedCanons(registry, otherPipe, visitedPipes, foundCanons, allPipes, allCanons, connectRange);
-	}
-}
 
 void Canon::Start(entt::entity entity, GameScene* scene) {
 	attackTimer_ = 0.0f;
@@ -160,6 +76,10 @@ void Canon::Start(entt::entity entity, GameScene* scene) {
 	if (!registry.all_of<WorldSpaceUIComponent>(entity)) {
 		registry.emplace<WorldSpaceUIComponent>(entity);
 	}
+
+	if (!registry.all_of<BuffComponent>(entity)) {
+		registry.emplace<BuffComponent>(entity);
+	}
 }
 
 void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
@@ -173,17 +93,7 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	}
 
-	connectionCheckTimer_ -= dt;
-	if (connectionCheckTimer_ <= 0.0f) {
-		connectionCheckTimer_ = 2.0f; // ★最適化: チェック間隔を0.5秒から2.0秒に延長してCPUスパイクを劇的削減
-		UpdateConnection(entity, scene);
-	}
 
-	float powerRate = 0.0f;
-
-	if (connectedCanonCount > 0) {
-		powerRate = static_cast<float>(connectedTankCount) / static_cast<float>(connectedCanonCount);
-	}
 
 	entt::entity gm = entt::null;
 	auto viewScript = registry.view<ScriptComponent>();
@@ -207,13 +117,35 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 
 	float currentAttackInterval = attackInterval_ / skillSpeedRate;
-
-	if (powerRate > 0.0f) {
-		currentAttackInterval = currentAttackInterval / powerRate;
-	}
-	currentAttackInterval_ = currentAttackInterval;
 	float currentRange = attackRange_ * skillRangeRate;
 	float currentDamage = damage_ * skillPowerRate;
+
+	// ★追加: プレイヤーからの距離によるバフ適用
+	if (registry.all_of<BuffComponent>(entity)) {
+		auto& buff = registry.get<BuffComponent>(entity);
+		buff.isBuffed = false;
+
+		auto players = scene->GetEntitiesByTag(TagType::Player);
+		if (!players.empty() && registry.valid(players[0])) {
+			if (registry.all_of<TransformComponent>(players[0])) {
+				auto& pTrans = registry.get<TransformComponent>(players[0]);
+				auto& cTrans = registry.get<TransformComponent>(entity);
+				float dx = pTrans.translate.x - cTrans.translate.x;
+				float dy = pTrans.translate.y - cTrans.translate.y;
+				float dz = pTrans.translate.z - cTrans.translate.z;
+				float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+
+				if (dist <= buff.buffRadius) {
+					buff.isBuffed = true;
+					// 大砲のバフ効果：連射速度（インターバル）が短縮され、攻撃力も少し上がる
+					currentAttackInterval /= buff.buffMultiplier; 
+					currentDamage *= 1.2f; // バフ時は威力も20%UP
+				}
+			}
+		}
+	}
+
+	currentAttackInterval_ = currentAttackInterval;
 	SetVar(entity, scene, "AttackRange", currentRange);
 	// Debug(isConnectedToTank_); // ★削除: Update 内での ImGui 呼び出しは例外の原因となる可能性があるため
 
@@ -221,9 +153,7 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 		attackTimer_ -= dt;
 	}
 
-	if (!isConnectedToTank_) {
-		return;
-	}
+
 
 	TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
 
@@ -261,16 +191,32 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 		currentTarget_ = entt::null;
 	}
 	if (currentTarget_ != entt::null) {
-		TransformComponent& currentTargetTransform = registry.get<TransformComponent>(currentTarget_);
 
-		float diffX = currentTargetTransform.translate.x - canonTransform.translate.x;
-		float diffY = currentTargetTransform.translate.y - canonTransform.translate.y;
-		float diffZ = currentTargetTransform.translate.z - canonTransform.translate.z;
-
-		float distanceToCurrentTarget = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
-
-		if (distanceToCurrentTarget > currentRange) {
+		if (!registry.valid(currentTarget_)) {
 			currentTarget_ = entt::null;
+		}
+
+		if (currentTarget_ != entt::null) {
+			if (!registry.all_of<TransformComponent>(currentTarget_)) {
+				currentTarget_ = entt::null;
+			}
+		}
+
+		if (currentTarget_ != entt::null) {
+
+			TransformComponent& currentTargetTransform = registry.get<TransformComponent>(currentTarget_);
+
+			float diffX = currentTargetTransform.translate.x - canonTransform.translate.x;
+
+			float diffY = currentTargetTransform.translate.y - canonTransform.translate.y;
+
+			float diffZ = currentTargetTransform.translate.z - canonTransform.translate.z;
+
+			float distanceToCurrentTarget = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
+
+			if (distanceToCurrentTarget > currentRange) {
+				currentTarget_ = entt::null;
+			}
 		}
 	}
 	if (currentTarget_ == entt::null) {
@@ -436,7 +382,18 @@ if (attackTimer_ > 0.0f) {
 	// 地面が光る演出（PointLightComponent）は完全に削除しました。
 }
 
-void Canon::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
+void Canon::OnDestroy(entt::entity entity, GameScene* scene) {
+	(void)entity; // 未使用警告回避baws
+	if (!scene) {
+		return;
+	}
+
+	entt::registry& registry = scene->GetRegistry();
+
+	if (registry.valid(baseEntity_)) {
+		registry.destroy(baseEntity_);
+	}
+}
 
 void Canon::OnEditorUI() {
 #if defined(USE_IMGUI) && !defined(NDEBUG)
@@ -447,63 +404,10 @@ void Canon::OnEditorUI() {
 	ImGui::Separator();
 	ImGui::Text("Status (Debug)");
 	ImGui::Text("Rotation: %.2f", rotationSpeed_);
-	ImGui::Text("Connected Tanks: %d", connectedTankCount);
-	ImGui::Text("Connected Canons: %d", connectedCanonCount);
-	ImGui::Text("Connected to Tank: %s", isConnectedToTank_ ? "YES" : "NO");
 #endif
 }
 
-void Canon::UpdateConnection(entt::entity entity, GameScene* scene) {
-	if (!scene) {
-		return;
-	}
 
-	entt::registry& registry = scene->GetRegistry();
-	float connectRange = 2.5f;
-
-	const std::vector<entt::entity>& allPipes = scene->GetEntitiesByTag(TagType::Pipe);
-	const std::vector<entt::entity>& allTanks = scene->GetEntitiesByTag(TagType::BulletTank);
-	const std::vector<entt::entity>& allCanons = scene->GetEntitiesByTag(TagType::Canon);
-
-	std::unordered_set<entt::entity> foundTanks;
-	std::unordered_set<entt::entity> visitedPipesForTanks;
-
-	for (entt::entity pipe : allPipes) {
-		if (!IsConnectedSphere(registry, entity, pipe, connectRange)) {
-			continue;
-		}
-
-		CollectConnectedBulletTanks(registry, pipe, visitedPipesForTanks, foundTanks, allPipes, allTanks, connectRange);
-	}
-
-	connectedTankCount = static_cast<int>(foundTanks.size());
-
-	if (connectedTankCount > 0) {
-		isConnectedToTank_ = true;
-	} else {
-		isConnectedToTank_ = false;
-	}
-
-	std::unordered_set<entt::entity> foundCanons;
-	std::unordered_set<entt::entity> visitedPipesForCanons;
-
-	for (entt::entity pipe : allPipes) {
-		if (!IsConnectedSphere(registry, entity, pipe, connectRange)) {
-			continue;
-		}
-
-		CollectConnectedCanons(registry, pipe, visitedPipesForCanons, foundCanons, allPipes, allCanons, connectRange);
-	}
-
-	foundCanons.insert(entity);
-	connectedCanonCount = static_cast<int>(foundCanons.size());
-
-}
-
-void Canon::Debug(bool /*connected*/) {
-	// 以前はここで ImGui::Begin を呼んでいたが、Update からの呼び出しは危険なため廃止。
-	// 代わりに OnEditorUI を使用する。
-}
 void Canon::DrawUI(entt::entity entity, GameScene* scene) {
 	if (!scene) {
 		return;

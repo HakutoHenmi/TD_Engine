@@ -5,6 +5,7 @@
 
 namespace Engine {
 struct Vector3;
+struct Vector4;
 }
 
 namespace Game {
@@ -12,35 +13,33 @@ namespace Game {
 class TutorialScript : public IScript {
 public:
 	enum class TutorialStep {
-		Preparation1,
-		Preparation2,
-		Preparation3,
-		PlayerMoveGuide1, 
-		PlayerMoveGuide2, 
-		PlayerMoveGuide3, 
-		InstallCannonGuide1,
-		InstallCannonGuide2,
-		InstallCannonGuide3,
-		InstallTankGuide1,
-		InstallTankGuide2,
-		InstallTankGuide3,
-		InstallPipeGuide1,
-		InstallPipeGuide2,
-		InstallPipeGuide3,
-		FirstBattle1,
-		FirstBattle2,
-		FirstBattle3,
-		SkillTreeGuide1,
-		SkillTreeGuide2,
-		SkillTreeGuide3,
-		Finish, // 終了
+		Step1_Greeting = 0,
+		Step2_CoreIntro,
+		Step3_SpawnerIntro,
+		Step4_PhaseIntro,
+		Step5_CameraControl,
+		Step6_FacilityIntro,
+		Step7_CannonInstall,
+		Step8_DeleteIntro,
+		Step9_BattleTransition,
+		Step10_PlayerAttack,
+		Step11_CombatPlay,
+		Step12_SkillTree,
+		Step13_EndExplanation,
+		Step14_FreePlayBattle,
+		Count
 	};
 
 	void Start(entt::entity entity, GameScene* scene) override;
 	void Update(entt::entity entity, GameScene* scene, float dt) override;
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
 
+	static TutorialScript* GetInstance() { return instance_; }
+	TutorialStep GetCurrentStep() const { return tutorialStep_; }
+	bool IsStep8PlacedExtraCannon() const { return step8_placedExtraCannon_; }
+
 private:
+	static TutorialScript* instance_;
 	void EnterStep(TutorialStep step);
 	void RequestPhaseChange(PhaseSystemScript::PhaseState nextPhase);
 	void UpdatePhaseTransition(GameScene* scene);
@@ -58,9 +57,14 @@ private:
 	bool IsPrefabPath(const std::string& path) const;
 	bool ExtractPrefabRenderPaths(const std::string& prefabPath, std::string& outModelPath, std::string& outTexturePath) const;
 
+	// 強調表示用のヘルパー
+	void DrawHighlights(GameScene* scene);
+	void Draw3DHighlight(GameScene* scene, entt::entity entity, const Engine::Vector4& color, float radius = 3.0f);
 
+	// 削除（売却）モードの処理
+	void UpdateSellMode(GameScene* scene);
 
-	TutorialStep tutorialStep_ = TutorialStep::Preparation1;
+	TutorialStep tutorialStep_ = TutorialStep::Step1_Greeting;
 	bool stepGuideShown_ = false;
 
 	float autoProceedTimer_ = 0.0f;
@@ -71,13 +75,6 @@ private:
 	bool isFadeFinished_ = false;
 
 	bool isPlacementMode_ = false;
-	bool isPipeSet_ = false;
-	bool hasPipeStartPoint_ = false;
-	float pipeStartX_ = 0.0f;
-	float pipeStartY_ = 0.0f;
-	float pipeStartZ_ = 0.0f;
-	bool hasPlacedTank_ = false;
-	bool hasPlacedPipe_ = false;
 	bool hasPlacedCannon_ = false;
 
 	std::string selectedObjPath_ = "Resources/Models/cube/cube.obj";
@@ -88,6 +85,21 @@ private:
 	SkillTree skillTree_;
 	bool preKeyN_ = false;
 	bool hasOpenedSkillTreeInGuide_ = false;
+
+	// 進行状況・テキスト管理用
+	int currentLineIndex_ = 0;
+
+	// 各種サブ状態
+	bool step8_placedExtraCannon_ = false;
+	bool step8_deletedCannon_ = false;
+	bool step12_pageSwitched_ = false;
+	bool step12_upgraded_ = false;
+	int step12_initialSP_ = 0;
+
+	// 削除モード
+	bool isSellMode_ = false;
+
+	float nextTimer_ = 3.0f; // 自動で次のステップに進むまでの時間（秒）
 };
 
 } // namespace Game
