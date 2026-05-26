@@ -26,12 +26,13 @@ private:
 
 	void CreateBase(entt::entity entity, GameScene* scene);
 	void UpdateBase(entt::entity entity, GameScene* scene);
-
+	void UpdateTarget(entt::registry& registry, GameScene* scene, const TransformComponent& canonTransform);
+	void FireMissile(entt::entity entity, entt::registry& registry, GameScene* scene, const TransformComponent& canonTransform, float finalDamage, float finalExplosionRadius, float currentAttackInterval);
+	
 	// ★追加: 永続VFXエンティティ（毎フレーム生成を廃止）
 	entt::entity persistentSparkVfx_ = entt::null;
 	entt::entity persistentSmokeVfx_ = entt::null;
 	bool persistentVfxCreated_ = false;
-
 
 private:
 	void Debug(bool connected);

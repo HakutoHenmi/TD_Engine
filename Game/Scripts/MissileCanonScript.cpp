@@ -13,6 +13,7 @@
 #endif
 
 namespace Game {
+
 static float LerpAngle(float current, float target, float speed, float dt) {
 	float diff = target - current;
 
@@ -187,65 +188,9 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 	float finalDamage = damage_ * attackPowerRateMisile;
 	float finalExplosionRadius = explosionRadius_ * attackAreaRateMisile;
 	SetVar(entity, scene, "AttackRange", attackRange_);
-	if (currentTarget_ != entt::null) {
 
-		if (!registry.valid(currentTarget_)) {
-			currentTarget_ = entt::null;
-		}
-
-		if (currentTarget_ != entt::null && !registry.all_of<TransformComponent>(currentTarget_)) {
-			currentTarget_ = entt::null;
-		}
-
-		if (currentTarget_ != entt::null) {
-			const TransformComponent& targetTransform = registry.get<TransformComponent>(currentTarget_);
-
-			float diffX = targetTransform.translate.x - canonTransform.translate.x;
-
-			float diffY = targetTransform.translate.y - canonTransform.translate.y;
-
-			float diffZ = targetTransform.translate.z - canonTransform.translate.z;
-
-			float distance = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
-
-			if (distance > attackRange_) {
-				currentTarget_ = entt::null;
-			}
-		}
-	}
-
-	if (currentTarget_ == entt::null) {
-
-		float bestDistance = attackRange_;
-
-		const std::vector<entt::entity>& enemies = scene->GetEntitiesByTag(TagType::Enemy);
-
-		for (entt::entity enemy : enemies) {
-
-			if (!registry.valid(enemy)) {
-				continue;
-			}
-
-			if (!registry.all_of<TransformComponent>(enemy)) {
-				continue;
-			}
-
-			const TransformComponent& enemyTransform = registry.get<TransformComponent>(enemy);
-
-			float diffX = enemyTransform.translate.x - canonTransform.translate.x;
-
-			float diffY = enemyTransform.translate.y - canonTransform.translate.y;
-
-			float diffZ = enemyTransform.translate.z - canonTransform.translate.z;
-
-			float distance = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
-
-			if (distance < bestDistance) {
-				bestDistance = distance;
-				currentTarget_ = enemy;
-			}
-		}
-	}
+	// ターゲットの更新と攻撃処理
+	UpdateTarget(registry, scene, canonTransform);
 
 	if (currentTarget_ == entt::null) {
 		return;
@@ -276,43 +221,8 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 		return;
 	}
 
-	entt::entity bullet = registry.create();
-
-	TagComponent& bulletTag = registry.emplace<TagComponent>(bullet);
-	bulletTag.tag = TagType::Bullet;
-
-	TransformComponent& bulletTransform = registry.emplace<TransformComponent>(bullet);
-	bulletTransform.translate = canonTransform.translate;
-
-	float launchForwardOffset = 2.5f;
-	float launchHeightOffset = 1.5f;
-
-	bulletTransform.translate.x += std::sin(canonTransform.rotate.y) * launchForwardOffset;
-	bulletTransform.translate.y += launchHeightOffset;
-	bulletTransform.translate.z += std::cos(canonTransform.rotate.y) * launchForwardOffset;
-
-	bulletTransform.rotate = canonTransform.rotate;
-	bulletTransform.rotate.x = -0.8f;
-	bulletTransform.scale = {0.5f, 0.5f, 1.2f};
-
-	Engine::Renderer* renderer = scene->GetRenderer();
-	if (renderer) {
-		MeshRendererComponent& bulletMeshRenderer = registry.emplace<MeshRendererComponent>(bullet);
-		bulletMeshRenderer.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
-		bulletMeshRenderer.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-	}
-
-	ScriptComponent& bulletScriptComponent = registry.emplace<ScriptComponent>(bullet);
-	bulletScriptComponent.scripts.push_back({"MissileBulletScript", "", nullptr});
-
-	SetVar(bullet, scene, "HasTarget", 1.0f);
-	SetVar(bullet, scene, "TargetEntity", static_cast<float>(static_cast<uint32_t>(currentTarget_)));
-	SetVar(bullet, scene, "Damage", finalDamage);
-	SetVar(bullet, scene, "ExplosionRadius", finalExplosionRadius);
-
-	SetVar(entity, scene, "MissileGaugeRate", 0.0f);
-	SetVar(entity, scene, "MissileGaugeState", 2.0f);
-	attackTimer_ = currentAttackInterval;
+	// 攻撃
+	FireMissile(entity, registry, scene, canonTransform, finalDamage, finalExplosionRadius, currentAttackInterval);
 }
 
 void MissileCanonScript::OnDestroy(entt::entity entity, GameScene* scene) {
@@ -386,6 +296,7 @@ void MissileCanonScript::CreateBase(entt::entity entity, GameScene* scene) {
 		meshRenderer.textureHandle = renderer->LoadTexture2D("Resources/Models/Misiilebase/MisileBase.png");
 	}
 }
+
 // ★追加: 永続VFXの初期化（1回だけ呼ばれる）
 void MissileCanonScript::CreatePersistentVFX(entt::entity entity, GameScene* scene) {
 	if (!scene || persistentVfxCreated_)
@@ -456,6 +367,7 @@ void MissileCanonScript::CreatePersistentVFX(entt::entity entity, GameScene* sce
 
 	persistentVfxCreated_ = true;
 }
+
 void MissileCanonScript::UpdateBase(entt::entity entity, GameScene* scene) {
 	if (!scene) {
 		return;
@@ -488,6 +400,125 @@ void MissileCanonScript::UpdateBase(entt::entity entity, GameScene* scene) {
 	baseTransform.rotate = {0.0f, 0.0f, 0.0f};
 }
 
+void MissileCanonScript::UpdateTarget(entt::registry& registry, GameScene* scene, const TransformComponent& canonTransform) {
+	if (currentTarget_ != entt::null) {
+
+		if (!registry.valid(currentTarget_)) {
+			currentTarget_ = entt::null;
+		}
+
+		if (currentTarget_ != entt::null && !registry.all_of<TransformComponent>(currentTarget_)) {
+
+			currentTarget_ = entt::null;
+		}
+
+		if (currentTarget_ != entt::null) {
+
+			const TransformComponent& targetTransform = registry.get<TransformComponent>(currentTarget_);
+
+			float diffX = targetTransform.translate.x - canonTransform.translate.x;
+
+			float diffY = targetTransform.translate.y - canonTransform.translate.y;
+
+			float diffZ = targetTransform.translate.z - canonTransform.translate.z;
+
+			float distance = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
+
+			if (distance > attackRange_) {
+				currentTarget_ = entt::null;
+			}
+		}
+	}
+
+	if (currentTarget_ == entt::null) {
+
+		float bestDistance = attackRange_;
+
+		const std::vector<entt::entity>& enemies = scene->GetEntitiesByTag(TagType::Enemy);
+
+		for (entt::entity enemy : enemies) {
+
+			if (!registry.valid(enemy)) {
+				continue;
+			}
+
+			if (!registry.all_of<TransformComponent>(enemy)) {
+				continue;
+			}
+
+			const TransformComponent& enemyTransform = registry.get<TransformComponent>(enemy);
+
+			float diffX = enemyTransform.translate.x - canonTransform.translate.x;
+
+			float diffY = enemyTransform.translate.y - canonTransform.translate.y;
+
+			float diffZ = enemyTransform.translate.z - canonTransform.translate.z;
+
+			float distance = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
+
+			if (distance < bestDistance) {
+				bestDistance = distance;
+				currentTarget_ = enemy;
+			}
+		}
+	}
+}
+
+
+void MissileCanonScript::FireMissile(entt::entity entity, entt::registry& registry, GameScene* scene, const TransformComponent& canonTransform, float finalDamage, float finalExplosionRadius, float currentAttackInterval) {
+	entt::entity bullet = registry.create();
+
+	TagComponent& bulletTag = registry.emplace<TagComponent>(bullet);
+
+	bulletTag.tag = TagType::Bullet;
+
+	TransformComponent& bulletTransform = registry.emplace<TransformComponent>(bullet);
+
+	bulletTransform.translate = canonTransform.translate;
+
+	float launchForwardOffset = 2.5f;
+	float launchHeightOffset = 1.5f;
+
+	bulletTransform.translate.x += std::sin(canonTransform.rotate.y) * launchForwardOffset;
+
+	bulletTransform.translate.y += launchHeightOffset;
+
+	bulletTransform.translate.z += std::cos(canonTransform.rotate.y) * launchForwardOffset;
+
+	bulletTransform.rotate = canonTransform.rotate;
+	bulletTransform.rotate.x = -0.8f;
+
+	bulletTransform.scale = {0.5f, 0.5f, 1.2f};
+
+	Engine::Renderer* renderer = scene->GetRenderer();
+
+	if (renderer) {
+
+		MeshRendererComponent& bulletMeshRenderer = registry.emplace<MeshRendererComponent>(bullet);
+
+		bulletMeshRenderer.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+
+		bulletMeshRenderer.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+	}
+
+	ScriptComponent& bulletScriptComponent = registry.emplace<ScriptComponent>(bullet);
+
+	bulletScriptComponent.scripts.push_back({"MissileBulletScript", "", nullptr});
+
+	SetVar(bullet, scene, "HasTarget", 1.0f);
+
+	SetVar(bullet, scene, "TargetEntity", static_cast<float>(static_cast<uint32_t>(currentTarget_)));
+
+	SetVar(bullet, scene, "Damage", finalDamage);
+
+	SetVar(bullet, scene, "ExplosionRadius", finalExplosionRadius);
+
+	SetVar(entity, scene, "MissileGaugeRate", 0.0f);
+
+	SetVar(entity, scene, "MissileGaugeState", 2.0f);
+
+	attackTimer_ = currentAttackInterval;
+}
 REGISTER_SCRIPT(MissileCanonScript);
 
 } // namespace Game
