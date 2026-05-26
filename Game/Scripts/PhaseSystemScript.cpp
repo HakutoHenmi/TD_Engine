@@ -110,6 +110,9 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 		preIsPhase_ = PreparationPhase;
 	}
 
+	if (scene->GetRegistry().all_of<UITextComponent>(entity))
+		scene->GetRegistry().get<UITextComponent>(entity).text = std::to_string(CoinCount);
+
 	currentPhase_ = 0;
 	CoinCount = StartCoinCount_;
 
@@ -532,7 +535,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	}
 
 	if (scene->GetRegistry().all_of<UITextComponent>(entity))
-		scene->GetRegistry().get<UITextComponent>(entity).text = "$"+ std::to_string(CoinCount);
+		scene->GetRegistry().get<UITextComponent>(entity).text = std::to_string(CoinCount);
 
 	// ★ 敵の数UIの更新
 	if (isPhase_ == BattlePhase) {
