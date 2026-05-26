@@ -1346,7 +1346,7 @@ void PhaseSystemScript::EndInsertPhase(GameScene* scene) {
 
 	isInsertInitialized_ = false;
 }
-
+bool Game::PhaseSystemScript::isSkillTreeOpen_ = false;
 REGISTER_SCRIPT(PhaseSystemScript);
 
 } // namespace Game

@@ -1,14 +1,14 @@
 #include "InstallationManager.h"
-#include "TutorialScript.h"
-#include "Scenes/GameScene.h"
+#include "../../Engine/ThirdParty/nlohmann/json.hpp"
 #include "ObjectTypes.h"
 #include "PhaseSystemScript.h"
+#include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
-#include "../../Engine/ThirdParty/nlohmann/json.hpp"
+#include "TutorialScript.h"
 
 #if defined(USE_IMGUI) && !defined(NDEBUG)
-#include <imgui.h>
 #include "Editor/EditorUI.h"
+#include <imgui.h>
 #endif
 
 #include "../../Engine/Input.h"
@@ -56,17 +56,17 @@ InstallationManager::InstallationManager() {
 void InstallationManager::Start(entt::entity /*entity*/, GameScene* scene) {
 	instance_ = this;
 	currentScene_ = scene;
-	if (!scene) return;
+	if (!scene)
+		return;
 
 	auto& registry = scene->GetRegistry();
-
+	panelTexture_ = scene->GetRenderer()->LoadTexture2D("Resources/Textures/white1x1.png");
 	// 古い/重複したボタンエンティティを一掃する（二重描画バグの修正）
 	std::vector<entt::entity> toDestroy;
 	for (auto e : registry.view<NameComponent, UIButtonComponent>()) {
 		const auto& name = registry.get<NameComponent>(e).name;
-		if (name == "DeleteButton" || name == "CannonButton" || name == "MissikeButton" || 
-			name == "PoisonTrapButton" || name == "IceCannonButton" || name == "TankButton" || 
-			name == "PipeButton" || name.find("Button_") != std::string::npos) {
+		if (name == "DeleteButton" || name == "CannonButton" || name == "MissikeButton" || name == "PoisonTrapButton" || name == "IceCannonButton" || name == "TankButton" || name == "PipeButton" ||
+		    name.find("Button_") != std::string::npos) {
 			toDestroy.push_back(e);
 		}
 	}
@@ -84,11 +84,30 @@ void InstallationManager::Start(entt::entity /*entity*/, GameScene* scene) {
 		}
 		btn.entity = entt::null; // Updateで新しく生成させる
 	}
+
+	descriptionTextEntity_ = scene->CreateEntity("DescriptionText");
+	auto& textRect = registry.emplace<RectTransformComponent>(descriptionTextEntity_);
+
+	textRect.pos = {50.0f, 150.0f};
+	textRect.size = {400.0f, 200.0f};
+
+	textRect.anchor = {0.0f, 0.0f};
+	textRect.pivot = {0.0f, 0.0f};
+	auto& text = registry.emplace<UITextComponent>(descriptionTextEntity_);
+
+	text.text = "";
+
+	text.fontSize = 32.0f;
+
+	text.color = {1, 1, 1, 1};
+
+	text.outlineEnabled = true;
 }
 
 void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, float dt) {
 	(void)dt;
-	if (!scene) return;
+	if (!scene)
+		return;
 	currentScene_ = scene;
 	instance_ = this;
 
@@ -116,11 +135,13 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 
 		if (!registry.valid(btn.entity)) {
 			EnsureButtonEntity(btn, scene);
-			if (!registry.valid(btn.entity)) continue;
+			if (!registry.valid(btn.entity))
+				continue;
 		}
 
 		// サイズと位置の自動設定
 		btn.size = { 180.0f, 180.0f };
+
 		btn.pos.y = 400.0f;
 
 		bool isTutorialSoloButton = false;
@@ -181,13 +202,16 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 			auto& rect = registry.get<RectTransformComponent>(btn.entity);
 			rect.pos = btn.pos;
 			rect.size = btn.size;
-			rect.anchor = { 0.5f, 0.5f };
-			rect.pivot = { 0.5f, 0.5f };
+			rect.anchor = {0.5f, 0.5f};
+			rect.pivot = {0.5f, 0.5f};
 		}
 
 		// フェーズに応じた表示・非表示の管理（ページ制限を廃止）
-		bool enabled = ((!scene->IsPlaying()) || (currentPhase == PhaseSystemScript::PreparationPhase));
 
+		bool enabled = ((!scene->IsPlaying()) || (currentPhase == PhaseSystemScript::PreparationPhase));
+		if (PhaseSystemScript::isSkillTreeOpen_) {
+			enabled = false;
+		}
 		// チュートリアル中の表示制御
 		if (auto* tutorial = TutorialScript::GetInstance()) {
 			auto step = tutorial->GetCurrentStep();
@@ -195,7 +219,6 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 			// ステップごとに許可するボタンを限定
 			if (step >= TutorialScript::TutorialStep::Step1_Greeting && step < TutorialScript::TutorialStep::Step14_EndExplanation) {
 				enabled = false; // 基本はすべて非表示
-
 				if (step == TutorialScript::TutorialStep::Step6_CannonInstall) {
 					if (btn.prefabPath == "Resources/Prefabs/Canon.prefab") enabled = true;
 				}
@@ -213,22 +236,115 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 		if (registry.all_of<RectTransformComponent>(btn.entity))
 			registry.get<RectTransformComponent>(btn.entity).enabled = enabled;
 	}
-}
+	isDescriptionVisible_ = false;
 
+	for (int i = 0; i < 5; i++) {
+
+		auto& btn = buttons_[i];
+
+		if (!registry.valid(btn.entity)) {
+			continue;
+		}
+
+		if (!registry.all_of<UIButtonComponent>(btn.entity)) {
+			continue;
+		}
+
+		UIButtonComponent& button = registry.get<UIButtonComponent>(btn.entity);
+
+		if (button.isHovered) {
+
+			isDescriptionVisible_ = true;
+			hoveredButtonIndex_ = i;
+			break;
+		}
+	}
+	float targetX = -500.0f;
+	UITextComponent& text = registry.get<UITextComponent>(descriptionTextEntity_);
+	if (hoveredButtonIndex_ == 0) {
+		text.text = "施設を削除";
+	}
+
+	if (hoveredButtonIndex_ == 1) {
+		text.text = "標準的な大砲";
+	}
+
+	if (hoveredButtonIndex_ == 2) {
+		text.text = "爆発ミサイル";
+	}
+	if (hoveredButtonIndex_ == 3) {
+		text.text = "毒トラップ";
+	}
+	if (hoveredButtonIndex_ == 4) {
+		text.text = "アイスキャノン";
+	}
+	if (!isDescriptionVisible_) {
+		text.text = "";
+	}
+	if (isDescriptionVisible_) {
+		targetX = 50.0f;
+	}
+
+	if (isDescriptionVisible_) {
+		descriptionPanelX_ = 50.0f;
+	} else {
+		descriptionPanelX_ = -500.0f;
+	}
+
+	Engine::Renderer::SpriteDesc panel;
+
+	panel.x = descriptionPanelX_;
+	panel.y = 100.0f;
+
+	panel.w = 400.0f;
+	panel.h = 500.0f;
+
+	panel.color = {0.1f, 0.1f, 0.1f, 0.9f};
+
+	scene->GetRenderer()->DrawSprite(panelTexture_, panel);
+}
 void InstallationManager::Draw(entt::entity /*entity*/, GameScene* /*scene*/) {
 	// UISystem が RectTransformComponent を通じて描画するため、
 	// ここでの二重描画は不要。エディタでも UISystem は動作する。
 }
 
 void InstallationManager::DrawUI(entt::entity /*entity*/, GameScene* scene) {
-	(void)scene;
-	// ページ情報の表示を削除
+
+	if (!scene) {
+		return;
+	}
+
+	auto* renderer = scene->GetRenderer();
+
+	if (!renderer) {
+		return;
+	}
+
+	float targetX = -500.0f;
+
+	if (isDescriptionVisible_) {
+		targetX = 0.0f;
+	}
+
+	descriptionPanelX_ += (targetX - descriptionPanelX_) * 0.1f;
+
+	Engine::Renderer::SpriteDesc panel;
+
+	panel.x = descriptionPanelX_;
+	panel.y = 100.0f;
+
+	panel.w = 400.0f;
+	panel.h = 500.0f;
+
+	panel.color = {0.1f, 0.1f, 0.1f, 0.9f};
+
+	renderer->DrawSprite(panelTexture_, panel);
 }
 
 void InstallationManager::OnEditorUI() {
 #if defined(USE_IMGUI) && !defined(NDEBUG)
 	ImGui::SeparatorText("Installation Manager");
-	
+
 	ImGui::Text("Fixed 5 Buttons Mode");
 	ImGui::Separator();
 
@@ -236,7 +352,7 @@ void InstallationManager::OnEditorUI() {
 		ImGui::PushID(static_cast<int>(i));
 		std::string label = buttons_[i].name + " (##" + std::to_string(i) + ")";
 		if (ImGui::TreeNode(label.c_str())) {
-			char nameBuf[1024] = { 0 };
+			char nameBuf[1024] = {0};
 			strncpy_s(nameBuf, buttons_[i].name.c_str(), _TRUNCATE);
 			if (ImGui::InputText("Name (Link to Entity)", nameBuf, sizeof(nameBuf))) {
 				buttons_[i].name = nameBuf;
@@ -287,14 +403,16 @@ std::string InstallationManager::SerializeParameters() {
 }
 
 void InstallationManager::DeserializeParameters(const std::string& data) {
-	if (data.empty() || data == "{}") return;
+	if (data.empty() || data == "{}")
+		return;
 	try {
 		json j = json::parse(data);
 		if (j.contains("buttons") && j["buttons"].is_array()) {
 			int totalSerialized = static_cast<int>(j["buttons"].size());
 			int idx = (totalSerialized <= 6) ? 1 : 0; // Old format logic
 			for (const auto& b : j["buttons"]) {
-				if (idx >= 5) break;
+				if (idx >= 5)
+					break;
 				auto& btn = buttons_[idx++];
 				btn.name = b.value("name", "");
 				btn.texturePath = b.value("texturePath", "");
@@ -312,53 +430,64 @@ void InstallationManager::DeserializeParameters(const std::string& data) {
 }
 
 bool InstallationManager::IsButtonPressed(const std::string& prefabPath) {
-	if (!instance_) return false;
+	if (!instance_)
+		return false;
 	for (int i = 0; i < 5; ++i) {
-		if (instance_->buttons_[i].prefabPath == prefabPath) return instance_->buttons_[i].isPressed;
+		if (instance_->buttons_[i].prefabPath == prefabPath)
+			return instance_->buttons_[i].isPressed;
 	}
 	return false;
 }
 
 int InstallationManager::GetCost(const std::string& prefabPath) {
-	if (!instance_) return 0;
+	if (!instance_)
+		return 0;
 	for (int i = 0; i < 5; ++i) {
-		if (instance_->buttons_[i].prefabPath == prefabPath) return instance_->buttons_[i].cost;
+		if (instance_->buttons_[i].prefabPath == prefabPath)
+			return instance_->buttons_[i].cost;
 	}
 	return 0;
 }
 
 bool InstallationManager::IsButtonPressedByName(const std::string& name) {
-	if (!instance_) return false;
+	if (!instance_)
+		return false;
 	for (int i = 0; i < 5; ++i) {
-		if (instance_->buttons_[i].name == name) return instance_->buttons_[i].isPressed;
+		if (instance_->buttons_[i].name == name)
+			return instance_->buttons_[i].isPressed;
 	}
 	return false;
 }
 
 bool InstallationManager::IsManagedButton(entt::entity entity) {
-	if (!instance_) return false;
+	if (!instance_)
+		return false;
 	for (int i = 0; i < 5; ++i) {
-		if (instance_->buttons_[i].entity == entity) return true;
+		if (instance_->buttons_[i].entity == entity)
+			return true;
 	}
 	return false;
 }
 
 void InstallationManager::EnsureButtonEntity(ButtonData& data, GameScene* scene) {
-	if (!scene) return;
+	if (!scene)
+		return;
 	auto& registry = scene->GetRegistry();
 
-	if (registry.valid(data.entity)) return;
+	if (registry.valid(data.entity))
+		return;
 
 	data.entity = scene->FindObjectByName(data.name);
-	if (registry.valid(data.entity)) return;
+	if (registry.valid(data.entity))
+		return;
 
 	// 新規作成
 	data.entity = scene->CreateEntity(data.name);
 	auto& rect = registry.emplace<RectTransformComponent>(data.entity);
 	rect.pos = data.pos;
 	rect.size = data.size;
-	rect.anchor = { 0.0f, 0.0f }; // 絶対座標指定にするため 0,0
-	rect.pivot = { 0.0f, 0.0f };  // 左上基準
+	rect.anchor = {0.0f, 0.0f}; // 絶対座標指定にするため 0,0
+	rect.pivot = {0.0f, 0.0f};  // 左上基準
 
 	auto& img = registry.emplace<UIImageComponent>(data.entity);
 	img.texturePath = data.texturePath;

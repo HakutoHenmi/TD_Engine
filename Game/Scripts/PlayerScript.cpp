@@ -412,6 +412,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (gunShootTimer_ > 0.0f)
 		gunShootTimer_ -= dt;
 
+	float currentBuffRadius = buffRadius_ * playerBuffRangeRate_;
 	// ★追加: 設備へのバフ効果範囲の視覚化
 	auto* renderer = scene->GetRenderer();
 	if (renderer && scene->GetRegistry().all_of<TransformComponent>(entity)) {
@@ -539,12 +540,13 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (isPrep && !s_wasPrep) {
 		// 戦闘フェーズ等から準備フェーズに戻った時、自動でカーソルを表示する
 		isCursorVisible_ = true;
-		while (ShowCursor(TRUE) < 0);
+		while (ShowCursor(TRUE) < 0)
+			;
 
 		// ★追加: フェーズクリア(準備フェーズ移行)時に初期位置へワープし、飛行状態などもリセットする
 		auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
 		pTc.translate = initialPos_;
-		
+
 		if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
 			auto& rb = scene->GetRegistry().get<RigidbodyComponent>(entity);
 			rb.velocity = {0.0f, 0.0f, 0.0f};
@@ -797,9 +799,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			UpdateGun(entity, scene, dt);
 		}
 
-
-		 maxSteam = maxSteamPressure_ * playerMaxSteamPressureRate_;
-
+		maxSteam = maxSteamPressure_ * playerMaxSteamPressureRate_;
 
 		// ★追加: 蒸気圧リチャージ処理 (モードに関わらず共通で実行)
 		if (isRecharging_) {
@@ -823,8 +823,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 		// ★追加: 圧力ゲージの描画 (リチャージ中、銃モード、消費中、スキル中、または戦闘フェーズなら表示)
 		bool isBattle = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::BattlePhase);
-		bool shouldShowGauge =
-		    (playerType_ == PlayerType::Gun) || isRecharging_ || (steamPressure_ < maxSteam) || isSkillActive_ || isBattle || isFlying_ || (flightPressure_ < maxFlightPressure_);
+		bool shouldShowGauge = (playerType_ == PlayerType::Gun) || isRecharging_ || (steamPressure_ < maxSteam) || isSkillActive_ || isBattle || isFlying_ || (flightPressure_ < maxFlightPressure_);
 		if (shouldShowGauge) {
 			DrawPressureGauge(scene);
 		}
@@ -841,22 +840,24 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		if (floor != entt::null && scene->GetRegistry().all_of<TransformComponent>(floor)) {
 			auto& fTc = scene->GetRegistry().get<TransformComponent>(floor);
 			// Floorのスケールを元にクランプ境界を計算。マージン(1.0f)を引いて落ちる前に止める。
-			float boundX = fTc.scale.x - 1.0f; 
+			float boundX = fTc.scale.x - 1.0f;
 			float boundZ = fTc.scale.y - 1.0f; // Stage床はX軸に-90度回転しているので奥行きはscale.y
-			
+
 			auto& playerTc = scene->GetRegistry().get<TransformComponent>(entity);
 			float clampedX = std::clamp(playerTc.translate.x, fTc.translate.x - boundX, fTc.translate.x + boundX);
 			float clampedZ = std::clamp(playerTc.translate.z, fTc.translate.z - boundZ, fTc.translate.z + boundZ);
-			
+
 			// 座標がクランプされた場合＝壁にぶつかっているため、めり込み防止と慣性のリセット
 			if (playerTc.translate.x != clampedX || playerTc.translate.z != clampedZ) {
 				playerTc.translate.x = clampedX;
 				playerTc.translate.z = clampedZ;
-				
+
 				if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
 					auto& rb = scene->GetRegistry().get<RigidbodyComponent>(entity);
-					if (playerTc.translate.x == clampedX) rb.velocity.x = 0.0f;
-					if (playerTc.translate.z == clampedZ) rb.velocity.z = 0.0f;
+					if (playerTc.translate.x == clampedX)
+						rb.velocity.x = 0.0f;
+					if (playerTc.translate.z == clampedZ)
+						rb.velocity.z = 0.0f;
 				}
 			}
 		}
@@ -989,13 +990,14 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			hpDesc.centerPx = {gaugeX + 520.0f * scale, gaugeY + 52.0f * scale};
 			hpDesc.sizePx = {750.0f * scale, 12.0f * scale};
 			hpDesc.lineWidth = 0.0f;
-			hpDesc.glow = 0.0f; // 枠からはみ出ないようにglowを0に
+			hpDesc.glow = 0.0f;                      // 枠からはみ出ないようにglowを0に
 			hpDesc.color = {0.8f, 0.2f, 0.2f, 1.0f}; // 赤色
 			hpDesc.shape = 0;
 			hpDesc.round = hpDesc.sizePx.y * 0.5f; // 端を完全な半円にする
 			hpDesc.progress = hpProgress;
 			hpDesc.fill = 1.0f;
-			if (hpProgress > 0.0f) uiRenderer->DrawSDFUI(hpDesc);
+			if (hpProgress > 0.0f)
+				uiRenderer->DrawSDFUI(hpDesc);
 
 			// ピクセルシェーダー(SDFUI)で灰色のゲージ内を埋める (経験値)
 			Engine::Renderer::SdfUIDesc expDesc{};
@@ -1009,7 +1011,8 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			expDesc.round = expDesc.sizePx.y * 0.5f;
 			expDesc.progress = expProgress;
 			expDesc.fill = 1.0f;
-			if (expProgress > 0.0f) uiRenderer->DrawSDFUI(expDesc);
+			if (expProgress > 0.0f)
+				uiRenderer->DrawSDFUI(expDesc);
 
 			// 上からHPIN.pngを被せる(透過部分からゲージが見える)
 			Engine::Renderer::SpriteDesc hpinDesc{};
@@ -1025,8 +1028,8 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			char textBuf[64];
 			snprintf(textBuf, sizeof(textBuf), "Lv.%d   EXP: %.1f / %.1f", level_, experience_, nextExperience_);
 			// 画像の右下にテキストを配置
-			uiRenderer->DrawString(textBuf, gaugeX + 30.0f + 2.0f, gaugeY + gaugeH + 10.0f + 2.0f, 0.5f, {0,0,0,1});
-			uiRenderer->DrawString(textBuf, gaugeX + 30.0f, gaugeY + gaugeH + 10.0f, 0.5f, {1,1,1,1});
+			uiRenderer->DrawString(textBuf, gaugeX + 30.0f + 2.0f, gaugeY + gaugeH + 10.0f + 2.0f, 0.5f, {0, 0, 0, 1});
+			uiRenderer->DrawString(textBuf, gaugeX + 30.0f, gaugeY + gaugeH + 10.0f, 0.5f, {1, 1, 1, 1});
 
 			float isSkillTreeOpen = 0.0f;
 			if (gmEntity != entt::null) {
@@ -2749,7 +2752,7 @@ void PlayerScript::ExecuteSkill(entt::entity entity, GameScene* scene) {
 		isSkillActive_ = true;
 		skillDuration_ = SKILL_MAX_DURATION;
 		steamPressure_ = maxSteam; // ★オーバークロック発動時に圧力を100まで戻す
-		isRecharging_ = false;              // リチャージ状態も強制解除
+		isRecharging_ = false;     // リチャージ状態も強制解除
 		std::cout << "Gun Skill Activated: Crystal Enhancement!\n";
 	}
 }
@@ -2800,15 +2803,17 @@ void PlayerScript::ApplySkillEffects(entt::entity entity, GameScene* scene) {
 
 	playerSwordAttackPowerRate_ = GetVar(gm, scene, "PlayerSwordAttackPowerRate", 1.0f); // 攻撃力の変数を取得
 
-	playerGunAttackPowerRate_ = GetVar(gm, scene, "PlayerGunAttackPowerRate", 1.0f);// 銃の攻撃力の変数を取得
+	playerGunAttackPowerRate_ = GetVar(gm, scene, "PlayerGunAttackPowerRate", 1.0f); // 銃の攻撃力の変数を取得
 
-	playerMaxSteamPressureRate_ = GetVar(gm, scene, "PlayerMaxSteamPressureRate", 1.0f);//スチーム圧力の変数を取得
+	playerMaxSteamPressureRate_ = GetVar(gm, scene, "PlayerMaxSteamPressureRate", 1.0f); // スチーム圧力の変数を取得
 
-	playerSwordSkillCooldownRate_ = GetVar(gm, scene, "PlayerSwordSkillCooldownRate", 1.0f);//クールダウンの変数を取得
-	playerGunSkillCooldownRate_ = GetVar(gm, scene, "PlayerGunSkillCooldownRate", 1.0f);// 銃スキルのクールダウン
+	playerSwordSkillCooldownRate_ = GetVar(gm, scene, "PlayerSwordSkillCooldownRate", 1.0f); // クールダウンの変数を取得
+	playerGunSkillCooldownRate_ = GetVar(gm, scene, "PlayerGunSkillCooldownRate", 1.0f);     // 銃スキルのクールダウン
 
-	playerSwordSkillAttackPowerRate_ = GetVar(gm, scene, "PlayerSwordSkillAttackPowerRate", 1.0f);// スキルの攻撃力の変数を取得
+	playerSwordSkillAttackPowerRate_ = GetVar(gm, scene, "PlayerSwordSkillAttackPowerRate", 1.0f); // スキルの攻撃力の変数を取得
 	playerGunSkillAttackPowerRate_ = GetVar(gm, scene, "PlayerGunSkillAttackPowerRate", 1.0f);
+
+	playerBuffRangeRate_ = GetVar(gm, scene, "PlayerBuffRangeRate", 1.0f); // バフの範囲の変数を取得
 }
 void PlayerScript::DrawUI(entt::entity /*entity*/, GameScene* /*scene*/) {
 	// ※注意: DrawUI は Renderer::EndFrame の後（ImGuiフェーズ）に呼び出されるため、

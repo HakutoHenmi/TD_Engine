@@ -208,6 +208,7 @@ private:
 	float playerSwordSkillAttackPowerRate_ = 1.0f;
 	float playerGunSkillAttackPowerRate_ = 1.0f;
 
+	float playerBuffRangeRate_ = 1.0f;
 	// ★追加: プレイヤーから設備へのバフ付与範囲
 	float buffRadius_ = 8.0f;
 };

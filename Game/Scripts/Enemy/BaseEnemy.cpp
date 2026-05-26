@@ -231,6 +231,15 @@ void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
 	// ターゲットとの距離をチェック
 	bool inAttackRange = false;
 	if (registry.valid(currentTarget_)) {
+		if (registry.all_of<HealthComponent>(currentTarget_)) {
+			auto& targetHc = registry.get<HealthComponent>(currentTarget_);
+			if (targetHc.isDead || targetHc.hp <= 0.0f) {
+				currentTarget_ = entt::null;
+			}
+		}
+	}
+
+	if (registry.valid(currentTarget_)) {
 		auto& myTc = registry.get<TransformComponent>(entity);
 		auto& tarTc = registry.get<TransformComponent>(currentTarget_);
 		float dx = tarTc.translate.x - myTc.translate.x;
@@ -328,6 +337,14 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float dt) {
 			for (auto t : towers) {
 				if (!registry.valid(t) || !registry.all_of<TransformComponent>(t)) continue;
 				
+				// すでに壊れている設備は警戒対象から除外
+				if (registry.all_of<HealthComponent>(t)) {
+					auto& hc = registry.get<HealthComponent>(t);
+					if (hc.isDead || hc.hp <= 0.0f) {
+						continue;
+					}
+				}
+
 				float tAttackRange = cautionRange_; // デフォルトの警戒範囲
 				float rawAttackRange = 50.0f;       // デフォルトの射程
 				if (registry.all_of<VariableComponent>(t)) {
@@ -528,6 +545,14 @@ void BaseEnemy::SearchTarget(entt::entity entity, GameScene* scene) {
 		for (auto d : towers) {
 			if (!registry.valid(d) || !registry.all_of<TransformComponent>(d)) continue;
 			
+			// すでに壊れている設備はターゲット候補から除外
+			if (registry.all_of<HealthComponent>(d)) {
+				auto& hc = registry.get<HealthComponent>(d);
+				if (hc.isDead || hc.hp <= 0.0f) {
+					continue;
+				}
+			}
+
 			auto& t = registry.get<TransformComponent>(d);
 			float distSq = (t.translate.x - myTc.translate.x) * (t.translate.x - myTc.translate.x) + 
 			               (t.translate.z - myTc.translate.z) * (t.translate.z - myTc.translate.z);

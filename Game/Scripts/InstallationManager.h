@@ -37,11 +37,15 @@ public:
 	static bool IsManagedButton(entt::entity entity);
 
 private:
+	uint32_t panelTexture_;
+	entt::entity descriptionTextEntity_ = entt::null;
 	GameScene* currentScene_ = nullptr;
 	ButtonData buttons_[5];
 	int currentPage_ = 0;
 	static InstallationManager* instance_;
-
+	int hoveredButtonIndex_ = -1;
+	bool isDescriptionVisible_ = false;
+	float descriptionPanelX_ = -500.0f;
 	// 固定パス（ImGuiではなくコードで管理するための変数）
 	std::string texPaths_[5];
 	std::string prefabPaths_[5];
@@ -54,6 +58,6 @@ class InstallationButton : public IScript {
 public:
 	void Start(entt::entity, GameScene*) override {}
 	void Update(entt::entity, GameScene*, float) override {}
-};
 
+};
 } // namespace Game

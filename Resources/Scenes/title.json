@@ -2,12 +2,12 @@
   "settings": {
     "postProcessEnabled": false,
     "ambientColor": [0.4, 0.4, 0.45],
-    "vignette": 0,
+    "vignette": 0.3,
     "noiseStrength": 0
   },
   "objects": [
     {
-      "id": 15,
+      "id": 1048591,
       "parentId": 4294967295,
       "name": "TitleManager",
       "locked": false,
@@ -19,8 +19,8 @@
       ]
     },
     {
-      "id": 14,
-      "parentId": 5,
+      "id": 1048590,
+      "parentId": 1048581,
       "name": "Btn_Back",
       "locked": false,
       "translate": [0, 0, 0],
@@ -34,8 +34,8 @@
       ]
     },
     {
-      "id": 13,
-      "parentId": 5,
+      "id": 1048589,
+      "parentId": 1048581,
       "name": "Btn_SEPlus",
       "locked": false,
       "translate": [0, 0, 0],
@@ -49,8 +49,8 @@
       ]
     },
     {
-      "id": 12,
-      "parentId": 5,
+      "id": 1048588,
+      "parentId": 1048581,
       "name": "Btn_SEMinus",
       "locked": false,
       "translate": [0, 0, 0],
@@ -64,8 +64,8 @@
       ]
     },
     {
-      "id": 11,
-      "parentId": 5,
+      "id": 1048587,
+      "parentId": 1048581,
       "name": "Text_SE",
       "locked": false,
       "translate": [0, 0, 0],
@@ -77,8 +77,8 @@
       ]
     },
     {
-      "id": 10,
-      "parentId": 5,
+      "id": 1048586,
+      "parentId": 1048581,
       "name": "Btn_BGMPlus",
       "locked": false,
       "translate": [0, 0, 0],
@@ -92,8 +92,8 @@
       ]
     },
     {
-      "id": 9,
-      "parentId": 5,
+      "id": 1048585,
+      "parentId": 1048581,
       "name": "Btn_BGMMinus",
       "locked": false,
       "translate": [0, 0, 0],
@@ -107,8 +107,8 @@
       ]
     },
     {
-      "id": 8,
-      "parentId": 5,
+      "id": 1048584,
+      "parentId": 1048581,
       "name": "Text_BGM",
       "locked": false,
       "translate": [0, 0, 0],
@@ -120,8 +120,8 @@
       ]
     },
     {
-      "id": 7,
-      "parentId": 5,
+      "id": 1048583,
+      "parentId": 1048581,
       "name": "Btn_Fullscreen",
       "locked": false,
       "translate": [0, 0, 0],
@@ -135,8 +135,8 @@
       ]
     },
     {
-      "id": 6,
-      "parentId": 5,
+      "id": 1048582,
+      "parentId": 1048581,
       "name": "SettingsTitle",
       "locked": false,
       "translate": [711, 0, 0],
@@ -148,7 +148,7 @@
       ]
     },
     {
-      "id": 5,
+      "id": 1048581,
       "parentId": 4294967295,
       "name": "SettingsMenuParent",
       "locked": false,
@@ -160,65 +160,62 @@
       ]
     },
     {
-      "id": 4,
-      "parentId": 0,
+      "id": 1048580,
+      "parentId": 1048576,
       "name": "Btn_Exit",
       "locked": false,
-      "translate": [0, 0, 0],
+      "translate": [600, 500, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [711.335,282.888], "size": [300,60], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIText", "enabled": true, "text": "Exit", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
+        {"type": "RectTransform", "enabled": true, "pos": [600,500], "size": [512,128], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TitleUI/EixtLogo.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIButton", "enabled": true, "normalColor": [0.2,0.2,0.2,0.8], "hoverColor": [0.4,0.4,0.4,1], "pressedColor": [0.1,0.1,0.1,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
-      "id": 3,
-      "parentId": 0,
+      "id": 1048579,
+      "parentId": 1048576,
       "name": "Btn_Settings",
       "locked": false,
-      "translate": [0, 0, 0],
+      "translate": [600, 350, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [708.972,186.346], "size": [300,60], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIText", "enabled": true, "text": "Settings", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
+        {"type": "RectTransform", "enabled": true, "pos": [600,350], "size": [512,128], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TitleUI/SettingLogo.png", "color": [1,1,1,1], "layer": 4, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIButton", "enabled": true, "normalColor": [0.2,0.2,0.2,0.8], "hoverColor": [0.4,0.4,0.4,1], "pressedColor": [0.1,0.1,0.1,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
-      "id": 2,
-      "parentId": 0,
+      "id": 1048578,
+      "parentId": 1048576,
       "name": "Btn_Start",
       "locked": false,
-      "translate": [0, 0, 0],
-      "rotate": [0, 0, 0],
+      "translate": [600, 200, 0],
+      "rotate": [0.24, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [706.608,101.619], "size": [300,60], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIText", "enabled": true, "text": "Start Game", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
+        {"type": "RectTransform", "enabled": true, "pos": [600,200], "size": [512,128], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TitleUI/SrartLogo.png", "color": [1,1,1,1], "layer": 100, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIButton", "enabled": true, "normalColor": [0.2,0.2,0.2,0.8], "hoverColor": [0.4,0.4,0.4,1], "pressedColor": [0.1,0.1,0.1,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
-      "id": 1,
-      "parentId": 0,
+      "id": 1048577,
+      "parentId": 1048576,
       "name": "TitleText",
       "locked": false,
-      "translate": [0, 0, 0],
+      "translate": [860, 1, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [862.954,1.24726], "size": [1000,500], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TitleUI/TitleLogo.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10}
+        {"type": "RectTransform", "enabled": true, "pos": [860,12], "size": [1000,500], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TitleUI/TitleLogo.png", "color": [1,1,1,1], "layer": -75, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10}
       ]
     },
     {
-      "id": 0,
+      "id": 1048576,
       "parentId": 4294967295,
       "name": "MainMenuParent",
       "locked": false,

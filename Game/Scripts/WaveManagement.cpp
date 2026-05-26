@@ -76,6 +76,10 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 		}
 	}
 
+	// 毎フレーム方角バーの描画フラグをリセット
+	static bool compassBarDrawn = false;
+	compassBarDrawn = false;
+
 	if (renderer && (isEditorMode || isPrepOrBattle)) {
 		for (size_t wi = 0; wi < enemySpawners_.size(); ++wi) {
 			// ゲームプレイ中は現在の（次に来る）ウェーブのものだけ表示する
@@ -171,8 +175,22 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 						planeTr.scale = { tc->scale.x * 2.0f, tc->scale.y * 2.0f, tc->scale.z * 2.0f };
 						renderer->DrawMesh(planeMeshHandle, spawnerTexHandle, planeTr, planeColor, "Unlit");
 
-						// 2D Sprite表示 (距離が30m以上のとき画面端に50x50で表示)
+						// 2D Sprite表示 (距離が30m以上のとき画面上部にコンパスバー＋アイコン表示)
 						if (distance >= 30.0f) {
+							// ====== テクスチャパス設定 (ここを変えるだけで差し替え可能) ======
+							static const char* kCompassBarTexPath  = "Resources/Textures/Direction.png";  // 方角バー背景
+							static const char* kIndicatorTexPath   = "Resources/Textures/white1x1.png";  // 縦線インジケーター
+
+							// ====== テクスチャハンドルのロード (初回のみ) ======
+							static uint32_t compassBarTexHandle = 0;
+							static uint32_t indicatorTexHandle  = 0;
+							if (compassBarTexHandle == 0) {
+								compassBarTexHandle = renderer->LoadTexture2D(kCompassBarTexPath, false);
+							}
+							if (indicatorTexHandle == 0) {
+								indicatorTexHandle = renderer->LoadTexture2D(kIndicatorTexPath, false);
+							}
+
 							// カメラの前方ベクトルを求める (ビュー行列の逆行列の3行目)
 							DirectX::XMMATRIX invView = DirectX::XMMatrixInverse(nullptr, view);
 							DirectX::XMVECTOR camForwardVec = invView.r[2];
@@ -194,27 +212,54 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 							while (angleDiff < -PI_VAL) angleDiff += 2.0f * PI_VAL;
 							while (angleDiff > PI_VAL) angleDiff -= 2.0f * PI_VAL;
 
-							// 画面幅の 10% から 90% の範囲に角度をマッピングする
-							float margin = (float)Engine::WindowDX::kW * 0.1f;
+							// 画面幅の 30% から 70% の範囲に角度をマッピングする
+							float screenW = (float)Engine::WindowDX::kW;
+							float margin = screenW * 0.3f;
 							float startX = margin;
-							float endX = (float)Engine::WindowDX::kW - margin;
+							float endX = screenW - margin;
 							float barWidth = endX - startX;
 
 							// 左右の逆転を修正するため、マッピング方向を反転
 							float t = (PI_VAL - angleDiff) / (2.0f * PI_VAL);
 							float targetX = startX + t * barWidth;
-							float targetY = 50.0f; // 画面上部固定
 
-							// 2D Spriteとして描画 (50x50)
-							Engine::Renderer::SpriteDesc spriteDesc;
-							spriteDesc.x = targetX - 25.0f;
-							spriteDesc.y = targetY - 25.0f;
-							spriteDesc.w = 50.0f;
-							spriteDesc.h = 50.0f;
-							spriteDesc.color = {1.0f, 1.0f, 1.0f, 1.0f};
-							spriteDesc.rotationRad = 0.0f;
-							spriteDesc.layer = 100; // 最前面
-							renderer->DrawSprite(spawnerTexHandle, spriteDesc);
+							// ====== レイアウト定数 ======
+							const float barH       = 70.0f;    // 方角バーの高さ
+							const float barY       = 20.0f;   // 方角バーのY位置
+							const float iconSize   = 50.0f;   // 敵アイコンのサイズ
+							const float iconY      = barY + (barH - iconSize) * 0.5f; // アイコンをバーの中央に配置
+
+							// ① 方角バー背景を描画 (全スポナーで共通、1回だけ描画)
+							//    カメラのヨー角に応じてUVをスクロールさせ、方角を反映する
+							if (!compassBarDrawn) {
+								// カメラの+Z（北）方向を向いたときにテクスチャの真ん中（N）が中央に来るようにオフセットを調整
+								float camYawNorm = (camAngle - (PI_VAL / 2.0f)) / (2.0f * PI_VAL);
+
+								Engine::Renderer::SpriteDesc barDesc;
+								barDesc.x = startX;
+								barDesc.y = barY;
+								barDesc.w = barWidth;
+								barDesc.h = barH;
+								barDesc.color = {1.0f, 1.0f, 1.0f, 0.6f};
+								barDesc.uvScaleOffset = {1.0f, 1.0f, camYawNorm, 0.0f}; // X方向にUVスクロール
+								barDesc.rotationRad = 0.0f;
+								barDesc.layer = 99;
+								renderer->DrawSprite(compassBarTexHandle, barDesc);
+								compassBarDrawn = true;
+							}
+
+							// ② 敵アイコンを描画 (バーの中央)
+							{
+								Engine::Renderer::SpriteDesc iconDesc;
+								iconDesc.x = targetX - iconSize * 0.5f;
+								iconDesc.y = iconY;
+								iconDesc.w = iconSize;
+								iconDesc.h = iconSize;
+								iconDesc.color = {1.0f, 1.0f, 1.0f, 1.0f};
+								iconDesc.rotationRad = 0.0f;
+								iconDesc.layer = 101; // バーより手前
+								renderer->DrawSprite(spawnerTexHandle, iconDesc);
+							}
 						}
 					}
 				}
