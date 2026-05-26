@@ -427,8 +427,8 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			for (int i = 0; i < segments; ++i) {
 				float theta1 = (2.0f * 3.14159265f * i) / segments;
 				float theta2 = (2.0f * 3.14159265f * (i + 1)) / segments;
-				Engine::Vector3 p1 = {pTc.translate.x + buffRadius_ * std::cos(theta1), pTc.translate.y + 0.15f, pTc.translate.z + buffRadius_ * std::sin(theta1)};
-				Engine::Vector3 p2 = {pTc.translate.x + buffRadius_ * std::cos(theta2), pTc.translate.y + 0.15f, pTc.translate.z + buffRadius_ * std::sin(theta2)};
+				Engine::Vector3 p1 = {pTc.translate.x + currentBuffRadius * std::cos(theta1), pTc.translate.y + 0.15f, pTc.translate.z + currentBuffRadius * std::sin(theta1)};
+				Engine::Vector3 p2 = {pTc.translate.x + currentBuffRadius * std::cos(theta2), pTc.translate.y + 0.15f, pTc.translate.z + currentBuffRadius * std::sin(theta2)};
 				// 発光する黄緑色のラインでオーラ範囲を描画
 				renderer->DrawLine3D(p1, p2, {0.6f, 1.0f, 0.2f, 1.0f}, true);
 			}
