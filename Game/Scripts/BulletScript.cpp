@@ -8,7 +8,8 @@
 namespace Game {
 
 static void SpawnExplosion(entt::registry& registry, GameScene* scene, const TransformComponent& posTrans) {
-	if (!scene) return;
+	if (!scene)
+		return;
 
 	entt::entity explosionVfx = scene->CreateEntity("CanonExplosion_VFX");
 	scene->SetTag(explosionVfx, TagType::VFX);
@@ -98,7 +99,7 @@ void BulletScript::Start(entt::entity entity, GameScene* scene) {
 		return;
 	}
 
-	speed_ = GetVar(entity, scene, "Speed", 80.0f); 
+	speed_ = GetVar(entity, scene, "Speed", 80.0f);
 	maxLifeTime_ = GetVar(entity, scene, "MaxLifeTime", 5.0f); // ★追加: 寿命を個別設定可能に
 
 	float hasTargetValue = GetVar(entity, scene, "HasTarget", 0.0f);
@@ -170,10 +171,12 @@ void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		// ★追加: レイキャストによる地形・オブジェクトとの衝突判定
 		Engine::Vector3 rayOrig = {bulletTransform.translate.x, bulletTransform.translate.y, bulletTransform.translate.z};
 		Engine::Vector3 rayDir = {moveX, moveY, moveZ};
-		float moveLen = std::sqrt(moveX*moveX + moveY*moveY + moveZ*moveZ);
-		
+		float moveLen = std::sqrt(moveX * moveX + moveY * moveY + moveZ * moveZ);
+
 		if (moveLen > 0.0001f) {
-			rayDir.x /= moveLen; rayDir.y /= moveLen; rayDir.z /= moveLen;
+			rayDir.x /= moveLen;
+			rayDir.y /= moveLen;
+			rayDir.z /= moveLen;
 			float hitDist = 0.0f;
 			if (scene->RayCast(rayOrig, rayDir, moveLen, static_cast<uint32_t>(entity), hitDist)) {
 				// 何かに当たった
@@ -210,6 +213,14 @@ void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	float length = std::sqrt(directionX * directionX + directionY * directionY + directionZ * directionZ);
 
 	if (length <= 0.0001f) {
+
+		if (registry.all_of<TagComponent>(entity) && registry.get<TagComponent>(entity).tag == TagType::Bullet) {
+
+			SpawnExplosion(registry, scene, bulletTransform);
+		}
+
+		scene->DestroyObject(static_cast<uint32_t>(entity));
+
 		return;
 	}
 
@@ -253,8 +264,7 @@ void BulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	bulletTransform.rotate.x = pitch;
 }
 
-void BulletScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
-}
+void BulletScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 REGISTER_SCRIPT(BulletScript);
 

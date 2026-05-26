@@ -206,6 +206,9 @@ void IceBulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	float length = std::sqrt(directionX * directionX + directionY * directionY + directionZ * directionZ);
 
 	if (length <= 0.0001f) {
+
+		scene->DestroyObject(static_cast<uint32_t>(entity));
+
 		return;
 	}
 
