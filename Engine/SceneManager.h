@@ -46,6 +46,7 @@ public:
 
 	IScene* Current() const { return current_.get(); }
 	const std::string& CurrentName() const { return currentName_; }
+	TransitionState GetTransitionState() const { return transitionState_; }
 
 	void SetDX(WindowDX* dx) { dx_ = dx; }
 

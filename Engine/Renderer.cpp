@@ -322,6 +322,9 @@ void Renderer::BeginFrame(const float clearColorRGBA[4]) {
 	upload_[fi].Reset();
 
 	drawCalls_.clear(); // ★追加: ドローコールをクリア
+	lineVertices_.clear();
+	lineVerticesXRay_.clear();
+	textVerticesMap_.clear();
 	
 	cbFrame_.time = std::fmod(cbFrame_.time + 0.016f, 3600.0f); // 固定値だが、本来はDeltaTimeを使うべき
 
