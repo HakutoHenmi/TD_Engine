@@ -28,6 +28,8 @@ private:
 
 	float damage_ = 2.0f;
 	float stopTime_ = 1.0f;
+	// ターゲット追尾用
+	entt::entity currentTarget_ = entt::null;
 };
 
 } // namespace Game

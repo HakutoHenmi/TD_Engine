@@ -92,6 +92,11 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 
 	attackTimer_ -= dt;
+
+	if (attackTimer_ < 0.0f) {
+		attackTimer_ = 0.0f;
+	}
+
 	if (attackTimer_ > 0.0f) {
 		return;
 	}
@@ -130,6 +135,9 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	float currentDamage = damage_ * attackPowerRate;
 	float currentAttackRange = attackRange_ * attackRangeRate;
+	if (attackSpeedRate <= 0.0f) {
+		attackSpeedRate = 0.01f;
+	}
 	float currentAttackInterval = attackInterval_ / attackSpeedRate;
 	float currentStopTime = stopTime_ * stopTimeRate;
 	int bulletCount = static_cast<int>(6.0f * bulletCountRate);
@@ -163,40 +171,79 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 		bulletCount = 1;
 	}
 
-	entt::entity target = entt::null;
-	float bestDistance = currentAttackRange;
-	SetVar(entity, scene, "AttackRange", currentAttackRange);
+	if (currentTarget_ != entt::null) {
 
-	const std::vector<entt::entity>& enemies = scene->GetEntitiesByTag(TagType::Enemy);
-
-	for (entt::entity other : enemies) {
-		if (!registry.valid(other)) {
-			continue;
+		if (!registry.valid(currentTarget_)) {
+			currentTarget_ = entt::null;
 		}
 
-		if (!registry.all_of<TransformComponent>(other)) {
-			continue;
+		if (currentTarget_ != entt::null && !registry.all_of<TransformComponent>(currentTarget_)) {
+
+			currentTarget_ = entt::null;
 		}
 
-		TransformComponent& enemyTransform = registry.get<TransformComponent>(other);
+		if (currentTarget_ != entt::null) {
 
-		float dx = enemyTransform.translate.x - canonTransform.translate.x;
-		float dy = enemyTransform.translate.y - canonTransform.translate.y;
-		float dz = enemyTransform.translate.z - canonTransform.translate.z;
+			const TransformComponent& targetTransform = registry.get<TransformComponent>(currentTarget_);
 
-		float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+			float dx = targetTransform.translate.x - canonTransform.translate.x;
 
-		if (distance < bestDistance) {
-			bestDistance = distance;
-			target = other;
+			float dy = targetTransform.translate.y - canonTransform.translate.y;
+
+			float dz = targetTransform.translate.z - canonTransform.translate.z;
+
+			float distanceSq = dx * dx + dy * dy + dz * dz;
+
+			float attackRangeSq = currentAttackRange * currentAttackRange;
+
+			if (distanceSq > attackRangeSq) {
+				currentTarget_ = entt::null;
+			}
 		}
 	}
 
-	if (target == entt::null) {
+	if (currentTarget_ == entt::null) {
+
+		float bestDistanceSq = currentAttackRange * currentAttackRange;
+
+		const std::vector<entt::entity>& enemies = scene->GetEntitiesByTag(TagType::Enemy);
+
+		for (entt::entity other : enemies) {
+
+			if (!registry.valid(other)) {
+				continue;
+			}
+
+			if (!registry.all_of<TransformComponent>(other)) {
+				continue;
+			}
+
+			const TransformComponent& enemyTransform = registry.get<TransformComponent>(other);
+
+			float dx = enemyTransform.translate.x - canonTransform.translate.x;
+
+			float dy = enemyTransform.translate.y - canonTransform.translate.y;
+
+			float dz = enemyTransform.translate.z - canonTransform.translate.z;
+
+			float distanceSq = dx * dx + dy * dy + dz * dz;
+
+			if (distanceSq < bestDistanceSq) {
+
+				bestDistanceSq = distanceSq;
+				currentTarget_ = other;
+			}
+		}
+	}
+
+	SetVar(entity, scene, "AttackRange", currentAttackRange);
+	if (currentTarget_ == entt::null) {
 		return;
 	}
-
-	TransformComponent& targetTransform = registry.get<TransformComponent>(target);
+	if (!registry.all_of<TransformComponent>(currentTarget_)) {
+		return;
+	}
+	TransformComponent& targetTransform = registry.get<TransformComponent>(currentTarget_);
 
 	float toX = targetTransform.translate.x - canonTransform.translate.x;
 	float toZ = targetTransform.translate.z - canonTransform.translate.z;
@@ -254,7 +301,7 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 		sc.scripts.push_back({"IceBulletScript", "", nullptr});
 
 		SetVar(bullet, scene, "HasTarget", 1.0f);
-		SetVar(bullet, scene, "TargetEntity", (float)(uint32_t)target);
+		SetVar(bullet, scene, "TargetEntity", (float)(uint32_t)currentTarget_);
 		SetVar(bullet, scene, "StopTime", currentStopTime);
 	}
 
@@ -278,6 +325,7 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 			// 1. 青白い冷気のブラスト (吹雪)
 			entt::entity blastVfx = scene->CreateEntity("IceBlast_VFX");
 			scene->SetTag(blastVfx, TagType::VFX);
+
 			auto& bTrans = registry.get<TransformComponent>(blastVfx);
 			bTrans.translate = muzzlePos;
 

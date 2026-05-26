@@ -504,7 +504,17 @@ void MissileBulletScript::CreateExplosionAttackArea(entt::entity entity, GameSce
 		swVc.SetValue("InitialAlpha", 2.6f);
 	}
 }
-void MissileBulletScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
+void MissileBulletScript::OnDestroy(entt::entity entity, GameScene* scene) {
+	(void)entity;
+	(void)scene;
+	if (!scene) {
+		return;
+	}
+
+	
+
+	
+}
 
 REGISTER_SCRIPT(MissileBulletScript);
 
