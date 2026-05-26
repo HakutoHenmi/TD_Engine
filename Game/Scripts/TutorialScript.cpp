@@ -1,5 +1,6 @@
 #include "ObjectTypes.h"
 #include "TutorialScript.h"
+#include "PlayerScript.h"
 #include "../Systems/UISystem.h"
 #include "../../Engine/Input.h"
 #include "../../Engine/PathUtils.h"
@@ -34,72 +35,69 @@ namespace {
 // 簡単に文言や行数を変更できます。SPACEキーで次の行に進みます。
 const std::unordered_map<TutorialScript::TutorialStep, std::vector<std::string>> kTutorialTexts = {
     { TutorialScript::TutorialStep::Step1_Greeting, {
-        "こんにちは！\nこのゲームのチュートリアルへようこそ。",
-        "防衛戦の基本を説明します。\n[SPACE]キーで読み進めてください。",
+        "こんにちは！チュートリアルへようこそ！",
+        "このゲームは[RED]『準備フェーズ』[/RED]と[RED]『戦闘フェーズ』[/RED]を\n交互に繰り返すぞ。"
     }},
     { TutorialScript::TutorialStep::Step2_CoreIntro, {
-        "まずはこちら、\n青い『コア』です。\n敵はこれを破壊しにきます。",
-        "コアを守り切ることがあなたの目的です。\n[SPACE]キーで進みます。"
+        "まずはあそこにある青い[RED]『コア』[/RED]だ。",
+        "敵はこれを破壊しにくる。コアを守り切るのが君の目的だ！"
     }},
     { TutorialScript::TutorialStep::Step3_SpawnerIntro, {
-        "次に、あちらに見えるのが\n『敵のスポナー』です。",
-        "戦闘フェーズになると、\nここから敵が出現します。\n[SPACE]キーで進みます。"
+        "次にあちらに見えるのが[RED]『敵のスポナー』[/RED]だ。",
+        "戦闘フェーズになると、ここから敵が出現するぞ。"
     }},
     { TutorialScript::TutorialStep::Step4_PhaseIntro, {
-        "このゲームは、\n『準備フェーズ』と『戦闘フェーズ』を\n交互に繰り返します。\n[SPACE]キーで進みます。",
-       "準備フェーズで設備を整え、\n戦闘フェーズで敵を迎撃しましょう。\n[SPACE]キーで進みます。"
+        "現在は[RED]『準備フェーズ』[/RED]だ。",
+        "このフェーズで防衛設備を整えよう！"
     }},
     { TutorialScript::TutorialStep::Step5_CameraControl, {
-        "カメラの操作方法について説明します。\n[SPACE]キーで進みます。",
-        "WASDで移動、マウス右ドラッグでカメラを回転できます。\n[SPACE]キーで進みます。",
-        "操作を確認したら、[SPACE]キーで次へ進みましょう。\n[SPACE]キーで進みます。"
+        "まずはカメラの操作方法だ。",
+        "[RED]WASDキー[/RED]で移動、[RED]マウス右ドラッグ[/RED]でカメラを回転できるぞ。",
+        "カメラを自由に動かして、マップ全体を確認しよう。"
     }},
-    { TutorialScript::TutorialStep::Step6_FacilityIntro, {
-        "それでは、\n防衛施設の設置について学びましょう。\n[SPACE]キーで進みます。",
-        "画面下のアイコンをクリックすることで選択できます。\n[SPACE]キーで進みます。"
+    { TutorialScript::TutorialStep::Step6_CannonInstall, {
+        "よし！それでは、敵を迎撃するための[RED]『大砲』[/RED]を設置しよう。",
+        "画面下の大砲アイコンをクリックして選択し、\nマップ上に配置するんだ！",
+        "目標：[RED]大砲を3個設置[/RED] (0/3)" 
     }},
-    { TutorialScript::TutorialStep::Step7_CannonInstall, {
-        "まずは敵を迎撃するための『大砲』を設置します。\n[SPACE]キーで進みます。",
-        "大砲のアイコンをクリックして設置したい場所に配置してください。"
+    { TutorialScript::TutorialStep::Step7_DeleteIntro, {
+        "大砲が設置できたな！",
+        "間違えて置いた時のために、削除の方法も覚えよう。",
+        "左下の[RED]『削除ボタン』[/RED]をクリックして、\n設置した大砲をどれか1つクリックして削除だ！"
     }},
-    { TutorialScript::TutorialStep::Step8_TankInstall, {
-        "次に、\n大砲を動かすためのエネルギー源『タンク』を設置します。\n[SPACE]キーで進みます。",
-        "タンクのアイコンをクリックして大砲の近くに配置してください。"
+    { TutorialScript::TutorialStep::Step8_BattleTransition, {
+        "防衛の準備が整ったな。",
+        "いよいよ戦闘開始だ！"
     }},
-    { TutorialScript::TutorialStep::Step9_PipeInstall, {
-        "タンクから大砲にエネルギーを届けるため、\n『パイプ』を繋ぎましょう。\n[SPACE]キーで進みます。",
-        "パイプのアイコンをクリックして、タンクの緑色の接続点から大砲に向けてパイプを伸ばして設置してください。"
+    { TutorialScript::TutorialStep::Step9_BuffExplanation, {
+        "戦闘フェーズに入った！\nまずはプレイヤーの攻撃操作だ。",
+        "プレイヤーは[RED]左クリック[/RED]で通常攻撃、\n[RED]Eキー[/RED]で強力なスキルが使えるぞ！",
+        "まずはやってくる敵を攻撃して、\n敵の[RED]シールドを2体分[/RED]割ってみよう！"
     }},
-    { TutorialScript::TutorialStep::Step10_DeleteIntro, {
-        "練習として、\nもう一つ余分にタンク（1キー）を適当に設置してみましょう。\n[SPACE]キーで進みます。",
-        "設置できました！\n左下の『削除ボタン』をクリックして、\n設置したタンクをクリックして削除してください。\n[SPACE]キーで進みます。",
-        "削除できました！\n[SPACE]キーで次へ進みます。"
+    { TutorialScript::TutorialStep::Step10_BuffPractice, {
+        "よくやった！次は防衛で[RED]一番大事なこと[/RED]を教えよう。",
+        "プレイヤーが持つ『青いオーラ』についてだ。",
+        "プレイヤーの周囲のオーラの中に大砲を入れると、\nエネルギーが供給され[RED]攻撃力が大幅に上昇[/RED]する！",
+        "実際にWASDで移動し、大砲に近づいてオーラを繋いでみてくれ。"
     }},
-    { TutorialScript::TutorialStep::Step9_BattleTransition, {
-        "防衛の準備が整いました。\nいよいよ戦闘フェーズへ移行します。\n[SPACE]キーで進みます。",
-        "[SPACE]キーを押して、\n戦闘を開始しましょう！"
+    { TutorialScript::TutorialStep::Step11_PlayerAttack, {
+        "素晴らしい！光のリンクが繋がったな！",
+        "さあ、大砲とプレイヤーの連携で全ての敵を撃退しよう！"
     }},
-    { TutorialScript::TutorialStep::Step10_PlayerAttack, {//nextTimerの時間を参照して、数行に分けて表示する
-        "戦闘フェーズが始まりました！\nプレイヤー自身も攻撃が可能です。",
-        "マウス左クリックで通常射撃を行い、\nEキーで強力なスキル攻撃を放ちます。",
-        "敵を倒してみましょう！\n[SPACE]キーで進みます。"
+    { TutorialScript::TutorialStep::Step12_CombatPlay, {
+        "大砲にバフを与えるのも忘れるなよ！"
     }},
-    { TutorialScript::TutorialStep::Step11_CombatPlay, {
-        "さあ、やってくる敵を大砲とプレイヤーの攻撃で全て撃退しましょう！"
+    { TutorialScript::TutorialStep::Step13_SkillTree, {
+        "敵を倒してレベルアップしたぞ！",
+        "[RED]Nキー[/RED]を押してスキルツリーを開き、\nオレンジ色に点滅しているスキルを獲得してみよう！",
+        "素晴らしい！スキルを獲得できたな！\n[RED]Nキー[/RED]を押してスキルツリーを閉じてくれ。"
     }},
-    { TutorialScript::TutorialStep::Step12_SkillTree, {
-        "敵を倒してレベルアップしました！能力を強化しましょう。\nNキーを押してスキルツリーを開いてください。", // Nを押すと次の行に進む
-        "スキルツリーが開きました。\n矢印キーか画面端のボタンでページを切り替えて、\n好きなスキルを1つ強化してください。",//強化すると進む
-        "強化が完了しました！",//Nで閉じると進む
-        "これでチュートリアルは終了ですが、\nゲームはここからが本番です！\n[SPACE]キーで進みます。"
+    { TutorialScript::TutorialStep::Step14_EndExplanation, {
+        "これでチュートリアルは終了だ！"
     }},
-    { TutorialScript::TutorialStep::Step13_EndExplanation, {
-        "これでチュートリアルの説明は全て終了です！\n[SPACE]キーで進みます。",
-        "ここからは自由にゲームを進めることができます。\n[SPACE]キーで進みます。", 
-        "ではここで練習しましょう\n[SPACE]キーで進みます。"
-    }},
-    { TutorialScript::TutorialStep::Step14_FreePlayBattle, {
-        "ESCでポーズが開けます。\nそこからチュートリアルを終了できます。\n[SPACE]キーで進みます。"
+    { TutorialScript::TutorialStep::Step15_FreePlayBattle, {
+        "ここからは無限に続くフリープレイになるぞ！",
+        "ESCキーのポーズメニューからいつでも終了できる。\n存分に楽しんでくれ！"
     }}
 };
 
@@ -151,6 +149,8 @@ entt::entity GetFacilityInRange(GameScene* scene, float x, float z, float range 
 // チュートリアルスクリプトの初期化処理。フェーズや変数の初期化、スキルツリーの読み込みなどを行う
 void TutorialScript::Start(entt::entity entity, GameScene* scene) {
     instance_ = this;
+    currentEntity_ = entity;
+    currentScene_ = scene;
     tutorialStep_ = TutorialStep::Step1_Greeting;
     currentLineIndex_ = 0;
     PhaseSystemScript::ResetPhaseCount();
@@ -166,11 +166,11 @@ void TutorialScript::Start(entt::entity entity, GameScene* scene) {
     isSellMode_ = false;
 
     // サブ状態のリセット
-    step8_placedExtraCannon_ = false;
-    step8_deletedCannon_ = false;
-    step12_pageSwitched_ = false;
-    step12_upgraded_ = false;
-    step12_initialSP_ = 0;
+    step7_placedExtraCannon_ = false;
+    step7_deletedCannon_ = false;
+    step13_pageSwitched_ = false;
+    step13_upgraded_ = false;
+    step13_initialSP_ = 0;
 
     PhaseSystemScript::ForcePhaseState(phaseState_);
     if (auto* renderer = Engine::Renderer::GetInstance()) {
@@ -200,23 +200,47 @@ void TutorialScript::EnterStep(TutorialStep step) {
     autoProceedTimer_ = 0.0f;
     currentLineIndex_ = 0;
 
-    if (step == TutorialStep::Step7_CannonInstall) {
-        hasPlacedCannon_ = false;
+    if (step == TutorialStep::Step5_CameraControl) {
+        step5_moved_ = false;
+        step5_rotated_ = false;
     }
-    if (step == TutorialStep::Step8_DeleteIntro) {
-        step8_placedExtraCannon_ = false;
-        step8_deletedCannon_ = false;
+    if (step == TutorialStep::Step6_CannonInstall) {
+        hasPlacedCannon_ = false;
+        step6_cannonCount_ = 0;
+    }
+    if (step == TutorialStep::Step7_DeleteIntro) {
+        step7_placedExtraCannon_ = false;
+        step7_deletedCannon_ = false;
         hasPlacedCannon_ = false;
         isSellMode_ = false;
     }
-    if (step == TutorialStep::Step12_SkillTree) {
-        step12_pageSwitched_ = false;
-        step12_upgraded_ = false;
-        step12_initialSP_ = skillTree_.GetSkillPoints();
+    if (step == TutorialStep::Step13_SkillTree) {
+        step13_pageSwitched_ = false;
+        step13_upgraded_ = false;
+        step13_initialSP_ = skillTree_.GetSkillPoints();
+        SetVar(currentEntity_, currentScene_, "IsLevelUpPhase", 1.0f);
+        if (currentScene_) {
+            currentScene_->GetEventSystem().Emit("GainExp", 10000.0f); // 確実にレベルアップさせる
+        }
         skillTree_.Close(nullptr);
+    } else if (step == TutorialStep::Step14_EndExplanation) {
+        SetVar(currentEntity_, currentScene_, "IsLevelUpPhase", 0.0f);
     }
 
-    if (step == TutorialStep::Step10_PlayerAttack || step == TutorialStep::Step11_CombatPlay || step == TutorialStep::Step14_FreePlayBattle) {
+    if (step == TutorialStep::Step9_BuffExplanation) {
+        WaveManagement::SetWave(0); // プレイヤー操作説明と同時に敵をスポーンさせる
+        ResetBrokenShieldCount();
+    }
+    
+    if (step == TutorialStep::Step10_BuffPractice) {
+        enemyTimeStopped_ = true; // オーラ説明時に敵の時間を止める
+    }
+    
+    if (step == TutorialStep::Step11_PlayerAttack) {
+        enemyTimeStopped_ = false; // オーラを繋いだら敵の時間を再開する
+    }
+
+    if (step == TutorialStep::Step9_BuffExplanation || step == TutorialStep::Step10_BuffPractice || step == TutorialStep::Step11_PlayerAttack || step == TutorialStep::Step12_CombatPlay || step == TutorialStep::Step15_FreePlayBattle) {
         RequestPhaseChange(PhaseSystemScript::BattlePhase);
     } else {
         RequestPhaseChange(PhaseSystemScript::PreparationPhase);
@@ -305,6 +329,115 @@ void TutorialScript::DrawHighlights(GameScene* scene) {
     if (!renderer) return;
 
     float time = (float)GetTickCount64() / 1000.0f;
+
+    // --- 視線誘導用：画面全体の暗転 ---
+    bool needsDarken = false;
+    entt::entity highlightEntity = entt::null;
+
+    if (tutorialStep_ == TutorialStep::Step6_CannonInstall) {
+        if (!isPlacementMode_) {
+            needsDarken = true;
+            highlightEntity = scene->FindObjectByName("CannonButton");
+        }
+    } else if (tutorialStep_ == TutorialStep::Step7_DeleteIntro) {
+        if (!step7_deletedCannon_) {
+            if (!isSellMode_) {
+                needsDarken = true;
+                highlightEntity = scene->FindObjectByName("DeleteButton");
+            }
+        }
+    } else if (tutorialStep_ == TutorialStep::Step13_SkillTree) {
+        if (!skillTree_.IsOpen()) {
+            needsDarken = true;
+        }
+        // HPゲージはImGuiのForegroundで描画されるため、暗転を描画するだけでハイライトされる
+    }
+
+    if (needsDarken) {
+        static uint32_t bgTexHandle = 0;
+        if (bgTexHandle == 0) bgTexHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+
+        if (tutorialStep_ == TutorialStep::Step13_SkillTree) {
+            // レベルUI部分をくり抜いて暗転を描画する
+            float holeX = 10.0f;
+            float holeY = 10.0f;
+            float holeW = 490.0f;
+            float holeH = 120.0f;
+            float sw = (float)Engine::WindowDX::kW;
+            float sh = (float)Engine::WindowDX::kH;
+            
+            Engine::Renderer::SpriteDesc s;
+            s.color = {0, 0, 0, 0.7f};
+            s.layer = 15000;
+            
+            // Top
+            s.x = 0; s.y = 0; s.w = sw; s.h = holeY;
+            renderer->DrawSprite(bgTexHandle, s);
+            // Bottom
+            s.x = 0; s.y = holeY + holeH; s.w = sw; s.h = sh - (holeY + holeH);
+            renderer->DrawSprite(bgTexHandle, s);
+            // Left
+            s.x = 0; s.y = holeY; s.w = holeX; s.h = holeH;
+            renderer->DrawSprite(bgTexHandle, s);
+            // Right
+            s.x = holeX + holeW; s.y = holeY; s.w = sw - (holeX + holeW); s.h = holeH;
+            renderer->DrawSprite(bgTexHandle, s);
+            
+            // 視線誘導のために穴の枠を少し光らせる
+            Engine::Renderer::SpriteDesc s2;
+            s2.color = { 1.0f, 1.0f, 0.8f, 0.5f + 0.3f * std::sin(time * 5.0f) };
+            s2.layer = 15001;
+            float t = 4.0f; // thickness
+            // Top edge
+            s2.x = holeX - t; s2.y = holeY - t; s2.w = holeW + t * 2; s2.h = t;
+            renderer->DrawSpriteAdditive(bgTexHandle, s2);
+            // Bottom edge
+            s2.x = holeX - t; s2.y = holeY + holeH; s2.w = holeW + t * 2; s2.h = t;
+            renderer->DrawSpriteAdditive(bgTexHandle, s2);
+            // Left edge
+            s2.x = holeX - t; s2.y = holeY; s2.w = t; s2.h = holeH;
+            renderer->DrawSpriteAdditive(bgTexHandle, s2);
+            // Right edge
+            s2.x = holeX + holeW; s2.y = holeY; s2.w = t; s2.h = holeH;
+            renderer->DrawSpriteAdditive(bgTexHandle, s2);
+        } else {
+            Engine::Renderer::SpriteDesc s;
+            s.x = 0; s.y = 0; s.w = (float)Engine::WindowDX::kW; s.h = (float)Engine::WindowDX::kH;
+            s.color = {0, 0, 0, 0.7f}; // やや濃いめの暗転
+            s.layer = 15000;
+            renderer->DrawSprite(bgTexHandle, s);
+        }
+    }
+
+    auto viewImg = scene->GetRegistry().view<UIImageComponent>();
+    for (auto e : viewImg) {
+        auto& img = viewImg.get<UIImageComponent>(e);
+        if (e == highlightEntity) {
+            img.layer = 20000; // 暗転より手前に描画
+            
+            // ★アイコンが暗く見えないように背面に光るパネルを描画する
+            if (scene->GetRegistry().all_of<RectTransformComponent>(e)) {
+                auto wr = UISystem::CalculateWorldRect(e, scene->GetRegistry(), (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH);
+                
+                static uint32_t glowTexHandle = 0;
+                if (glowTexHandle == 0) glowTexHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+                
+                Engine::Renderer::SpriteDesc bg;
+                bg.x = wr.x;
+                bg.y = wr.y;
+                bg.w = wr.w;
+                bg.h = wr.h;
+                
+                float alpha = 0.3f + 0.2f * std::sin(time * 5.0f); // 穏やかな点滅
+                bg.color = { 1.0f, 1.0f, 0.8f, alpha }; 
+                bg.layer = 19999; // ボタン(20000)の直前（奥）に描画
+                
+                renderer->DrawSpriteAdditive(glowTexHandle, bg);
+            }
+        } else if (img.layer == 20000 || img.layer == 5000) {
+            img.layer = 10; // 元に戻す
+        }
+    }
 
     if (tutorialStep_ == TutorialStep::Step2_CoreIntro) {
         auto core = scene->FindObjectByName("Core");
@@ -420,14 +553,7 @@ void TutorialScript::UpdateSellMode(GameScene* scene) {
 
         auto& registry = scene->GetRegistry();
         registry.view<NameComponent, TransformComponent>().each([&](entt::entity entity, const NameComponent& nc, const TransformComponent& tc) {
-            if (nc.name.find("Terrain") != std::string::npos ||
-                nc.name.find("Floor") != std::string::npos ||
-                nc.name.find("Ground") != std::string::npos ||
-                nc.name.find("Stage") != std::string::npos ||
-                nc.name.find("Plane") != std::string::npos ||
-                nc.name.find("Core") != std::string::npos ||
-                nc.name.find("Player") != std::string::npos ||
-                nc.name.find("PhysicsSystem") != std::string::npos) {
+            if (nc.name.find("Canon") == std::string::npos && nc.name.find("Cannon") == std::string::npos) {
                 return;
             }
 
@@ -480,7 +606,7 @@ void TutorialScript::UpdateSellMode(GameScene* scene) {
             if (input->IsMouseTrigger(0)) {
                 scene->DestroyObject(static_cast<uint32_t>(hoverEntity));
                 isSellMode_ = false;
-                step8_deletedCannon_ = true;
+                step7_deletedCannon_ = true;
                 EditorUI::Log("Tutorial: Object deleted successfully");
             }
         }
@@ -489,6 +615,8 @@ void TutorialScript::UpdateSellMode(GameScene* scene) {
 
 // 毎フレームの更新処理。チュートリアルのステップ進行判定やキー入力の処理を一括して行う
 void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
+    currentEntity_ = entity;
+    currentScene_ = scene;
     auto* input = Engine::Input::GetInstance();
     if (!scene || !input)
         return;
@@ -508,13 +636,20 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
     bool placementSelectionChangedThisFrame = false;
     const bool clickedInstallationButtonThisFrame = input->IsMouseTrigger(0) && IsPointerOverInstallationButton(scene);
 
-    // Keep Core fully healed during Steps 1 to 15 to prevent game over
-    if (static_cast<int>(tutorialStep_) <= static_cast<int>(TutorialStep::Step13_EndExplanation)) {
-        auto core = scene->FindObjectByName("Core");
-        if (scene->GetRegistry().valid(core)) {
-            if (auto* hc = scene->GetRegistry().try_get<HealthComponent>(core)) {
-                hc->hp = hc->maxHp;
-                hc->isDead = false;
+    // Keep Core, Player, and Towers fully healed during Steps 1 to 14 to prevent game over
+    if (static_cast<int>(tutorialStep_) <= static_cast<int>(TutorialStep::Step14_EndExplanation)) {
+        auto viewHC = scene->GetRegistry().view<HealthComponent>();
+        for (auto e : viewHC) {
+            bool isEnemy = false;
+            if (auto* tag = scene->GetRegistry().try_get<TagComponent>(e)) {
+                if (tag->tag == TagType::Enemy) {
+                    isEnemy = true;
+                }
+            }
+            if (!isEnemy) {
+                auto& hc = viewHC.get<HealthComponent>(e);
+                hc.hp = hc.maxHp;
+                hc.isDead = false;
             }
         }
     }
@@ -524,28 +659,33 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
     if (textIt != kTutorialTexts.end()) {
         const auto& lines = textIt->second;
         if (keySpace) {
-            if (tutorialStep_ == TutorialStep::Step8_DeleteIntro) {
-                if (step8_deletedCannon_ && currentLineIndex_ == 2) {
-                    EnterStep(TutorialStep::Step9_BattleTransition);
+            // ★ SPACEキーをチュートリアルのテキスト進行で消費したフレームは、ジャンプをキャンセルする
+            if (scene) {
+                auto view = scene->GetRegistry().view<PlayerInputComponent>();
+                for (auto e : view) {
+                    view.get<PlayerInputComponent>(e).jumpRequested = false;
                 }
             }
-            else if (tutorialStep_ == TutorialStep::Step10_PlayerAttack) {
-                // Step10はSPACEキーに反応しない（自動的に3秒後に進む）
+            if (tutorialStep_ == TutorialStep::Step11_PlayerAttack) {
+                // Step11はSPACEキーに反応しない（自動的に3秒後に進む）
             }
-            else if (tutorialStep_ == TutorialStep::Step12_SkillTree) {
-                if (step12_upgraded_ && currentLineIndex_ == 3) {
-                    EnterStep(TutorialStep::Step13_EndExplanation);
+            else if (tutorialStep_ == TutorialStep::Step13_SkillTree) {
+                // Step13 ではSPACEキーで次のテキスト（Nキーの指示）に進めるようにする
+                if (currentLineIndex_ < static_cast<int>(lines.size()) - 1) {
+                    currentLineIndex_++;
                 }
             }
             else {
                 if (currentLineIndex_ < static_cast<int>(lines.size()) - 1) {
                     currentLineIndex_++;
                 } else {
-                    bool isActionStep = (tutorialStep_ == TutorialStep::Step7_CannonInstall ||
-                                         tutorialStep_ == TutorialStep::Step8_DeleteIntro ||
-                                         tutorialStep_ == TutorialStep::Step11_CombatPlay ||
-                                         tutorialStep_ == TutorialStep::Step12_SkillTree ||
-                                         tutorialStep_ == TutorialStep::Step14_FreePlayBattle);
+                    bool isActionStep = (tutorialStep_ == TutorialStep::Step6_CannonInstall ||
+                                         tutorialStep_ == TutorialStep::Step7_DeleteIntro ||
+                                         tutorialStep_ == TutorialStep::Step9_BuffExplanation ||
+                                         tutorialStep_ == TutorialStep::Step10_BuffPractice ||
+                                         tutorialStep_ == TutorialStep::Step12_CombatPlay ||
+                                         tutorialStep_ == TutorialStep::Step13_SkillTree ||
+                                         tutorialStep_ == TutorialStep::Step15_FreePlayBattle);
                     if (!isActionStep) {
                         int nextStepInt = static_cast<int>(tutorialStep_) + 1;
                         if (nextStepInt < static_cast<int>(TutorialStep::Count)) {
@@ -558,7 +698,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
     }
 
     switch (tutorialStep_) {
-    case TutorialStep::Step7_CannonInstall:
+    case TutorialStep::Step6_CannonInstall:
         if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
             break;
 
@@ -576,85 +716,100 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
             Installation(scene, selectedObjPath_);
         }
 
-        if (hasPlacedCannon_) {
-            EnterStep(TutorialStep::Step8_DeleteIntro);
+        if ((isPlacementMode_ || step6_cannonCount_ > 0) && currentLineIndex_ < static_cast<int>(kTutorialTexts.at(tutorialStep_).size()) - 1) {
+            currentLineIndex_ = static_cast<int>(kTutorialTexts.at(tutorialStep_).size()) - 1; // 設置モードに入った、または設置したらテキストスキップ
+        }
+
+        if (step6_cannonCount_ >= 3) {
+            EnterStep(TutorialStep::Step7_DeleteIntro);
         }
         break;
 
-    case TutorialStep::Step8_DeleteIntro:
+    case TutorialStep::Step7_DeleteIntro:
         if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
             break;
 
-        if (!step8_placedExtraCannon_) {
-            currentLineIndex_ = 0;
-            if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/Canon.prefab")) {
-                selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
-                isPlacementMode_ = true;
-                placementSelectionChangedThisFrame = true;
-            }
-            if (!placementSelectionChangedThisFrame && !clickedInstallationButtonThisFrame) {
-                Installation(scene, selectedObjPath_);
-            }
-            if (hasPlacedCannon_) {
-                step8_placedExtraCannon_ = true;
-                hasPlacedCannon_ = false;
-                isPlacementMode_ = false;
-            }
-        } else if (!step8_deletedCannon_) {
-            currentLineIndex_ = 1;
-            UpdateSellMode(scene);
-        } else {
-            currentLineIndex_ = 2;
-            isSellMode_ = false;
+        if ((isSellMode_ || InstallationManager::IsButtonPressedByName("DeleteButton")) && currentLineIndex_ < static_cast<int>(kTutorialTexts.at(tutorialStep_).size()) - 1) {
+            currentLineIndex_ = static_cast<int>(kTutorialTexts.at(tutorialStep_).size()) - 1; // 削除モードに入ったらテキストスキップ
         }
-        break;
 
-    case TutorialStep::Step9_BattleTransition:
-        if (keySpace && currentLineIndex_ == static_cast<int>(kTutorialTexts.at(tutorialStep_).size()) - 1) {
-            EnterStep(TutorialStep::Step10_PlayerAttack);
-        }
-        break;
-
-    case TutorialStep::Step10_PlayerAttack: {
-        // 3秒ごとに説明文の行を進める
-        autoProceedTimer_ += dt;
-        if (autoProceedTimer_ >= nextTimer_) {
-            autoProceedTimer_ = 0.0f;
-            const auto& lines = kTutorialTexts.at(tutorialStep_);
-            if (currentLineIndex_ < static_cast<int>(lines.size()) - 1) {
-                // 次の行へ進む
-                currentLineIndex_++;
+        if (currentLineIndex_ == 2) {
+            if (!step7_deletedCannon_) {
+                UpdateSellMode(scene);
             } else {
-                // すべての行が終わったのでStep11へ進む
-                EnterStep(TutorialStep::Step11_CombatPlay);
+                isSellMode_ = false;
+                EnterStep(TutorialStep::Step8_BattleTransition);
+            }
+        }
+        break;
+
+    case TutorialStep::Step8_BattleTransition:
+        // SPACEキーで進行するため、ここでは何もしない
+        break;
+
+    case TutorialStep::Step9_BuffExplanation:
+        if (brokenShieldCount_ > 0 && currentLineIndex_ < static_cast<int>(kTutorialTexts.at(tutorialStep_).size()) - 1) {
+            currentLineIndex_ = static_cast<int>(kTutorialTexts.at(tutorialStep_).size()) - 1; // 攻撃を開始したらスキップ
+        }
+        if (currentLineIndex_ == static_cast<int>(kTutorialTexts.at(tutorialStep_).size()) - 1) {
+            if (brokenShieldCount_ >= 2) {
+                EnterStep(TutorialStep::Step10_BuffPractice);
+            }
+        }
+        break;
+
+    case TutorialStep::Step10_BuffPractice: {
+        if (currentLineIndex_ == static_cast<int>(kTutorialTexts.at(tutorialStep_).size()) - 1) {
+            bool anyBuffed = false;
+            auto viewBuff = scene->GetRegistry().view<BuffComponent>();
+            for (auto [e, buff] : viewBuff.each()) {
+                if (buff.isBuffed) {
+                    anyBuffed = true;
+                    break;
+                }
+            }
+            if (anyBuffed) {
+                EnterStep(TutorialStep::Step11_PlayerAttack);
             }
         }
         break;
     }
 
-    case TutorialStep::Step11_CombatPlay:
-        if (phaseState_ == PhaseSystemScript::BattlePhase) {
-            // Check if all enemies are defeated
-            auto waveManagerEntity = WaveManagement::GetManagerEntity();
-            if (scene->GetRegistry().valid(waveManagerEntity)) {
-                if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(waveManagerEntity)) {
-                    for (auto& entry : sc->scripts) {
-                        if (entry.scriptPath == "WaveManagement" && entry.instance) {
-                            auto* wm = static_cast<WaveManagement*>(entry.instance.get());
-                            int remainingEnemies = wm->GetTotalRemainingEnemies(scene);
-                            if (remainingEnemies <= 0) {
-                                // All enemies defeated, transition to preparation phase
-                                EnterStep(TutorialStep::Step12_SkillTree);
-                            }
-                            break;
+    case TutorialStep::Step11_PlayerAttack: {
+        step11Timer_ += dt;
+        if (currentLineIndex_ == 0 && step11Timer_ > 3.0f) {
+            currentLineIndex_ = 1;
+        }
+        if (currentLineIndex_ == 1 && step11Timer_ > 6.0f) {
+            EnterStep(TutorialStep::Step12_CombatPlay);
+            step11Timer_ = 0.0f;
+        }
+        break;
+    }
+
+    case TutorialStep::Step12_CombatPlay: {
+        bool allDead = false;
+        if (WaveManagement::GetManagerEntity() != entt::null) {
+            if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(WaveManagement::GetManagerEntity())) {
+                for (auto& entry : sc->scripts) {
+                    if (entry.scriptPath == "WaveManagement" && entry.instance) {
+                        auto* wm = static_cast<WaveManagement*>(entry.instance.get());
+                        if (wm->GetTotalRemainingEnemies(scene) <= 0) {
+                            allDead = true;
                         }
                     }
                 }
             }
         }
-        break;
 
-    case TutorialStep::Step12_SkillTree: {
+        // 敵が全滅してWave終了、またはフェーズが切り替わった場合にクリアとする
+        if (PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase || WaveManagement::IsWaveEnded() || allDead) {
+            EnterStep(TutorialStep::Step13_SkillTree);
+        }
+        break;
+    }
+
+    case TutorialStep::Step13_SkillTree: {
         if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
             break;
 
@@ -662,13 +817,13 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
         UpdateSkillTree(entity, scene, keyNTrigger);
 
         if (!skillTree_.IsOpen()) {
-            // SkillTree が閉じられた場合、スキルが強化されていれば行4に進む
-            if (step12_upgraded_) {
-                currentLineIndex_ = 3;
-            } else {
-                currentLineIndex_ = 0;
+            SetVar(entity, scene, "IsSkillTreeOpen", 0.0f);
+            // SkillTree が閉じられた場合、スキルが強化されていればStep14に進む
+            if (step13_upgraded_) {
+                EnterStep(TutorialStep::Step14_EndExplanation);
             }
         } else {
+            SetVar(entity, scene, "IsSkillTreeOpen", 1.0f);
             // SkillTree が開いている
             if (input->IsMouseTrigger(0)) {
                 float mx = 0, my = 0;
@@ -686,26 +841,29 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
 #endif
                 if ((mx >= 100.0f && mx <= 180.0f && my >= 520.0f && my <= 570.0f) ||
                     (mx >= 1000.0f && mx <= 1080.0f && my >= 520.0f && my <= 570.0f)) {
-                    step12_pageSwitched_ = true;
+                    step13_pageSwitched_ = true;
                 }
             }
 
-            if (skillTree_.GetSkillPoints() < step12_initialSP_) {
+            if (skillTree_.IsSkillUnlocked(1)) {
                 // スキルを強化した
-                step12_upgraded_ = true;
+                step13_upgraded_ = true;
                 currentLineIndex_ = 2;
-            } else if (keyNTrigger) {
-                // Nを押した
-                currentLineIndex_ = 1;
             } else {
-                currentLineIndex_ = 0;
+                currentLineIndex_ = 1;
             }
         }
         preKeyN_ = keyNTrigger;
         break;
     }
 
-    case TutorialStep::Step14_FreePlayBattle:
+    case TutorialStep::Step14_EndExplanation:
+        if (phaseState_ == PhaseSystemScript::PreparationPhase && !isPhaseTransitioning_) {
+            EnterStep(TutorialStep::Step15_FreePlayBattle);
+        }
+        break;
+
+    case TutorialStep::Step15_FreePlayBattle:
         if (phaseState_ == PhaseSystemScript::PreparationPhase && !isPhaseTransitioning_) {
             if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/Canon.prefab")) {
                 selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
@@ -723,7 +881,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
             if (keySpace) {
                 currentLineIndex_ = 0;
-                EnterStep(TutorialStep::Step14_FreePlayBattle);
+                EnterStep(TutorialStep::Step15_FreePlayBattle);
             }
         } else if (phaseState_ == PhaseSystemScript::BattlePhase) {
             if (WaveManagement::IsWaveEnded()) {
@@ -750,6 +908,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
     }
 
     UpdatePhaseTransition(scene);
+    UpdateCameraFocus(scene, dt);
 }
 
 // 準備フェーズと戦闘フェーズの間で状態を切り替えるよう要求する（フェード遷移を開始する）
@@ -772,8 +931,15 @@ void TutorialScript::RequestPhaseChange(PhaseSystemScript::PhaseState nextPhase)
 
 // フェーズ遷移中の処理を更新し、フェード完了タイミングで実際のフェーズ状態切り替えを適用する
 void TutorialScript::UpdatePhaseTransition(GameScene* scene) {
-    if (!isPhaseTransitioning_)
+    PhaseSystemScript::PhaseState currentPhase = PhaseSystemScript::IsPhase();
+
+    if (!isPhaseTransitioning_) {
+        // PhaseSystemScript側でフェーズが変わっていた場合（Spawner経由など）、同期する
+        if (phaseState_ != currentPhase && currentPhase != PhaseSystemScript::Transition) {
+            phaseState_ = currentPhase;
+        }
         return;
+    }
 
     if (PhaseTransition::IsAvailable()) {
         isFadeFinished_ = PhaseTransition::ConsumeSwitchPoint();
@@ -797,7 +963,7 @@ void TutorialScript::UpdatePhaseTransition(GameScene* scene) {
                 nav.GenerateFlowField(tc.translate.x, tc.translate.z);
             }
 
-            if (tutorialStep_ == TutorialStep::Step11_CombatPlay || tutorialStep_ == TutorialStep::Step14_FreePlayBattle) {
+            if (tutorialStep_ == TutorialStep::Step15_FreePlayBattle) {
                 WaveManagement::SetWave(0);
             }
         } else if (phaseState_ == PhaseSystemScript::PreparationPhase) {
@@ -806,19 +972,291 @@ void TutorialScript::UpdatePhaseTransition(GameScene* scene) {
     }
 }
 
+void TutorialScript::UpdateCameraFocus(GameScene* scene, float dt) {
+    if (!scene) return;
+
+    entt::entity targetEntity = entt::null;
+    bool needsOverride = false;
+    DirectX::XMFLOAT3 customEyeOffset = { 0.0f, 20.0f, -25.0f }; // Default offset
+
+    if (tutorialStep_ == TutorialStep::Step2_CoreIntro) {
+        targetEntity = scene->FindObjectByName("Core");
+        needsOverride = true;
+        customEyeOffset = { 8.0f, 6.0f, -8.0f }; // コアに大きくズーム
+    } else if (tutorialStep_ == TutorialStep::Step3_SpawnerIntro) {
+        auto& reg = scene->GetRegistry();
+        for (auto [e, nc] : reg.view<NameComponent>().each()) {
+            if (nc.name.find("Spawner") != std::string::npos) {
+                targetEntity = e;
+                break;
+            }
+        }
+        needsOverride = true;
+        customEyeOffset = { -5.0f, 6.0f, -10.0f }; // スポナーに大きくズーム
+    }
+
+    auto& reg = scene->GetRegistry();
+
+    if (needsOverride && targetEntity != entt::null) {
+        if (!isCameraOverriding_) {
+            isCameraOverriding_ = true;
+            cameraTargetFound_ = true;
+            cameraTransitionTime_ = 0.0f;
+            
+            auto camPos = scene->GetCamera().Position();
+            startEye_ = { camPos.x, camPos.y, camPos.z };
+
+            // Calculate start target from camera rotation
+            Engine::Vector3 rot = scene->GetCamera().GetRotation();
+            float yaw = rot.y;
+            float pitch = rot.x;
+            float dirX = std::sin(yaw) * std::cos(pitch);
+            float dirY = -std::sin(pitch);
+            float dirZ = std::cos(yaw) * std::cos(pitch);
+            startTarget_ = { startEye_.x + dirX * 10.0f, startEye_.y + dirY * 10.0f, startEye_.z + dirZ * 10.0f };
+
+            // 一時的に既存のカメラターゲットを無効化（PreparationCameraの干渉を防ぐためコンポーネントごと削除）
+            cameraTargetEntities_.clear();
+            for (auto [e, ct] : reg.view<CameraTargetComponent>().each()) {
+                cameraTargetEntities_.push_back(e);
+            }
+            for (auto e : cameraTargetEntities_) {
+                reg.remove<CameraTargetComponent>(e);
+            }
+        }
+    } else {
+        if (isCameraOverriding_) {
+            isCameraOverriding_ = false;
+            cameraTargetFound_ = false;
+
+            // コンポーネントを元のエンティティに復元
+            for (auto e : cameraTargetEntities_) {
+                if (reg.valid(e)) {
+                    (void)reg.get_or_emplace<CameraTargetComponent>(e);
+                }
+            }
+            cameraTargetEntities_.clear();
+        }
+    }
+
+    if (isCameraOverriding_ && cameraTargetFound_) {
+        auto* tc = reg.try_get<TransformComponent>(targetEntity);
+        if (tc) {
+            cameraOverrideTargetPos_ = { tc->translate.x, tc->translate.y, tc->translate.z };
+            cameraOverrideEyePos_ = { tc->translate.x + customEyeOffset.x, tc->translate.y + customEyeOffset.y, tc->translate.z + customEyeOffset.z };
+
+            cameraTransitionTime_ += dt;
+            float t = std::min(cameraTransitionTime_ / cameraTransitionMax_, 1.0f);
+            
+            // Smoothstep
+            t = t * t * (3.0f - 2.0f * t);
+
+            DirectX::XMFLOAT3 currentEye = {
+                startEye_.x + (cameraOverrideEyePos_.x - startEye_.x) * t,
+                startEye_.y + (cameraOverrideEyePos_.y - startEye_.y) * t,
+                startEye_.z + (cameraOverrideEyePos_.z - startEye_.z) * t
+            };
+            DirectX::XMFLOAT3 currentTarget = {
+                startTarget_.x + (cameraOverrideTargetPos_.x - startTarget_.x) * t,
+                startTarget_.y + (cameraOverrideTargetPos_.y - startTarget_.y) * t,
+                startTarget_.z + (cameraOverrideTargetPos_.z - startTarget_.z) * t
+            };
+
+            auto& camera = scene->GetCamera();
+            camera.SetPosition(currentEye.x, currentEye.y, currentEye.z);
+            camera.LookAt(currentTarget.x, currentTarget.y, currentTarget.z, 0.0f, 1.0f, 0.0f);
+        }
+    }
+}
+
 // 現在のチュートリアルステップに基づくテキストをUIテキストコンポーネントに適用する
 void TutorialScript::ShowGuideText(entt::entity entity, GameScene* scene) {
     if (!scene) return;
+    if (scene->IsPaused()) return; // ポーズ中はチュートリアル表示を消す
+
     auto& registry = scene->GetRegistry();
     if (!registry.all_of<UITextComponent>(entity)) return;
 
     auto& uiText = registry.get<UITextComponent>(entity);
+    uiText.enabled = false; // 独自で描画するためUISystemには描かせない
 
     auto it = kTutorialTexts.find(tutorialStep_);
     if (it != kTutorialTexts.end()) {
         const auto& lines = it->second;
         if (currentLineIndex_ >= 0 && currentLineIndex_ < static_cast<int>(lines.size())) {
-            uiText.text = lines[currentLineIndex_];
+            std::string currentText = lines[currentLineIndex_];
+            
+            if (tutorialStep_ == TutorialStep::Step6_CannonInstall && currentLineIndex_ == 2) {
+                currentText = "目標：[RED]大砲を3個設置[/RED] (" + std::to_string(step6_cannonCount_) + "/3)";
+            }
+
+            uiText.color = {1.0f, 1.0f, 1.0f, 1.0f}; // 白
+            uiText.outlineEnabled = true;
+            uiText.outlineColor = {0.0f, 0.0f, 0.0f, 1.0f}; // 黒のアウトライン
+            uiText.outlineThickness = 2.0f;
+            uiText.fontSize = 60.0f; 
+            uiText.fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf";
+
+            auto* renderer = Engine::Renderer::GetInstance();
+            if (renderer) {
+                float fontScale = uiText.fontSize / 64.0f;
+                float lineHeight = renderer->GetTextLineHeight(fontScale, uiText.fontPath);
+                
+                // タグを除いたテキストで幅を計算する関数
+                auto measureRawTextWidth = [&](const std::string& text) {
+                    std::string noTag = text;
+                    size_t pos;
+                    while ((pos = noTag.find("[RED]")) != std::string::npos) noTag.replace(pos, 5, "");
+                    while ((pos = noTag.find("[/RED]")) != std::string::npos) noTag.replace(pos, 6, "");
+                    return renderer->MeasureTextWidth(noTag, fontScale, uiText.fontPath);
+                };
+
+                // 行ごとに分割
+                std::vector<std::string> splitted;
+                size_t start = 0;
+                size_t nlPos;
+                while ((nlPos = currentText.find('\n', start)) != std::string::npos) {
+                    splitted.push_back(currentText.substr(start, nlPos - start));
+                    start = nlPos + 1;
+                }
+                splitted.push_back(currentText.substr(start));
+
+                float exactW = 0.0f;
+                for (const auto& line : splitted) {
+                    float w = measureRawTextWidth(line);
+                    if (w > exactW) exactW = w;
+                }
+                float exactH = lineHeight * splitted.size();
+
+                std::string navText = "";
+                bool isActionStep = (tutorialStep_ == TutorialStep::Step5_CameraControl ||
+                                     tutorialStep_ == TutorialStep::Step6_CannonInstall ||
+                                     tutorialStep_ == TutorialStep::Step7_DeleteIntro ||
+                                     tutorialStep_ == TutorialStep::Step9_BuffExplanation ||
+                                     tutorialStep_ == TutorialStep::Step10_BuffPractice ||
+                                     tutorialStep_ == TutorialStep::Step12_CombatPlay ||
+                                     tutorialStep_ == TutorialStep::Step13_SkillTree ||
+                                     tutorialStep_ == TutorialStep::Step15_FreePlayBattle);
+
+                bool isLastLine = (currentLineIndex_ >= static_cast<int>(lines.size()) - 1);
+
+                if (tutorialStep_ == TutorialStep::Step11_PlayerAttack) {
+                    navText = "( 自動で進みます )";
+                } else if (tutorialStep_ == TutorialStep::Step5_CameraControl && isLastLine) {
+                    navText = ""; // 自動・アクション進行
+                } else if (tutorialStep_ == TutorialStep::Step7_DeleteIntro && currentLineIndex_ == 2) {
+                    navText = "[SPACE]キー で進む ▼";
+                } else if (tutorialStep_ == TutorialStep::Step13_SkillTree && currentLineIndex_ > 0) {
+                    navText = ""; // アクション待ち
+                } else if (isActionStep && isLastLine) {
+                    navText = ""; // アクション待ち
+                } else {
+                    navText = "[SPACE]キー で進む ▼";
+                }
+
+                float navScale = fontScale * 0.8f;
+                float navW = 0.0f;
+                float navH = 0.0f;
+                if (!navText.empty()) {
+                    navW = renderer->MeasureTextWidth(navText, navScale, uiText.fontPath);
+                    navH = renderer->GetTextLineHeight(navScale, uiText.fontPath);
+                }
+
+                float maxW = std::max(exactW, navW);
+                float centerX = Engine::WindowDX::kW * 0.5f;
+                
+                // 動的Y位置計算 (被りを防ぐためステップに応じてYを変える)
+                float targetY = Engine::WindowDX::kH * 0.1f; // デフォルト上部
+                if (tutorialStep_ == TutorialStep::Step2_CoreIntro || tutorialStep_ == TutorialStep::Step3_SpawnerIntro) {
+                    targetY = Engine::WindowDX::kH * 0.75f; // コア等を見せる時は下部
+                }
+                if (tutorialStep_ == TutorialStep::Step6_CannonInstall || tutorialStep_ == TutorialStep::Step7_DeleteIntro) {
+                    targetY = Engine::WindowDX::kH * 0.15f; // UIを見る時は少し上
+                }
+                if (tutorialStep_ == TutorialStep::Step13_SkillTree && skillTree_.IsOpen()) {
+                    targetY = Engine::WindowDX::kH * 0.78f; // スキルツリーと被らないように下へ
+                }
+
+                static uint32_t bgTexHandle = 0;
+                if (bgTexHandle == 0) {
+                    bgTexHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+                }
+                float margin = 40.0f; 
+                float navSpaceY = 20.0f; 
+                float totalH = exactH + (navText.empty() ? 0 : navSpaceY + navH);
+
+                float bgX = centerX - maxW * 0.5f - margin;
+                float bgY = targetY - margin;
+
+                Engine::Renderer::SpriteDesc bgDesc;
+                bgDesc.x = bgX;
+                bgDesc.y = bgY;
+                bgDesc.w = maxW + margin * 2.0f; 
+                bgDesc.h = totalH + margin * 2.0f; 
+                bgDesc.layer = 10000; 
+                bgDesc.color = {0.0f, 0.0f, 0.0f, 0.6f}; // 半透明黒背景
+                renderer->DrawSprite(bgTexHandle, bgDesc);
+
+                // 本文描画ルーチン
+                float currentY = targetY;
+                for (const auto& line : splitted) {
+                    float lineW = measureRawTextWidth(line);
+                    float currentX = centerX - lineW * 0.5f;
+
+                    std::string textToProcess = line;
+                    bool isRed = false;
+                    
+                    while (!textToProcess.empty()) {
+                        size_t redStart = textToProcess.find("[RED]");
+                        size_t redEnd = textToProcess.find("[/RED]");
+                        size_t nextTag = std::min(redStart, redEnd);
+                        
+                        std::string part = textToProcess.substr(0, nextTag);
+                        if (!part.empty()) {
+                            Engine::Vector4 color = isRed ? Engine::Vector4{1.0f, 0.3f, 0.3f, 1.0f} : Engine::Vector4{uiText.color.x, uiText.color.y, uiText.color.z, uiText.color.w};
+                            float ot = uiText.outlineThickness;
+                            Engine::Vector4 oColor = {uiText.outlineColor.x, uiText.outlineColor.y, uiText.outlineColor.z, uiText.outlineColor.w};
+                            
+                            // アウトライン描画
+                            renderer->DrawString(part, currentX - ot, currentY, fontScale, oColor, uiText.fontPath);
+                            renderer->DrawString(part, currentX + ot, currentY, fontScale, oColor, uiText.fontPath);
+                            renderer->DrawString(part, currentX, currentY - ot, fontScale, oColor, uiText.fontPath);
+                            renderer->DrawString(part, currentX, currentY + ot, fontScale, oColor, uiText.fontPath);
+                            
+                            renderer->DrawString(part, currentX, currentY, fontScale, color, uiText.fontPath);
+                            currentX += renderer->MeasureTextWidth(part, fontScale, uiText.fontPath);
+                        }
+                        
+                        if (nextTag == std::string::npos) break;
+                        if (nextTag == redStart) {
+                            isRed = true;
+                            textToProcess = textToProcess.substr(redStart + 5);
+                        } else {
+                            isRed = false;
+                            textToProcess = textToProcess.substr(redEnd + 6);
+                        }
+                    }
+                    currentY += lineHeight;
+                }
+
+                if (!navText.empty()) {
+                    static float blinkTimer = 0.0f;
+                    blinkTimer += 0.016f; 
+                    float alpha = (std::sin(blinkTimer * 5.0f) + 1.0f) * 0.5f; 
+                    float minAlpha = 0.3f;
+                    float finalAlpha = minAlpha + (1.0f - minAlpha) * alpha; 
+
+                    Engine::Vector4 navColor = {1.0f, 1.0f, 1.0f, finalAlpha};
+                    Engine::Vector4 outlineColor = {0.0f, 0.0f, 0.0f, finalAlpha};
+
+                    float navX = centerX + maxW * 0.5f - navW; 
+                    float navY = targetY + exactH + navSpaceY;
+
+                    float shadowOffset = 2.0f;
+                    renderer->DrawString(navText, navX + shadowOffset, navY + shadowOffset, navScale, outlineColor, uiText.fontPath);
+                    renderer->DrawString(navText, navX, navY, navScale, navColor, uiText.fontPath);
+                }
+            }
         }
     }
 }
@@ -843,12 +1281,11 @@ void TutorialScript::Installation(GameScene* scene, const std::string& objPath) 
 
 
 
-    const bool canPlace = !IsPlacementBlocked(scene, snappedHitPoint);
+    const bool canPlace = !IsPlacementBlocked(scene, snappedHitPoint) && !IsPointerOverInstallationButton(scene);
     DrawPlacementPreview(scene, snappedHitPoint, objPath, canPlace);
 
     if (input->IsMouseTrigger(0) && canPlace) {
         SpawnPlacedObject(scene, snappedHitPoint, objPath);
-        isPlacementMode_ = false;
     }
 }
 
@@ -1070,8 +1507,26 @@ bool TutorialScript::ExtractPrefabRenderPaths(const std::string& prefabPath, std
 // 指定した位置に既に他のオブジェクトが存在し、設置がブロックされるかどうかを判定する
 bool TutorialScript::IsPlacementBlocked(GameScene* scene, const Engine::Vector3& hitPoint) const {
     constexpr float kBlockHalfExtent = 2.0f;
-
     auto& registry = scene->GetRegistry();
+
+    // ★ チュートリアル特有の制限：コア（タワー）付近かスポナーの付近にしか置けないようにする
+    bool isNearValidArea = false;
+    auto viewTransform = registry.view<NameComponent, TransformComponent>();
+    for (auto [entity, nc, tc] : viewTransform.each()) {
+        if (nc.name.find("Spawner") != std::string::npos || nc.name.find("Core") != std::string::npos) {
+            float dx = tc.translate.x - hitPoint.x;
+            float dz = tc.translate.z - hitPoint.z;
+            if (dx * dx + dz * dz <= 20.0f * 20.0f) {
+                isNearValidArea = true;
+                break;
+            }
+        }
+    }
+    
+    if (!isNearValidArea) {
+        return true; // コア・スポナーから遠い場合はブロックする
+    }
+
     auto view = registry.view<TransformComponent>();
     for (auto entity : view) {
         if (!registry.any_of<MeshRendererComponent, BoxColliderComponent, GpuMeshColliderComponent>(entity)) {
@@ -1120,7 +1575,12 @@ void TutorialScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector3& 
             }
         }
 
-        if (objPath.find("Canon") != std::string::npos) hasPlacedCannon_ = true;
+        if (objPath.find("Canon") != std::string::npos) {
+            hasPlacedCannon_ = true;
+            if (tutorialStep_ == TutorialStep::Step6_CannonInstall) {
+                step6_cannonCount_++;
+            }
+        }
 
         return;
     }
@@ -1146,7 +1606,12 @@ void TutorialScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector3& 
     mr.texturePath = "Resources/Textures/white1x1.png";
     mr.shaderName = "Toon";
 
-    if (objPath.find("Canon") != std::string::npos) hasPlacedCannon_ = true;
+    if (objPath.find("Canon") != std::string::npos) {
+        hasPlacedCannon_ = true;
+        if (tutorialStep_ == TutorialStep::Step6_CannonInstall) {
+            step6_cannonCount_++;
+        }
+    }
 }
 
 // スクリプト破棄時の処理。スキルツリーを閉じ、フェーズを初期状態にリセットする

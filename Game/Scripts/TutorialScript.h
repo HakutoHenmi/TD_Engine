@@ -2,6 +2,7 @@
 #include "IScript.h"
 #include "PhaseSystemScript.h"
 #include "SkillTree.h"
+#include <DirectXMath.h>
 
 namespace Engine {
 struct Vector3;
@@ -9,6 +10,7 @@ struct Vector4;
 }
 
 namespace Game {
+class GameScene;
 
 class TutorialScript : public IScript {
 public:
@@ -18,15 +20,16 @@ public:
 		Step3_SpawnerIntro,
 		Step4_PhaseIntro,
 		Step5_CameraControl,
-		Step6_FacilityIntro,
-		Step7_CannonInstall,
-		Step8_DeleteIntro,
-		Step9_BattleTransition,
-		Step10_PlayerAttack,
-		Step11_CombatPlay,
-		Step12_SkillTree,
-		Step13_EndExplanation,
-		Step14_FreePlayBattle,
+		Step6_CannonInstall,
+		Step7_DeleteIntro,
+		Step8_BattleTransition,
+		Step9_BuffExplanation,
+		Step10_BuffPractice,
+		Step11_PlayerAttack,
+		Step12_CombatPlay,
+		Step13_SkillTree,
+		Step14_EndExplanation,
+		Step15_FreePlayBattle,
 		Count
 	};
 
@@ -36,7 +39,13 @@ public:
 
 	static TutorialScript* GetInstance() { return instance_; }
 	TutorialStep GetCurrentStep() const { return tutorialStep_; }
-	bool IsStep8PlacedExtraCannon() const { return step8_placedExtraCannon_; }
+	bool IsStep7PlacedExtraCannon() const { return step7_placedExtraCannon_; }
+	bool IsAuraEnabled() const { return tutorialStep_ >= TutorialStep::Step10_BuffPractice; }
+	bool IsEnemyTimeStopped() const { return enemyTimeStopped_; }
+	void SetEnemyTimeStopped(bool stopped) { enemyTimeStopped_ = stopped; }
+	int GetBrokenShieldCount() const { return brokenShieldCount_; }
+	void IncrementBrokenShieldCount() { brokenShieldCount_++; }
+	void ResetBrokenShieldCount() { brokenShieldCount_ = 0; }
 
 private:
 	static TutorialScript* instance_;
@@ -90,16 +99,38 @@ private:
 	int currentLineIndex_ = 0;
 
 	// 各種サブ状態
-	bool step8_placedExtraCannon_ = false;
-	bool step8_deletedCannon_ = false;
-	bool step12_pageSwitched_ = false;
-	bool step12_upgraded_ = false;
-	int step12_initialSP_ = 0;
+	bool step5_moved_ = false;
+	bool step5_rotated_ = false;
+	int step6_cannonCount_ = 0;
+	bool step7_placedExtraCannon_ = false;
+	bool step7_deletedCannon_ = false;
+	bool step13_pageSwitched_ = false;
+	bool step13_upgraded_ = false;
+	int step13_initialSP_ = 0;
+	bool enemyTimeStopped_ = false;
+	int brokenShieldCount_ = 0;
+	float step11Timer_ = 0.0f;
+
+	entt::entity currentEntity_{};
+	GameScene* currentScene_ = nullptr;
 
 	// 削除モード
 	bool isSellMode_ = false;
 
-	float nextTimer_ = 3.0f; // 自動で次のステップに進むまでの時間（秒）
+	float nextTimer_ = 6.0f; // 自動で次のステップに進むまでの時間（秒）
+
+	// カメラフォーカス用変数
+	bool isCameraOverriding_ = false;
+	bool cameraTargetFound_ = false;
+	DirectX::XMFLOAT3 cameraOverrideTargetPos_{0,0,0};
+	DirectX::XMFLOAT3 cameraOverrideEyePos_{0,0,0};
+	float cameraTransitionTime_ = 0.0f;
+	float cameraTransitionMax_ = 1.5f;
+	DirectX::XMFLOAT3 startEye_{0,0,0};
+	DirectX::XMFLOAT3 startTarget_{0,0,0};
+	std::vector<entt::entity> cameraTargetEntities_;
+	
+	void UpdateCameraFocus(GameScene* scene, float dt);
 };
 
 } // namespace Game

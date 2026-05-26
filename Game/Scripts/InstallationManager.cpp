@@ -119,10 +119,28 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 			if (!registry.valid(btn.entity)) continue;
 		}
 
-		// サイズと位置の自動設定（5ボタンを画面下部に綺麗に横並びにする）
+		// サイズと位置の自動設定
 		btn.size = { 180.0f, 180.0f };
-		btn.pos.x = (i - 2.0f) * 210.0f;
 		btn.pos.y = 400.0f;
+
+		bool isTutorialSoloButton = false;
+		if (auto* tutorial = TutorialScript::GetInstance()) {
+			auto step = tutorial->GetCurrentStep();
+			if (step == TutorialScript::TutorialStep::Step6_CannonInstall ||
+				step == TutorialScript::TutorialStep::Step7_DeleteIntro) {
+				isTutorialSoloButton = true;
+			}
+		}
+
+		if (isTutorialSoloButton) {
+			if (btn.name == "DeleteButton") {
+				btn.pos.x = -210.0f; // 大砲の左隣
+			} else {
+				btn.pos.x = 0.0f; // 中央へ
+			}
+		} else {
+			btn.pos.x = (i - 2.0f) * 210.0f; // 通常時は横並び
+		}
 
 		// 状態の更新
 		if (registry.all_of<UIButtonComponent>(btn.entity)) {
@@ -138,9 +156,21 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 					img.textureHandle = scene->GetRenderer()->LoadTexture2D(btn.texturePath);
 				}
 			}
-			// ★追加: DeleteButton の場合は明度を強制的に上げる（2.0倍の明るさ）
-			if (btn.name == "DeleteButton") {
-				img.color = {2.0f, 2.0f, 2.0f, 1.0f}; // RGBを2倍にブースト
+			// ★追加: チュートリアルで注目させるボタンを光らせる
+			bool isHighlighted = false;
+			if (auto* tutorial = TutorialScript::GetInstance()) {
+				auto step = tutorial->GetCurrentStep();
+				if (step == TutorialScript::TutorialStep::Step6_CannonInstall && btn.name == "CannonButton") {
+					isHighlighted = true;
+				} else if (step == TutorialScript::TutorialStep::Step7_DeleteIntro && btn.name == "DeleteButton") {
+					isHighlighted = true;
+				}
+			}
+
+			if (isHighlighted) {
+				img.color = {2.5f, 2.5f, 2.5f, 1.0f}; // RGBを強めにブーストして光らせる
+			} else if (btn.name == "DeleteButton") {
+				img.color = {1.5f, 1.5f, 1.5f, 1.0f}; // 通常時もDeleteは少し明るめ
 			} else {
 				img.color = {1.0f, 1.0f, 1.0f, 1.0f}; // 通常のボタンは等倍
 			}
@@ -163,13 +193,14 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 			auto step = tutorial->GetCurrentStep();
 
 			// ステップごとに許可するボタンを限定
-			if (step >= TutorialScript::TutorialStep::Step1_Greeting && step < TutorialScript::TutorialStep::Step13_EndExplanation) {
+			if (step >= TutorialScript::TutorialStep::Step1_Greeting && step < TutorialScript::TutorialStep::Step14_EndExplanation) {
 				enabled = false; // 基本はすべて非表示
 
-				if (step == TutorialScript::TutorialStep::Step7_CannonInstall) {
+				if (step == TutorialScript::TutorialStep::Step6_CannonInstall) {
 					if (btn.prefabPath == "Resources/Prefabs/Canon.prefab") enabled = true;
 				}
-				else if (step == TutorialScript::TutorialStep::Step8_DeleteIntro) {
+				else if (step == TutorialScript::TutorialStep::Step7_DeleteIntro) {
+					if (btn.prefabPath == "Resources/Prefabs/Canon.prefab") enabled = true;
 					if (btn.name == "DeleteButton") enabled = true;
 				}
 			}

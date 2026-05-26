@@ -340,15 +340,15 @@ public:
 	// x, y: スクリーン座標 (左上基準, ピクセル)
 	// scale: フォントのスケール (1.0 = デフォルトサイズ)
 	// color: 文字色 (RGBA)
-	void DrawString(const std::string& text, float x, float y, float scale = 1.0f, const Vector4& color = {1,1,1,1}, const std::string& fontPath = "Resources\\Fonts\\ZenAntique-Regular.ttf");
+	void DrawString(const std::string& text, float x, float y, float scale = 1.0f, const Vector4& color = {1,1,1,1}, const std::string& fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf");
 	void FlushText(); // テキストの描画実行
 
 	// テキストシステムの初期化 (フォントファイルの読み込み)
 	bool InitTextSystem(const std::string& fontPath, float pixelHeight = 48.0f);
 
 	// テキスト描画の幅を事前計算 (レイアウト用)
-	float MeasureTextWidth(const std::string& text, float scale = 1.0f, const std::string& fontPath = "Resources\\Fonts\\ZenAntique-Regular.ttf");
-	float GetTextLineHeight(float scale = 1.0f, const std::string& fontPath = "Resources\\Fonts\\ZenAntique-Regular.ttf") const;
+	float MeasureTextWidth(const std::string& text, float scale = 1.0f, const std::string& fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf");
+	float GetTextLineHeight(float scale = 1.0f, const std::string& fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf") const;
 
 	// ★追加: 3Dライン描画（エディタ用ギズモ・グリッドなど）
 	void DrawLine3D(const Vector3& p0, const Vector3& p1, const Vector4& color, bool xray = false);

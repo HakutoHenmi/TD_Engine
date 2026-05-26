@@ -430,7 +430,7 @@ struct UITextComponent : public Component {
 	std::string text = "New Text";
 	float fontSize = 24.0f;
 	DirectX::XMFLOAT4 color = {1, 1, 1, 1};
-	std::string fontPath = "Resources\\Fonts\\ZenAntique-Regular.ttf"; // フォントファイルパス
+	std::string fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf"; // フォントファイルパス
 	bool outlineEnabled = false; // ★追加: アウトラインの有効化
 	DirectX::XMFLOAT4 outlineColor = {0, 0, 0, 1}; // ★追加: アウトライン色
 	float outlineThickness = 2.0f; // ★追加: アウトラインの太さ

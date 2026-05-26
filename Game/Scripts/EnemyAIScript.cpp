@@ -2,6 +2,7 @@
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
+#include "TutorialScript.h"
 #include <cmath>
 #include <cstdlib> // rand()用
 #include <iostream>
@@ -19,6 +20,9 @@ void EnemyAIScript::Start(entt::entity /*entity*/, GameScene* /*scene*/) {
 }
 
 void EnemyAIScript::Update(entt::entity entity, GameScene* scene, float dt) {
+	if (auto* tutorial = TutorialScript::GetInstance(); tutorial && tutorial->IsEnemyTimeStopped()) {
+		return;
+	}
 	if (!scene || !scene->GetRegistry().valid(entity)) return;
 	auto& registry = scene->GetRegistry();
 

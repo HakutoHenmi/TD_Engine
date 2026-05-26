@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include "TutorialScript.h"
 
 using json = nlohmann::json;
 
@@ -735,6 +736,11 @@ bool SkillTree::HandlePageButtonInput(float screenW, float screenH, float mouseX
 	}
 
 	if (mouseX >= prevButtonLeft_ && mouseX <= prevButtonRight_ && mouseY >= prevButtonTop_ && mouseY <= prevButtonBottom_) {
+		if (auto* tutorial = TutorialScript::GetInstance()) {
+			if (tutorial->GetCurrentStep() == TutorialScript::TutorialStep::Step13_SkillTree) {
+				return false; // チュートリアル中はページ変更禁止
+			}
+		}
 		if (currentPageId_ > 0) {
 			currentPageId_ -= 1;
 		}
@@ -742,6 +748,11 @@ bool SkillTree::HandlePageButtonInput(float screenW, float screenH, float mouseX
 	}
 
 	if (mouseX >= nextButtonLeft_ && mouseX <= nextButtonRight_ && mouseY >= nextButtonTop_ && mouseY <= nextButtonBottom_) {
+		if (auto* tutorial = TutorialScript::GetInstance()) {
+			if (tutorial->GetCurrentStep() == TutorialScript::TutorialStep::Step13_SkillTree) {
+				return false; // チュートリアル中はページ変更禁止
+			}
+		}
 		if (currentPageId_ < pageCount_ - 1) {
 			currentPageId_ += 1;
 		}
@@ -758,6 +769,15 @@ bool SkillTree::TryUnlockSkill(int index) {
 
 	if (nodes_[index].unlocked) {
 		return false;
+	}
+
+	if (auto* tutorial = TutorialScript::GetInstance()) {
+		if (tutorial->GetCurrentStep() == TutorialScript::TutorialStep::Step13_SkillTree) {
+			// チュートリアル中は id == 1 (一番左の基本的なキャノンスキル) のみ選べるようにする
+			if (nodes_[index].id != 1) {
+				return false;
+			}
+		}
 	}
 
 	std::vector<int> neededIndices;
@@ -939,10 +959,36 @@ void SkillTree::DrawNodes(Engine::Renderer* renderer, float screenW, float scree
 			}
 
 			if (canUnlock && skillPoints_ >= node.cost) {
-				if (isHovered) {
-					bgColor = {1.0f, 0.9f, 0.3f, 1.0f}; // 解放可能(ホバー)：明るい黄色の枠
+				bool isTutorialRestricted = false;
+				if (auto* tutorial = TutorialScript::GetInstance()) {
+					if (tutorial->GetCurrentStep() == TutorialScript::TutorialStep::Step13_SkillTree) {
+						if (node.id != 1) {
+							isTutorialRestricted = true;
+						}
+					}
+				}
+
+				if (isTutorialRestricted) {
+					bgColor = {0.3f, 0.3f, 0.3f, 0.7f};   // ロック中扱い
+					iconColor = {0.4f, 0.4f, 0.4f, 1.0f}; // アイコンも暗く
 				} else {
-					bgColor = {0.8f, 0.7f, 0.2f, 0.9f}; // 解放可能：暗い黄色の枠
+					if (isHovered) {
+						bgColor = {1.0f, 0.9f, 0.3f, 1.0f}; // 解放可能(ホバー)：明るい黄色の枠
+					} else {
+						bool isTutorialTarget = false;
+						if (auto* tutorial = TutorialScript::GetInstance()) {
+							if (tutorial->GetCurrentStep() == TutorialScript::TutorialStep::Step13_SkillTree && node.id == 1) {
+								isTutorialTarget = true;
+							}
+						}
+						
+						if (isTutorialTarget) {
+							float blink = std::sin((float)GetTickCount64() * 0.01f) * 0.5f + 0.5f;
+							bgColor = {1.0f, 0.5f + 0.5f * blink, 0.0f, 1.0f}; // チュートリアル中は対象を点滅させる
+						} else {
+							bgColor = {0.8f, 0.7f, 0.2f, 0.9f}; // 解放可能：暗い黄色の枠
+						}
+					}
 				}
 			} else {
 				bgColor = {0.3f, 0.3f, 0.3f, 0.7f};   // ロック中：灰色の枠
@@ -989,19 +1035,16 @@ void SkillTree::DrawSkillPointsText(Engine::Renderer* renderer, float screenW, f
 
 	float baseX = kPanelMargin + 40.0f;
 	float baseY = screenH - kPanelMargin - 70.0f;
-	float dotSize = 16.0f;
-	float dotGap = 4.0f;
-	int displayPoints = (std::min)(skillPoints_, 20);
-
-	for (int i = 0; i < displayPoints; ++i) {
-		Engine::Renderer::SpriteDesc dot;
-		dot.x = baseX + i * (dotSize + dotGap);
-		dot.y = baseY;
-		dot.w = dotSize;
-		dot.h = dotSize;
-		dot.color = {1.0f, 1.0f, 1.0f, 1.0f};
-		renderer->DrawSprite(texSkillPoint_, dot);
-	}
+	
+	std::string text = "スキルポイント " + std::to_string(skillPoints_);
+	float outline = 2.0f;
+	std::string font = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf";
+	
+	renderer->DrawString(text, baseX - outline, baseY, 0.6f, {0.0f, 0.0f, 0.0f, 1.0f}, font);
+	renderer->DrawString(text, baseX + outline, baseY, 0.6f, {0.0f, 0.0f, 0.0f, 1.0f}, font);
+	renderer->DrawString(text, baseX, baseY - outline, 0.6f, {0.0f, 0.0f, 0.0f, 1.0f}, font);
+	renderer->DrawString(text, baseX, baseY + outline, 0.6f, {0.0f, 0.0f, 0.0f, 1.0f}, font);
+	renderer->DrawString(text, baseX, baseY, 0.6f, {1.0f, 1.0f, 1.0f, 1.0f}, font);
 }
 
 #pragma endregion

@@ -27,6 +27,9 @@ void TitleManagerScript::Start(entt::entity entity, GameScene* scene) {
 	btnSEPlus_     = scene->FindObjectByName("Btn_SEPlus");
 	btnBack_       = scene->FindObjectByName("Btn_Back");
 	textFullscreen_ = scene->FindObjectByName("Text_Fullscreen");
+	if (textFullscreen_ == entt::null) {
+		textFullscreen_ = btnFullscreen_; // ボタン自体にテキストコンポーネントがある場合のフォールバック
+	}
 	textBGM_       = scene->FindObjectByName("Text_BGM");
 	textSE_        = scene->FindObjectByName("Text_SE");
 
@@ -90,7 +93,9 @@ void TitleManagerScript::Update(entt::entity entity, GameScene* scene, float dt)
 		// テキスト更新
 		if (textFullscreen_ != entt::null && reg.valid(textFullscreen_) && reg.all_of<UITextComponent>(textFullscreen_)) {
 			bool isFS = false;
-			// WindowDXへのアクセスはRendererから間接的に取得するか、直接取得
+			if (auto* dx = scene->GetWindow()) {
+				isFS = dx->IsFullscreen();
+			}
 			reg.get<UITextComponent>(textFullscreen_).text = isFS ? "Fullscreen: ON" : "Fullscreen: OFF";
 		}
 		if (audio && textBGM_ != entt::null && reg.valid(textBGM_) && reg.all_of<UITextComponent>(textBGM_)) {
@@ -112,7 +117,9 @@ void TitleManagerScript::Update(entt::entity entity, GameScene* scene, float dt)
 					reg.get<RectTransformComponent>(settingsEntities_[0]).enabled = false;
 			} else if (btnFullscreen_ != entt::null && reg.valid(btnFullscreen_) && reg.all_of<UIButtonComponent>(btnFullscreen_) &&
 				reg.get<UIButtonComponent>(btnFullscreen_).isHovered) {
-				// フルスクリーン切り替え (WindowDXへのアクセスが必要)
+				if (auto* dx = scene->GetWindow()) {
+					dx->ToggleFullscreen();
+				}
 			} else if (audio) {
 				if (btnBGMMinus_ != entt::null && reg.valid(btnBGMMinus_) && reg.all_of<UIButtonComponent>(btnBGMMinus_) &&
 					reg.get<UIButtonComponent>(btnBGMMinus_).isHovered) {

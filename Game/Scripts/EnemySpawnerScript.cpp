@@ -5,6 +5,7 @@
 #include "../Scenes/GameScene.h"
 #include "../../Engine/Renderer.h"
 #include "../../Engine/SceneManager.h"
+#include "TutorialScript.h"
 #ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
 #endif
@@ -67,6 +68,21 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 		}
 
 		if (!hasEnemy) {
+			bool isTutorialFreePlay = false;
+			if (auto* tutorial = TutorialScript::GetInstance()) {
+				if (tutorial->GetCurrentStep() == TutorialScript::TutorialStep::Step15_FreePlayBattle) {
+					isTutorialFreePlay = true;
+				}
+			}
+
+			if (isTutorialFreePlay) {
+				currentWave_ = 0;
+				spawnedThisWave_ = 0;
+				elapsedTime_ = 0.0f;
+				isWaitingDelay_ = true;
+				return;
+			}
+
             auto& sc = registry.get<ScriptComponent>(spawnerEntity);
 			sc.enabled = false;
 			if (WaveManagement::IsLastWave()) {

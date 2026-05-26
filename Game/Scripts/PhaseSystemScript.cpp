@@ -22,6 +22,7 @@
 #include "InstallationManager.h"
 
 #include "WaveManagement.h"
+#include "TutorialScript.h"
 #include "ResultManagerScript.h"
 #include "../../Engine/SceneManager.h"
 #include "../../Engine/ThirdParty/nlohmann/json.hpp"
@@ -205,43 +206,53 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
         bool placementSelectionChangedThisFrame = false;
 		const bool clickedInstallationButtonThisFrame = input->IsMouseTrigger(0) && IsPointerOverInstallationButton(scene);
 
-		// Nキーでスキルツリーの開閉
-		if (keyN && !preKeyN_) {
-			skillTree_.Toggle(scene);
+		bool isTutorial = false;
+		if (scene) {
+			const auto& path = scene->GetStagePath();
+			if (path.find("Tutorial") != std::string::npos || path.find("tutorial") != std::string::npos) {
+				isTutorial = true;
+			}
 		}
 
-// スキルツリーが開いている間はスキルツリーの更新のみ
-		if (skillTree_.IsOpen()) {
-			SetVar(entity, scene, "IsSkillTreeOpen", 1.0f);
+		if (!isTutorial) {
+			// Nキーでスキルツリーの開閉
+			if (keyN && !preKeyN_) {
+				skillTree_.Toggle(scene);
+			}
 
-			float mx = 0.0f;
-			float my = 0.0f;
-			float tW = (float)Engine::WindowDX::kW;
-			float tH = (float)Engine::WindowDX::kH;
+			// スキルツリーが開いている間はスキルツリーの更新のみ
+			if (skillTree_.IsOpen()) {
+				SetVar(entity, scene, "IsSkillTreeOpen", 1.0f);
+
+				float mx = 0.0f;
+				float my = 0.0f;
+				float tW = (float)Engine::WindowDX::kW;
+				float tH = (float)Engine::WindowDX::kH;
 
 #if defined(USE_IMGUI) && !defined(NDEBUG)
-			ImVec2 mousePos = ImGui::GetMousePos();
-			ImVec2 gameMin = EditorUI::GetGameImageMin();
-			ImVec2 gameMax = EditorUI::GetGameImageMax();
-			float viewW = gameMax.x - gameMin.x;
-			float viewH = gameMax.y - gameMin.y;
+				ImVec2 mousePos = ImGui::GetMousePos();
+				ImVec2 gameMin = EditorUI::GetGameImageMin();
+				ImVec2 gameMax = EditorUI::GetGameImageMax();
+				float viewW = gameMax.x - gameMin.x;
+				float viewH = gameMax.y - gameMin.y;
 
-			if (viewW > 0.0f && viewH > 0.0f) {
-				mx = (mousePos.x - gameMin.x) * (tW / viewW);
-				my = (mousePos.y - gameMin.y) * (tH / viewH);
-			}
+				if (viewW > 0.0f && viewH > 0.0f) {
+					mx = (mousePos.x - gameMin.x) * (tW / viewW);
+					my = (mousePos.y - gameMin.y) * (tH / viewH);
+				}
 #else
-			input->GetMousePos(mx, my);
+				input->GetMousePos(mx, my);
 #endif
 
-			skillTree_.SetUIContext(renderer, tW, tH, mx, my);
-			skillTree_.Update(entity, scene, dt);
+				skillTree_.SetUIContext(renderer, tW, tH, mx, my);
+				skillTree_.Update(entity, scene, dt);
 
-			preKeyN_ = keyN;
-			return;
+				preKeyN_ = keyN;
+				return;
+			}
+
+			SetVar(entity, scene, "IsSkillTreeOpen", 0.0f);
 		}
-
-		SetVar(entity, scene, "IsSkillTreeOpen", 0.0f);
 
 		// 設置モードへの切り替え
 
@@ -301,10 +312,12 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		}
 
 		if (!placementSelectionChangedThisFrame && !clickedInstallationButtonThisFrame && !isSellMode_) {
-			Installation(scene, selectedObjPath_);
+			if (!isTutorial) {
+				Installation(scene, selectedObjPath_);
+			}
 		}
 
-		if (isSellMode_ && !clickedInstallationButtonThisFrame) {
+		if (isSellMode_ && !clickedInstallationButtonThisFrame && !isTutorial) {
 			// マウス位置からレイキャストしてヒットしたハイライトを描画する
 			float localX = 0, localY = 0;
 			float tW = 0, tH = 0;
@@ -441,7 +454,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			}
 		}
 
-		if (keySpace) {
+		if (keySpace && !isTutorial) {
 			RequestPhaseChange(BattlePhase);
 			isPlacementMode_ = false;
 			skillTree_.Close(scene); // フェーズ移行時にスキルツリーを閉じる
@@ -478,7 +491,15 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 			currentPhase_++;
 			
-			WaveManagement::SetWave(currentPhase_-1);
+			bool skipSpawn = false;
+			if (auto* tutorial = TutorialScript::GetInstance()) {
+				if (static_cast<int>(tutorial->GetCurrentStep()) <= static_cast<int>(TutorialScript::TutorialStep::Step13_SkillTree)) {
+					skipSpawn = true;
+				}
+			}
+			if (!skipSpawn) {
+				WaveManagement::SetWave(currentPhase_-1);
+			}
 
 			// 戦闘中は絵画風エフェクトをオンにする	
 			Engine::Renderer::GetInstance()->SetPostEffect("Painterly");
@@ -534,7 +555,17 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		scene->GetRegistry().get<UITextComponent>(entity).text = "$"+ std::to_string(CoinCount);
 
 	// ★ 敵の数UIの更新
-	if (isPhase_ == BattlePhase) {
+	bool showEnemyCount = (isPhase_ == BattlePhase);
+	if (showEnemyCount) {
+		if (auto* tutorial = TutorialScript::GetInstance()) {
+			auto step = tutorial->GetCurrentStep();
+			if (static_cast<int>(step) < static_cast<int>(TutorialScript::TutorialStep::Step11_PlayerAttack)) {
+				showEnemyCount = false; // Step11より前は敵数UIを非表示にする
+			}
+		}
+	}
+
+	if (showEnemyCount) {
 		auto waveManagerEntity = WaveManagement::GetManagerEntity();
 		if (scene->GetRegistry().valid(waveManagerEntity)) {
 			auto* sc = scene->GetRegistry().try_get<ScriptComponent>(waveManagerEntity);
@@ -648,17 +679,27 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			isPhaseTransitioning_ = true;
 			isPhase_ = Transition;
 		} else if (WaveManagement::IsWaveEnded()) {
-			ResultManagerScript::pendingIsWin = true;
-			ResultManagerScript::pendingOriginalScene = scene->GetStagePath();
-			Engine::SceneParameters p;
-			p.sceneName = "Result";
-			p.isWin = true;
-			p.score = 1500;
-			p.clearTime = scene->GetPlayTime();
-			Engine::SceneManager::GetInstance()->RequestChange("Result", p);
-			
-			isPhaseTransitioning_ = true;
-			isPhase_ = Transition;
+			bool isTutorial = false;
+			if (scene) {
+				const auto& path = scene->GetStagePath();
+				if (path.find("Tutorial") != std::string::npos || path.find("tutorial") != std::string::npos) {
+					isTutorial = true;
+				}
+			}
+
+			if (!isTutorial) {
+				ResultManagerScript::pendingIsWin = true;
+				ResultManagerScript::pendingOriginalScene = scene->GetStagePath();
+				Engine::SceneParameters p;
+				p.sceneName = "Result";
+				p.isWin = true;
+				p.score = 1500;
+				p.clearTime = scene->GetPlayTime();
+				Engine::SceneManager::GetInstance()->RequestChange("Result", p);
+				
+				isPhaseTransitioning_ = true;
+				isPhase_ = Transition;
+			}
 		}
 	}
 
@@ -722,7 +763,7 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 
 
 
-	const bool canPlace = (!IsPlacementBlocked(scene, snappedHitPoint) && (CoinCount >= selectedObjCost_));
+	const bool canPlace = (!IsPlacementBlocked(scene, snappedHitPoint) && (CoinCount >= selectedObjCost_) && !IsPointerOverInstallationButton(scene));
 
 	DrawPlacementPreview(scene, snappedHitPoint, objPath, canPlace);
 
@@ -1205,7 +1246,7 @@ void PhaseSystemScript::CreateSkipUI(GameScene* scene) {
 	textPrompt.text = "[S]長押しでスキップ";
 	textPrompt.fontSize = 32.0f;
 	textPrompt.color = {1.0f, 1.0f, 1.0f, 1.0f};
-	textPrompt.fontPath = "Resources\\Fonts\\ZenAntique-Regular.ttf";
+	textPrompt.fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf";
 	textPrompt.outlineEnabled = true;
 	textPrompt.outlineColor = {0.0f, 0.0f, 0.0f, 1.0f};
 	textPrompt.outlineThickness = 2.0f;
