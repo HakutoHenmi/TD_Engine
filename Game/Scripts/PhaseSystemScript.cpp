@@ -913,6 +913,12 @@ void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vec
 	if (!renderer)
 		return;
 
+	// シーン遷移中はグリッドやプレビューを一切描画しない
+	auto* sm = Engine::SceneManager::GetInstance();
+	if (sm && sm->GetTransitionState() != Engine::SceneManager::TransitionState::None) {
+		return;
+	}
+
 	// ★ 床のマス目ハイライトとグリッドの描画
 	float hs = 1.0f; // 2x2マスなので半径1.0f
 	

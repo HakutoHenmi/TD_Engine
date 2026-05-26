@@ -1377,6 +1377,12 @@ void TutorialScript::DrawPlacementPreview(GameScene* scene, const Engine::Vector
 	if (!renderer)
 		return;
 
+	// シーン遷移中はグリッドやプレビューを一切描画しない
+	auto* sm = Engine::SceneManager::GetInstance();
+	if (sm && sm->GetTransitionState() != Engine::SceneManager::TransitionState::None) {
+		return;
+	}
+
 	std::string previewModelPath = objPath;
 	std::string previewTexturePath = "Resources/Textures/white1x1.png";
 	if (IsPrefabPath(objPath)) {

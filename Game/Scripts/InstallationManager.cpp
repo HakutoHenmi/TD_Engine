@@ -447,14 +447,14 @@ void InstallationManager::DeserializeParameters(const std::string& data) {
 				if (idx >= 5)
 					break;
 				auto& btn = buttons_[idx++];
-				btn.name = b.value("name", "");
-				btn.texturePath = b.value("texturePath", "");
-				btn.prefabPath = b.value("prefabPath", "");
-				btn.cost = b.value("cost", 0);
-				btn.pos.x = b.value("posX", 0.0f);
-				btn.pos.y = b.value("posY", 0.0f);
-				btn.size.x = b.value("sizeX", 200.0f);
-				btn.size.y = b.value("sizeY", 200.0f);
+				// ★バグ回避: ボタンの名前、テクスチャ、プレハブパスは、
+				// コード上の定義（コンストラクタ）を絶対的に保護するため、JSONからのロードによる上書きを禁止する！
+				// これにより、名前の重複によるUIエンティティの紐づけバグを完全に解消します。
+				btn.cost = b.value("cost", btn.cost);
+				btn.pos.x = b.value("posX", btn.pos.x);
+				btn.pos.y = b.value("posY", btn.pos.y);
+				btn.size.x = b.value("sizeX", btn.size.x);
+				btn.size.y = b.value("sizeY", btn.size.y);
 			}
 		}
 	} catch (const std::exception& e) {
