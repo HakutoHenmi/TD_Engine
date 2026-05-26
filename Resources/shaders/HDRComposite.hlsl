@@ -37,7 +37,12 @@ cbuffer CBPost : register(b0)
     float gFogColorR;
     float gFogColorG;
     float gFogColorB;
-    float pad0;
+    float gPad0;
+
+    // モードボーダー
+    float gPrepModeBorder;
+    float gDeleteModeBorder;
+    float2 gPad2;
 };
 
 struct VSOut
@@ -265,8 +270,27 @@ float4 main(float4 svpos : SV_POSITION, float2 uv : TEXCOORD0) : SV_TARGET
     {
         float gray = dot(sceneColor, float3(0.2126, 0.7152, 0.0722));
         sceneColor = lerp(sceneColor, float3(gray, gray, gray), gSan);
-
     }
     
+    // 8. UIボーダー (準備フェーズ・削除モード用)
+    if (gPrepModeBorder > 0.5f) {
+        float2 texSize = float2(1920.0f, 1080.0f);
+        float aspectX = texSize.x / texSize.y; // 1920/1080 = 1.777...
+        float2 absUv = abs(uv - 0.5f) * 2.0f; 
+        
+        if (gDeleteModeBorder > 0.5f) {
+            // 削除モード：赤いシマシマ模様の太枠
+            float borderThickness = 0.015f; 
+            if (absUv.x > 1.0f - borderThickness || absUv.y > 1.0f - borderThickness * aspectX) {
+                float stripe = sin((uv.x + uv.y) * 200.0f - gTime * 10.0f);
+                if (stripe > 0.0f) {
+                    sceneColor = float3(1.0f, 0.1f, 0.1f);
+                } else {
+                    sceneColor = float3(0.7f, 0.05f, 0.05f);
+                }
+            }
+        }
+    }
+
     return float4(saturate(sceneColor), 1.0f);
 }

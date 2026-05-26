@@ -170,6 +170,11 @@ public:
 		float exposure = 1.0f;           // 露出補正
 		float nearPlane = 0.1f;          // カメラ近面 (深度リニア化用)
 		float farPlane = 500.0f;         // カメラ遠面 (深度リニア化用)
+
+		// ★追加: モード用ボーダーパラメータ
+		float prepModeBorder = 0.0f;
+		float deleteModeBorder = 0.0f;
+		float _pad4[2];
 	};
 
 	// ★追加: フレーム統計情報

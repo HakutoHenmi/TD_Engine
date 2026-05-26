@@ -18,6 +18,7 @@ void TitleManagerScript::Start(entt::entity entity, GameScene* scene) {
 	// ボタンエンティティを名前で検索
 	btnStart_    = scene->FindObjectByName("Btn_Start");
 	btnSettings_ = scene->FindObjectByName("Btn_Settings");
+	btnCredits_  = scene->FindObjectByName("Btn_Credits");
 	btnExit_     = scene->FindObjectByName("Btn_Exit");
 
 	btnFullscreen_ = scene->FindObjectByName("Btn_Fullscreen");
@@ -35,12 +36,126 @@ void TitleManagerScript::Start(entt::entity entity, GameScene* scene) {
 
 	auto mainParent = scene->FindObjectByName("MainMenuParent");
 	auto settingsParent = scene->FindObjectByName("SettingsMenuParent");
+	auto creditsParent = scene->FindObjectByName("CreditsMenuParent");
+	btnCreditsBack_ = scene->FindObjectByName("Btn_CreditsBack");
 
 	// UIがまだ存在しない場合（初回起動 or JSONが空の場合）、フォールバックで自動生成
 	if (btnStart_ == entt::null) {
 		CreateFallbackUI(scene);
+		// 生成後に再取得
+		mainParent = scene->FindObjectByName("MainMenuParent");
+		settingsParent = scene->FindObjectByName("SettingsMenuParent");
+		creditsParent = scene->FindObjectByName("CreditsMenuParent");
+		btnCreditsBack_ = scene->FindObjectByName("Btn_CreditsBack");
+		btnCredits_ = scene->FindObjectByName("Btn_Credits");
 		uiInitialized_ = true;
 	} else {
+		// btnStart_ はあるが btnCredits_ が無い場合（既存シーンのアップデート対応）
+		if (btnCredits_ == entt::null && mainParent != entt::null) {
+			btnCredits_ = CreateTitleButton(scene, reg, "クレジット", 160.0f, mainParent);
+			reg.emplace<NameComponent>(btnCredits_, "Btn_Credits");
+		}
+
+		// UIの位置とテキストの修正（クレジットボタンをきれいに並べる）
+		if (btnStart_ != entt::null && btnSettings_ != entt::null && btnCredits_ != entt::null && btnExit_ != entt::null) {
+			if (reg.all_of<RectTransformComponent>(btnStart_) && reg.all_of<RectTransformComponent>(btnSettings_)) {
+				auto& startRect = reg.get<RectTransformComponent>(btnStart_);
+				auto& setRect = reg.get<RectTransformComponent>(btnSettings_);
+				float spacing = setRect.pos.y - startRect.pos.y;
+
+				if (reg.all_of<RectTransformComponent>(btnCredits_)) {
+					auto& credRect = reg.get<RectTransformComponent>(btnCredits_);
+					credRect.pos.x = setRect.pos.x;
+					credRect.pos.y = setRect.pos.y + spacing;
+					credRect.anchor = setRect.anchor;
+					credRect.pivot = setRect.pivot;
+					credRect.size = setRect.size;
+				}
+
+				if (reg.all_of<RectTransformComponent>(btnExit_)) {
+					auto& exitRect = reg.get<RectTransformComponent>(btnExit_);
+					exitRect.pos.x = setRect.pos.x;
+					exitRect.pos.y = setRect.pos.y + spacing * 2.0f;
+				}
+			}
+
+			// 余計なテキストコンポーネントがあれば無効化（画像UIのボタンの上に文字が重ならないようにする）
+			if (reg.all_of<UITextComponent>(btnStart_)) reg.get<UITextComponent>(btnStart_).text = "";
+			if (reg.all_of<UITextComponent>(btnSettings_)) reg.get<UITextComponent>(btnSettings_).text = "";
+			if (reg.all_of<UITextComponent>(btnExit_)) reg.get<UITextComponent>(btnExit_).text = "";
+		}
+		if (creditsParent == entt::null) {
+			creditsParent = reg.create();
+			reg.emplace<NameComponent>(creditsParent, "CreditsMenuParent");
+			auto& crRect = reg.emplace<RectTransformComponent>(creditsParent);
+			crRect.pos = {0.0f, 0.0f};
+			crRect.size = {1920.0f, 1080.0f};
+			crRect.anchor = {0.0f, 0.0f};
+			crRect.pivot = {0.0f, 0.0f};
+			crRect.enabled = false;
+
+			auto creditsTitle = reg.create();
+			reg.emplace<NameComponent>(creditsTitle, "CreditsTitle");
+			auto& cstRect = reg.emplace<RectTransformComponent>(creditsTitle);
+			cstRect.pos = {0.0f, 250.0f};
+			cstRect.size = {1920.0f, 100.0f};
+			cstRect.anchor = {0.0f, 0.0f};
+			cstRect.pivot = {0.0f, 0.0f};
+			scene->SetParent(creditsTitle, creditsParent);
+			auto& cstTxt = reg.emplace<UITextComponent>(creditsTitle);
+			cstTxt.text = "Special Thanks";
+			cstTxt.fontSize = 64.0f;
+			cstTxt.fontPath = "Resources\\\\Fonts\\\\Kiwi_Maru\\\\KiwiMaru-Regular.ttf";
+
+			auto creditsText = reg.create();
+			reg.emplace<NameComponent>(creditsText, "CreditsText");
+			auto& ctxRect = reg.emplace<RectTransformComponent>(creditsText);
+			ctxRect.pos = {0.0f, 400.0f};
+			ctxRect.size = {1920.0f, 200.0f};
+			ctxRect.anchor = {0.0f, 0.0f};
+			ctxRect.pivot = {0.0f, 0.0f};
+			scene->SetParent(creditsText, creditsParent);
+			auto& ctxTxt = reg.emplace<UITextComponent>(creditsText);
+			ctxTxt.text = "Steampunk Font\nCreated by hannarb";
+			ctxTxt.fontSize = 48.0f;
+			ctxTxt.fontPath = "Resources\\\\Fonts\\\\Kiwi_Maru\\\\KiwiMaru-Regular.ttf";
+
+			btnCreditsBack_ = CreateTitleButton(scene, reg, "Back", 800.0f, creditsParent);
+			reg.emplace<NameComponent>(btnCreditsBack_, "Btn_CreditsBack");
+		}
+		
+		// 古いJSONからロードされた場合でも強制的に中央配置を適用する
+		auto creditsTitle = scene->FindObjectByName("CreditsTitle");
+		auto creditsText = scene->FindObjectByName("CreditsText");
+		if (creditsParent != entt::null && reg.all_of<RectTransformComponent>(creditsParent)) {
+			auto& r = reg.get<RectTransformComponent>(creditsParent);
+			r.pos = {0.0f, 0.0f};
+			r.size = {1920.0f, 1080.0f};
+			r.anchor = {0.0f, 0.0f};
+			r.pivot = {0.0f, 0.0f};
+		}
+		if (creditsTitle != entt::null && reg.all_of<RectTransformComponent>(creditsTitle)) {
+			auto& r = reg.get<RectTransformComponent>(creditsTitle);
+			r.pos = {0.0f, 250.0f};
+			r.size = {1920.0f, 100.0f};
+			r.anchor = {0.0f, 0.0f};
+			r.pivot = {0.0f, 0.0f};
+		}
+		if (creditsText != entt::null && reg.all_of<RectTransformComponent>(creditsText)) {
+			auto& r = reg.get<RectTransformComponent>(creditsText);
+			r.pos = {0.0f, 400.0f};
+			r.size = {1920.0f, 200.0f};
+			r.anchor = {0.0f, 0.0f};
+			r.pivot = {0.0f, 0.0f};
+		}
+		if (btnCreditsBack_ != entt::null && reg.all_of<RectTransformComponent>(btnCreditsBack_)) {
+			auto& r = reg.get<RectTransformComponent>(btnCreditsBack_);
+			r.pos.x = 960.0f;
+			r.pos.y = 800.0f;
+			r.anchor = {0.0f, 0.0f};
+			r.pivot = {0.5f, 0.5f};
+		}
+
 		uiInitialized_ = true;
 	}
 
@@ -50,12 +165,17 @@ void TitleManagerScript::Start(entt::entity entity, GameScene* scene) {
 	settingsEntities_.clear();
 	if (settingsParent != entt::null) settingsEntities_.push_back(settingsParent);
 
+	creditsEntities_.clear();
+	if (creditsParent != entt::null) creditsEntities_.push_back(creditsParent);
+
 	// 初期状態: メインメニュー表示
 	state_ = MenuState::Main;
 	if (mainParent != entt::null && reg.valid(mainParent) && reg.all_of<RectTransformComponent>(mainParent))
 		reg.get<RectTransformComponent>(mainParent).enabled = true;
 	if (settingsParent != entt::null && reg.valid(settingsParent) && reg.all_of<RectTransformComponent>(settingsParent))
 		reg.get<RectTransformComponent>(settingsParent).enabled = false;
+	if (creditsParent != entt::null && reg.valid(creditsParent) && reg.all_of<RectTransformComponent>(creditsParent))
+		reg.get<RectTransformComponent>(creditsParent).enabled = false;
 }
 
 void TitleManagerScript::Update(entt::entity entity, GameScene* scene, float dt) {
@@ -82,6 +202,13 @@ void TitleManagerScript::Update(entt::entity entity, GameScene* scene, float dt)
 					reg.get<RectTransformComponent>(mainEntities_[0]).enabled = false;
 				if (!settingsEntities_.empty() && reg.valid(settingsEntities_[0]) && reg.all_of<RectTransformComponent>(settingsEntities_[0]))
 					reg.get<RectTransformComponent>(settingsEntities_[0]).enabled = true;
+			} else if (btnCredits_ != entt::null && reg.valid(btnCredits_) && reg.all_of<UIButtonComponent>(btnCredits_) &&
+				reg.get<UIButtonComponent>(btnCredits_).isHovered) {
+				state_ = MenuState::Credits;
+				if (!mainEntities_.empty() && reg.valid(mainEntities_[0]) && reg.all_of<RectTransformComponent>(mainEntities_[0]))
+					reg.get<RectTransformComponent>(mainEntities_[0]).enabled = false;
+				if (!creditsEntities_.empty() && reg.valid(creditsEntities_[0]) && reg.all_of<RectTransformComponent>(creditsEntities_[0]))
+					reg.get<RectTransformComponent>(creditsEntities_[0]).enabled = true;
 			} else if (btnExit_ != entt::null && reg.valid(btnExit_) && reg.all_of<UIButtonComponent>(btnExit_) &&
 				reg.get<UIButtonComponent>(btnExit_).isHovered) {
 				PostQuitMessage(0);
@@ -134,6 +261,17 @@ void TitleManagerScript::Update(entt::entity entity, GameScene* scene, float dt)
 					reg.get<UIButtonComponent>(btnSEPlus_).isHovered) {
 					audio->SetMasterSEVolume(audio->GetMasterSEVolume() + 0.1f);
 				}
+			}
+		}
+	} else if (state_ == MenuState::Credits) {
+		if (isClicked) {
+			if (btnCreditsBack_ != entt::null && reg.valid(btnCreditsBack_) && reg.all_of<UIButtonComponent>(btnCreditsBack_) &&
+				reg.get<UIButtonComponent>(btnCreditsBack_).isHovered) {
+				state_ = MenuState::Main;
+				if (!mainEntities_.empty() && reg.valid(mainEntities_[0]) && reg.all_of<RectTransformComponent>(mainEntities_[0]))
+					reg.get<RectTransformComponent>(mainEntities_[0]).enabled = true;
+				if (!creditsEntities_.empty() && reg.valid(creditsEntities_[0]) && reg.all_of<RectTransformComponent>(creditsEntities_[0]))
+					reg.get<RectTransformComponent>(creditsEntities_[0]).enabled = false;
 			}
 		}
 	}
@@ -208,13 +346,16 @@ void TitleManagerScript::CreateFallbackUI(GameScene* scene) {
 	txt.color = {1.0f, 0.8f, 0.2f, 1.0f};
 
 	// ボタン生成
-	auto btnStart_ = CreateTitleButton(scene, reg, "Start Game", 0.0f, mainParent);
+	auto btnStart_ = CreateTitleButton(scene, reg, "スタート", 0.0f, mainParent);
 	reg.emplace<NameComponent>(btnStart_, "Btn_Start");
 
-	auto btnSettings_ = CreateTitleButton(scene, reg, "Settings", 80.0f, mainParent);
+	auto btnSettings_ = CreateTitleButton(scene, reg, "設定", 80.0f, mainParent);
 	reg.emplace<NameComponent>(btnSettings_, "Btn_Settings");
 
-	auto btnExit_ = CreateTitleButton(scene, reg, "Exit", 160.0f, mainParent);
+	auto btnCredits_ = CreateTitleButton(scene, reg, "クレジット", 160.0f, mainParent);
+	reg.emplace<NameComponent>(btnCredits_, "Btn_Credits");
+
+	auto btnExit_ = CreateTitleButton(scene, reg, "ゲーム終了", 240.0f, mainParent);
 	reg.emplace<NameComponent>(btnExit_, "Btn_Exit");
 
 	// 設定メニュー
@@ -283,6 +424,49 @@ void TitleManagerScript::CreateFallbackUI(GameScene* scene) {
 	// 戻るボタン
 	auto btnBack_ = CreateTitleButton(scene, reg, "Back", 260.0f, settingsParent);
 	reg.emplace<NameComponent>(btnBack_, "Btn_Back");
+
+	// クレジットメニュー
+	auto creditsParent = reg.create();
+	reg.emplace<NameComponent>(creditsParent, "CreditsMenuParent");
+	auto& crRect = reg.emplace<RectTransformComponent>(creditsParent);
+	crRect.pos = {0.0f, 0.0f};
+	crRect.size = {1920.0f, 1080.0f};
+	crRect.anchor = {0.0f, 0.0f};
+	crRect.pivot = {0.0f, 0.0f};
+	crRect.enabled = false;
+
+	auto creditsTitle = reg.create();
+	reg.emplace<NameComponent>(creditsTitle, "CreditsTitle");
+	auto& cstRect = reg.emplace<RectTransformComponent>(creditsTitle);
+	cstRect.pos = {0.0f, 250.0f};
+	cstRect.size = {1920.0f, 100.0f};
+	cstRect.anchor = {0.0f, 0.0f};
+	cstRect.pivot = {0.0f, 0.0f};
+	scene->SetParent(creditsTitle, creditsParent);
+	auto& cstTxt = reg.emplace<UITextComponent>(creditsTitle);
+	cstTxt.text = "Special Thanks";
+	cstTxt.fontSize = 64.0f;
+	cstTxt.fontPath = "Resources\\\\Fonts\\\\Kiwi_Maru\\\\KiwiMaru-Regular.ttf";
+
+	auto creditsText = reg.create();
+	reg.emplace<NameComponent>(creditsText, "CreditsText");
+	auto& ctxRect = reg.emplace<RectTransformComponent>(creditsText);
+	ctxRect.pos = {0.0f, 400.0f};
+	ctxRect.size = {1920.0f, 200.0f};
+	ctxRect.anchor = {0.0f, 0.0f};
+	ctxRect.pivot = {0.0f, 0.0f};
+	scene->SetParent(creditsText, creditsParent);
+	auto& ctxTxt = reg.emplace<UITextComponent>(creditsText);
+	ctxTxt.text = "Steampunk Font\nCreated by hannarb";
+	ctxTxt.fontSize = 48.0f;
+	ctxTxt.fontPath = "Resources\\\\Fonts\\\\Kiwi_Maru\\\\KiwiMaru-Regular.ttf";
+
+	auto btnCreditsBack_ = CreateTitleButton(scene, reg, "Back", 800.0f, creditsParent);
+	reg.emplace<NameComponent>(btnCreditsBack_, "Btn_CreditsBack");
+	auto& cbRect = reg.get<RectTransformComponent>(btnCreditsBack_);
+	cbRect.pos.x = 960.0f;
+	cbRect.anchor = {0.0f, 0.0f};
+	cbRect.pivot = {0.5f, 0.5f};
 }
 
 REGISTER_SCRIPT(TitleManagerScript)

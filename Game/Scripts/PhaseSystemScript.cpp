@@ -93,15 +93,15 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	(void)entity;
 	
 	// チュートリアルシーン以外ならインサートカメラ演出から開始
-	bool isTutorial = false;
+	isTutorialScene_ = false;
 	if (scene) {
 		const auto& path = scene->GetStagePath();
 		if (path.find("Tutorial") != std::string::npos || path.find("tutorial") != std::string::npos) {
-			isTutorial = true;
+			isTutorialScene_ = true;
 		}
 	}
 
-	if (!isTutorial) {
+	if (!isTutorialScene_) {
 		isPhase_ = InsertPhase;
 		NextPhase_ = InsertPhase;
 		preIsPhase_ = InsertPhase;
@@ -131,12 +131,14 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	skipPromptUI_ = entt::null;
 	skipProgressUI_ = entt::null;
 
-	// キー入力の初期化
-	preKeyP_ = false;
-	preKeySpace_ = false;
-	preKeyN_ = false;
+	// キー入力の初期化 (trueにして初回フレームの残留入力による誤検出を防ぐ)
+	preKeyP_ = true;
+	preKeySpace_ = true;
+	preKeyN_ = true;
 
-
+	// グローバルなフラグの初期化
+	isSkillTreeOpen_ = false;
+	skillTree_.Close(scene);
 
 	// 必要に応じてパスやハンドルの初期化
 	selectedObjPath_ = "Resources/Models/cube/cube.obj";
@@ -454,10 +456,66 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			}
 		}
 
-		if (keySpace && !isTutorial) {
-			RequestPhaseChange(BattlePhase);
-			isPlacementMode_ = false;
-			skillTree_.Close(scene); // フェーズ移行時にスキルツリーを閉じる
+		if (!isTutorial) {
+			if (keySpace) {
+				battleStartHoldTime_ += dt;
+				if (battleStartHoldTime_ >= 1.0f) {
+					RequestPhaseChange(BattlePhase);
+					isPlacementMode_ = false;
+					skillTree_.Close(scene); // フェーズ移行時にスキルツリーを閉じる
+					battleStartHoldTime_ = 0.0f;
+				}
+			} else {
+				battleStartHoldTime_ -= dt * 3.0f; // 離すと少し早く戻る
+				if (battleStartHoldTime_ < 0.0f) battleStartHoldTime_ = 0.0f;
+			}
+
+			// 長押し開始UIの描画 (画面右端の中央付近)
+			if (renderer) {
+				float cx = (float)Engine::WindowDX::kW - 140.0f;
+				float cy = (float)Engine::WindowDX::kH * 0.5f;
+				
+				// 背景の円
+				Engine::Renderer::SdfUIDesc bg;
+				bg.centerPx = {cx, cy};
+				bg.sizePx = {100.0f, 100.0f}; // 少し小さく
+				bg.shape = 1; // 円
+				bg.color = {0.1f, 0.1f, 0.1f, 0.8f};
+				bg.fill = 1.0f;
+				renderer->DrawSDFUI(bg);
+
+				// 外枠 (ボーダー)
+				Engine::Renderer::SdfUIDesc border;
+				border.centerPx = {cx, cy};
+				border.sizePx = {100.0f, 100.0f};
+				border.shape = 1; // 円
+				border.color = {0.2f, 0.2f, 0.2f, 0.9f};
+				border.lineWidth = 3.0f;
+				border.fill = 0.0f;
+				renderer->DrawSDFUI(border);
+
+				// 進捗ゲージ (扇形クリッピング)
+				if (battleStartHoldTime_ > 0.0f) {
+					Engine::Renderer::SdfUIDesc bar;
+					bar.centerPx = {cx, cy};
+					bar.sizePx = {100.0f, 100.0f};
+					bar.shape = 1; // 円
+					bar.color = {1.0f, 0.7f, 0.1f, 0.9f}; // オレンジ色
+					bar.progress = battleStartHoldTime_ / 1.0f;
+					bar.fill = 1.0f;
+					renderer->DrawSDFUI(bar);
+				}
+
+				// テキスト表示
+				std::string promptStr = "[SPACE]長押しで開始";
+				float tw = renderer->MeasureTextWidth(promptStr, 0.35f);
+				renderer->DrawString(promptStr, cx - tw * 0.5f, cy + 65.0f, 0.35f, {1.0f, 1.0f, 1.0f, 1.0f});
+				
+				// ゲージ中央のアイコン的なテキスト
+				std::string centerStr = "開始";
+				float cw = renderer->MeasureTextWidth(centerStr, 0.3f);
+				renderer->DrawString(centerStr, cx - cw * 0.5f, cy - 8.0f, 0.3f, {0.9f, 0.9f, 0.9f, 1.0f});
+			}
 		}
 
 	} else if (isPhase_ == BattlePhase) {
@@ -483,18 +541,26 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			nav.UpdateCostMap(scene);
 
 			// 敵が目指すコアをゴールの位置としてフローフィールドを計算
-			auto core = scene->FindObjectByName("Core");
-			if (scene->GetRegistry().valid(core)) {
-				auto& tc = scene->GetRegistry().get<TransformComponent>(core);
+			entt::entity coreEntity = entt::null;
+			const auto& cores = scene->GetEntitiesByTag(TagType::Core);
+			if (!cores.empty()) coreEntity = cores[0];
+
+			if (scene->GetRegistry().valid(coreEntity)) {
+				auto& tc = scene->GetRegistry().get<TransformComponent>(coreEntity);
 				nav.GenerateFlowField(tc.translate.x, tc.translate.z);
+			} else {
+				// フォールバック
+				nav.GenerateFlowField(0.0f, 0.0f);
 			}
 
 			currentPhase_++;
 			
 			bool skipSpawn = false;
-			if (auto* tutorial = TutorialScript::GetInstance()) {
-				if (static_cast<int>(tutorial->GetCurrentStep()) <= static_cast<int>(TutorialScript::TutorialStep::Step13_SkillTree)) {
-					skipSpawn = true;
+			if (isTutorialScene_) {
+				if (auto* tutorial = TutorialScript::GetInstance()) {
+					if (static_cast<int>(tutorial->GetCurrentStep()) <= static_cast<int>(TutorialScript::TutorialStep::Step13_SkillTree)) {
+						skipSpawn = true;
+					}
 				}
 			}
 			if (!skipSpawn) {
@@ -701,6 +767,18 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				isPhase_ = Transition;
 			}
 		}
+	}
+
+	if (renderer) {
+		auto ppParams = renderer->GetPostProcessParams();
+		if (isPhase_ == PreparationPhase) {
+			ppParams.prepModeBorder = 1.0f;
+			ppParams.deleteModeBorder = isSellMode_ ? 1.0f : 0.0f;
+		} else {
+			ppParams.prepModeBorder = 0.0f;
+			ppParams.deleteModeBorder = 0.0f;
+		}
+		renderer->SetPostProcessParams(ppParams);
 	}
 
 	preKeyN_ = keyN;
@@ -1085,7 +1163,10 @@ void PhaseSystemScript::InitializeInsertPhase(GameScene* scene) {
 
 	// 1. コアと最初のスポナーの座標を検索
 	DirectX::XMFLOAT3 corePos = {0.0f, 0.0f, 0.0f};
-	auto coreObj = scene->FindObjectByName("Core");
+	entt::entity coreObj = entt::null;
+	const auto& cores = scene->GetEntitiesByTag(TagType::Core);
+	if (!cores.empty()) coreObj = cores[0];
+
 	if (scene->GetRegistry().valid(coreObj) && scene->GetRegistry().all_of<TransformComponent>(coreObj)) {
 		auto& tc = scene->GetRegistry().get<TransformComponent>(coreObj);
 		corePos = {tc.translate.x, tc.translate.y, tc.translate.z};
@@ -1237,7 +1318,7 @@ void PhaseSystemScript::CreateSkipUI(GameScene* scene) {
 	// 1. テキストUI
 	skipPromptUI_ = scene->CreateEntity("SkipPromptUI");
 	auto& rectPrompt = reg.emplace<RectTransformComponent>(skipPromptUI_);
-	rectPrompt.pos = {650.0f, 400.0f}; // 画面右下
+	rectPrompt.pos = {0.0f, 400.0f}; // 画面中央下に配置
 	rectPrompt.anchor = {0.5f, 0.5f};
 	rectPrompt.pivot = {0.5f, 0.5f};
 	rectPrompt.size = {400.0f, 50.0f};
@@ -1251,16 +1332,27 @@ void PhaseSystemScript::CreateSkipUI(GameScene* scene) {
 	textPrompt.outlineColor = {0.0f, 0.0f, 0.0f, 1.0f};
 	textPrompt.outlineThickness = 2.0f;
 
-	// 2. プログレスバーUI
+	// 2. プログレスバー背景UI (文字の上に配置)
+	skipProgressBgUI_ = scene->CreateEntity("SkipProgressBgUI");
+	auto& rectBg = reg.emplace<RectTransformComponent>(skipProgressBgUI_);
+	rectBg.pos = {0.0f, 360.0f}; // テキスト(400)の上
+	rectBg.anchor = {0.5f, 0.5f};
+	rectBg.pivot = {0.5f, 0.5f};
+	rectBg.size = {254.0f, 12.0f};
+
+	auto& imgBg = reg.emplace<UIImageComponent>(skipProgressBgUI_);
+	imgBg.color = {0.1f, 0.1f, 0.1f, 0.8f};
+
+	// 3. プログレスバー中身UI
 	skipProgressUI_ = scene->CreateEntity("SkipProgressUI");
 	auto& rectBar = reg.emplace<RectTransformComponent>(skipProgressUI_);
-	rectBar.pos = {650.0f, 440.0f};
+	rectBar.pos = {-125.0f, 360.0f}; // 背景の左端(-125)からスタート
 	rectBar.anchor = {0.5f, 0.5f};
-	rectBar.pivot = {0.5f, 0.5f};
+	rectBar.pivot = {0.0f, 0.5f}; // 左端基準でスケール
 	rectBar.size = {0.0f, 8.0f};
 
 	auto& imgBar = reg.emplace<UIImageComponent>(skipProgressUI_);
-	imgBar.color = {1.0f, 0.3f, 0.3f, 0.8f};
+	imgBar.color = {1.0f, 0.3f, 0.3f, 0.9f};
 }
 
 void PhaseSystemScript::UpdateSkipUIProgress(GameScene* scene) {
@@ -1287,10 +1379,17 @@ void PhaseSystemScript::EndInsertPhase(GameScene* scene) {
 		scene->DestroyObject(static_cast<uint32_t>(skipProgressUI_));
 		skipProgressUI_ = entt::null;
 	}
+	if (skipProgressBgUI_ != entt::null && scene->GetRegistry().valid(skipProgressBgUI_)) {
+		scene->DestroyObject(static_cast<uint32_t>(skipProgressBgUI_));
+		skipProgressBgUI_ = entt::null;
+	}
 
 	// 終了時に標準の準備フェーズ用カメラ（コア見下ろし）に移行
 	auto prepCam = scene->FindObjectByName("PreparationCamera");
-	auto core = scene->FindObjectByName("Core");
+	entt::entity core = entt::null;
+	const auto& cores = scene->GetEntitiesByTag(TagType::Core);
+	if (!cores.empty()) core = cores[0];
+
 	if (scene->GetRegistry().valid(core) && scene->GetRegistry().valid(prepCam)) {
 		auto& coreTc = scene->GetRegistry().get<TransformComponent>(core);
 		
@@ -1345,6 +1444,11 @@ void PhaseSystemScript::EndInsertPhase(GameScene* scene) {
 	preIsPhase_ = PreparationPhase;
 
 	isInsertInitialized_ = false;
+}
+
+void PhaseSystemScript::DrawUI(entt::entity /*entity*/, GameScene* /*scene*/) {
+	// SDFUIなどの描画は Update フェーズ内で処理されるため、
+	// ここは空実装としておく
 }
 bool Game::PhaseSystemScript::isSkillTreeOpen_ = false;
 REGISTER_SCRIPT(PhaseSystemScript);

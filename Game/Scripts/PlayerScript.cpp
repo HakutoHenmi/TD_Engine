@@ -1148,35 +1148,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 				shellCasings_.pop_front();
 
 			// ==== ★追加: スキルバフ中のUI表示 ====
-			if (isSkillActive_ && playerType_ == PlayerType::Gun) {
-				float remaining = skillDuration_;
-				float ratio = remaining / SKILL_MAX_DURATION;
-				Engine::Renderer::SdfUIDesc skillBg{};
-				skillBg.centerPx = {640.0f, 680.0f};
-				skillBg.sizePx = {200.0f, 16.0f};
-				skillBg.lineWidth = 0.0f;
-				skillBg.glow = 0.0f;
-				skillBg.color = {0.05f, 0.05f, 0.1f, 0.7f};
-				skillBg.shape = 0;
-				skillBg.round = 4.0f;
-				skillBg.progress = 1.0f;
-				skillBg.fill = 1.0f;
-				uiRenderer->DrawSDFUI(skillBg);
-				Engine::Renderer::SdfUIDesc skillBar{};
-				skillBar.centerPx = {640.0f, 680.0f};
-				skillBar.sizePx = {200.0f, 16.0f};
-				skillBar.lineWidth = 0.0f;
-				skillBar.glow = 3.0f;
-				skillBar.color = {0.3f, 0.9f, 1.0f, 1.0f};
-				skillBar.shape = 0;
-				skillBar.round = 4.0f;
-				skillBar.progress = ratio;
-				skillBar.fill = 1.0f;
-				uiRenderer->DrawSDFUI(skillBar);
-				char skillText[64];
-				snprintf(skillText, sizeof(skillText), "CRYSTAL ENHANCE  %.1fs", remaining);
-				uiRenderer->DrawString(skillText, 560.0f, 674.0f, 0.4f, {0.3f, 0.9f, 1.0f, 1.0f});
-			}
+			// 右下の円形UIに統合したため、ここでは描画しない
 		}
 	}
 
@@ -1872,9 +1844,11 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 		return;
 
 	// ===== 1. 基本設定 =====
-	float gaugeX = (float)Engine::WindowDX::kW * 0.5f;
-	float gaugeY = (float)Engine::WindowDX::kH - 140.0f;
-	float R = 85.0f;
+	float screenW = (float)Engine::WindowDX::kW;
+	float screenH = (float)Engine::WindowDX::kH;
+	float gaugeX = screenW - 130.0f; // 右下に配置
+	float gaugeY = screenH - 120.0f; // 右下に配置
+	float R = 75.0f; // 少し小さくする（元は85.0f）
 	float pressureRatio = std::clamp(steamPressure_ / maxSteam, 0.0f, 1.0f);
 	float startAngle = DirectX::XM_PI * 0.75f;
 	float totalAngle = DirectX::XM_PI * 1.5f;
@@ -1970,43 +1944,26 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
         });
 	}
 
-	// ===== 6. 漢字数字ラベル（縦書き対応）=====
-	const char* kanjiLabels[] = {(const char*)u8"零", (const char*)u8"五十", (const char*)u8"百"};
+	// ===== 6. 数字ラベル =====
+	const char* numLabels[] = {"0", "50", "100"};
 	float labelSteps[] = {0.0f, 0.5f, 1.0f};
 	for (int i = 0; i < 3; ++i) {
 		float angle = startAngle + labelSteps[i] * totalAngle;
 		float labelR = R - 30.0f;
 		float sx = gaugeX + std::cos(angle) * labelR;
 		float sy = gaugeY + std::sin(angle) * labelR;
-		float fontSize = 0.45f;
+		float fontSize = 0.35f;
 
-		// 縦書き描画ロジック（簡易版）
-		std::vector<std::string> chars;
-		if (i == 1) { // "五十"
-			chars.push_back((const char*)u8"五");
-			chars.push_back((const char*)u8"十");
-		} else {
-			chars.push_back(kanjiLabels[i]);
-		}
-
-		float totalH = chars.size() * 15.0f;
-		for (size_t c = 0; c < chars.size(); ++c) {
-			float tw = renderer->MeasureTextWidth(chars[c].c_str(), fontSize);
-			float offsetX = -tw * 0.5f;
-			float offsetY = -totalH * 0.5f + c * 15.0f;
-			renderer->DrawString(chars[c].c_str(), sx + offsetX, sy + offsetY, fontSize, {0.1f, 0.08f, 0.05f, 1.0f});
-		}
+		float tw = renderer->MeasureTextWidth(numLabels[i], fontSize);
+		renderer->DrawString(numLabels[i], sx - tw * 0.5f, sy - 5.0f, fontSize, {0.1f, 0.08f, 0.05f, 1.0f});
 	}
 
-	// ===== 7. 中央ラベル（圧力計 - 軸の下側に配置）=====
+	// ===== 7. 中央ラベル（PRESSURE）=====
 	{
-		const char* titleChars[] = {(const char*)u8"圧", (const char*)u8"力", (const char*)u8"計"};
 		float fontSize = 0.28f;
-		float startY = gaugeY + R * 0.15f; // 軸の下側に移動
-		for (int i = 0; i < 3; ++i) {
-			float tw = renderer->MeasureTextWidth(titleChars[i], fontSize);
-			renderer->DrawString(titleChars[i], gaugeX - tw * 0.5f, startY + i * 14.0f, fontSize, {0.25f, 0.18f, 0.1f, 0.8f});
-		}
+		const char* title = "PRESSURE";
+		float tw = renderer->MeasureTextWidth(title, fontSize);
+		renderer->DrawString(title, gaugeX - tw * 0.5f, gaugeY + R * 0.25f, fontSize, {0.25f, 0.18f, 0.1f, 0.8f});
 	}
 
 	// ===== 8. 針 & カウンターウェイト（微細な振動を追加）=====
@@ -2084,9 +2041,9 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 
 	// ===== 10. 飛行圧力計 (Gunモードのみ) =====
 	if (playerType_ == PlayerType::Gun) {
-		float flightGaugeX = gaugeX + 150.0f; // メイン圧力計の右側
-		float flightGaugeY = gaugeY + 30.0f;  // 少し下
-		float fR = 55.0f;                     // 少し小さめ
+		float flightGaugeX = gaugeX - 110.0f; // メイン圧力計の左側
+		float flightGaugeY = gaugeY + 15.0f;  // 少し下
+		float fR = 45.0f;                     // 少し小さめ
 		float fRatio = std::clamp(flightPressure_ / maxFlightPressure_, 0.0f, 1.0f);
 
 		// 背景
@@ -2129,11 +2086,47 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
         });
 
 		// ラベル
-		const char* fTitle[] = {(const char*)u8"飛", (const char*)u8"行"};
-		for (int i = 0; i < 2; ++i) {
-			float tw = renderer->MeasureTextWidth(fTitle[i], 0.25f);
-			renderer->DrawString(fTitle[i], flightGaugeX - tw * 0.5f, flightGaugeY + fR * 0.2f + i * 12.0f, 0.25f, {0.1f, 0.2f, 0.3f, 0.8f});
+		float fTitleTw = renderer->MeasureTextWidth("FLIGHT", 0.2f);
+		renderer->DrawString("FLIGHT", flightGaugeX - fTitleTw * 0.5f, flightGaugeY + fR * 0.2f, 0.2f, {0.1f, 0.2f, 0.3f, 0.8f});
+	}
+
+	// ===== 11. スキルクールタイム/バフ円形UI =====
+	{
+		float skillGaugeX = gaugeX - 50.0f; // 圧力計の左上
+		float skillGaugeY = gaugeY - 90.0f;
+		float sR = 30.0f;
+		
+		float skillRatio = 0.0f;
+		Engine::Vector4 skillColor = {0.5f, 0.5f, 0.5f, 1.0f};
+		float maxCd = (playerType_ == PlayerType::Gun) ? (SKILL_COOLDOWN_TIME / playerGunSkillCooldownRate_) : (20.0f / playerSwordSkillCooldownRate_);
+
+		if (isSkillActive_) {
+			skillRatio = skillDuration_ / SKILL_MAX_DURATION;
+			skillColor = {0.3f, 0.9f, 1.0f, 1.0f}; // バフ中：水色
+		} else if (skillCooldown_ > 0.0f) {
+			skillRatio = 1.0f - (skillCooldown_ / maxCd); // クールダウン中は増えていく
+			skillColor = {0.5f, 0.2f, 0.2f, 0.8f}; // クールダウン中：暗い赤
+		} else {
+			skillRatio = 1.0f;
+			skillColor = {0.9f, 0.8f, 0.2f, 1.0f}; // 使用可能：黄色
 		}
+
+		// 背景
+		renderer->DrawSDFUI({
+			{skillGaugeX, skillGaugeY}, {sR + 4, sR + 4},
+			0, 0, {0.1f, 0.1f, 0.15f, 0.8f}, 1, 0, 0, 0, 1.0f, 1.0f, false
+		});
+
+		// ゲージ
+		renderer->DrawSDFUI({
+			{skillGaugeX, skillGaugeY}, {sR, sR},
+			0, (skillRatio >= 1.0f) ? 3.0f : 0.0f, skillColor,
+			1, 0, 0, 0, skillRatio, 1.0f, false // shape = 1 (Circle)
+		});
+
+		// ラベル "E" または "SKILL"
+		float tw = renderer->MeasureTextWidth("E", 0.35f);
+		renderer->DrawString("E", skillGaugeX - tw * 0.5f, skillGaugeY - 10.0f, 0.35f, {1, 1, 1, 0.9f});
 	}
 }
 
