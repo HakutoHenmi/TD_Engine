@@ -1962,6 +1962,28 @@ void GameScene::CreatePauseMenu() {
 	pauseMainEntities_.push_back(pauseBtnResume_);
 	pauseMainEntities_.push_back(pauseBtnSettings_);
 	pauseMainEntities_.push_back(pauseBtnTitle_);
+
+	// 操作説明テキスト（ポーズ画面の右側に表示）
+	auto guideParent = pauseRegistry_.create();
+	auto& gRect = pauseRegistry_.emplace<RectTransformComponent>(guideParent);
+	gRect.pos = {(float)Engine::WindowDX::kW / 2.0f + 250.0f, (float)Engine::WindowDX::kH / 2.0f - 100.0f};
+	gRect.size = {0, 0};
+	gRect.anchor = {0.0f, 0.0f};
+	pauseMainEntities_.push_back(guideParent);
+
+	auto guideText = pauseRegistry_.create();
+	auto& gtRect = pauseRegistry_.emplace<RectTransformComponent>(guideText);
+	gtRect.pos = {0.0f, 0.0f};
+	pauseRegistry_.emplace<HierarchyComponent>(guideText, guideParent);
+	auto& gtTxt = pauseRegistry_.emplace<UITextComponent>(guideText);
+	gtTxt.text = "【操作説明】\n\n[WASD] 移動\n[右ドラッグ] 視点操作\n[左クリック] 攻撃 / 長押しでチャージ\n[右クリック] 特殊移動 (ブースト等)\n[E] スキル\n[T] 武器切り替え\n[N] スキルツリー";
+	gtTxt.fontSize = 28.0f;
+	gtTxt.color = {1.0f, 1.0f, 1.0f, 1.0f};
+	gtTxt.fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf";
+	gtTxt.outlineEnabled = true;
+	gtTxt.outlineColor = {0.0f, 0.0f, 0.0f, 1.0f};
+	gtTxt.outlineThickness = 2.0f;
+	pauseMainEntities_.push_back(guideText);
 }
 
 void GameScene::CreatePauseSettingsMenu() {

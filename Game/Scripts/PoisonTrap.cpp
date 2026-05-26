@@ -3,6 +3,7 @@
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
 #include "ScriptUtils.h"
+#include "TutorialScript.h"
 #include <algorithm>
 #include <cmath>
 #include <unordered_set>
@@ -159,19 +160,25 @@ void PoisonTrap::Update(entt::entity entity, GameScene* scene, float dt) {
 
 		auto players = scene->GetEntitiesByTag(TagType::Player);
 		if (!players.empty() && registry.valid(players[0])) {
-			if (registry.all_of<TransformComponent>(players[0])) {
-				auto& pTrans = registry.get<TransformComponent>(players[0]);
-				auto& cTrans = registry.get<TransformComponent>(entity);
-				float dx = pTrans.translate.x - cTrans.translate.x;
-				float dy = pTrans.translate.y - cTrans.translate.y;
-				float dz = pTrans.translate.z - cTrans.translate.z;
-				float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+			bool auraEnabled = true;
+			if (auto* tutorial = TutorialScript::GetInstance(); tutorial && !tutorial->IsAuraEnabled()) {
+				auraEnabled = false;
+			}
+			if (auraEnabled) {
+				if (registry.all_of<TransformComponent>(players[0])) {
+					auto& pTrans = registry.get<TransformComponent>(players[0]);
+					auto& cTrans = registry.get<TransformComponent>(entity);
+					float dx = pTrans.translate.x - cTrans.translate.x;
+					float dy = pTrans.translate.y - cTrans.translate.y;
+					float dz = pTrans.translate.z - cTrans.translate.z;
+					float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
 
-				if (dist <= buff.buffRadius) {
-					buff.isBuffed = true;
-					// ポイズンのバフ効果：範囲拡大、持続時間延長
-					finalRange *= buff.buffMultiplier;
-					finalPoisonActiveTime_ *= 1.2f;
+					if (dist <= buff.buffRadius) {
+						buff.isBuffed = true;
+						// ポイズンのバフ効果：範囲拡大、持続時間延長
+						finalRange *= buff.buffMultiplier;
+						finalPoisonActiveTime_ *= 1.2f;
+					}
 				}
 			}
 		}

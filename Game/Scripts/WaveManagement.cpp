@@ -15,6 +15,7 @@
 #include <algorithm>
 
 #include "PhaseSystemScript.h"
+#include "TutorialScript.h"
 
 using json = nlohmann::json;
 
@@ -52,7 +53,7 @@ void WaveManagement::Start(entt::entity entity, GameScene* scene) {
 		enemySpawners_.push_back(waveSpawners);
 	}
 
-	currentWave_ = 0;
+	currentWave_ = -1;
 	previousWave_ = -1;
 	isWaveInitialized_ = false;
 }
@@ -90,6 +91,8 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 					} else if (phase == PhaseSystemScript::BattlePhase) {
 						targetWave = currentWave_;
 					}
+
+					// (チュートリアル中のアイコン非表示処理は削除しました)
 
 					if (static_cast<int>(wi) != targetWave) {
 						continue;

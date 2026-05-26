@@ -2,6 +2,7 @@
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
+#include "TutorialScript.h"
 #include <cmath>
 
 #ifdef USE_IMGUI
@@ -75,6 +76,7 @@ void ExplosionAttackArea::Start(entt::entity entity, GameScene* scene) {
 					} else {
 						float overflowDamage = effectiveShieldDamage - hc.shieldHp;
 						hc.shieldHp = 0.0f; // 破壊
+						if (auto* tutorial = TutorialScript::GetInstance()) tutorial->IncrementBrokenShieldCount();
 						damageToApply = (overflowDamage / shieldDamageRate) * hpDamageRate;
 					}
 				} else {
