@@ -225,7 +225,7 @@ void TutorialScript::UpdateSkillTree(entt::entity entity, GameScene* scene, bool
 	if (!renderer)
 		return;
 
-	outKeyN = input->Trigger(DIK_N) || (GetAsyncKeyState('N') & 0x8001);
+	outKeyN = input->Trigger(DIK_N) || (GetAsyncKeyState('N') & 0x8001) || input->IsControllerButtonTrigger(XINPUT_GAMEPAD_BACK);
 	if (outKeyN && !preKeyN_) {
 		skillTree_.Toggle(scene);
 	}
@@ -628,7 +628,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	static bool prevKeySpace = false;
 	const bool currentRawSpace = (GetAsyncKeyState(VK_SPACE) & 0x8000) != 0;
-	const bool keySpace = input->Trigger(DIK_SPACE) || (currentRawSpace && !prevKeySpace);
+	const bool keySpace = input->Trigger(DIK_SPACE) || (currentRawSpace && !prevKeySpace) || input->IsControllerButtonTrigger(XINPUT_GAMEPAD_A);
 	prevKeySpace = currentRawSpace;
 
 	bool placementSelectionChangedThisFrame = false;
@@ -1075,10 +1075,28 @@ void TutorialScript::ShowGuideText(entt::entity entity, GameScene* scene) {
 	if (it != kTutorialTexts.end()) {
 		const auto& lines = it->second;
 		if (currentLineIndex_ >= 0 && currentLineIndex_ < static_cast<int>(lines.size())) {
-			std::string currentText = lines[currentLineIndex_];
+			// Xbox用テキスト置換ヘルパー
+			auto replaceGamepadText = [&](std::string text) {
+				if (Engine::Input::GetInstance() && Engine::Input::GetInstance()->GetActiveDeviceType() == Engine::InputDeviceType::Controller) {
+					size_t pos;
+					std::string tgt;
+					tgt = "SPACEキー"; while ((pos = text.find(tgt)) != std::string::npos) text.replace(pos, tgt.length(), "Aボタン");
+					tgt = "[SPACE]キー"; while ((pos = text.find(tgt)) != std::string::npos) text.replace(pos, tgt.length(), "[A]ボタン");
+					tgt = "WASDキー"; while ((pos = text.find(tgt)) != std::string::npos) text.replace(pos, tgt.length(), "左スティック");
+					tgt = "WASD"; while ((pos = text.find(tgt)) != std::string::npos) text.replace(pos, tgt.length(), "左スティック");
+					tgt = "マウス右ドラッグ"; while ((pos = text.find(tgt)) != std::string::npos) text.replace(pos, tgt.length(), "右スティック");
+					tgt = "左クリック"; while ((pos = text.find(tgt)) != std::string::npos) text.replace(pos, tgt.length(), "RTボタン");
+					tgt = "Eキー"; while ((pos = text.find(tgt)) != std::string::npos) text.replace(pos, tgt.length(), "RBボタン");
+					tgt = "Nキー"; while ((pos = text.find(tgt)) != std::string::npos) text.replace(pos, tgt.length(), "BACKボタン");
+					tgt = "ESCキー"; while ((pos = text.find(tgt)) != std::string::npos) text.replace(pos, tgt.length(), "STARTボタン");
+				}
+				return text;
+			};
+
+			std::string currentText = replaceGamepadText(lines[currentLineIndex_]);
 
 			if (tutorialStep_ == TutorialStep::Step6_CannonInstall && currentLineIndex_ == 2) {
-				currentText = "目標：[RED]大砲を3個設置[/RED] (" + std::to_string(step6_cannonCount_) + "/3)";
+				currentText = replaceGamepadText("目標：[RED]大砲を3個設置[/RED] (" + std::to_string(step6_cannonCount_) + "/3)");
 			}
 
 			uiText.color = {1.0f, 1.0f, 1.0f, 1.0f}; // 白
@@ -1143,6 +1161,8 @@ void TutorialScript::ShowGuideText(entt::entity entity, GameScene* scene) {
 				} else {
 					navText = "[SPACE]キー で進む ▼";
 				}
+				
+				navText = replaceGamepadText(navText);
 
 				float navScale = fontScale * 0.8f;
 				float navW = 0.0f;

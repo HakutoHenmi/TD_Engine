@@ -2293,7 +2293,14 @@ float4 main(PSIn i) : SV_TARGET { return i.color; }
 		// シェーダー名リストに追加 (エディタのドロップダウンに表示される)
 		// ※CreatePSO や CreatePSO_Transparent 内部で重複チェック付きで push_back されるため、明示的な処理は不要です。
 
-		// ★追加: リッチシェーダー
+		// ★追加: スチームパンクシェーダー
+		auto vsSteampunk = CompileShaderFromFile(L"Resources/shaders/SteampunkVS.hlsl", "main", "vs_5_0");
+		auto psSteampunk = CompileShaderFromFile(L"Resources/shaders/SteampunkPS.hlsl", "main", "ps_5_0");
+		if (vsSteampunk && psSteampunk) {
+			CreatePSO("Steampunk", vsSteampunk.Get(), psSteampunk.Get());
+		}
+
+	// ★追加: リッチシェーダー
 		auto vsEmissive = CompileShaderFromFile(L"Resources/shaders/EmissiveGlowVS.hlsl", "main", "vs_5_0");
 		auto psEmissive = CompileShaderFromFile(L"Resources/shaders/EmissiveGlowPS.hlsl", "main", "ps_5_0");
 		if (vsEmissive && psEmissive) {
