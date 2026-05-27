@@ -158,11 +158,13 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 			mr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
 			DirectX::XMFLOAT4 enemyColor = { 1.0f, 0.4f, 0.2f, 1.0f };
 			if (enemyScriptPath == "Warrior") {
-				enemyColor = {0.2f, 0.2f, 1.0f, 1.0f}; // Blue
+				mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
 			} else if (enemyScriptPath == "Guardian") {
-				enemyColor = {1.0f, 0.2f, 0.2f, 1.0f}; // Red
+				mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
 			} else if (enemyScriptPath == "Gunner") {
-				enemyColor = { 0.2f, 1.0f, 0.2f, 1.0f }; // Green
+				mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+			} else {
+				mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
 			}
 			mr.color = enemyColor;
 			mr.shaderName = "Default";
