@@ -503,9 +503,9 @@ void MissileCanonScript::FireMissile(entt::entity entity, entt::registry& regist
 
 		MeshRendererComponent& bulletMeshRenderer = registry.emplace<MeshRendererComponent>(bullet);
 
-		bulletMeshRenderer.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+		bulletMeshRenderer.modelHandle = renderer->LoadObjMesh("Resources/MisiileBullet/MisiileBullet.obj");
 
-		bulletMeshRenderer.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+		bulletMeshRenderer.textureHandle = renderer->LoadTexture2D("Resources/MisiileBullet/MisiileBullet.png");
 	}
 
 	ScriptComponent& bulletScriptComponent = registry.emplace<ScriptComponent>(bullet);
