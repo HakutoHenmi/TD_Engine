@@ -3,7 +3,7 @@
     {
       "id": 0,
       "name": "CanonBase",
-      "icon": "Base",
+      "icon": "CanonButtonSkill",
       "cost": 0,
       "parentId": -1,
       "unlocked": true,
@@ -124,7 +124,7 @@
 {
   "id": 100,
   "name": "PoisonBase",
-  "icon": "Base2",
+  "icon": "PoisonButtonSkill",
   "cost": 0,
   "parentId": -1,
   "unlocked": true,
@@ -209,7 +209,7 @@
     {
       "id": 200,
       "name": "MissileBase",
-      "icon": "Base3",
+      "icon": "MisileButtonSkill",
       "cost": 0,
       "parentId": -1,
       "unlocked": true,
@@ -294,7 +294,7 @@
     {
       "id": 300,
       "name": "IceBase",
-      "icon": "Base4",
+      "icon": "IceCanonSkill",
       "cost": 0,
       "parentId": -1,
       "unlocked": true,
@@ -379,7 +379,7 @@
     {
       "id": 400,
       "name": "PlayerBase",
-      "icon": "PlayerBase",
+      "icon": "PlayerButtonSkill",
       "cost": 0,
       "parentId": -1,
       "unlocked": true,
