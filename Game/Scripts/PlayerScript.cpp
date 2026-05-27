@@ -281,6 +281,7 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 	if (scene->GetRegistry().all_of<NameComponent>(entity)) {
 		std::cout << "PlayerScript Started: Greatsword & Gun Initialized.\n";
 	}
+	skillFrameTextureHandle_ = renderer->LoadTexture2D("Resources/Textures/GamaUI/swordSkillCoolDown.png");
 }
 
 void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
@@ -2112,10 +2113,15 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 		}
 
 		// 背景
-		renderer->DrawSDFUI({
-			{skillGaugeX, skillGaugeY}, {sR + 4, sR + 4},
-			0, 0, {0.1f, 0.1f, 0.15f, 0.8f}, 1, 0, 0, 0, 1.0f, 1.0f, false
-		});
+		Engine::Renderer::SpriteDesc skillDesc;
+
+		skillDesc.w = 120.0f;
+		skillDesc.h = 120.0f;
+
+		skillDesc.x = skillGaugeX - skillDesc.w * 0.5f;
+		skillDesc.y = skillGaugeY - skillDesc.h * 0.5f;
+
+		renderer->DrawSprite(skillFrameTextureHandle_, skillDesc);
 
 		// ゲージ
 		renderer->DrawSDFUI({
