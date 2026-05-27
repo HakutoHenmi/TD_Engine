@@ -979,11 +979,13 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			}
 
 			// HPIN.pngの元画像サイズ (1024x128) とスケール
-			float scale = 0.45f;
+			float scale = 0.55f; // ★変更: 0.65fだと大きすぎるので少し調整(0.45f->0.55f)
 			float gaugeW = 1024.0f * scale;
 			float gaugeH = 128.0f * scale;
-			float gaugeX = 20.0f;
-			float gaugeY = 20.0f;
+			// ★工夫: 画面右下の圧力計メーターの「左隣」に配置し、画面下端に固定する。
+			// これにより、左のアクションボタンと被らず、戦闘フェーズでも浮いて見えない。
+			float gaugeX = (float)Engine::WindowDX::kW - gaugeW - 250.0f; 
+			float gaugeY = (float)Engine::WindowDX::kH - gaugeH - 15.0f; 
 
 			// ピクセルシェーダー(SDFUI)で灰色のゲージ内を埋める (HP)
 			Engine::Renderer::SdfUIDesc hpDesc{};
@@ -1028,9 +1030,11 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			// テキスト (Lvと経験値)
 			char textBuf[64];
 			snprintf(textBuf, sizeof(textBuf), "Lv.%d   EXP: %.1f / %.1f", level_, experience_, nextExperience_);
-			// 画像の右下にテキストを配置
-			uiRenderer->DrawString(textBuf, gaugeX + 30.0f + 2.0f, gaugeY + gaugeH + 10.0f + 2.0f, 0.5f, {0, 0, 0, 1});
-			uiRenderer->DrawString(textBuf, gaugeX + 30.0f, gaugeY + gaugeH + 10.0f, 0.5f, {1, 1, 1, 1});
+			// ★工夫: ゲージの左上の空きスペースに配置し、テキストを見やすくする
+			float textScale = 0.55f;
+			float textY = gaugeY - 25.0f; // ★変更: 装飾と被らないようもう少しだけ上に離す
+			uiRenderer->DrawString(textBuf, gaugeX + 20.0f + 2.0f, textY + 2.0f, textScale, {0, 0, 0, 1});
+			uiRenderer->DrawString(textBuf, gaugeX + 20.0f, textY, textScale, {1, 1, 1, 1});
 
 			float isSkillTreeOpen = 0.0f;
 			if (gmEntity != entt::null) {
@@ -2128,6 +2132,13 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 
 		skillDesc.x = skillGaugeX - skillDesc.w * 0.5f;
 		skillDesc.y = skillGaugeY - skillDesc.h * 0.5f;
+
+		// クールタイム中はアイコンを透過して薄くし、溜まったらハッキリさせる
+		if (!isSkillActive_ && skillCooldown_ > 0.0f) {
+			skillDesc.color = {0.4f, 0.4f, 0.4f, 0.6f}; // 暗くして半透明に
+		} else {
+			skillDesc.color = {1.0f, 1.0f, 1.0f, 1.0f}; // 白くハッキリ
+		}
 
 		renderer->DrawSprite(skillFrameTextureHandle_, skillDesc);
 		// ラベル "E" または "SKILL"

@@ -17,13 +17,10 @@ public:
 			auto& ct = view.get<CameraTargetComponent>(entity);
 			if (!ct.enabled) continue;
 
-			// ★追加: 初期位置とマウスホイール最低値のズレを完全に解消（JSONロード値の自動補正）
-			if (ct.distance < 15.0f) {
-				ct.distance = 15.0f;
+			if (ct.distance < 10.0f) {
+				ct.distance = 10.0f;
 			}
-			if (ct.height < 4.5f) {
-				ct.height = 4.5f;
-			}
+			// ※ height はフェーズごとに制御するため、ここでの強制上書きは削除
 
 			// ★追加: マウスホイールによるズーム（準備フェーズ中は無効）
 			bool isPrep = (Game::PhaseSystemScript::IsPhase() == Game::PhaseSystemScript::PreparationPhase);
@@ -32,8 +29,8 @@ public:
 				float wheel = inputIns->GetMouseWheelDelta();
 				if (std::abs(wheel) > 0.001f) {
 					ct.distance -= wheel * 2.0f; // 感度調整（1クリックで2m移動）
-					// 下限値を初期距離の15.0fとし、これ以上ズームインしてカメラが下がらないように制限
-					ct.distance = std::clamp(ct.distance, 15.0f, 35.0f); // 範囲制限
+					// 下限値を初期距離の10.0fとし、これ以上ズームインしてカメラが下がらないように制限
+					ct.distance = std::clamp(ct.distance, 10.0f, 35.0f); // 範囲制限
 				}
 			}
 
@@ -139,6 +136,12 @@ public:
 			float dz = targetPos.z - lastTargetPos.z;
 			float moveDist = std::sqrt(dx * dx + dz * dz);
 			float currentSpeed = moveDist / (ctx.dt > 0 ? ctx.dt : 0.016f);
+			
+			// ★追加: ターゲットがワープ（フェーズ移行時など）した場合はスピードを0にする
+			if (moveDist > 5.0f) {
+				currentSpeed = 0.0f;
+			}
+			
 			lastTargetPos = targetPos;
 
 			// ★動的距離調整: スピードに合わせて距離を引く
