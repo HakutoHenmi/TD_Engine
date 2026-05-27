@@ -21,11 +21,11 @@
 // Button UI
 #include "InstallationManager.h"
 
-#include "WaveManagement.h"
-#include "TutorialScript.h"
-#include "ResultManagerScript.h"
 #include "../../Engine/SceneManager.h"
 #include "../../Engine/ThirdParty/nlohmann/json.hpp"
+#include "ResultManagerScript.h"
+#include "TutorialScript.h"
+#include "WaveManagement.h"
 
 using json = nlohmann::json;
 
@@ -56,8 +56,6 @@ bool IsPointerOverInstallationButton(GameScene* scene) {
 	return false;
 }
 
-
-
 // 高さキャッシュ用（配置フェーズ中は地形が頻繁に変わらないためキャッシュして毎フレームのRayCastを省く）
 static std::unordered_map<int64_t, float> s_heightCache;
 static void ClearHeightCache() { s_heightCache.clear(); }
@@ -83,7 +81,7 @@ bool TryGetPlacementSurfaceYAt(GameScene* scene, float x, float z, float& outY) 
 		s_heightCache[key] = y;
 		return true;
 	}
-	
+
 	outY = 0.0f;
 	return false;
 }
@@ -91,7 +89,7 @@ bool TryGetPlacementSurfaceYAt(GameScene* scene, float x, float z, float& outY) 
 
 void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	(void)entity;
-	
+
 	// チュートリアルシーン以外ならインサートカメラ演出から開始
 	isTutorialScene_ = false;
 	if (scene) {
@@ -111,7 +109,6 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 		preIsPhase_ = PreparationPhase;
 	}
 
-	
 	currentPhase_ = 0;
 	CoinCount = StartCoinCount_;
 
@@ -123,7 +120,7 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 
 	enemyCountUI_ = entt::null;
 	installationCostUI_ = entt::null;
-	
+
 	// インサートカメラ変数の初期化
 	isInsertInitialized_ = false;
 	currentWaypointIndex_ = 0;
@@ -152,6 +149,9 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 		skillTree_.SetUIContext(renderer, (float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH, 0.0f, 0.0f);
 		skillTree_.Start(entity, scene);
 		skillTree_.LoadFromJson("Resources/Scenes/skills.json");
+
+		// その他のテクスチャをロード（リソース管理は別途行うことを想定）
+		startButtonFrameTextureHandle_ = renderer->LoadTexture2D("Resources/Textures/GamaUI/successs.png");
 	}
 
 	// 設置開始イベントの購読
@@ -162,16 +162,24 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 			selectedObjCost_ = data.value("cost", 0);
 			isPlacementMode_ = true;
 			isSellMode_ = false;
-		} catch (...) {}
+		} catch (...) {
+		}
 	});
 
 	if (scene->GetRegistry().all_of<UITextComponent>(entity))
 		scene->GetRegistry().get<UITextComponent>(entity).text = std::to_string(CoinCount);
+
+
+
+	
+
+	
+
 }
 
 void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	(void)entity;
-	
+
 	if (isPhase_ == InsertPhase) {
 		UpdateInsertPhase(scene, dt);
 		return;
@@ -184,7 +192,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	// スクリプト動作確認用の白い線 (常に表示)
 	auto* renderer = scene->GetRenderer();
 	if (renderer) {
-	// デバッグ用の線は削除しました
+		// デバッグ用の線は削除しました
 	}
 
 	// ★入力処理: キーボードとUI両方からの入力を受け付ける
@@ -209,7 +217,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	}
 
 	if (isPhase_ == PreparationPhase) {
-        bool placementSelectionChangedThisFrame = false;
+		bool placementSelectionChangedThisFrame = false;
 		const bool clickedInstallationButtonThisFrame = input->IsMouseTrigger(0) && IsPointerOverInstallationButton(scene);
 
 		bool isTutorial = false;
@@ -224,8 +232,6 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			// Nキーでスキルツリーの開閉
 			if (keyN && !preKeyN_) {
 				skillTree_.Toggle(scene);
-				
-
 			}
 
 			// スキルツリーが開いている間はスキルツリーの更新のみ
@@ -264,12 +270,11 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		// 設置モードへの切り替え
 
-
-
 		if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/Canon.prefab")) {
 			selectedObjPath_ = "Resources/Prefabs/NewCannon.prefab";
 			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
-			if (selectedObjCost_ == 0) selectedObjCost_ = canonCost_;
+			if (selectedObjCost_ == 0)
+				selectedObjCost_ = canonCost_;
 			isPlacementMode_ = true;
 			isSellMode_ = false;
 			placementSelectionChangedThisFrame = true;
@@ -278,7 +283,8 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		if (key4 || InstallationManager::IsButtonPressed("Resources/Prefabs/Missile.prefab")) {
 			selectedObjPath_ = "Resources/Prefabs/Missile.prefab";
 			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
-			if (selectedObjCost_ == 0) selectedObjCost_ = missileCost_;
+			if (selectedObjCost_ == 0)
+				selectedObjCost_ = missileCost_;
 			isPlacementMode_ = true;
 			isSellMode_ = false;
 			placementSelectionChangedThisFrame = true;
@@ -287,7 +293,8 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		if (key5 || InstallationManager::IsButtonPressed("Resources/Prefabs/Poison.prefab")) {
 			selectedObjPath_ = "Resources/Prefabs/Poison.prefab";
 			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
-			if (selectedObjCost_ == 0) selectedObjCost_ = poisonCost_;
+			if (selectedObjCost_ == 0)
+				selectedObjCost_ = poisonCost_;
 			isPlacementMode_ = true;
 			isSellMode_ = false;
 			placementSelectionChangedThisFrame = true;
@@ -296,10 +303,11 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		if (key6 || InstallationManager::IsButtonPressed("Resources/Prefabs/IceCanon.prefab")) {
 			selectedObjPath_ = "Resources/Prefabs/IceCanon.prefab";
 			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
-			if (selectedObjCost_ == 0) selectedObjCost_ = iceCanonCost_;
-		 isPlacementMode_ = true;
-		 isSellMode_ = false;
-		 placementSelectionChangedThisFrame = true;
+			if (selectedObjCost_ == 0)
+				selectedObjCost_ = iceCanonCost_;
+			isPlacementMode_ = true;
+			isSellMode_ = false;
+			placementSelectionChangedThisFrame = true;
 		}
 
 		// Xキーまたは「削除機能ボタン」クリックで削除(売却)モードへの切り替え
@@ -356,10 +364,12 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				if (registry.all_of<NameComponent>(e)) {
 					const auto& name = registry.get<NameComponent>(e).name;
 					// 地形などは削除できないようにする
-					if (name.find("Terrain") != std::string::npos || name.find("Plane") != std::string::npos || name.find("Core") != std::string::npos || name.find("Floor") != std::string::npos) return;
+					if (name.find("Terrain") != std::string::npos || name.find("Plane") != std::string::npos || name.find("Core") != std::string::npos || name.find("Floor") != std::string::npos)
+						return;
 					// PipeConnectionはパイプのつなぎ目（導線）なのでレイキャスト対象から除外する
 					// パイプ本体を削除すれば PipeScript::OnDestroy が自動的に消してくれる
-					if (name.find("PipeConnection") != std::string::npos) return;
+					if (name.find("PipeConnection") != std::string::npos)
+						return;
 				}
 
 				Engine::Model* model = nullptr;
@@ -370,7 +380,8 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				}
 
 				if (model) {
-					float d; Engine::Vector3 hp;
+					float d;
+					Engine::Vector3 hp;
 					if (model->RayCast(rayOrig, rayDir, tc.ToMatrix(), d, hp) && d < bestDist) {
 						bestDist = d;
 						hoverEntity = e;
@@ -393,23 +404,35 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 					Engine::Matrix4x4 mat = tc.ToMatrix();
 					// Matrix4x4をXMMATRIXに変換
 					DirectX::XMMATRIX xmat = DirectX::XMMatrixSet(
-						mat.m[0][0], mat.m[0][1], mat.m[0][2], mat.m[0][3],
-						mat.m[1][0], mat.m[1][1], mat.m[1][2], mat.m[1][3],
-						mat.m[2][0], mat.m[2][1], mat.m[2][2], mat.m[2][3],
-						mat.m[3][0], mat.m[3][1], mat.m[3][2], mat.m[3][3]
-					);
+					    mat.m[0][0], mat.m[0][1], mat.m[0][2], mat.m[0][3], mat.m[1][0], mat.m[1][1], mat.m[1][2], mat.m[1][3], mat.m[2][0], mat.m[2][1], mat.m[2][2], mat.m[2][3], mat.m[3][0],
+					    mat.m[3][1], mat.m[3][2], mat.m[3][3]);
 
 					float hs = 1.0f; // 大体の大きさ
 					// 少し外側に枠を描画（赤色で）
 					Engine::Vector3 cv[8] = {
-						{-hs, -hs, -hs}, {hs,  -hs, -hs}, {hs,  hs,  -hs}, {-hs, hs,  -hs},
-						{-hs, -hs, hs }, {hs,  -hs, hs }, {hs,  hs,  hs }, {-hs, hs,  hs }
-					};
+					    {-hs, -hs, -hs},
+                        {hs,  -hs, -hs},
+                        {hs,  hs,  -hs},
+                        {-hs, hs,  -hs},
+                        {-hs, -hs, hs },
+                        {hs,  -hs, hs },
+                        {hs,  hs,  hs },
+                        {-hs, hs,  hs }
+                    };
 					int edges[12][2] = {
-						{0,1},{1,2},{2,3},{3,0},
-						{4,5},{5,6},{6,7},{7,4},
-						{0,4},{1,5},{2,6},{3,7}
-					};
+					    {0, 1},
+                        {1, 2},
+                        {2, 3},
+                        {3, 0},
+                        {4, 5},
+                        {5, 6},
+                        {6, 7},
+                        {7, 4},
+                        {0, 4},
+                        {1, 5},
+                        {2, 6},
+                        {3, 7}
+                    };
 					for (int i = 0; i < 8; ++i) {
 						DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(cv[i].x, cv[i].y, cv[i].z, 1.0f), xmat);
 						DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&cv[i]), p);
@@ -419,7 +442,6 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 					}
 				}
 			}
-
 
 			// 右クリックでキャンセルは上部で処理済み
 			if (input->IsMouseTrigger(0)) {
@@ -431,13 +453,18 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 						int refundCost = 0;
 						if (registry.all_of<NameComponent>(hoverEntity)) {
 							const auto& name = registry.get<NameComponent>(hoverEntity).name;
-							if (name.find("Canon") != std::string::npos || name.find("Cannon") != std::string::npos) { refundCost = canonCost_; }
-							else if (name.find("Missile") != std::string::npos) { refundCost = missileCost_; }
-							else if (name.find("Poison") != std::string::npos) { refundCost = poisonCost_; }
-							else if (name.find("Ice") != std::string::npos) { refundCost = iceCanonCost_; }
-							else { refundCost = 0; } // 未知のオブジェクト
+							if (name.find("Canon") != std::string::npos || name.find("Cannon") != std::string::npos) {
+								refundCost = canonCost_;
+							} else if (name.find("Missile") != std::string::npos) {
+								refundCost = missileCost_;
+							} else if (name.find("Poison") != std::string::npos) {
+								refundCost = poisonCost_;
+							} else if (name.find("Ice") != std::string::npos) {
+								refundCost = iceCanonCost_;
+							} else {
+								refundCost = 0;
+							} // 未知のオブジェクト
 						}
-
 
 						if (refundCost > 0) {
 							int getRefundAmount = CalculateRefund(refundCost);
@@ -447,7 +474,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 							// GameObjectの削除
 							if (registry.all_of<HierarchyComponent>(hoverEntity)) {
 								auto root = hoverEntity;
-								while(registry.get<HierarchyComponent>(root).parentId != entt::null) {
+								while (registry.get<HierarchyComponent>(root).parentId != entt::null) {
 									root = registry.get<HierarchyComponent>(root).parentId;
 								}
 								scene->DestroyObject(static_cast<uint32_t>(root));
@@ -473,22 +500,23 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				}
 			} else {
 				battleStartHoldTime_ -= dt * 3.0f; // 離すと少し早く戻る
-				if (battleStartHoldTime_ < 0.0f) battleStartHoldTime_ = 0.0f;
+				if (battleStartHoldTime_ < 0.0f)
+					battleStartHoldTime_ = 0.0f;
 			}
 
 			// 長押し開始UIの描画 (画面右端の中央付近)
 			if (renderer) {
 				float cx = (float)Engine::WindowDX::kW - 140.0f;
 				float cy = (float)Engine::WindowDX::kH * 0.5f;
-				
+
 				// 背景の円
 				Engine::Renderer::SdfUIDesc bg;
 				bg.centerPx = {cx, cy};
 				bg.sizePx = {100.0f, 100.0f}; // 少し小さく
-				bg.shape = 1; // 円
+				bg.shape = 1;                 // 円
 				bg.color = {0.1f, 0.1f, 0.1f, 0.8f};
 				bg.fill = 1.0f;
-				renderer->DrawSDFUI(bg);
+				//renderer->DrawSDFUI(bg);
 
 				// 外枠 (ボーダー)
 				Engine::Renderer::SdfUIDesc border;
@@ -498,25 +526,36 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				border.color = {0.2f, 0.2f, 0.2f, 0.9f};
 				border.lineWidth = 3.0f;
 				border.fill = 0.0f;
-				renderer->DrawSDFUI(border);
+				//renderer->DrawSDFUI(border);
 
+			
 				// 進捗ゲージ (扇形クリッピング)
 				if (battleStartHoldTime_ > 0.0f) {
 					Engine::Renderer::SdfUIDesc bar;
 					bar.centerPx = {cx, cy};
-					bar.sizePx = {100.0f, 100.0f};
-					bar.shape = 1; // 円
+					bar.sizePx = {75.0f, 75.0f};
+					bar.shape = 1;                        // 円
 					bar.color = {1.0f, 0.7f, 0.1f, 0.9f}; // オレンジ色
 					bar.progress = battleStartHoldTime_ / 1.0f;
 					bar.fill = 1.0f;
 					renderer->DrawSDFUI(bar);
 				}
+				Engine::Renderer::SpriteDesc desc;
 
+				desc.x = cx - 50.0f;
+				desc.y = cy - 50.0f;
+				desc.w = 360.0f;
+				desc.h = 360.0f;
+
+				desc.x = cx - desc.w * 0.5f+8.8f;
+				desc.y = cy - desc.h * 0.5f-6.0f;
+
+				renderer->DrawSprite(startButtonFrameTextureHandle_, desc);
 				// テキスト表示
 				std::string promptStr = "[SPACE]長押しで開始";
 				float tw = renderer->MeasureTextWidth(promptStr, 0.35f);
 				renderer->DrawString(promptStr, cx - tw * 0.5f, cy + 65.0f, 0.35f, {1.0f, 1.0f, 1.0f, 1.0f});
-				
+
 				// ゲージ中央のアイコン的なテキスト
 				std::string centerStr = "開始";
 				float cw = renderer->MeasureTextWidth(centerStr, 0.3f);
@@ -549,7 +588,8 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			// 敵が目指すコアをゴールの位置としてフローフィールドを計算
 			entt::entity coreEntity = entt::null;
 			const auto& cores = scene->GetEntitiesByTag(TagType::Core);
-			if (!cores.empty()) coreEntity = cores[0];
+			if (!cores.empty())
+				coreEntity = cores[0];
 
 			if (scene->GetRegistry().valid(coreEntity)) {
 				auto& tc = scene->GetRegistry().get<TransformComponent>(coreEntity);
@@ -560,7 +600,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			}
 
 			currentPhase_++;
-			
+
 			bool skipSpawn = false;
 			if (isTutorialScene_) {
 				if (auto* tutorial = TutorialScript::GetInstance()) {
@@ -570,10 +610,10 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				}
 			}
 			if (!skipSpawn) {
-				WaveManagement::SetWave(currentPhase_-1);
+				WaveManagement::SetWave(currentPhase_ - 1);
 			}
 
-			// 戦闘中は絵画風エフェクトをオンにする	
+			// 戦闘中は絵画風エフェクトをオンにする
 			Engine::Renderer::GetInstance()->SetPostEffect("Painterly");
 
 		} else if (isPhase_ == PreparationPhase) {
@@ -589,19 +629,19 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			if (scene->GetRegistry().valid(core) && scene->GetRegistry().valid(prepCam)) {
 				// コアの座標を取得
 				auto& coreTc = scene->GetRegistry().get<TransformComponent>(core);
-				
+
 				// PreparationCameraの座標をコアに移動
 				if (scene->GetRegistry().all_of<TransformComponent>(prepCam)) {
 					auto& camTc = scene->GetRegistry().get<TransformComponent>(prepCam);
 					camTc.translate = coreTc.translate; // コアと同じ位置へ（CameraFollowSystemがここをターゲットにする）
 				}
-				
+
 				// 視点の角度（見下ろし）をリセット
 				if (scene->GetRegistry().all_of<PlayerInputComponent>(prepCam)) {
 					auto& camPi = scene->GetRegistry().get<PlayerInputComponent>(prepCam);
 					camPi.cameraPitch = 0.5f; // 下を向く（X軸回転）
 					camPi.cameraYaw = 0.0f;
-					
+
 					// 直接カメラの回転も変更して即座に反映
 					auto& camera = scene->GetCamera();
 					auto rot = camera.Rotation();
@@ -609,7 +649,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 					rot.y = 0.0f;
 					camera.SetRotation(rot);
 				}
-				
+
 				// ズーム距離の初期化
 				if (scene->GetRegistry().all_of<CameraTargetComponent>(prepCam)) {
 					auto& ct = scene->GetRegistry().get<CameraTargetComponent>(prepCam);
@@ -652,13 +692,13 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 						if (enemyCountUI_ == entt::null || !scene->GetRegistry().valid(enemyCountUI_)) {
 							enemyCountUI_ = scene->CreateEntity("EnemyCountUI");
 							auto& rect = scene->GetRegistry().emplace<RectTransformComponent>(enemyCountUI_);
-							rect.pos = { 0, -450 }; // 画面上部中央
-							rect.anchor = { 0.5f, 0.5f }; // 中央基準で上へ
-							rect.pivot = { 0.5f, 0.5f };
+							rect.pos = {0, -450};       // 画面上部中央
+							rect.anchor = {0.5f, 0.5f}; // 中央基準で上へ
+							rect.pivot = {0.5f, 0.5f};
 
 							auto& text = scene->GetRegistry().emplace<UITextComponent>(enemyCountUI_);
 							text.fontSize = 64.0f;
-							text.color = { 1, 1, 1, 1 };
+							text.color = {1, 1, 1, 1};
 							text.outlineEnabled = true;
 						}
 
@@ -681,13 +721,13 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		if (installationCostUI_ == entt::null || !scene->GetRegistry().valid(installationCostUI_)) {
 			installationCostUI_ = scene->CreateEntity("InstallationCostUI");
 			auto& rect = scene->GetRegistry().emplace<RectTransformComponent>(installationCostUI_);
-			rect.pos = { 0, -400 }; // 画面上部
-			rect.anchor = { 0.5f, 0.5f };
-			rect.pivot = { 0.5f, 0.5f };
+			rect.pos = {0, -400}; // 画面上部
+			rect.anchor = {0.5f, 0.5f};
+			rect.pivot = {0.5f, 0.5f};
 
 			auto& text = scene->GetRegistry().emplace<UITextComponent>(installationCostUI_);
 			text.fontSize = 48.0f;
-			text.color = { 1, 1, 1, 1 };
+			text.color = {1, 1, 1, 1};
 			text.outlineEnabled = true;
 		}
 
@@ -695,14 +735,12 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		text.text = "Cost: " + std::to_string(currentInstallationCost_);
 		// お金が足りない場合は赤色にする
 		if (CoinCount < currentInstallationCost_) {
-			text.color = { 1, 0, 0, 1 };
-		}
-		else {
-			text.color = { 1, 1, 1, 1 };
+			text.color = {1, 0, 0, 1};
+		} else {
+			text.color = {1, 1, 1, 1};
 		}
 		scene->GetRegistry().get<RectTransformComponent>(installationCostUI_).enabled = true;
-	}
-	else {
+	} else {
 		if (installationCostUI_ != entt::null && scene->GetRegistry().valid(installationCostUI_)) {
 			scene->GetRegistry().get<RectTransformComponent>(installationCostUI_).enabled = false;
 		}
@@ -712,7 +750,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	if (isPhase_ == BattlePhase && scene->IsPlaying()) {
 		// コア破壊判定
 		bool isCoreDead = false;
-		
+
 		// 1. 名前で検索
 		auto coreByName = scene->FindObjectByName("Core");
 		if (scene->GetRegistry().valid(coreByName)) {
@@ -740,14 +778,14 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		if (isCoreDead) {
 			ResultManagerScript::pendingIsWin = false;
-			ResultManagerScript::pendingOriginalScene = scene->GetStagePath(); 
+			ResultManagerScript::pendingOriginalScene = scene->GetStagePath();
 			Engine::SceneParameters p;
 			p.sceneName = "Result";
 			p.isWin = false;
 			p.score = 300;
 			p.clearTime = scene->GetPlayTime();
 			Engine::SceneManager::GetInstance()->RequestChange("Result", p);
-			
+
 			isPhaseTransitioning_ = true;
 			isPhase_ = Transition;
 		} else if (WaveManagement::IsWaveEnded()) {
@@ -768,7 +806,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				p.score = 1500;
 				p.clearTime = scene->GetPlayTime();
 				Engine::SceneManager::GetInstance()->RequestChange("Result", p);
-				
+
 				isPhaseTransitioning_ = true;
 				isPhase_ = Transition;
 			}
@@ -845,8 +883,6 @@ void PhaseSystemScript::Installation(GameScene* scene, const std::string& objPat
 		snappedHitPoint.y = surfaceY;
 	}
 
-
-
 	const bool canPlace = (!IsPlacementBlocked(scene, snappedHitPoint) && (CoinCount >= selectedObjCost_) && !IsPointerOverInstallationButton(scene));
 
 	DrawPlacementPreview(scene, snappedHitPoint, objPath, canPlace);
@@ -921,7 +957,7 @@ void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vec
 
 	// ★ 床のマス目ハイライトとグリッドの描画
 	float hs = 1.0f; // 2x2マスなので半径1.0f
-	
+
 	// ハイライト用の半透明パネル（メッシュ）を描画
 	static uint32_t highlightPlaneHandle = 0;
 	if (highlightPlaneHandle == 0) {
@@ -931,7 +967,7 @@ void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vec
 	highlightTr.translate = {hitPoint.x, hitPoint.y + 0.025f, hitPoint.z};
 	highlightTr.scale = {1.0f, 0.01f, 1.0f}; // 2x2 flat plane
 	Engine::Vector4 planeColor = canPlace ? Engine::Vector4{0.0f, 1.0f, 0.0f, 0.4f} : Engine::Vector4{1.0f, 0.0f, 0.0f, 0.4f};
-	
+
 	// ダミーのテクスチャハンドルがあればそれを使う（なければプレビューの使い回しでもOKですが、まだロードされてないので白テクスチャを後で使う）
 
 	// 外枠の線を少し太く（多重に）描画して強調
@@ -939,11 +975,11 @@ void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vec
 	for (int k = -1; k <= 1; ++k) {
 		float o = k * 0.03f;
 		Engine::Vector3 cv[4] = {
-			{hitPoint.x - hs - o, hitPoint.y + 0.05f, hitPoint.z - hs - o},
-			{hitPoint.x + hs + o, hitPoint.y + 0.05f, hitPoint.z - hs - o},
-			{hitPoint.x + hs + o, hitPoint.y + 0.05f, hitPoint.z + hs + o},
-			{hitPoint.x - hs - o, hitPoint.y + 0.05f, hitPoint.z + hs + o}
-		};
+		    {hitPoint.x - hs - o, hitPoint.y + 0.05f, hitPoint.z - hs - o},
+		    {hitPoint.x + hs + o, hitPoint.y + 0.05f, hitPoint.z - hs - o},
+		    {hitPoint.x + hs + o, hitPoint.y + 0.05f, hitPoint.z + hs + o},
+		    {hitPoint.x - hs - o, hitPoint.y + 0.05f, hitPoint.z + hs + o}
+        };
 		renderer->DrawLine3D(cv[0], cv[1], highlightLineColor, true);
 		renderer->DrawLine3D(cv[1], cv[2], highlightLineColor, true);
 		renderer->DrawLine3D(cv[2], cv[3], highlightLineColor, true);
@@ -966,7 +1002,6 @@ void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vec
 			renderer->DrawLine3D(p1, p2, gridColor, true);
 		}
 	}
-
 
 	std::string previewModelP = objPath; // Changed name to avoid shadowing class member
 	std::string previewTexturePath = "Resources/Textures/white1x1.png";
@@ -991,8 +1026,6 @@ void PhaseSystemScript::DrawPlacementPreview(GameScene* scene, const Engine::Vec
 	tr.scale = {1.0f, 1.0f, 1.0f};
 	const Engine::Vector4 previewColor = canPlace ? Engine::Vector4{0.6f, 1.0f, 0.6f, 0.6f} : Engine::Vector4{1.0f, 0.3f, 0.3f, 0.6f};
 	renderer->DrawMesh(previewModelHandle_, previewTextureHandle_, tr, previewColor, "Toon");
-
-
 
 	// 大砲の場合は攻撃範囲も描画する
 	if (objPath.find("Canon") != std::string::npos) {
@@ -1074,7 +1107,7 @@ bool PhaseSystemScript::IsPlacementBlocked(GameScene* scene, const Engine::Vecto
 			const auto& nc = registry.get<NameComponent>(entity);
 			const bool isTerrain = (nc.name.find("Terrain") != std::string::npos) || (nc.name.find("Floor") != std::string::npos) || (nc.name.find("Ground") != std::string::npos) ||
 			                       (nc.name.find("Stage") != std::string::npos) || (nc.name.find("Plane") != std::string::npos);
-          if (isTerrain)
+			if (isTerrain)
 				continue;
 		}
 
@@ -1169,7 +1202,8 @@ void PhaseSystemScript::OnEditorUI() {
 void PhaseSystemScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 void PhaseSystemScript::InitializeInsertPhase(GameScene* scene) {
-	if (isInsertInitialized_) return;
+	if (isInsertInitialized_)
+		return;
 
 	insertWaypoints_.clear();
 
@@ -1177,7 +1211,8 @@ void PhaseSystemScript::InitializeInsertPhase(GameScene* scene) {
 	DirectX::XMFLOAT3 corePos = {0.0f, 0.0f, 0.0f};
 	entt::entity coreObj = entt::null;
 	const auto& cores = scene->GetEntitiesByTag(TagType::Core);
-	if (!cores.empty()) coreObj = cores[0];
+	if (!cores.empty())
+		coreObj = cores[0];
 
 	if (scene->GetRegistry().valid(coreObj) && scene->GetRegistry().all_of<TransformComponent>(coreObj)) {
 		auto& tc = scene->GetRegistry().get<TransformComponent>(coreObj);
@@ -1210,31 +1245,31 @@ void PhaseSystemScript::InitializeInsertPhase(GameScene* scene) {
 	// 3. ウェイポイントの構築 (コア -> 鳥瞰 -> スポナー -> 元に戻る)
 	// WP0: コアを見下ろす視点 (開始)
 	insertWaypoints_.push_back({
-		{corePos.x, corePos.y + 12.0f, corePos.z - 20.0f},
-		{0.45f, 0.0f, 0.0f}, // Pitch 25度下向き
-		3.5f
-	});
+	    {corePos.x, corePos.y + 12.0f, corePos.z - 20.0f},
+	    {0.45f,     0.0f,              0.0f             }, // Pitch 25度下向き
+	    3.5f
+    });
 
 	// WP1: ステージ全体を見下ろす鳥瞰視点
 	insertWaypoints_.push_back({
-		{corePos.x, corePos.y + 40.0f, corePos.z - 45.0f},
-		{0.7f, 0.0f, 0.0f}, // Pitch 40度下向き
-		4.0f
-	});
+	    {corePos.x, corePos.y + 40.0f, corePos.z - 45.0f},
+	    {0.7f,      0.0f,              0.0f             }, // Pitch 40度下向き
+	    4.0f
+    });
 
 	// WP2: 最初の敵出現地点（スポナー）にクローズアップする視点
 	insertWaypoints_.push_back({
-		{spawnerPos.x, spawnerPos.y + 8.0f, spawnerPos.z - 15.0f},
-		{0.4f, 0.0f, 0.0f}, // Pitch 22度下向き
-		4.0f
-	});
+	    {spawnerPos.x, spawnerPos.y + 8.0f, spawnerPos.z - 15.0f},
+	    {0.4f,         0.0f,                0.0f                }, // Pitch 22度下向き
+	    4.0f
+    });
 
 	// WP3: プレイヤー操作開始位置にスムーズに戻る
 	insertWaypoints_.push_back({
-		{corePos.x, corePos.y + 25.0f, corePos.z - 25.0f},
-		{0.5f, 0.0f, 0.0f},
-		2.0f
-	});
+	    {corePos.x, corePos.y + 25.0f, corePos.z - 25.0f},
+        {0.5f,      0.0f,              0.0f             },
+        2.0f
+    });
 
 	currentWaypointIndex_ = 0;
 	waypointTime_ = 0.0f;
@@ -1244,7 +1279,8 @@ void PhaseSystemScript::InitializeInsertPhase(GameScene* scene) {
 	CreateSkipUI(scene);
 
 	// 演出中はカーソルを非表示
-	while (ShowCursor(FALSE) >= 0);
+	while (ShowCursor(FALSE) >= 0)
+		;
 
 	// 5. インサート演出中の不要な入力と追従を無効化する
 	auto player = scene->FindObjectByName("Player");
@@ -1266,7 +1302,8 @@ void PhaseSystemScript::InitializeInsertPhase(GameScene* scene) {
 
 void PhaseSystemScript::UpdateInsertPhase(GameScene* scene, float dt) {
 	auto* input = Engine::Input::GetInstance();
-	if (!input) return;
+	if (!input)
+		return;
 
 	if (!isInsertInitialized_) {
 		InitializeInsertPhase(scene);
@@ -1299,7 +1336,8 @@ void PhaseSystemScript::UpdateInsertPhase(GameScene* scene, float dt) {
 
 	waypointTime_ += dt;
 	float t = waypointTime_ / target.duration;
-	if (t > 1.0f) t = 1.0f;
+	if (t > 1.0f)
+		t = 1.0f;
 
 	// Smooth Step (3t^2 - 2t^3) による滑らかな加減速補間
 	float smoothT = t * t * (3.0f - 2.0f * t);
@@ -1324,7 +1362,8 @@ void PhaseSystemScript::UpdateInsertPhase(GameScene* scene, float dt) {
 }
 
 void PhaseSystemScript::CreateSkipUI(GameScene* scene) {
-	if (!scene) return;
+	if (!scene)
+		return;
 	auto& reg = scene->GetRegistry();
 
 	// 1. テキストUI
@@ -1368,19 +1407,22 @@ void PhaseSystemScript::CreateSkipUI(GameScene* scene) {
 }
 
 void PhaseSystemScript::UpdateSkipUIProgress(GameScene* scene) {
-	if (!scene || skipProgressUI_ == entt::null) return;
+	if (!scene || skipProgressUI_ == entt::null)
+		return;
 	auto& reg = scene->GetRegistry();
 
 	if (reg.valid(skipProgressUI_) && reg.all_of<RectTransformComponent>(skipProgressUI_)) {
 		auto& rect = reg.get<RectTransformComponent>(skipProgressUI_);
 		float progress = skipHoldTime_ / 1.0f;
-		if (progress > 1.0f) progress = 1.0f;
+		if (progress > 1.0f)
+			progress = 1.0f;
 		rect.size.x = progress * 250.0f;
 	}
 }
 
 void PhaseSystemScript::EndInsertPhase(GameScene* scene) {
-	if (!scene) return;
+	if (!scene)
+		return;
 
 	// UIオブジェクトの破棄
 	if (skipPromptUI_ != entt::null && scene->GetRegistry().valid(skipPromptUI_)) {
@@ -1400,28 +1442,29 @@ void PhaseSystemScript::EndInsertPhase(GameScene* scene) {
 	auto prepCam = scene->FindObjectByName("PreparationCamera");
 	entt::entity core = entt::null;
 	const auto& cores = scene->GetEntitiesByTag(TagType::Core);
-	if (!cores.empty()) core = cores[0];
+	if (!cores.empty())
+		core = cores[0];
 
 	if (scene->GetRegistry().valid(core) && scene->GetRegistry().valid(prepCam)) {
 		auto& coreTc = scene->GetRegistry().get<TransformComponent>(core);
-		
+
 		if (scene->GetRegistry().all_of<TransformComponent>(prepCam)) {
 			auto& camTc = scene->GetRegistry().get<TransformComponent>(prepCam);
 			camTc.translate = coreTc.translate;
 		}
-		
+
 		if (scene->GetRegistry().all_of<PlayerInputComponent>(prepCam)) {
 			auto& camPi = scene->GetRegistry().get<PlayerInputComponent>(prepCam);
 			camPi.cameraPitch = 0.5f;
 			camPi.cameraYaw = 0.0f;
-			
+
 			auto& camera = scene->GetCamera();
 			auto rot = camera.Rotation();
 			rot.x = 0.5f;
 			rot.y = 0.0f;
 			camera.SetRotation(rot);
 		}
-		
+
 		if (scene->GetRegistry().all_of<CameraTargetComponent>(prepCam)) {
 			auto& ct = scene->GetRegistry().get<CameraTargetComponent>(prepCam);
 			ct.distance = 25.0f;
@@ -1448,7 +1491,8 @@ void PhaseSystemScript::EndInsertPhase(GameScene* scene) {
 	}
 
 	// カーソルを強制表示
-	while (ShowCursor(TRUE) < 0);
+	while (ShowCursor(TRUE) < 0)
+		;
 
 	// 通常の準備フェーズに移行
 	isPhase_ = PreparationPhase;
