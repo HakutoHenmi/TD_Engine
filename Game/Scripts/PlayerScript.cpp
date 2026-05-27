@@ -2112,6 +2112,14 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 			skillColor = {0.9f, 0.8f, 0.2f, 1.0f}; // 使用可能：黄色
 		}
 
+	
+
+		// ゲージ
+		renderer->DrawSDFUI({
+			{skillGaugeX, skillGaugeY}, {sR, sR},
+			0, (skillRatio >= 1.0f) ? 3.0f : 0.0f, skillColor,
+			1, 0, 0, 0, skillRatio, 1.0f, false // shape = 1 (Circle)
+		});
 		// 背景
 		Engine::Renderer::SpriteDesc skillDesc;
 
@@ -2122,14 +2130,6 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 		skillDesc.y = skillGaugeY - skillDesc.h * 0.5f;
 
 		renderer->DrawSprite(skillFrameTextureHandle_, skillDesc);
-
-		// ゲージ
-		renderer->DrawSDFUI({
-			{skillGaugeX, skillGaugeY}, {sR, sR},
-			0, (skillRatio >= 1.0f) ? 3.0f : 0.0f, skillColor,
-			1, 0, 0, 0, skillRatio, 1.0f, false // shape = 1 (Circle)
-		});
-
 		// ラベル "E" または "SKILL"
 		float tw = renderer->MeasureTextWidth("E", 0.35f);
 		renderer->DrawString("E", skillGaugeX - tw * 0.5f, skillGaugeY - 10.0f, 0.35f, {1, 1, 1, 0.9f});
