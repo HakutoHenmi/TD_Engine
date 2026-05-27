@@ -519,13 +519,13 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	// ★追加: インサート中や準備フェーズ中は武器の切り替えやスキル発動を無効化
 	if (!isPrep && !isInsert) {
-		bool currentSwitchKeyDown = (GetAsyncKeyState('T') & 0x8000) != 0;
+		bool currentSwitchKeyDown = ((GetAsyncKeyState('T') & 0x8000) != 0) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->IsControllerButtonDown(XINPUT_GAMEPAD_Y));
 		if (currentSwitchKeyDown && !prevPlayerSwitchKeyDown_) {
 			SwitchPlayerType(entity, scene);
 		}
 		prevPlayerSwitchKeyDown_ = currentSwitchKeyDown;
 
-		bool currentSkillKeyDown = (GetAsyncKeyState('E') & 0x8000) != 0;
+		bool currentSkillKeyDown = ((GetAsyncKeyState('E') & 0x8000) != 0) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->IsControllerButtonDown(XINPUT_GAMEPAD_RIGHT_SHOULDER));
 		if (currentSkillKeyDown && !prevSkillKeyDown_) {
 			ExecuteSkill(entity, scene);
 		}
@@ -557,9 +557,9 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 	s_wasPrep = isPrep;
 
-	// ★追加: カーソル表示切り替え (Left Altキー)
+	// ★追加: カーソル表示切り替え (Left Altキー または BACKボタン)
 	if (isPrep) {
-		bool currentCursorToggle = (GetAsyncKeyState(VK_LMENU) & 0x8000) != 0;
+		bool currentCursorToggle = ((GetAsyncKeyState(VK_LMENU) & 0x8000) != 0) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->IsControllerButtonDown(XINPUT_GAMEPAD_BACK));
 		if (currentCursorToggle && !prevCursorToggle_) {
 			isCursorVisible_ = !isCursorVisible_;
 			if (isCursorVisible_) {
@@ -604,7 +604,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	if (!isPrep && !isInsert) {
 		// ★追加: スチーム・ブースト（剣士モード専用の高速回避）
-		bool currentDashKeyDown = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+		bool currentDashKeyDown = ((GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->IsControllerButtonDown(XINPUT_GAMEPAD_B)) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->GetLeftTrigger() > 0.5f);
 		if (currentDashKeyDown && !prevDashKeyDown_ && playerType_ == PlayerType::Sword) {
 			if (steamPressure_ > 0.0f && !isRecharging_) { // ★少しでもあれば発動可能に
 				steamPressure_ -= DASH_COST;
@@ -687,7 +687,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 				}
 			}
 		}
-		prevDashKeyDown_ = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+		prevDashKeyDown_ = ((GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->IsControllerButtonDown(XINPUT_GAMEPAD_B)) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->GetLeftTrigger() > 0.5f);
 
 		// ★ジャンプ開始時の反動Yリセットはもう不要（rbに統合したため）
 
@@ -702,7 +702,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			}
 		}
 
-		bool currentRightClickDown = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+		bool currentRightClickDown = ((GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->GetLeftTrigger() > 0.5f);
 		if (playerType_ == PlayerType::Gun && !isPrep && !isInsert) {
 			if (currentRightClickDown && !prevRightClickDown_) {
 				if (isFlying_) {
@@ -1217,7 +1217,7 @@ void PlayerScript::UpdateMovement(entt::entity entity, GameScene* scene, float /
 }
 
 void PlayerScript::UpdateAttack(entt::entity entity, GameScene* scene, float dt) {
-	bool currentAttackKeyDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+	bool currentAttackKeyDown = ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->IsControllerButtonDown(XINPUT_GAMEPAD_X)) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->GetRightTrigger() > 0.5f);
 
 	// ★追加: 大剣の溜め攻撃ロジック
 	if (playerType_ == PlayerType::Sword && !isRecharging_) {
@@ -1586,7 +1586,7 @@ void PlayerScript::UpdateGun(entt::entity entity, GameScene* scene, float /*dt*/
 
 void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float dt) {
 	isAiming_ = false; // 右クリックは飛行用になったためエイムは廃止
-	bool currentAttackKeyDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+	bool currentAttackKeyDown = ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->IsControllerButtonDown(XINPUT_GAMEPAD_X)) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->GetRightTrigger() > 0.5f);
 
 	// ★リチャージ中は射撃不可（スキル発動中のみオーバークロックで許可）
 	if (isRecharging_ && !isSkillActive_) {

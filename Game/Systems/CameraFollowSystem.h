@@ -99,19 +99,9 @@ public:
 				if (pi.enabled) {
 					auto rot = ctx.camera->Rotation();
 					
-					// ★修正: 準備フェーズ中は右クリック中にInputから直接マウスデルタを取得
 					float yawInput = pi.cameraYaw;
 					float pitchInput = pi.cameraPitch;
-					if (isPrep && inputIns) {
-						bool rClick = inputIns->IsMouseDown(1); // 右ボタン
-						if (rClick) {
-							yawInput = inputIns->GetMouseDeltaX() * 0.003f;
-							pitchInput = inputIns->GetMouseDeltaY() * 0.003f;
-						} else {
-							yawInput = 0.0f;
-							pitchInput = 0.0f;
-						}
-					}
+					// 準備フェーズ中もPlayerInputSystem側でマウス/スティックの入力を処理しているため、ここでの上書きは不要
 
 					if (ct.lockedTarget != entt::null && registry.valid(ct.lockedTarget)) {
 						auto& eTc = registry.get<TransformComponent>(ct.lockedTarget);
