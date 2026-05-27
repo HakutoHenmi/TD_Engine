@@ -116,6 +116,7 @@ private:
 
 	// バトル開始ホールド用
 	float battleStartHoldTime_ = 0.0f;
+	uint32_t startButtonFrameTextureHandle_ = 0;
 
 public:
 	static bool isSkillTreeOpen_; // スキルツリーが開いているかどうかを管理する静的変数
