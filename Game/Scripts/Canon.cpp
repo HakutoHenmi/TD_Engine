@@ -324,7 +324,7 @@ if (attackTimer_ > 0.0f) {
 		MeshRendererComponent& bulletMeshRenderer = registry.emplace<MeshRendererComponent>(bullet);
 		bulletMeshRenderer.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
 		bulletMeshRenderer.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-		bulletMeshRenderer.color = {0.0f, 0.0f, 0.0f, 1.0f};
+		bulletMeshRenderer.color = {0.0f, 0.0f, 0.0f, 1.0f};//黒に変更
 	}
 
 	HitboxComponent& bulletHitbox = registry.emplace<HitboxComponent>(bullet);
