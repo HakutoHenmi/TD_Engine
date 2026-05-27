@@ -30,10 +30,9 @@
       "components": [
         {"type": "Tag", "enabled": true, "tag": "Default"},
         {"type": "Variable", "enabled": true, "values": {}, "strings": {"Path": "Resources/Scenes/TutorialScene.json"}},
-        {"type": "RectTransform", "enabled": true, "pos": [0,-120.0], "size": [500,60], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIText", "enabled": true, "text": "チュートリアル", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
-        {"type": "UIButton", "enabled": true, "normalColor": [0.25,0.25,0.35,1], "hoverColor": [0.4,0.4,0.6,1], "pressedColor": [0.15,0.15,0.25,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+        {"type": "RectTransform", "enabled": true, "pos": [300,-150.0], "size": [400,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/tutorial.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
@@ -47,10 +46,9 @@
       "components": [
         {"type": "Tag", "enabled": true, "tag": "Default"},
         {"type": "Variable", "enabled": true, "values": {}, "strings": {"Path": "Resources/Scenes/Stage1.json"}},
-        {"type": "RectTransform", "enabled": true, "pos": [0,0.0], "size": [500,60], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIText", "enabled": true, "text": "ステージ 1", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
-        {"type": "UIButton", "enabled": true, "normalColor": [0.25,0.25,0.35,1], "hoverColor": [0.4,0.4,0.6,1], "pressedColor": [0.15,0.15,0.25,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+        {"type": "RectTransform", "enabled": true, "pos": [200,0.0], "size": [400,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/Stage1.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
@@ -64,10 +62,9 @@
       "components": [
         {"type": "Tag", "enabled": true, "tag": "Default"},
         {"type": "Variable", "enabled": true, "values": {}, "strings": {"Path": "Resources/Scenes/Stage2.json"}},
-        {"type": "RectTransform", "enabled": true, "pos": [0,120.0], "size": [500,60], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIText", "enabled": true, "text": "ステージ 2", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
-        {"type": "UIButton", "enabled": true, "normalColor": [0.25,0.25,0.35,1], "hoverColor": [0.4,0.4,0.6,1], "pressedColor": [0.15,0.15,0.25,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+        {"type": "RectTransform", "enabled": true, "pos": [300,150.0], "size": [400,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/Stage2.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
@@ -80,7 +77,7 @@
       "scale": [1, 1, 1],
       "components": [
         {"type": "RectTransform", "enabled": true, "pos": [0,0], "size": [1920,1080], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [0.1,0.1,0.15,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10}
+        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [0.1,0.1,0.15,0], "layer": -10, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10}
       ]
     },
     {
@@ -92,10 +89,9 @@
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [-800,450], "size": [200,60], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIText", "enabled": true, "text": "BACK", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
-        {"type": "UIButton", "enabled": true, "normalColor": [0.4,0.15,0.15,1], "hoverColor": [0.6,0.2,0.2,1], "pressedColor": [0.3,0.1,0.1,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+        {"type": "RectTransform", "enabled": true, "pos": [-750,450], "size": [320,80], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/backSprite.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
@@ -109,6 +105,76 @@
       "components": [
         {"type": "Script", "enabled": true, "scripts": [{"path": "SelectManagerScript", "param": ""}]}
       ]
+    },
+    {
+      "id": 1048600, "parentId": 4294967295, "name": "TitleCamera", "locked": false,
+      "translate": [0, 2, -25], "rotate": [0.05, 0, 0], "scale": [1, 1, 1],
+      "components": [{"type": "Camera", "enabled": true}]
+    },
+    {
+      "id": 1048601, "parentId": 4294967295, "name": "DirLight", "locked": false,
+      "translate": [0, 10, -10], "rotate": [0.5, 0.5, 0], "scale": [1, 1, 1],
+      "components": [{"type": "DirectionalLight", "enabled": true, "color": [1.0, 0.8, 0.7], "intensity": 1.5}]
+    },
+    {
+      "id": 1048610, "parentId": 4294967295, "name": "Pipe_V", "locked": false,
+      "translate": [-6, 0, 10], "rotate": [0, 0, 1.5708], "scale": [40, 2.5, 2.5],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.4, 0.35, 0.3, 1.0]}]
+    },
+    {
+      "id": 1048611, "parentId": 4294967295, "name": "Pipe_H", "locked": false,
+      "translate": [0, -4, 12], "rotate": [0, 0, 0], "scale": [40, 3.5, 3.5],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe2.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.5, 0.3, 0.2, 1.0]}]
+    },
+    {
+      "id": 1048612, "parentId": 4294967295, "name": "SmallGear1Pivot", "locked": false,
+      "translate": [-2, 5, 8], "rotate": [1.5708, 0, 0], "scale": [5, 5, 5],
+      "components": []
+    },
+    {
+      "id": 1048613, "parentId": 1048612, "name": "SmallGear1", "locked": false,
+      "translate": [0, 0, 0], "rotate": [0, 0, 0], "scale": [1, 1, 1],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.7, 0.6, 0.4, 1.0]}]
+    },
+    {
+      "id": 1048614, "parentId": 4294967295, "name": "SmallGear2Pivot", "locked": false,
+      "translate": [4, -4, 10], "rotate": [1.5708, 0, 0], "scale": [3, 3, 3],
+      "components": []
+    },
+    {
+      "id": 1048615, "parentId": 1048614, "name": "SmallGear2", "locked": false,
+      "translate": [0, 0, 0], "rotate": [0, 0, 0], "scale": [1, 1, 1],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.5, 0.5, 0.5, 1.0]}]
+    },
+    {
+      "id": 1048616, "parentId": 4294967295, "name": "SmallGear3Pivot", "locked": false,
+      "translate": [2, 6, 7], "rotate": [1.5708, 0, 0], "scale": [4, 4, 4],
+      "components": []
+    },
+    {
+      "id": 1048617, "parentId": 1048616, "name": "SmallGear3", "locked": false,
+      "translate": [0, 0, 0], "rotate": [0, 0, 0], "scale": [1, 1, 1],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.8, 0.5, 0.3, 1.0]}]
+    },
+    {
+      "id": 1048618, "parentId": 4294967295, "name": "SmallGear4Pivot", "locked": false,
+      "translate": [-5, -5, 9], "rotate": [1.5708, 0, 0], "scale": [4.5, 4.5, 4.5],
+      "components": []
+    },
+    {
+      "id": 1048619, "parentId": 1048618, "name": "SmallGear4", "locked": false,
+      "translate": [0, 0, 0], "rotate": [0, 0, 0], "scale": [1, 1, 1],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6, 0.6, 0.6, 1.0]}]
+    },
+    {
+      "id": 1048602, "parentId": 4294967295, "name": "MainGearPivot", "locked": false,
+      "translate": [12, 0, 6], "rotate": [1.5708, 0, 0], "scale": [16, 16, 16],
+      "components": []
+    },
+    {
+      "id": 1048603, "parentId": 1048602, "name": "MainGear", "locked": false,
+      "translate": [0, 0, 0], "rotate": [0, 0, 0], "scale": [1, 1, 1],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6, 0.5, 0.3, 1.0]}]
     }
   ]
 }

@@ -30,7 +30,7 @@
         {"type": "RectTransform", "enabled": true, "pos": [681.223,387.86], "size": [300,60], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIText", "enabled": true, "text": "Back", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
-        {"type": "UIButton", "enabled": true, "normalColor": [0.2,0.2,0.2,0.8], "hoverColor": [0.4,0.4,0.4,1], "pressedColor": [0.1,0.1,0.1,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
@@ -45,7 +45,7 @@
         {"type": "RectTransform", "enabled": true, "pos": [975.284,296.245], "size": [60,60], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIText", "enabled": true, "text": "+", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
-        {"type": "UIButton", "enabled": true, "normalColor": [0.2,0.2,0.2,0.8], "hoverColor": [0.4,0.4,0.4,1], "pressedColor": [0.1,0.1,0.1,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
@@ -60,7 +60,7 @@
         {"type": "RectTransform", "enabled": true, "pos": [888.515,300.437], "size": [60,60], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIText", "enabled": true, "text": "-", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
-        {"type": "UIButton", "enabled": true, "normalColor": [0.2,0.2,0.2,0.8], "hoverColor": [0.4,0.4,0.4,1], "pressedColor": [0.1,0.1,0.1,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
@@ -88,7 +88,7 @@
         {"type": "RectTransform", "enabled": true, "pos": [975.284,193.188], "size": [60,60], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIText", "enabled": true, "text": "+", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
-        {"type": "UIButton", "enabled": true, "normalColor": [0.2,0.2,0.2,0.8], "hoverColor": [0.4,0.4,0.4,1], "pressedColor": [0.1,0.1,0.1,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
@@ -103,7 +103,7 @@
         {"type": "RectTransform", "enabled": true, "pos": [888.515,186.9], "size": [60,60], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIText", "enabled": true, "text": "-", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
-        {"type": "UIButton", "enabled": true, "normalColor": [0.2,0.2,0.2,0.8], "hoverColor": [0.4,0.4,0.4,1], "pressedColor": [0.1,0.1,0.1,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
@@ -131,7 +131,7 @@
         {"type": "RectTransform", "enabled": true, "pos": [693.799,115.284], "size": [300,60], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIText", "enabled": true, "text": "Fullscreen: OFF", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
-        {"type": "UIButton", "enabled": true, "normalColor": [0.2,0.2,0.2,0.8], "hoverColor": [0.4,0.4,0.4,1], "pressedColor": [0.1,0.1,0.1,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
@@ -170,7 +170,7 @@
       "components": [
         {"type": "RectTransform", "enabled": true, "pos": [600,500], "size": [512,128], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TitleUI/EixtLogo.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIButton", "enabled": true, "normalColor": [0.2,0.2,0.2,0.8], "hoverColor": [0.4,0.4,0.4,1], "pressedColor": [0.1,0.1,0.1,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
@@ -184,7 +184,7 @@
       "components": [
         {"type": "RectTransform", "enabled": true, "pos": [600,350], "size": [512,128], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TitleUI/SettingLogo.png", "color": [1,1,1,1], "layer": 4, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIButton", "enabled": true, "normalColor": [0.2,0.2,0.2,0.8], "hoverColor": [0.4,0.4,0.4,1], "pressedColor": [0.1,0.1,0.1,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
@@ -198,7 +198,7 @@
       "components": [
         {"type": "RectTransform", "enabled": true, "pos": [600,200], "size": [512,128], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TitleUI/SrartLogo.png", "color": [1,1,1,1], "layer": 100, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIButton", "enabled": true, "normalColor": [0.2,0.2,0.2,0.8], "hoverColor": [0.4,0.4,0.4,1], "pressedColor": [0.1,0.1,0.1,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
