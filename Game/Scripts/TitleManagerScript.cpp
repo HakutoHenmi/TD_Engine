@@ -84,6 +84,33 @@ void TitleManagerScript::Start(entt::entity entity, GameScene* scene) {
 			if (reg.all_of<UITextComponent>(btnStart_)) reg.get<UITextComponent>(btnStart_).text = "";
 			if (reg.all_of<UITextComponent>(btnSettings_)) reg.get<UITextComponent>(btnSettings_).text = "";
 			if (reg.all_of<UITextComponent>(btnExit_)) reg.get<UITextComponent>(btnExit_).text = "";
+			if (reg.all_of<UITextComponent>(btnCredits_)) reg.get<UITextComponent>(btnCredits_).text = "";
+
+			// クレジットボタンの画像設定
+			if (reg.all_of<UIImageComponent>(btnCredits_)) {
+				auto& img = reg.get<UIImageComponent>(btnCredits_);
+				img.texturePath = "Resources/Textures/Button/creditt.png";
+				if (auto* renderer = Engine::Renderer::GetInstance()) {
+					img.textureHandle = renderer->LoadTexture2D(img.texturePath);
+				}
+				img.color = {1.0f, 1.0f, 1.0f, 1.0f};
+			}
+
+			// 色味の調整（すべてのボタンを強制的に同じ明るさに統一する）
+			std::vector<entt::entity> titleBtns = { btnStart_, btnSettings_, btnCredits_, btnExit_ };
+			for (auto e : titleBtns) {
+				if (e != entt::null) {
+					if (reg.all_of<UIImageComponent>(e)) {
+						reg.get<UIImageComponent>(e).color = {1.0f, 1.0f, 1.0f, 1.0f};
+					}
+					if (reg.all_of<UIButtonComponent>(e)) {
+						auto& btn = reg.get<UIButtonComponent>(e);
+						btn.normalColor = {1.0f, 1.0f, 1.0f, 1.0f};
+						btn.hoverColor = {0.8f, 0.8f, 0.8f, 1.0f};
+						btn.pressedColor = {0.5f, 0.5f, 0.5f, 1.0f};
+					}
+				}
+			}
 		}
 		if (creditsParent == entt::null) {
 			creditsParent = reg.create();
@@ -303,8 +330,8 @@ void TitleManagerScript::Update(entt::entity entity, GameScene* scene, float dt)
 	auto* renderer = Engine::Renderer::GetInstance();
 	if (renderer) {
 		auto pp = renderer->GetPostProcessParams();
-		// 画面の四隅を確実に暗くするため、ヴィネットを強めに設定
-		pp.vignette = 1.5f; 
+		// ビネットを大幅に弱めて画面全体の重さを取り除く
+		pp.vignette = 0.2f; 
 		
 		// 白飛びを防ぎつつ柔らかさを出すためブルームを控えめに調整
 		pp.bloomIntensity = 0.5f;   // 少し明るく
