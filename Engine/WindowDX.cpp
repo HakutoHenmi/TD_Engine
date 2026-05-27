@@ -110,8 +110,16 @@ bool WindowDX::Initialize(HINSTANCE hInst, int cmdShow, HWND& outHwnd) {
 }
 
 void WindowDX::BeginFrame() {
-	alloc_->Reset();
-	list_->Reset(alloc_.Get(), nullptr);
+	fi_ = swap_->GetCurrentBackBufferIndex();
+
+	// ★追加: 前回のこのバックバッファのGPU処理が終わっているか待つ（WaitGPUを呼ばないためのダブルバッファリング処理）
+	if (fence_->GetCompletedValue() < fenceVals_[fi_]) {
+		fence_->SetEventOnCompletion(fenceVals_[fi_], fev_);
+		WaitForSingleObject(fev_, INFINITE);
+	}
+
+	alloc_[fi_]->Reset();
+	list_->Reset(alloc_[fi_].Get(), nullptr);
 }
 
 void WindowDX::EndFrame() {
@@ -126,18 +134,17 @@ void WindowDX::EndFrame() {
 	ID3D12CommandList* lists[] = {list_.Get()};
 	que_->ExecuteCommandLists(1, lists);
 
-	// ★VSYNCを無効化（ノートPC環境での強制的な30FPS低下を防ぐため）
+	// ★VSYNCを無効化（ノートPC環境での強制的な30FPS低下やDWMの重い合成処理を防ぐため）
+	UINT presentFlags = (allowTearing_) ? DXGI_PRESENT_ALLOW_TEARING : 0;
 	auto startPresent = std::chrono::high_resolution_clock::now();
-	swap_->Present(0, 0); // 第1引数 0 で垂直同期OFF
+	swap_->Present(0, presentFlags); // 第1引数 0 で垂直同期OFF
 	auto endPresent = std::chrono::high_resolution_clock::now();
 	lastPresentMs_ = std::chrono::duration<float, std::milli>(endPresent - startPresent).count();
 
-	auto startWait = std::chrono::high_resolution_clock::now();
-	WaitGPU();
-	auto endWait = std::chrono::high_resolution_clock::now();
-	lastWaitGPUMs_ = std::chrono::duration<float, std::milli>(endWait - startWait).count();
-
-	fi_ = swap_->GetCurrentBackBufferIndex();
+	// 現在のフレームにフェンス値を設定してキューにシグナル（EndFrame毎のWaitGPUは行わない）
+	fenceVal_++;
+	fenceVals_[fi_] = fenceVal_;
+	que_->Signal(fence_.Get(), fenceVals_[fi_]);
 
 	// ★手動フレームレート制限 (60FPS固定)
 	// VSyncがオフの環境（ウィンドウモードなど）でもゲームスピードが速くならないように制御
@@ -157,7 +164,14 @@ void WindowDX::EndFrame() {
 		}
 	}
 	
-	lastFrameTime_ = steady_clock::now();
+	// ★修正: フレーム時間が大幅に遅れた場合は現在時刻にリセットし、
+	// そうでない場合は目標時間に設定することで微小なズレ（ドリフト）の蓄積を防ぐ
+	auto afterSleep = steady_clock::now();
+	if (afterSleep > targetTime + milliseconds(2)) {
+		lastFrameTime_ = afterSleep;
+	} else {
+		lastFrameTime_ = targetTime;
+	}
 }
 
 void WindowDX::WaitGPU() {
@@ -226,7 +240,9 @@ void WindowDX::Shutdown() {
 	rtvH_.Reset();
 
 	list_.Reset();
-	alloc_.Reset();
+	for (auto& a : alloc_) {
+		a.Reset();
+	}
 	que_.Reset();
 	swap_.Reset();
 	fence_.Reset();
@@ -301,6 +317,16 @@ bool WindowDX::InitDX_() {
 
 	if (FAILED(CreateDXGIFactory2(0, IID_PPV_ARGS(&factory_))))
 		return false;
+
+	// ★追加: Tearing (DWMバイパス) のサポートをチェックし、可能なら有効化する
+	Microsoft::WRL::ComPtr<IDXGIFactory5> factory5;
+	if (SUCCEEDED(factory_.As(&factory5))) {
+		BOOL allowTearing = FALSE;
+		if (SUCCEEDED(factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allowTearing, sizeof(allowTearing))) && allowTearing) {
+			allowTearing_ = true;
+		}
+	}
+
 	if (FAILED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&dev_))))
 		return false;
 
@@ -325,12 +351,17 @@ bool WindowDX::CreateSwapchain_() {
 	sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	sd.BufferCount = kBackBufferCount;
 	sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+	sd.Flags = allowTearing_ ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0; // ★追加: ティアリング許可
 
 	Microsoft::WRL::ComPtr<IDXGISwapChain1> sc;
 	if (FAILED(factory_->CreateSwapChainForHwnd(que_.Get(), hwnd_, &sd, nullptr, nullptr, &sc)))
 		return false;
 	sc.As(&swap_);
 	fi_ = swap_->GetCurrentBackBufferIndex();
+	
+	// ★追加: DXGIによる自動のフルスクリーン切り替えを無効化（独自のボーダレスフルスクリーンと競合して重くなるのを防ぐ）
+	factory_->MakeWindowAssociation(hwnd_, DXGI_MWA_NO_ALT_ENTER);
+	
 	return true;
 }
 
@@ -394,13 +425,15 @@ bool WindowDX::CreateRTVDSV_() {
 }
 
 bool WindowDX::CreateCommand_() {
-	if (FAILED(dev_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&alloc_))))
-		return false;
+	for (int i = 0; i < kBackBufferCount; ++i) {
+		if (FAILED(dev_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&alloc_[i]))))
+			return false;
+	}
 	D3D12_COMMAND_QUEUE_DESC qd{};
 	qd.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 	if (FAILED(dev_->CreateCommandQueue(&qd, IID_PPV_ARGS(&que_))))
 		return false;
-	if (FAILED(dev_->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, alloc_.Get(), nullptr, IID_PPV_ARGS(&list_))))
+	if (FAILED(dev_->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, alloc_[0].Get(), nullptr, IID_PPV_ARGS(&list_))))
 		return false;
 	list_->Close();
 	return true;

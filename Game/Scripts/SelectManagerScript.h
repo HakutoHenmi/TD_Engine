@@ -27,6 +27,13 @@ private:
 	std::vector<StageInfo> stages_;
 
 	bool uiInitialized_ = false;
+	
+	int selectedIndex_ = 0;
+	float currentAngle_ = 0.0f;
+	float targetAngle_ = 0.0f;
+	
+	float steamTimerH_ = 0.0f; // ★水平パイプ用タイマー
+	float steamTimerV_ = 0.5f; // ★垂直パイプ用タイマー（タイミングをずらす）
 };
 
 } // namespace Game
