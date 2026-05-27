@@ -334,7 +334,7 @@
         {"type": "Tag", "enabled": true, "tag": "Default"},
         {"type": "PlayerInput", "enabled": true},
         {"type": "CharacterMovement", "enabled": true, "speed": 40, "jumpPower": 0, "gravity": 0},
-        {"type": "CameraTarget", "enabled": true, "distance": 18, "height": 16, "smoothSpeed": 10}
+        {"type": "CameraTarget", "enabled": true, "distance": 10, "height": 3, "smoothSpeed": 10}
       ]
     },
     {

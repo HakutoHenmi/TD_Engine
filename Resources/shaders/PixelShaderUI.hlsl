@@ -104,8 +104,9 @@ float4 drawLineGlow(float d, float width, float glow, float4 col, float innerMas
         glowCol = col * lineAlpha; // 塗りつぶしの場合はそのままの色
     }
 
-    // 内側マスク（三日月など内側を切るため）
+    // 内側マスク（三日月やプログレスでクリッピングするため）
     glowCol.a *= innerMask;
+    glowCol.rgb *= innerMask; // 加算ブレンド時にRGBが残って表示されないようにする
 
     return glowCol; // 加算ブレンド前提
 }
@@ -137,8 +138,8 @@ float4 mainPS(PSIn i) : SV_TARGET
     if (uShape == 0) {
         // 角丸矩形：uSizePx=幅高、halfに
         d = sdRoundedBox(p, uSizePx * 0.5, uRound);
-    } else if (uShape == 1) {
-        // 円：uSizePx.x を半径として使用
+    } else if (uShape == 1 || uShape == 5) {
+        // 円：uSizePx.x を半径として使用 (5は下から上のクリッピング用)
         d = sdCircle(p, uSizePx.x);
     } else if (uShape == 2) {
         // Crescent
@@ -191,7 +192,12 @@ float4 mainPS(PSIn i) : SV_TARGET
 
     // プログレス(クリッピング)処理
     if (uProgress >= 0.0 && uProgress <= 1.0) {
-        if (uShape == 1 || uShape == 2) {
+        if (uShape == 5) {
+            // 下から上への直線プログレス (円などの高さベース)
+            float height = uSizePx.x * 2.0;
+            float t = (-p.y + height * 0.5) / height;
+            innerMask *= step(t, uProgress);
+        } else if (uShape == 1 || uShape == 2) {
             // 円・三日月の場合は扇形(角度)クリッピング (上から時計回り)
             float angle = atan2(p.x, -p.y);
             if (angle < 0.0) angle += 6.283185307f;

@@ -146,9 +146,9 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 		}
 
 		// サイズと位置の自動設定
-		btn.size = { 180.0f, 180.0f };
+		btn.size = { 160.0f, 160.0f }; // ★変更: 140だと小さすぎたので160に拡大
 
-		btn.pos.y = 400.0f;
+		btn.pos.y = 300.0f; // ★変更: 右下のHPゲージと被らないよう、Y位置を上に上げて回避
 
 		bool isTutorialSoloButton = false;
 		{
@@ -170,12 +170,12 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 
 		if (isTutorialSoloButton) {
 			if (btn.name == "DeleteButton") {
-				btn.pos.x = -210.0f; // 大砲の左隣
+				btn.pos.x = -180.0f; // 大砲の左隣
 			} else {
 				btn.pos.x = 0.0f; // 中央へ
 			}
 		} else {
-			btn.pos.x = (i - 2.0f) * 210.0f; // 通常時は横並び
+			btn.pos.x = (i - 2.0f) * 180.0f; // ★変更: サイズ拡大に合わせて間隔を180に
 		}
 
 		// 状態の更新

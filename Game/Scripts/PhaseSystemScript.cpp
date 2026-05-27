@@ -102,12 +102,13 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	if (!isTutorialScene_) {
 		isPhase_ = InsertPhase;
 		NextPhase_ = InsertPhase;
-		preIsPhase_ = InsertPhase;
 	} else {
 		isPhase_ = PreparationPhase;
 		NextPhase_ = PreparationPhase;
-		preIsPhase_ = PreparationPhase;
 	}
+	
+	// ★修正: 初回Update時に確実に初期化処理(カメラ位置設定など)が走るように、preIsPhase_を現在と違う値にする
+	preIsPhase_ = static_cast<decltype(isPhase_)>(-1);
 
 	currentPhase_ = 0;
 	CoinCount = StartCoinCount_;
@@ -203,9 +204,6 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	bool key6 = input->Trigger(DIK_6) || (GetAsyncKeyState('6') & 0x8001);
 	bool keyX = input->Trigger(DIK_X) || (GetAsyncKeyState('X') & 0x8001); // 削除モード用
 	bool keyP = false;
-#ifndef NDEBUG
-	keyP = input->Trigger(DIK_P) || (GetAsyncKeyState('P') & 0x8001);
-#endif
 	bool keySpace = input->Trigger(DIK_SPACE) || (GetAsyncKeyState(VK_SPACE) & 0x8001);
 
 	// ★ スキルツリーの入力処理: スキルツリーのUI開閉処理 (NキーまたはコントローラーのBACKボタン)
@@ -529,12 +527,12 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				//renderer->DrawSDFUI(border);
 
 			
-				// 進捗ゲージ (扇形クリッピング)
+				// 進捗ゲージ (扇形クリッピングから下から上へ)
 				if (battleStartHoldTime_ > 0.0f) {
 					Engine::Renderer::SdfUIDesc bar;
 					bar.centerPx = {cx, cy};
 					bar.sizePx = {75.0f, 75.0f};
-					bar.shape = 1;                        // 円
+					bar.shape = 5;                        // 下から上へ埋まる円
 					bar.color = {1.0f, 0.7f, 0.1f, 0.9f}; // オレンジ色
 					bar.progress = battleStartHoldTime_ / 1.0f;
 					bar.fill = 1.0f;
@@ -579,7 +577,22 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	if (isPhase_ != preIsPhase_) {
 		auto& nav = scene->GetNavigationManager();
 
+		// フェーズに応じたカメラ追従対象の切り替え
+		auto player = scene->FindObjectByName("Player");
+		auto prepCam = scene->FindObjectByName("PreparationCamera");
+
 		if (isPhase_ == BattlePhase) {
+			// バトル中はプレイヤーにカメラを追従させる
+			if (scene->GetRegistry().valid(player) && scene->GetRegistry().all_of<CameraTargetComponent>(player)) {
+				scene->GetRegistry().get<CameraTargetComponent>(player).enabled = true;
+			}
+			if (scene->GetRegistry().valid(prepCam) && scene->GetRegistry().all_of<CameraTargetComponent>(prepCam)) {
+				scene->GetRegistry().get<CameraTargetComponent>(prepCam).enabled = false;
+			}
+			if (scene->GetRegistry().valid(prepCam) && scene->GetRegistry().all_of<PlayerInputComponent>(prepCam)) {
+				scene->GetRegistry().get<PlayerInputComponent>(prepCam).enabled = false;
+			}
+
 			// 準備から戦闘に切り替わった瞬間
 			// 設置物を反映するためにコストマップを更新
 
@@ -617,6 +630,17 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			Engine::Renderer::GetInstance()->SetPostEffect("Painterly");
 
 		} else if (isPhase_ == PreparationPhase) {
+			// 準備中はコア見下ろしカメラを有効にする
+			if (scene->GetRegistry().valid(player) && scene->GetRegistry().all_of<CameraTargetComponent>(player)) {
+				scene->GetRegistry().get<CameraTargetComponent>(player).enabled = false;
+			}
+			if (scene->GetRegistry().valid(prepCam) && scene->GetRegistry().all_of<CameraTargetComponent>(prepCam)) {
+				scene->GetRegistry().get<CameraTargetComponent>(prepCam).enabled = true;
+			}
+			if (scene->GetRegistry().valid(prepCam) && scene->GetRegistry().all_of<PlayerInputComponent>(prepCam)) {
+				scene->GetRegistry().get<PlayerInputComponent>(prepCam).enabled = true;
+			}
+
 			// 準備フェーズに戻った場合はウェーブを待機状態（スポナー無し）にする
 			WaveManagement::SetWave(-1);
 
@@ -625,7 +649,6 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 			// ★ カメラをコアの上に戻して見下ろす視点にする
 			auto core = scene->FindObjectByName("Core");
-			auto prepCam = scene->FindObjectByName("PreparationCamera");
 			if (scene->GetRegistry().valid(core) && scene->GetRegistry().valid(prepCam)) {
 				// コアの座標を取得
 				auto& coreTc = scene->GetRegistry().get<TransformComponent>(core);
@@ -639,13 +662,13 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				// 視点の角度（見下ろし）をリセット
 				if (scene->GetRegistry().all_of<PlayerInputComponent>(prepCam)) {
 					auto& camPi = scene->GetRegistry().get<PlayerInputComponent>(prepCam);
-					camPi.cameraPitch = 0.5f; // 下を向く（X軸回転）
+					camPi.cameraPitch = 1.2f; // さらに高く見下ろす角度（約68度）
 					camPi.cameraYaw = 0.0f;
 
 					// 直接カメラの回転も変更して即座に反映
 					auto& camera = scene->GetCamera();
 					auto rot = camera.Rotation();
-					rot.x = 0.5f;
+					rot.x = 1.2f;
 					rot.y = 0.0f;
 					camera.SetRotation(rot);
 				}
@@ -653,8 +676,8 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				// ズーム距離の初期化
 				if (scene->GetRegistry().all_of<CameraTargetComponent>(prepCam)) {
 					auto& ct = scene->GetRegistry().get<CameraTargetComponent>(prepCam);
-					ct.distance = 25.0f; // 少し引いた視点
-					ct.height = 10.0f;   // 少し高めの視点
+					ct.distance = 45.0f; // 高さを出すために距離を大きく離す
+					ct.height = 0.0f;    // 視線のズレを防ぐため追加の高さはゼロにする
 				}
 			}
 		}
@@ -1250,24 +1273,31 @@ void PhaseSystemScript::InitializeInsertPhase(GameScene* scene) {
 	    3.5f
     });
 
+	// 地面の高さを取得して基準にする
+	float coreGroundY = scene->GetHeightAt(corePos.x, corePos.z, 1000.0f);
+	if (coreGroundY <= -999.0f) coreGroundY = corePos.y;
+
+	float spawnerGroundY = scene->GetHeightAt(spawnerPos.x, spawnerPos.z, 1000.0f);
+	if (spawnerGroundY <= -999.0f) spawnerGroundY = spawnerPos.y;
+
 	// WP1: ステージ全体を見下ろす鳥瞰視点
 	insertWaypoints_.push_back({
-	    {corePos.x, corePos.y + 40.0f, corePos.z - 45.0f},
+	    {corePos.x, coreGroundY + 30.0f, corePos.z - 35.0f},
 	    {0.7f,      0.0f,              0.0f             }, // Pitch 40度下向き
 	    4.0f
     });
 
 	// WP2: 最初の敵出現地点（スポナー）にクローズアップする視点
 	insertWaypoints_.push_back({
-	    {spawnerPos.x, spawnerPos.y + 8.0f, spawnerPos.z - 15.0f},
+	    {spawnerPos.x, spawnerGroundY + 15.0f, spawnerPos.z - 20.0f},
 	    {0.4f,         0.0f,                0.0f                }, // Pitch 22度下向き
 	    4.0f
     });
 
-	// WP3: プレイヤー操作開始位置にスムーズに戻る
+	// WP3: プレイヤー操作開始位置にスムーズに戻る（EndInsertPhaseのカメラ位置と一致させる）
 	insertWaypoints_.push_back({
-	    {corePos.x, corePos.y + 25.0f, corePos.z - 25.0f},
-        {0.5f,      0.0f,              0.0f             },
+	    {corePos.x, coreGroundY + 43.7f, corePos.z - 16.3f},
+        {1.2f,      0.0f,              0.0f             },
         2.0f
     });
 
@@ -1455,25 +1485,34 @@ void PhaseSystemScript::EndInsertPhase(GameScene* scene) {
 
 		if (scene->GetRegistry().all_of<PlayerInputComponent>(prepCam)) {
 			auto& camPi = scene->GetRegistry().get<PlayerInputComponent>(prepCam);
-			camPi.cameraPitch = 0.5f;
+			camPi.cameraPitch = 1.2f;
 			camPi.cameraYaw = 0.0f;
 
 			auto& camera = scene->GetCamera();
 			auto rot = camera.Rotation();
-			rot.x = 0.5f;
+			rot.x = 1.2f;
 			rot.y = 0.0f;
 			camera.SetRotation(rot);
 		}
 
 		if (scene->GetRegistry().all_of<CameraTargetComponent>(prepCam)) {
 			auto& ct = scene->GetRegistry().get<CameraTargetComponent>(prepCam);
-			ct.distance = 25.0f;
-			ct.height = 10.0f;
+			ct.distance = 45.0f;
+			ct.height = 0.0f;    // ★統一: 全準備フェーズで同じ高さ
 		}
 
+		// 地面の高さを取得
+		float coreGroundY = scene->GetHeightAt(coreTc.translate.x, coreTc.translate.z, 1000.0f);
+		if (coreGroundY <= -999.0f) coreGroundY = coreTc.translate.y;
+
+		// ★修正: CameraFollowSystemの計算結果と一致させてカメラの跳ね上がりを防止
+		// pitch=1.2, yaw=0, distance=45, height=0 から算出:
+		// offsetY = height + sin(1.2)*distance = 0.0 + 41.94 = 41.94
+		// offsetZ = -cos(0)*cos(1.2)*distance = -16.30
+		// targetY追加 = 1.0(プレイヤーオフセット) + 0.8(フレーミング) = 1.8
 		auto& camera = scene->GetCamera();
-		camera.SetPosition({coreTc.translate.x, coreTc.translate.y + 25.0f, coreTc.translate.z - 25.0f});
-		camera.SetRotation({0.5f, 0.0f, 0.0f});
+		camera.SetPosition({coreTc.translate.x, coreGroundY + 43.7f, coreTc.translate.z - 16.3f});
+		camera.SetRotation({1.2f, 0.0f, 0.0f});
 	}
 
 	// 演出中に無効化していた入力を復旧

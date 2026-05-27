@@ -426,8 +426,8 @@ void GameScene::Update() {
 	// コンテキストを更新
 	ctx_.dt = dt;
 
-	// ★追加: ESCキーでポーズ切り替え (プレイ中のみ)
-	if (isPlaying_ && Engine::Input::GetInstance()->Trigger(DIK_ESCAPE)) {
+	// ★追加: ESCキーでポーズ切り替え (プレイ中かつゲーム本編またはチュートリアルのみ)
+	if (isPlaying_ && (sceneName_ == "Game" || sceneName_ == "Tutorial") && Engine::Input::GetInstance()->Trigger(DIK_ESCAPE)) {
 		isPaused_ = !isPaused_;
 		if (isPaused_) {
 			// ポーズ開始: メインメニュー表示
@@ -457,16 +457,15 @@ void GameScene::Update() {
 	if (isPlaying_)
 		playTime_ += dt;
 
-	// ★ 勝利/敗北判定 (テスト用) - ★変更: Gameシーンのみ
+	// ★ 勝利/敗北判定 - ★変更: Gameシーンのみ
 	if (isPlaying_ && sceneName_ == "Game") {
-		bool inputBlocked = Engine::Input::GetInstance()->IsGameInputBlocked();
-		bool win = (!inputBlocked && Engine::Input::GetInstance()->Trigger(DIK_G));
+		bool win = false;
 		if (auto waveEntity = WaveManagement::GetManagerEntity(); waveEntity != entt::null && registry_.valid(waveEntity)) {
 			if (WaveManagement::IsWaveEnded()) {
 				win = true;
 			}
 		}
-		bool loss = (!inputBlocked && Engine::Input::GetInstance()->Trigger(DIK_J));
+		bool loss = false;
 
 		// プレイヤーの生存確認 (Viewを直接参照して同期ズレを防ぐ)
 		// プレイヤーの生存確認
@@ -1067,51 +1066,15 @@ void GameScene::Draw() {
 		return;
 	auto drawStart = std::chrono::high_resolution_clock::now();
 
-	// ★★★ GPU負荷テスト: Hキーで大量オブジェクト生成 ★★★
-	{
-		static int stressTestGridSize = 0;
-		if (!isPlaying_)
-			stressTestGridSize = 0; // Stop時にリセット
-		static bool prevH = false;
-		bool currH = (GetAsyncKeyState('H') & 0x8000) != 0;
-		// ★修正: エディタUI操作中は誤発火を防止
-		if (Engine::Input::GetInstance()->IsGameInputBlocked()) currH = false;
-		if (currH && !prevH) {
-			stressTestGridSize += 32; // add 32x32 = 1024 objects each press
-			std::string msg = "[StressTest] Triggered! Grid size: " + std::to_string(stressTestGridSize) + "x" + std::to_string(stressTestGridSize) + " (" +
-			                  std::to_string(stressTestGridSize * stressTestGridSize) + " objects)\n";
-			OutputDebugStringA(msg.c_str());
-		}
-		prevH = currH;
-
-		if (stressTestGridSize > 0) {
-			uint32_t cubeModel = renderer_->LoadObjMesh("Resources/Models/cube/cube.obj");
-			uint32_t whiteTex = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
-
-			float spacing = 2.0f;
-			float startOffset = -(stressTestGridSize / 2.0f) * spacing;
-
-			for (int z = 0; z < stressTestGridSize; ++z) {
-				for (int x = 0; x < stressTestGridSize; ++x) {
-					Engine::Transform t;
-					t.translate = {startOffset + x * spacing, 10.0f, startOffset + z * spacing};
-					t.rotate = {0, 0, 0};
-					t.scale = {0.5f, 0.5f, 0.5f};
-					Engine::Vector4 color = {0.3f + (x % 5) * 0.15f, 0.3f + (z % 5) * 0.15f, 0.5f + ((x + z) % 3) * 0.2f, 1.0f};
-					renderer_->DrawMeshInstanced(cubeModel, whiteTex, t, color, "Default");
-				}
-			}
-		}
-	}
-	// ★★★ GPU負荷テスト ここまで ★★★
 
 	renderer_->SetCamera(camera_);
 #ifdef USE_IMGUI
-	if (!isPlaying_) {
+	// エディタのSceneビューでのみギズモを描画する
+	if (!isPlaying_ && EditorUI::GetViewMode() == ViewMode::Scene) {
 		DrawEditorGizmos();
 	}
 	// デバッグ時のみフローフィールドを表示
-	if (!isPlaying_ && flowField_) {
+	if (!isPlaying_ && flowField_ && EditorUI::GetViewMode() == ViewMode::Scene) {
 		flowField_->DrawDebug(this);
 	}
 #endif
