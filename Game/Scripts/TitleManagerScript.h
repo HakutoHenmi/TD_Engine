@@ -51,6 +51,20 @@ private:
 	std::vector<entt::entity> creditsEntities_;
 
 	bool uiInitialized_ = false;
+
+	// ★追加: スチームパンク タイトル演出用
+	struct GearInfo {
+		entt::entity entity = entt::null;
+		float speed = 1.0f;  // 回転速度（負で逆回転）
+		int axis = 1;        // 0=X, 1=Y, 2=Z
+	};
+	std::vector<GearInfo> gears_;
+	std::vector<entt::entity> pipes_;
+	float titleTime_ = 0.0f;
+	float cameraOrbitAngle_ = 0.0f;
+	entt::entity titleCamera_ = entt::null;
+	float currentParallaxX_ = 0.0f;
+	float currentParallaxY_ = 0.0f;
 };
 
 } // namespace Game

@@ -225,6 +225,91 @@
       "components": [
         {"type": "RectTransform", "enabled": true, "pos": [100,300], "size": [0,0], "anchor": [0,0], "pivot": [0.5,0.5], "rotation": 0}
       ]
+    },
+    {
+      "id": 1048600, "parentId": 4294967295, "name": "TitleCamera", "locked": false,
+      "translate": [0, 3, -15], "rotate": [0.1, 0, 0], "scale": [1, 1, 1],
+      "components": [{"type": "Camera", "enabled": true}]
+    },
+    {
+      "id": 1048601, "parentId": 4294967295, "name": "DirLight", "locked": false,
+      "translate": [0, 10, -10], "rotate": [0.5, 0.5, 0], "scale": [1, 1, 1],
+      "components": [{"type": "DirectionalLight", "enabled": true, "color": [1.0, 0.8, 0.7], "intensity": 1.5}]
+    },
+    {
+      "id": 1048602, "parentId": 4294967295, "name": "Gear_0", "locked": false,
+      "translate": [0, 5, 12], "rotate": [0, 0, 0], "scale": [12, 12, 12],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.3, 0.3, 0.3, 0.5]}]
+    },
+    {
+      "id": 1048603, "parentId": 4294967295, "name": "Gear_1", "locked": false,
+      "translate": [-6, 8, 8], "rotate": [0, 0, 0], "scale": [5, 5, 5],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6, 0.8, 0.2, 0.5]}]
+    },
+    {
+      "id": 1048604, "parentId": 4294967295, "name": "Gear_2", "locked": false,
+      "translate": [7, 6, 7.5], "rotate": [0, 0, 0], "scale": [4.5, 4.5, 4.5],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.8, 0.4, 0.1, 0.5]}]
+    },
+    {
+      "id": 1048605, "parentId": 4294967295, "name": "Gear_3", "locked": false,
+      "translate": [-4, 3, 5], "rotate": [0, 0, 0], "scale": [2.5, 2.5, 2.5],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6, 0.8, 0.2, 0.5]}]
+    },
+    {
+      "id": 1048606, "parentId": 4294967295, "name": "Gear_4", "locked": false,
+      "translate": [4, 2, 4.5], "rotate": [0, 0, 0], "scale": [2.0, 2.0, 2.0],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.3, 0.3, 0.3, 0.5]}]
+    },
+    {
+      "id": 1048607, "parentId": 4294967295, "name": "Gear_5", "locked": false,
+      "translate": [-2, 1, 3], "rotate": [0, 0, 0], "scale": [1.2, 1.2, 1.2],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.8, 0.4, 0.1, 0.5]}]
+    },
+    {
+      "id": 1048608, "parentId": 4294967295, "name": "Gear_6", "locked": false,
+      "translate": [1.5, 0, 3.2], "rotate": [0, 0, 0], "scale": [1.5, 1.5, 1.5],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6, 0.8, 0.2, 0.5]}]
+    },
+    {
+      "id": 1048609, "parentId": 4294967295, "name": "Gear_7", "locked": false,
+      "translate": [-6, -3, 6], "rotate": [0, 0, 0], "scale": [3.5, 3.5, 3.5],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.3, 0.3, 0.3, 0.5]}]
+    },
+    {
+      "id": 1048610, "parentId": 4294967295, "name": "Gear_8", "locked": false,
+      "translate": [5, -5, 7], "rotate": [0, 0, 0], "scale": [4, 4, 4],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.8, 0.4, 0.1, 0.5]}]
+    },
+    {
+      "id": 1048611, "parentId": 4294967295, "name": "Gear_9", "locked": false,
+      "translate": [0, -6, 5], "rotate": [0, 0, 0], "scale": [3, 3, 3],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6, 0.8, 0.2, 0.5]}]
+    },
+    {
+      "id": 1048612, "parentId": 4294967295, "name": "Pipe_0", "locked": false,
+      "translate": [0, 8, 3], "rotate": [0, 0, 0], "scale": [30, 1, 1],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.3, 0.3, 0.3, 0.6]}]
+    },
+    {
+      "id": 1048613, "parentId": 4294967295, "name": "Pipe_1", "locked": false,
+      "translate": [0, -2.5, 4], "rotate": [0, 0, 0], "scale": [30, 1.2, 1.2],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.8, 0.4, 0.1, 0.6]}]
+    },
+    {
+      "id": 1048614, "parentId": 4294967295, "name": "Pipe_2", "locked": false,
+      "translate": [-8, 0, 3.5], "rotate": [0, 0, 0], "scale": [1, 30, 1],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6, 0.8, 0.2, 0.7]}]
+    },
+    {
+      "id": 1048615, "parentId": 4294967295, "name": "Pipe_3", "locked": false,
+      "translate": [8, 0, 2.5], "rotate": [0, 0, 0], "scale": [1.2, 30, 1.2],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.3, 0.3, 0.3, 0.7]}]
+    },
+    {
+      "id": 1048616, "parentId": 4294967295, "name": "Pipe_4", "locked": false,
+      "translate": [-1, 0, 10], "rotate": [0, 0, 0], "scale": [1.5, 30, 1.5],
+      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.8, 0.4, 0.1, 0.7]}]
     }
   ]
 }

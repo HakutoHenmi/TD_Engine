@@ -3,6 +3,7 @@
 #include <Windows.h>
 #include <cmath>
 #include "../Scripts/PhaseSystemScript.h"
+#include "../../Engine/Input.h"
 
 namespace Game {
 
@@ -27,6 +28,12 @@ public:
 				if (input->Down(DIK_A)) moveDir.x -= 1.0f;
 				if (input->Down(DIK_D)) moveDir.x += 1.0f;
 
+				// コントローラー左スティック
+				float padX = input->GetLeftStickX();
+				float padY = input->GetLeftStickY();
+				if (std::abs(padX) > 0.1f) moveDir.x += padX;
+				if (std::abs(padY) > 0.1f) moveDir.y += padY;
+
 				float len = std::sqrt(moveDir.x * moveDir.x + moveDir.y * moveDir.y);
 				if (len > 0.001f) {
 					moveDir.x /= len;
@@ -35,7 +42,7 @@ public:
 				pi.moveDir = moveDir;
 
 				// ジャンプ入力
-				bool currentSpace = input->Down(DIK_SPACE);
+				bool currentSpace = input->Down(DIK_SPACE) || input->IsControllerButtonDown(XINPUT_GAMEPAD_A);
 				if (currentSpace && !prevSpace_)
 					pi.jumpRequested = true;
 				else
@@ -61,13 +68,17 @@ public:
 				pi.cameraPitch = 0.0f;
 				
 				bool canMoveCamera = true;
+				bool hasRightStickInput = (std::abs(input->GetRightStickX()) > 0.1f || std::abs(input->GetRightStickY()) > 0.1f);
 				if (PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase) {
-					canMoveCamera = input->IsMouseDown(1); // 右ボタン
+					canMoveCamera = input->IsMouseDown(1) || hasRightStickInput; 
 				}
 				
 				if (canMoveCamera) {
 					pi.cameraYaw = input->GetMouseDeltaX() * 0.003f;
 					pi.cameraPitch = input->GetMouseDeltaY() * 0.003f;
+					
+					pi.cameraYaw += input->GetRightStickX() * 0.05f;
+					pi.cameraPitch -= input->GetRightStickY() * 0.05f;
 				}
 			}
 		}

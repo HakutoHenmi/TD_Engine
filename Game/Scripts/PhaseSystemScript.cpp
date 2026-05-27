@@ -200,8 +200,8 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 #endif
 	bool keySpace = input->Trigger(DIK_SPACE) || (GetAsyncKeyState(VK_SPACE) & 0x8001);
 
-	// ★ スキルツリーの入力処理 (準備フェーズ中のみ)
-	bool keyN = input->Trigger(DIK_N) || (GetAsyncKeyState('N') & 0x8001);
+	// ★ スキルツリーの入力処理: スキルツリーのUI開閉処理 (NキーまたはコントローラーのBACKボタン)
+	bool keyN = input->Trigger(DIK_N) || (GetAsyncKeyState('N') & 0x8001) || input->IsControllerButtonTrigger(XINPUT_GAMEPAD_BACK);
 
 	// 外部(EnemySpawnerScript など)からのフェーズ変更要求を反映
 	if (!isPhaseTransitioning_ && isPhase_ != Transition && NextPhase_ != isPhase_) {
