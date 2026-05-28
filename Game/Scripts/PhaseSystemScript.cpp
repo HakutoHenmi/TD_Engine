@@ -671,56 +671,132 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				}
 			});
 
-			if (hoverEntity != entt::null) {
-				if (registry.all_of<TransformComponent>(hoverEntity)) {
-					auto tc = registry.get<TransformComponent>(hoverEntity);
-					// ルートの取得
-					if (registry.all_of<HierarchyComponent>(hoverEntity)) {
-						auto root = hoverEntity;
-						while (registry.get<HierarchyComponent>(root).parentId != entt::null) {
-							root = registry.get<HierarchyComponent>(root).parentId;
+			// ★修正: ヒットがある場合のみハイライト表示（空中での描画を防止）
+			if (hoverEntity != entt::null && registry.all_of<TransformComponent>(hoverEntity)) {
+				auto tc = registry.get<TransformComponent>(hoverEntity);
+
+				// ルートの取得
+				entt::entity rootEntity = hoverEntity;
+				if (registry.all_of<HierarchyComponent>(hoverEntity)) {
+					auto root = hoverEntity;
+					while (registry.get<HierarchyComponent>(root).parentId != entt::null) {
+						root = registry.get<HierarchyComponent>(root).parentId;
+					}
+					rootEntity = root;
+					if (registry.all_of<TransformComponent>(rootEntity)) {
+						tc = registry.get<TransformComponent>(rootEntity);
+					}
+				}
+
+				// グリッド座標に変換（削除ロジックと同じ）
+				constexpr float gridSize = 2.0f;
+				int gridX = static_cast<int>(std::floor(tc.translate.x / gridSize));
+				int gridZ = static_cast<int>(std::floor(tc.translate.z / gridSize));
+
+				// 同じグリッド内のすべてのエンティティを集める
+				std::vector<entt::entity> highlightEntities;
+				auto view = registry.view<TransformComponent>();
+				for (auto e : view) {
+					if (registry.all_of<NameComponent>(e)) {
+						const auto& name = registry.get<NameComponent>(e).name;
+						// 削除不可オブジェクトはスキップ
+						if (name.find("Terrain") != std::string::npos || name.find("Plane") != std::string::npos || 
+							name.find("Core") != std::string::npos || name.find("Floor") != std::string::npos ||
+							name.find("PipeConnection") != std::string::npos) {
+							continue;
 						}
-						tc = registry.get<TransformComponent>(root);
 					}
 
-					Engine::Matrix4x4 mat = tc.ToMatrix();
-					// Matrix4x4をXMMATRIXに変換
-					DirectX::XMMATRIX xmat = DirectX::XMMatrixSet(
-					    mat.m[0][0], mat.m[0][1], mat.m[0][2], mat.m[0][3], mat.m[1][0], mat.m[1][1], mat.m[1][2], mat.m[1][3], mat.m[2][0], mat.m[2][1], mat.m[2][2], mat.m[2][3], mat.m[3][0],
-					    mat.m[3][1], mat.m[3][2], mat.m[3][3]);
-
-					float hs = 1.0f; // 大体の大きさ
-					// 少し外側に枠を描画（赤色で）
-					Engine::Vector3 cv[8] = {
-					    {-hs, -hs, -hs},
-                        {hs,  -hs, -hs},
-                        {hs,  hs,  -hs},
-                        {-hs, hs,  -hs},
-                        {-hs, -hs, hs },
-                        {hs,  -hs, hs },
-                        {hs,  hs,  hs },
-                        {-hs, hs,  hs }
-                    };
-					int edges[12][2] = {
-					    {0, 1},
-                        {1, 2},
-                        {2, 3},
-                        {3, 0},
-                        {4, 5},
-                        {5, 6},
-                        {6, 7},
-                        {7, 4},
-                        {0, 4},
-                        {1, 5},
-                        {2, 6},
-                        {3, 7}
-                    };
-					for (int i = 0; i < 8; ++i) {
-						DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(cv[i].x, cv[i].y, cv[i].z, 1.0f), xmat);
-						DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&cv[i]), p);
+					// ★修正: レイキャスト対象となるメッシュを持つかチェック
+					// UI ボタンなど削除対象でないオブジェクトをフィルタリング
+					Engine::Model* model = nullptr;
+					if (registry.all_of<GpuMeshColliderComponent>(e)) {
+						model = scene->GetRenderer()->GetModel(registry.get<GpuMeshColliderComponent>(e).meshHandle);
+					} else if (registry.all_of<MeshRendererComponent>(e)) {
+						model = scene->GetRenderer()->GetModel(registry.get<MeshRendererComponent>(e).modelHandle);
 					}
-					for (int i = 0; i < 12; ++i) {
-						scene->GetRenderer()->DrawLine3D(cv[edges[i][0]], cv[edges[i][1]], {1.0f, 0.0f, 0.0f, 1.0f}, true);
+
+					// モデルがない = レイキャスト対象でない = 削除対象ではない
+					if (!model) {
+						continue;
+					}
+
+					const auto& eTc = registry.get<TransformComponent>(e);
+					int eGridX = static_cast<int>(std::floor(eTc.translate.x / gridSize));
+					int eGridZ = static_cast<int>(std::floor(eTc.translate.z / gridSize));
+
+					// 同じグリッドマス内か判定
+					if (eGridX == gridX && eGridZ == gridZ) {
+						// ルートエンティティを取得
+						entt::entity highlightEntity = e;
+						if (registry.all_of<HierarchyComponent>(e)) {
+							auto root = e;
+							while (registry.get<HierarchyComponent>(root).parentId != entt::null) {
+								root = registry.get<HierarchyComponent>(root).parentId;
+							}
+							highlightEntity = root;
+						}
+
+						// 重複チェック
+						bool alreadyAdded = false;
+						for (auto& added : highlightEntities) {
+							if (added == highlightEntity) {
+								alreadyAdded = true;
+								break;
+							}
+						}
+						if (!alreadyAdded) {
+							highlightEntities.push_back(highlightEntity);
+						}
+					}
+				}
+
+				// ★修正: ボタンで出せる施設（大砲、ミサイル、ポイズン、アイスキャノン）のみを赤色で描画
+				for (auto highlightEntity : highlightEntities) {
+					if (!registry.all_of<TransformComponent>(highlightEntity))
+						continue;
+
+					// 土台は赤くハイライトしない（名前で判定）
+					bool isBase = false;
+					if (registry.all_of<NameComponent>(highlightEntity)) {
+						const auto& name = registry.get<NameComponent>(highlightEntity).name;
+						if (name.find("Base") != std::string::npos || name.find("base") != std::string::npos) {
+							isBase = true;
+						}
+					}
+					if (isBase) {
+						continue;
+					}
+
+					// ボタンで出せる施設かチェック（大砲、ミサイル、ポイズン、アイスキャノンのみハイライト）
+					bool isHighlightableBuilding = false;
+					if (registry.all_of<NameComponent>(highlightEntity)) {
+						const auto& name = registry.get<NameComponent>(highlightEntity).name;
+						if (name.find("Canon") != std::string::npos || name.find("Cannon") != std::string::npos ||
+							name.find("Missile") != std::string::npos ||
+							name.find("Poison") != std::string::npos ||
+							name.find("Ice") != std::string::npos) {
+							isHighlightableBuilding = true;
+						}
+					}
+					if (!isHighlightableBuilding) {
+						continue;
+					}
+
+					auto hlTc = registry.get<TransformComponent>(highlightEntity);
+					uint32_t meshHandle = 0;
+					if (registry.all_of<MeshRendererComponent>(highlightEntity)) {
+						meshHandle = registry.get<MeshRendererComponent>(highlightEntity).modelHandle;
+					} else if (registry.all_of<GpuMeshColliderComponent>(highlightEntity)) {
+						meshHandle = registry.get<GpuMeshColliderComponent>(highlightEntity).meshHandle;
+					}
+
+					if (meshHandle != 0) {
+						Engine::Transform tr;
+						tr.translate = {hlTc.translate.x, hlTc.translate.y, hlTc.translate.z};
+						tr.rotate = {hlTc.rotate.x, hlTc.rotate.y, hlTc.rotate.z};
+						tr.scale = {hlTc.scale.x, hlTc.scale.y, hlTc.scale.z};
+						scene->GetRenderer()->DrawMesh(meshHandle, 0, tr, {1.0f, 0.0f, 0.0f, 0.7f}, "Toon");
 					}
 				}
 			}
@@ -749,22 +825,109 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 						}
 
 						if (refundCost > 0) {
-							int getRefundAmount = CalculateRefund(refundCost);
-							CoinCount += getRefundAmount;
-
-							// 親オブジェクト等があれば再帰的に削除するか、単純にエンティティをデストロイする
-							// GameObjectの削除
+							// 削除対象エンティティを決定（親がいればそれを削除対象にする）
+							entt::entity targetEntity = hoverEntity;
 							if (registry.all_of<HierarchyComponent>(hoverEntity)) {
 								auto root = hoverEntity;
 								while (registry.get<HierarchyComponent>(root).parentId != entt::null) {
 									root = registry.get<HierarchyComponent>(root).parentId;
 								}
-								scene->DestroyObject(static_cast<uint32_t>(root));
-							} else {
-								scene->DestroyObject(static_cast<uint32_t>(hoverEntity));
+								targetEntity = root;
 							}
 
-							EditorUI::Log("Object sold for " + std::to_string(getRefundAmount));
+							// ★修正: 同じマス（2x2グリッド）内にあるすべてのオブジェクトを収集して削除
+							std::vector<entt::entity> entitiesToDelete;
+
+							// グリッド座標に変換
+							constexpr float gridSize = 2.0f;
+							if (registry.all_of<TransformComponent>(targetEntity)) {
+								auto& targetTc = registry.get<TransformComponent>(targetEntity);
+								int gridX = static_cast<int>(std::floor(targetTc.translate.x / gridSize));
+								int gridZ = static_cast<int>(std::floor(targetTc.translate.z / gridSize));
+
+								// 同じグリッド内のすべてのエンティティを探す
+								auto view = registry.view<TransformComponent>();
+								for (auto e : view) {
+									if (registry.all_of<NameComponent>(e)) {
+										const auto& name = registry.get<NameComponent>(e).name;
+										// 削除不可オブジェクトはスキップ
+										if (name.find("Terrain") != std::string::npos || name.find("Plane") != std::string::npos || 
+											name.find("Core") != std::string::npos || name.find("Floor") != std::string::npos ||
+											name.find("PipeConnection") != std::string::npos) {
+											continue;
+										}
+									}
+
+									const auto& eTc = registry.get<TransformComponent>(e);
+									int eGridX = static_cast<int>(std::floor(eTc.translate.x / gridSize));
+									int eGridZ = static_cast<int>(std::floor(eTc.translate.z / gridSize));
+
+									// 同じグリッドマス内か判定
+									if (eGridX == gridX && eGridZ == gridZ) {
+										entitiesToDelete.push_back(e);
+									}
+								}
+							}
+
+							// 収集したエンティティをすべて削除し、返金を合計する
+							int totalRefund = 0;
+							std::vector<entt::entity> deletedRoots;
+
+							for (auto deleteEntity : entitiesToDelete) {
+								// ルートエンティティを取得
+								entt::entity rootToDelete = deleteEntity;
+								if (registry.all_of<HierarchyComponent>(deleteEntity)) {
+									auto root = deleteEntity;
+									while (registry.get<HierarchyComponent>(root).parentId != entt::null) {
+										root = registry.get<HierarchyComponent>(root).parentId;
+									}
+									rootToDelete = root;
+								}
+
+								// 重複チェック（既に削除リストにあれば追加しない）
+								bool alreadyAdded = false;
+								for (auto& deleted : deletedRoots) {
+									if (deleted == rootToDelete) {
+										alreadyAdded = true;
+										break;
+									}
+								}
+								if (alreadyAdded) continue;
+
+								deletedRoots.push_back(rootToDelete);
+
+								// この削除対象の返金額を計算
+								int entityRefund = 0;
+								if (registry.all_of<NameComponent>(rootToDelete)) {
+									const auto& name = registry.get<NameComponent>(rootToDelete).name;
+									if (name.find("Canon") != std::string::npos || name.find("Cannon") != std::string::npos) {
+										entityRefund = CalculateRefund(canonCost_);
+									} else if (name.find("Missile") != std::string::npos) {
+										entityRefund = CalculateRefund(missileCost_);
+									} else if (name.find("Poison") != std::string::npos) {
+										entityRefund = CalculateRefund(poisonCost_);
+									} else if (name.find("Ice") != std::string::npos) {
+										entityRefund = CalculateRefund(iceCanonCost_);
+									}
+								}
+								totalRefund += entityRefund;
+
+								// スクリプトの OnDestroy を呼び出す
+								if (registry.all_of<ScriptComponent>(rootToDelete)) {
+									auto& sc = registry.get<ScriptComponent>(rootToDelete);
+									for (auto& entry : sc.scripts) {
+										if (entry.instance) {
+											entry.instance->OnDestroy(rootToDelete, scene);
+										}
+									}
+								}
+
+								// エンティティを削除
+								scene->DestroyObject(static_cast<uint32_t>(rootToDelete));
+							}
+
+							CoinCount += totalRefund;
+							EditorUI::Log("Objects sold for " + std::to_string(totalRefund));
 						}
 					}
 				}
