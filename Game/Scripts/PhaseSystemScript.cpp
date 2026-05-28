@@ -90,6 +90,12 @@ bool TryGetPlacementSurfaceYAt(GameScene* scene, float x, float z, float& outY) 
 void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	(void)entity;
 
+	s_gameOverPhase_ = 0;
+	gameOverTimer_ = 0.0f;
+	if (scene) {
+		scene->SetGameTimeScale(1.0f);
+	}
+
 	// チュートリアルシーン以外ならインサートカメラ演出から開始
 	isTutorialScene_ = false;
 	if (scene) {
@@ -180,6 +186,284 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 
 void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	(void)entity;
+
+	// === Game Over Sequence Update ===
+	if (s_gameOverPhase_ > 0) {
+		static auto lastTime = std::chrono::steady_clock::now();
+		auto nowTime = std::chrono::steady_clock::now();
+		float realDt = std::chrono::duration<float>(nowTime - lastTime).count();
+		lastTime = nowTime;
+		if (realDt > 0.1f) realDt = 1.0f / 60.0f;
+
+		gameOverTimer_ += realDt;
+		auto& camera = scene->GetCamera();
+
+		// Find core position
+		DirectX::XMFLOAT3 corePos = {0,0,0};
+		auto core = scene->FindObjectByName("Core");
+		if (scene->GetRegistry().valid(core) && scene->GetRegistry().all_of<TransformComponent>(core)) {
+			corePos = scene->GetRegistry().get<TransformComponent>(core).translate;
+		} else {
+			const auto& cores = scene->GetEntitiesByTag(TagType::Core);
+			if (!cores.empty() && scene->GetRegistry().valid(cores[0]) && scene->GetRegistry().all_of<TransformComponent>(cores[0])) {
+				corePos = scene->GetRegistry().get<TransformComponent>(cores[0]).translate;
+			}
+		}
+
+		if (s_gameOverPhase_ == 1) {
+			// Phase 1: カメラをコアに近づけ、コアが爆発する様子を見せる (2秒間)
+			float t = (std::min)(gameOverTimer_ / 2.0f, 1.0f);
+			float ease = t * t * (3.0f - 2.0f * t);
+
+			// 現在のカメラとコアの方向ベクトルを計算
+			float dirX = goStartCamPos_.x - corePos.x;
+			float dirZ = goStartCamPos_.z - corePos.z;
+			float dist = std::sqrt(dirX * dirX + dirZ * dirZ);
+			if (dist < 0.1f) { dirX = 0; dirZ = -1; dist = 1; }
+			dirX /= dist;
+			dirZ /= dist;
+
+			// Target: close to core from current direction
+			DirectX::XMFLOAT3 targetCamPos = {corePos.x + dirX * 15.0f, corePos.y + 5.0f, corePos.z + dirZ * 15.0f}; 
+
+			// コアを正確に見るための角度を計算
+			DirectX::XMFLOAT3 targetCamRot;
+			float ldx = corePos.x - targetCamPos.x;
+			float ldy = corePos.y - targetCamPos.y;
+			float ldz = corePos.z - targetCamPos.z;
+			targetCamRot.y = std::atan2(ldx, ldz);
+			float xzDist = std::sqrt(ldx * ldx + ldz * ldz);
+			targetCamRot.x = -std::atan2(ldy, xzDist);
+			targetCamRot.z = 0.0f;
+
+			DirectX::XMFLOAT3 newPos;
+			newPos.x = goStartCamPos_.x + (targetCamPos.x - goStartCamPos_.x) * ease;
+			newPos.y = goStartCamPos_.y + (targetCamPos.y - goStartCamPos_.y) * ease;
+			newPos.z = goStartCamPos_.z + (targetCamPos.z - goStartCamPos_.z) * ease;
+			
+			DirectX::XMFLOAT3 newRot;
+			newRot.x = goStartCamRot_.x + (targetCamRot.x - goStartCamRot_.x) * ease;
+			newRot.y = goStartCamRot_.y + (targetCamRot.y - goStartCamRot_.y) * ease;
+			newRot.z = goStartCamRot_.z + (targetCamRot.z - goStartCamRot_.z) * ease;
+
+			camera.SetPosition({newPos.x, newPos.y, newPos.z});
+			camera.SetRotation(newRot);
+
+			// 爆発エフェクトを定期的に発生させる
+			static float expTimer = 0;
+			expTimer += realDt;
+			if (expTimer > 0.1f) {
+				expTimer = 0;
+				entt::entity expEntity = scene->CreateEntity("GameOverExplosion");
+				auto& tc = scene->GetRegistry().get<TransformComponent>(expEntity);
+				tc.translate = {
+					corePos.x + (-2.0f + 4.0f * (rand() / (float)RAND_MAX)),
+					corePos.y + (0.0f + 4.0f * (rand() / (float)RAND_MAX)),
+					corePos.z + (-2.0f + 4.0f * (rand() / (float)RAND_MAX))
+				};
+				auto& vc = scene->GetRegistry().emplace<VariableComponent>(expEntity);
+				vc.SetValue("NormalX", 0.0f);
+				vc.SetValue("NormalY", 1.0f); // 真上に噴き上がらせる
+				vc.SetValue("NormalZ", 0.0f);
+				vc.SetValue("Radius", 6.0f);
+				vc.SetValue("Duration", 2.0f);
+				vc.SetValue("ScatterMode", 0.0f); // 大砲と同じく法線方向へ伸びる
+				vc.SetValue("ScatterSpeed", 20.0f);
+				vc.SetValue("Count", 40.0f); // 煙の量
+				vc.SetValue("ColorMode", 0.0f); // 通常の白/茶色スチーム
+				vc.SetValue("IsFlight", 1.0f); // キューブ破片を出さない
+				vc.SetValue("IgnoreTimeScale", 1.0f); // 時間停止中も動かす
+
+				auto& sc = scene->GetRegistry().emplace<ScriptComponent>(expEntity);
+				sc.scripts.push_back({"SpaceShatterScript", "", nullptr});
+			}
+
+			if (gameOverTimer_ >= 2.5f) {
+				s_gameOverPhase_ = 2;
+				gameOverTimer_ = 0.0f;
+				goStartCamPos_ = camera.Position();
+				goStartCamRot_ = camera.Rotation();
+			}
+		} else if (s_gameOverPhase_ == 2) {
+			// Phase 2: カメラを空に向けてリザルトUIを表示
+			float t = (std::min)(gameOverTimer_ / 1.5f, 1.0f);
+			float ease = t * t * (3.0f - 2.0f * t);
+
+			// Target: looking up at sky
+			DirectX::XMFLOAT3 targetCamRot = { -1.5f, goStartCamRot_.y, 0.0f }; // -1.5 rad is roughly looking straight up
+
+			DirectX::XMFLOAT3 newRot;
+			newRot.x = goStartCamRot_.x + (targetCamRot.x - goStartCamRot_.x) * ease;
+			newRot.y = goStartCamRot_.y + (targetCamRot.y - goStartCamRot_.y) * ease;
+			newRot.z = goStartCamRot_.z + (targetCamRot.z - goStartCamRot_.z) * ease;
+
+			camera.SetRotation(newRot);
+
+			if (gameOverTimer_ >= 1.5f && resultManagerEntity_ == entt::null) {
+				ResultManagerScript::pendingIsWin = false;
+				ResultManagerScript::pendingOriginalScene = scene->GetStagePath();
+				
+				resultManagerEntity_ = scene->CreateEntity("SkyResultManager");
+				
+				// リザルトUI用のスコアとタイムをセット
+				scene->GetRegistry().emplace<VariableComponent>(resultManagerEntity_);
+				scene->SetVar(resultManagerEntity_, "isWin", 0.0f);
+				scene->SetVar(resultManagerEntity_, "score", 300.0f);
+				scene->SetVar(resultManagerEntity_, "clearTime", scene->GetPlayTime());
+
+				auto& sc = scene->GetRegistry().emplace<ScriptComponent>(resultManagerEntity_);
+				ScriptEntry entry;
+				entry.scriptPath = "ResultManagerScript";
+				entry.instance = ScriptEngine::GetInstance()->CreateScript("ResultManagerScript");
+				if (entry.instance) {
+					entry.instance->Start(resultManagerEntity_, scene);
+				}
+				sc.scripts.push_back(std::move(entry));
+			}
+		}
+		
+		// ゲームオーバー中は通常のフェーズ処理をスキップ
+		return;
+	}
+
+	// === Game Clear Sequence Update ===
+	if (s_gameClearPhase_ > 0) {
+		static auto lastTime = std::chrono::steady_clock::now();
+		auto nowTime = std::chrono::steady_clock::now();
+		float realDt = std::chrono::duration<float>(nowTime - lastTime).count();
+		lastTime = nowTime;
+		if (realDt > 0.1f) realDt = 1.0f / 60.0f;
+
+		gameOverTimer_ += realDt;
+		Engine::Camera& camera = scene->GetCamera();
+
+		DirectX::XMFLOAT3 corePos = {0,0,0};
+		auto core = scene->FindObjectByName("Core");
+		if (scene->GetRegistry().valid(core) && scene->GetRegistry().all_of<TransformComponent>(core)) {
+			corePos = scene->GetRegistry().get<TransformComponent>(core).translate;
+		}
+
+		if (s_gameClearPhase_ == 1) {
+			// Phase 1: カメラをコアに近づけ、花火を見上げる
+			float t = (std::min)(gameOverTimer_ / 1.2f, 1.0f);
+			float ease = t * t * (3.0f - 2.0f * t);
+
+			// 現在のカメラとコアの方向ベクトルを計算
+			float dirX = goStartCamPos_.x - corePos.x;
+			float dirZ = goStartCamPos_.z - corePos.z;
+			float dist = std::sqrt(dirX * dirX + dirZ * dirZ);
+			if (dist < 0.1f) { dirX = 0; dirZ = -1; dist = 1; }
+			dirX /= dist;
+			dirZ /= dist;
+
+			DirectX::XMFLOAT3 targetCamPos = {corePos.x + dirX * 15.0f, corePos.y + 5.0f, corePos.z + dirZ * 15.0f}; 
+			
+			// コアを正確に見るための角度を計算
+			DirectX::XMFLOAT3 targetCamRot;
+			float ldx = corePos.x - targetCamPos.x;
+			float ldy = corePos.y - targetCamPos.y;
+			float ldz = corePos.z - targetCamPos.z;
+			targetCamRot.y = std::atan2(ldx, ldz);
+			float xzDist = std::sqrt(ldx * ldx + ldz * ldz);
+			targetCamRot.x = -std::atan2(ldy, xzDist);
+			targetCamRot.z = 0.0f;
+
+			DirectX::XMFLOAT3 newPos;
+			newPos.x = goStartCamPos_.x + (targetCamPos.x - goStartCamPos_.x) * ease;
+			newPos.y = goStartCamPos_.y + (targetCamPos.y - goStartCamPos_.y) * ease;
+			newPos.z = goStartCamPos_.z + (targetCamPos.z - goStartCamPos_.z) * ease;
+			
+			DirectX::XMFLOAT3 newRot;
+			newRot.x = goStartCamRot_.x + (targetCamRot.x - goStartCamRot_.x) * ease;
+			// Y軸回転は最短距離で補間
+			float diff = targetCamRot.y - goStartCamRot_.y;
+			while (diff >  DirectX::XM_PI) diff -= DirectX::XM_2PI;
+			while (diff < -DirectX::XM_PI) diff += DirectX::XM_2PI;
+			newRot.y = goStartCamRot_.y + diff * ease;
+			newRot.z = goStartCamRot_.z + (targetCamRot.z - goStartCamRot_.z) * ease;
+
+			camera.SetPosition({newPos.x, newPos.y, newPos.z});
+			camera.SetRotation(newRot);
+
+			// 追加の花火をランダムに打ち上げる
+			static float fwTimer = 0;
+			fwTimer += realDt;
+			if (fwTimer > 0.15f) {
+				fwTimer = 0;
+				entt::entity fwEntity = scene->CreateEntity("GameClearFirework");
+				auto& tc = scene->GetRegistry().emplace<TransformComponent>(fwEntity);
+				tc.translate = {
+					corePos.x + (-30.0f + 60.0f * (rand() / (float)RAND_MAX)),
+					corePos.y,
+					corePos.z + (-10.0f + 40.0f * (rand() / (float)RAND_MAX))
+				};
+				auto& sc = scene->GetRegistry().emplace<ScriptComponent>(fwEntity);
+				sc.scripts.push_back({"FireworkScript", "", nullptr});
+				sc.enabled = true;
+			}
+
+			if (gameOverTimer_ >= 1.2f) { // 最初の花火が爆発するくらいのタイミング
+				s_gameClearPhase_ = 2;
+				gameOverTimer_ = 0.0f;
+				goStartCamPos_ = camera.Position();
+				goStartCamRot_ = camera.Rotation();
+			}
+		} else if (s_gameClearPhase_ == 2) {
+			// Phase 2: カメラを空に向けてリザルトUIを表示しつつ、引き続き花火を打ち上げる
+			float t = (std::min)(gameOverTimer_ / 1.5f, 1.0f);
+			float ease = t * t * (3.0f - 2.0f * t);
+
+			// Target: 花火が画面にしっかり収まるように、真上ではなく約57度(-1.0f)上を見上げる
+			DirectX::XMFLOAT3 targetCamRot = { -1.0f, goStartCamRot_.y, 0.0f }; 
+
+			DirectX::XMFLOAT3 newRot;
+			newRot.x = goStartCamRot_.x + (targetCamRot.x - goStartCamRot_.x) * ease;
+			newRot.y = goStartCamRot_.y + (targetCamRot.y - goStartCamRot_.y) * ease;
+			newRot.z = goStartCamRot_.z + (targetCamRot.z - goStartCamRot_.z) * ease;
+
+			camera.SetRotation(newRot);
+
+			static float fwTimer2 = 0;
+			fwTimer2 += realDt;
+			if (fwTimer2 > 0.12f) {
+				fwTimer2 = 0;
+				entt::entity fwEntity = scene->CreateEntity("GameClearFirework");
+				auto& tc = scene->GetRegistry().emplace<TransformComponent>(fwEntity);
+				tc.translate = {
+					corePos.x + (-40.0f + 80.0f * (rand() / (float)RAND_MAX)),
+					corePos.y,
+					corePos.z + (-10.0f + 40.0f * (rand() / (float)RAND_MAX))
+				};
+				auto& sc = scene->GetRegistry().emplace<ScriptComponent>(fwEntity);
+				sc.scripts.push_back({"FireworkScript", "", nullptr});
+				sc.enabled = true;
+			}
+
+			if (gameOverTimer_ >= 1.5f && resultManagerEntity_ == entt::null) {
+				ResultManagerScript::pendingIsWin = true;
+				ResultManagerScript::pendingOriginalScene = scene->GetStagePath();
+				
+				resultManagerEntity_ = scene->CreateEntity("SkyResultManager");
+				
+				scene->GetRegistry().emplace<VariableComponent>(resultManagerEntity_);
+				scene->SetVar(resultManagerEntity_, "isWin", 1.0f);
+				scene->SetVar(resultManagerEntity_, "score", 1500.0f);
+				scene->SetVar(resultManagerEntity_, "clearTime", scene->GetPlayTime());
+
+				auto& sc = scene->GetRegistry().emplace<ScriptComponent>(resultManagerEntity_);
+				ScriptEntry entry;
+				entry.scriptPath = "ResultManagerScript";
+				entry.instance = ScriptEngine::GetInstance()->CreateScript("ResultManagerScript");
+				if (entry.instance) {
+					entry.instance->Start(resultManagerEntity_, scene);
+				}
+				sc.scripts.push_back(std::move(entry));
+			}
+		}
+
+		// クリア演出中は通常のフェーズ処理をスキップ
+		return;
+	}
 
 	if (isPhase_ == InsertPhase) {
 		UpdateInsertPhase(scene, dt);
@@ -387,56 +671,132 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				}
 			});
 
-			if (hoverEntity != entt::null) {
-				if (registry.all_of<TransformComponent>(hoverEntity)) {
-					auto tc = registry.get<TransformComponent>(hoverEntity);
-					// ルートの取得
-					if (registry.all_of<HierarchyComponent>(hoverEntity)) {
-						auto root = hoverEntity;
-						while (registry.get<HierarchyComponent>(root).parentId != entt::null) {
-							root = registry.get<HierarchyComponent>(root).parentId;
+			// ★修正: ヒットがある場合のみハイライト表示（空中での描画を防止）
+			if (hoverEntity != entt::null && registry.all_of<TransformComponent>(hoverEntity)) {
+				auto tc = registry.get<TransformComponent>(hoverEntity);
+
+				// ルートの取得
+				entt::entity rootEntity = hoverEntity;
+				if (registry.all_of<HierarchyComponent>(hoverEntity)) {
+					auto root = hoverEntity;
+					while (registry.get<HierarchyComponent>(root).parentId != entt::null) {
+						root = registry.get<HierarchyComponent>(root).parentId;
+					}
+					rootEntity = root;
+					if (registry.all_of<TransformComponent>(rootEntity)) {
+						tc = registry.get<TransformComponent>(rootEntity);
+					}
+				}
+
+				// グリッド座標に変換（削除ロジックと同じ）
+				constexpr float gridSize = 2.0f;
+				int gridX = static_cast<int>(std::floor(tc.translate.x / gridSize));
+				int gridZ = static_cast<int>(std::floor(tc.translate.z / gridSize));
+
+				// 同じグリッド内のすべてのエンティティを集める
+				std::vector<entt::entity> highlightEntities;
+				auto view = registry.view<TransformComponent>();
+				for (auto e : view) {
+					if (registry.all_of<NameComponent>(e)) {
+						const auto& name = registry.get<NameComponent>(e).name;
+						// 削除不可オブジェクトはスキップ
+						if (name.find("Terrain") != std::string::npos || name.find("Plane") != std::string::npos || 
+							name.find("Core") != std::string::npos || name.find("Floor") != std::string::npos ||
+							name.find("PipeConnection") != std::string::npos) {
+							continue;
 						}
-						tc = registry.get<TransformComponent>(root);
 					}
 
-					Engine::Matrix4x4 mat = tc.ToMatrix();
-					// Matrix4x4をXMMATRIXに変換
-					DirectX::XMMATRIX xmat = DirectX::XMMatrixSet(
-					    mat.m[0][0], mat.m[0][1], mat.m[0][2], mat.m[0][3], mat.m[1][0], mat.m[1][1], mat.m[1][2], mat.m[1][3], mat.m[2][0], mat.m[2][1], mat.m[2][2], mat.m[2][3], mat.m[3][0],
-					    mat.m[3][1], mat.m[3][2], mat.m[3][3]);
-
-					float hs = 1.0f; // 大体の大きさ
-					// 少し外側に枠を描画（赤色で）
-					Engine::Vector3 cv[8] = {
-					    {-hs, -hs, -hs},
-                        {hs,  -hs, -hs},
-                        {hs,  hs,  -hs},
-                        {-hs, hs,  -hs},
-                        {-hs, -hs, hs },
-                        {hs,  -hs, hs },
-                        {hs,  hs,  hs },
-                        {-hs, hs,  hs }
-                    };
-					int edges[12][2] = {
-					    {0, 1},
-                        {1, 2},
-                        {2, 3},
-                        {3, 0},
-                        {4, 5},
-                        {5, 6},
-                        {6, 7},
-                        {7, 4},
-                        {0, 4},
-                        {1, 5},
-                        {2, 6},
-                        {3, 7}
-                    };
-					for (int i = 0; i < 8; ++i) {
-						DirectX::XMVECTOR p = DirectX::XMVector3TransformCoord(DirectX::XMVectorSet(cv[i].x, cv[i].y, cv[i].z, 1.0f), xmat);
-						DirectX::XMStoreFloat3(reinterpret_cast<DirectX::XMFLOAT3*>(&cv[i]), p);
+					// ★修正: レイキャスト対象となるメッシュを持つかチェック
+					// UI ボタンなど削除対象でないオブジェクトをフィルタリング
+					Engine::Model* model = nullptr;
+					if (registry.all_of<GpuMeshColliderComponent>(e)) {
+						model = scene->GetRenderer()->GetModel(registry.get<GpuMeshColliderComponent>(e).meshHandle);
+					} else if (registry.all_of<MeshRendererComponent>(e)) {
+						model = scene->GetRenderer()->GetModel(registry.get<MeshRendererComponent>(e).modelHandle);
 					}
-					for (int i = 0; i < 12; ++i) {
-						scene->GetRenderer()->DrawLine3D(cv[edges[i][0]], cv[edges[i][1]], {1.0f, 0.0f, 0.0f, 1.0f}, true);
+
+					// モデルがない = レイキャスト対象でない = 削除対象ではない
+					if (!model) {
+						continue;
+					}
+
+					const auto& eTc = registry.get<TransformComponent>(e);
+					int eGridX = static_cast<int>(std::floor(eTc.translate.x / gridSize));
+					int eGridZ = static_cast<int>(std::floor(eTc.translate.z / gridSize));
+
+					// 同じグリッドマス内か判定
+					if (eGridX == gridX && eGridZ == gridZ) {
+						// ルートエンティティを取得
+						entt::entity highlightEntity = e;
+						if (registry.all_of<HierarchyComponent>(e)) {
+							auto root = e;
+							while (registry.get<HierarchyComponent>(root).parentId != entt::null) {
+								root = registry.get<HierarchyComponent>(root).parentId;
+							}
+							highlightEntity = root;
+						}
+
+						// 重複チェック
+						bool alreadyAdded = false;
+						for (auto& added : highlightEntities) {
+							if (added == highlightEntity) {
+								alreadyAdded = true;
+								break;
+							}
+						}
+						if (!alreadyAdded) {
+							highlightEntities.push_back(highlightEntity);
+						}
+					}
+				}
+
+				// ★修正: ボタンで出せる施設（大砲、ミサイル、ポイズン、アイスキャノン）のみを赤色で描画
+				for (auto highlightEntity : highlightEntities) {
+					if (!registry.all_of<TransformComponent>(highlightEntity))
+						continue;
+
+					// 土台は赤くハイライトしない（名前で判定）
+					bool isBase = false;
+					if (registry.all_of<NameComponent>(highlightEntity)) {
+						const auto& name = registry.get<NameComponent>(highlightEntity).name;
+						if (name.find("Base") != std::string::npos || name.find("base") != std::string::npos) {
+							isBase = true;
+						}
+					}
+					if (isBase) {
+						continue;
+					}
+
+					// ボタンで出せる施設かチェック（大砲、ミサイル、ポイズン、アイスキャノンのみハイライト）
+					bool isHighlightableBuilding = false;
+					if (registry.all_of<NameComponent>(highlightEntity)) {
+						const auto& name = registry.get<NameComponent>(highlightEntity).name;
+						if (name.find("Canon") != std::string::npos || name.find("Cannon") != std::string::npos ||
+							name.find("Missile") != std::string::npos ||
+							name.find("Poison") != std::string::npos ||
+							name.find("Ice") != std::string::npos) {
+							isHighlightableBuilding = true;
+						}
+					}
+					if (!isHighlightableBuilding) {
+						continue;
+					}
+
+					auto hlTc = registry.get<TransformComponent>(highlightEntity);
+					uint32_t meshHandle = 0;
+					if (registry.all_of<MeshRendererComponent>(highlightEntity)) {
+						meshHandle = registry.get<MeshRendererComponent>(highlightEntity).modelHandle;
+					} else if (registry.all_of<GpuMeshColliderComponent>(highlightEntity)) {
+						meshHandle = registry.get<GpuMeshColliderComponent>(highlightEntity).meshHandle;
+					}
+
+					if (meshHandle != 0) {
+						Engine::Transform tr;
+						tr.translate = {hlTc.translate.x, hlTc.translate.y, hlTc.translate.z};
+						tr.rotate = {hlTc.rotate.x, hlTc.rotate.y, hlTc.rotate.z};
+						tr.scale = {hlTc.scale.x, hlTc.scale.y, hlTc.scale.z};
+						scene->GetRenderer()->DrawMesh(meshHandle, 0, tr, {1.0f, 0.0f, 0.0f, 0.7f}, "Toon");
 					}
 				}
 			}
@@ -465,22 +825,109 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 						}
 
 						if (refundCost > 0) {
-							int getRefundAmount = CalculateRefund(refundCost);
-							CoinCount += getRefundAmount;
-
-							// 親オブジェクト等があれば再帰的に削除するか、単純にエンティティをデストロイする
-							// GameObjectの削除
+							// 削除対象エンティティを決定（親がいればそれを削除対象にする）
+							entt::entity targetEntity = hoverEntity;
 							if (registry.all_of<HierarchyComponent>(hoverEntity)) {
 								auto root = hoverEntity;
 								while (registry.get<HierarchyComponent>(root).parentId != entt::null) {
 									root = registry.get<HierarchyComponent>(root).parentId;
 								}
-								scene->DestroyObject(static_cast<uint32_t>(root));
-							} else {
-								scene->DestroyObject(static_cast<uint32_t>(hoverEntity));
+								targetEntity = root;
 							}
 
-							EditorUI::Log("Object sold for " + std::to_string(getRefundAmount));
+							// ★修正: 同じマス（2x2グリッド）内にあるすべてのオブジェクトを収集して削除
+							std::vector<entt::entity> entitiesToDelete;
+
+							// グリッド座標に変換
+							constexpr float gridSize = 2.0f;
+							if (registry.all_of<TransformComponent>(targetEntity)) {
+								auto& targetTc = registry.get<TransformComponent>(targetEntity);
+								int gridX = static_cast<int>(std::floor(targetTc.translate.x / gridSize));
+								int gridZ = static_cast<int>(std::floor(targetTc.translate.z / gridSize));
+
+								// 同じグリッド内のすべてのエンティティを探す
+								auto view = registry.view<TransformComponent>();
+								for (auto e : view) {
+									if (registry.all_of<NameComponent>(e)) {
+										const auto& name = registry.get<NameComponent>(e).name;
+										// 削除不可オブジェクトはスキップ
+										if (name.find("Terrain") != std::string::npos || name.find("Plane") != std::string::npos || 
+											name.find("Core") != std::string::npos || name.find("Floor") != std::string::npos ||
+											name.find("PipeConnection") != std::string::npos) {
+											continue;
+										}
+									}
+
+									const auto& eTc = registry.get<TransformComponent>(e);
+									int eGridX = static_cast<int>(std::floor(eTc.translate.x / gridSize));
+									int eGridZ = static_cast<int>(std::floor(eTc.translate.z / gridSize));
+
+									// 同じグリッドマス内か判定
+									if (eGridX == gridX && eGridZ == gridZ) {
+										entitiesToDelete.push_back(e);
+									}
+								}
+							}
+
+							// 収集したエンティティをすべて削除し、返金を合計する
+							int totalRefund = 0;
+							std::vector<entt::entity> deletedRoots;
+
+							for (auto deleteEntity : entitiesToDelete) {
+								// ルートエンティティを取得
+								entt::entity rootToDelete = deleteEntity;
+								if (registry.all_of<HierarchyComponent>(deleteEntity)) {
+									auto root = deleteEntity;
+									while (registry.get<HierarchyComponent>(root).parentId != entt::null) {
+										root = registry.get<HierarchyComponent>(root).parentId;
+									}
+									rootToDelete = root;
+								}
+
+								// 重複チェック（既に削除リストにあれば追加しない）
+								bool alreadyAdded = false;
+								for (auto& deleted : deletedRoots) {
+									if (deleted == rootToDelete) {
+										alreadyAdded = true;
+										break;
+									}
+								}
+								if (alreadyAdded) continue;
+
+								deletedRoots.push_back(rootToDelete);
+
+								// この削除対象の返金額を計算
+								int entityRefund = 0;
+								if (registry.all_of<NameComponent>(rootToDelete)) {
+									const auto& name = registry.get<NameComponent>(rootToDelete).name;
+									if (name.find("Canon") != std::string::npos || name.find("Cannon") != std::string::npos) {
+										entityRefund = CalculateRefund(canonCost_);
+									} else if (name.find("Missile") != std::string::npos) {
+										entityRefund = CalculateRefund(missileCost_);
+									} else if (name.find("Poison") != std::string::npos) {
+										entityRefund = CalculateRefund(poisonCost_);
+									} else if (name.find("Ice") != std::string::npos) {
+										entityRefund = CalculateRefund(iceCanonCost_);
+									}
+								}
+								totalRefund += entityRefund;
+
+								// スクリプトの OnDestroy を呼び出す
+								if (registry.all_of<ScriptComponent>(rootToDelete)) {
+									auto& sc = registry.get<ScriptComponent>(rootToDelete);
+									for (auto& entry : sc.scripts) {
+										if (entry.instance) {
+											entry.instance->OnDestroy(rootToDelete, scene);
+										}
+									}
+								}
+
+								// エンティティを削除
+								scene->DestroyObject(static_cast<uint32_t>(rootToDelete));
+							}
+
+							CoinCount += totalRefund;
+							EditorUI::Log("Objects sold for " + std::to_string(totalRefund));
 						}
 					}
 				}
@@ -799,18 +1246,58 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			}
 		}
 
-		if (isCoreDead) {
-			ResultManagerScript::pendingIsWin = false;
-			ResultManagerScript::pendingOriginalScene = scene->GetStagePath();
-			Engine::SceneParameters p;
-			p.sceneName = "Result";
-			p.isWin = false;
-			p.score = 300;
-			p.clearTime = scene->GetPlayTime();
-			Engine::SceneManager::GetInstance()->RequestChange("Result", p);
+		// ★追加: プレイヤーの死亡確認
+		bool isPlayerDead = false;
+		const auto& players = scene->GetEntitiesByTag(TagType::Player);
+		for (auto playerEntity : players) {
+			if (scene->GetRegistry().valid(playerEntity) && scene->GetRegistry().all_of<HealthComponent>(playerEntity)) {
+				if (scene->GetRegistry().get<HealthComponent>(playerEntity).hp <= 0.0f) {
+					isPlayerDead = true;
+					break;
+				}
+			}
+		}
 
-			isPhaseTransitioning_ = true;
-			isPhase_ = Transition;
+		if ((isCoreDead || isPlayerDead) && s_gameOverPhase_ == 0) {
+			s_gameOverPhase_ = 1;
+			gameOverTimer_ = 0.0f;
+			scene->SetGameTimeScale(0.0f); // 全ての時間を止める
+
+			// ★追加: リザルト画面や演出に不要なワールドUIを非表示にする
+			auto wsUIView = scene->GetRegistry().view<WorldSpaceUIComponent>();
+			for (auto e : wsUIView) {
+				scene->GetRegistry().get<WorldSpaceUIComponent>(e).enabled = false;
+			}
+
+			// ★追加: ゲーム中のHUD（RectTransformを持つすべてのUI）を非表示にする
+			auto uiView = scene->GetRegistry().view<RectTransformComponent>();
+			for (auto e : uiView) {
+				scene->GetRegistry().get<RectTransformComponent>(e).enabled = false;
+			}
+			
+			// ★追加: テキストや画像もすべて無効化 (残存UIを確実に消去)
+			auto txtView = scene->GetRegistry().view<UITextComponent>();
+			for (auto e : txtView) {
+				scene->GetRegistry().get<UITextComponent>(e).enabled = false;
+			}
+			auto imgView = scene->GetRegistry().view<UIImageComponent>();
+			for (auto e : imgView) {
+				scene->GetRegistry().get<UIImageComponent>(e).enabled = false;
+			}
+			
+			// カメラの初期位置を保存
+			goStartCamPos_ = scene->GetCamera().Position();
+			goStartCamRot_ = scene->GetCamera().Rotation();
+
+			// カメラ追従などの入力を無効化
+			auto targetView = scene->GetRegistry().view<CameraTargetComponent>();
+			for (auto e : targetView) {
+				scene->GetRegistry().get<CameraTargetComponent>(e).enabled = false;
+			}
+			auto inputView = scene->GetRegistry().view<PlayerInputComponent>();
+			for (auto e : inputView) {
+				scene->GetRegistry().get<PlayerInputComponent>(e).enabled = false;
+			}
 		} else if (WaveManagement::IsWaveEnded()) {
 			bool isTutorial = false;
 			if (scene) {
@@ -820,18 +1307,49 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				}
 			}
 
-			if (!isTutorial) {
-				ResultManagerScript::pendingIsWin = true;
-				ResultManagerScript::pendingOriginalScene = scene->GetStagePath();
-				Engine::SceneParameters p;
-				p.sceneName = "Result";
-				p.isWin = true;
-				p.score = 1500;
-				p.clearTime = scene->GetPlayTime();
-				Engine::SceneManager::GetInstance()->RequestChange("Result", p);
+			if (!isTutorial && s_gameClearPhase_ == 0) {
+				s_gameClearPhase_ = 1;
+				gameOverTimer_ = 0.0f;
+				scene->SetGameTimeScale(0.0f); // 全ての時間を止める
 
-				isPhaseTransitioning_ = true;
-				isPhase_ = Transition;
+				// リザルト画面や演出に不要なワールドUIを非表示にする
+				auto wsUIView = scene->GetRegistry().view<WorldSpaceUIComponent>();
+				for (auto e : wsUIView) {
+					scene->GetRegistry().get<WorldSpaceUIComponent>(e).enabled = false;
+				}
+				// ゲーム中のHUD（RectTransformを持つすべてのUI）を非表示にする
+				auto uiView = scene->GetRegistry().view<RectTransformComponent>();
+				for (auto e : uiView) {
+					scene->GetRegistry().get<RectTransformComponent>(e).enabled = false;
+				}
+				// テキストや画像もすべて無効化
+				auto txtView = scene->GetRegistry().view<UITextComponent>();
+				for (auto e : txtView) {
+					scene->GetRegistry().get<UITextComponent>(e).enabled = false;
+				}
+				auto imgView = scene->GetRegistry().view<UIImageComponent>();
+				for (auto e : imgView) {
+					scene->GetRegistry().get<UIImageComponent>(e).enabled = false;
+				}
+
+				// カメラの初期位置を保存
+				goStartCamPos_ = scene->GetCamera().Position();
+				goStartCamRot_ = scene->GetCamera().Rotation();
+
+				// コアの場所を特定
+				DirectX::XMFLOAT3 corePos = {0,0,0};
+				auto core = scene->FindObjectByName("Core");
+				if (scene->GetRegistry().valid(core) && scene->GetRegistry().all_of<TransformComponent>(core)) {
+					corePos = scene->GetRegistry().get<TransformComponent>(core).translate;
+				}
+
+				// 最初の花火を1つ打ち上げる
+				entt::entity fwEntity = scene->CreateEntity("GameClearFirework");
+				auto& tc = scene->GetRegistry().emplace<TransformComponent>(fwEntity);
+				tc.translate = corePos;
+				auto& sc = scene->GetRegistry().emplace<ScriptComponent>(fwEntity);
+				sc.scripts.push_back({"FireworkScript", "", nullptr});
+				sc.enabled = true;
 			}
 		}
 	}

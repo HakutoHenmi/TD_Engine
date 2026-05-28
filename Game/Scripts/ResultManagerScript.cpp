@@ -83,16 +83,7 @@ void ResultManagerScript::CreateFallbackUI(GameScene* scene, bool isWin, int sco
 	auto& reg = scene->GetRegistry();
 	auto* renderer = scene->GetRenderer();
 
-	// 背景
-	auto bg = reg.create();
-	reg.emplace<NameComponent>(bg, "Background");
-	auto& rectBg = reg.emplace<RectTransformComponent>(bg);
-	rectBg.pos = {0, 0};
-	rectBg.size = {(float)Engine::WindowDX::kW, (float)Engine::WindowDX::kH};
-	rectBg.anchor = {0.5f, 0.5f};
-	rectBg.pivot = {0.5f, 0.5f};
-	auto& imgBg = reg.emplace<UIImageComponent>(bg);
-	imgBg.color = {0.05f, 0.05f, 0.05f, 0.8f};
+	// 背景は作成せず、現在のシーン（空）をそのまま見せる
 
 	// 勝敗テキスト
 	auto resText = reg.create();

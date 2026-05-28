@@ -31,6 +31,7 @@ private:
     bool isSpecial_ = false;      // 特殊射撃フラグ
     bool isFlight_ = false;       // 飛行エフェクトフラグ
     int colorMode_ = 0;           // 0=通常, 1=Poison
+    bool ignoreTimeScale_ = false; // 時間停止無視フラグ
     float scatterDelay_ = 0.05f;
     float scatterSpeed_ = 10.0f;
 

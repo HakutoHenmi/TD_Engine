@@ -52,6 +52,8 @@ public:
 	bool IsPlaying() const { return isPlaying_; } // Alias for backward compatibility
 	bool IsPaused() const { return isPaused_; }
 	void SetIsPlaying(bool play);
+	void SetGameTimeScale(float scale) { gameTimeScale_ = scale; }
+	float GetGameTimeScale() const { return gameTimeScale_; }
 	const std::string& GetSceneSnapshot() const { return sceneSnapshot_; } // ★追加: プレイ開始時のクリーンな状態を取得
 	Engine::Renderer* GetRenderer() const { return renderer_; }
 	Engine::WindowDX* GetWindow() const { return dx_; }
@@ -145,6 +147,7 @@ private:
     Engine::ParticleEditor particleEditor_;
 
     float playTime_ = 0.0f; // クリアタイム計測用
+    float gameTimeScale_ = 1.0f; // ゲーム内時間のスケール（ポーズ等とは独立）
     std::string stagePath_; // ロードしたステージのJSONパス
 
     DirectX::XMFLOAT3 editorCameraPos_ = {0.0f, 2.0f, -5.0f};

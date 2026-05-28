@@ -6,6 +6,7 @@
 #include <algorithm>
 #include "Renderer.h"
 #include "Camera.h"
+#include "../../Engine/Time/TimeManager.h" // ★追加
 
 namespace Game {
 
@@ -45,6 +46,7 @@ void SpaceShatterScript::Start(entt::entity entity, GameScene* scene) {
         colorMode_ = (int)vc.GetValue("ColorMode", 0.0f);
         scatterDelay_ = vc.GetValue("ScatterDelay", 0.05f);
         scatterSpeed_ = vc.GetValue("ScatterSpeed", 10.0f);
+        ignoreTimeScale_ = vc.GetValue("IgnoreTimeScale", 0.0f) > 0.5f; // ★追加: 時間停止を無視するフラグ
     }
 
     // 銃撃エフェクトの場合は、銃口から少し離すために法線方向へオフセット
@@ -82,7 +84,7 @@ void SpaceShatterScript::Start(entt::entity entity, GameScene* scene) {
     }
     
     int sCount = isFlight_ ? shardCount_ : (isSpecial_ ? 15 : 10);
-    if (colorMode_ == 1) sCount = shardCount_; // 毒霧モードは破片の代わりに煙を大量に生成
+    if (colorMode_ == 1 || colorMode_ == 2) sCount = shardCount_; // ★修正: colorMode == 2(爆発)も破片とは別に煙を大量に生成
     
     GenerateSmokeParticles(scene, sCount);
 }
@@ -147,6 +149,9 @@ void SpaceShatterScript::GenerateShards(GameScene* scene) {
 }
 
 void SpaceShatterScript::Update(entt::entity entity, GameScene* scene, float dt) {
+    if (ignoreTimeScale_ && dt <= 0.0001f) {
+        dt = Engine::TimeManager::GetInstance().GetUnscaledDeltaTime();
+    }
     timer_ += dt;
     auto& reg = scene->GetRegistry();
 
@@ -224,6 +229,7 @@ void SpaceShatterScript::Draw(entt::entity /*entity*/, GameScene* scene) {
             Engine::Matrix4x4 world; XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&world), m);
             Engine::Vector4 color = {0.2f, 0.7f, 2.0f, lifeT};
             if (colorMode_ == 1) color = {0.3f, 0.9f, 0.1f, lifeT};
+            else if (colorMode_ == 2) color = {1.0f, 0.2f, 0.1f, lifeT}; // Red
             renderer->DrawParticleInstanced(cubeMesh_, sparkTex_, world, color, {1,1,0,0}, "ParticleAdditive");
         } else {
             m = XMMatrixScaling(s, s, s) *
@@ -233,6 +239,7 @@ void SpaceShatterScript::Draw(entt::entity /*entity*/, GameScene* scene) {
             Engine::Vector4 color = {1.0f, 1.0f, 1.0f, lifeT};
             if (sh.colorType == 1) color = {1.2f, 1.4f, 1.8f, lifeT};
             if (colorMode_ == 1) color = {0.4f, 0.9f, 0.2f, lifeT};
+            else if (colorMode_ == 2) color = {1.0f, 0.3f, 0.1f, lifeT}; // Red shards
             renderer->DrawParticleInstanced(cubeMesh_, 0, world, color, {1.0f, 1.0f, 0.0f, 0.0f}, "Default");
         }
     }
@@ -315,6 +322,8 @@ void SpaceShatterScript::GenerateSmokeParticles(GameScene* scene, int count) {
 
         if (colorMode_ == 1) { // Poison Color
             sp.color = isSteam ? DirectX::XMFLOAT4{0.4f, 0.9f, 0.2f, 1.0f} : DirectX::XMFLOAT4{0.2f, 0.7f, 0.1f, 1.0f};
+        } else if (colorMode_ == 2) { // Red Explosion
+            sp.color = isSteam ? DirectX::XMFLOAT4{0.7f, 0.3f, 0.2f, 1.0f} : DirectX::XMFLOAT4{0.2f, 0.1f, 0.1f, 1.0f};
         } else {
             if (!scatterMode_) {
                 if (isFlight_) {
