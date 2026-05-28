@@ -643,18 +643,41 @@ void Renderer::FlushDrawCalls() {
 					list_->SetGraphicsRootConstantBufferView(2, cbLightAddr_);
 					if (shadowSrv_.ptr != 0) list_->SetGraphicsRootDescriptorTable(5, shadowSrv_);
 					
-					// テクスチャ
-					if (idc.tex != 0 && idc.tex < textures_.size()) {
-						list_->SetGraphicsRootDescriptorTable(3, textures_[idc.tex].srvGpu);
-					} else {
-						list_->SetGraphicsRootDescriptorTable(3, textures_[0].srvGpu);
-					}
 					// インスタンスデータバインド (Slot 6)
 					list_->SetGraphicsRootShaderResourceView(6, upload_[fi].buffer->GetGPUVirtualAddress() + offset);
+
+					const auto& subsets = model->GetData().subsets;
+					if (subsets.empty()) {
+						// テクスチャ
+						if (idc.tex != 0 && idc.tex < textures_.size()) {
+							list_->SetGraphicsRootDescriptorTable(3, textures_[idc.tex].srvGpu);
+						} else {
+							list_->SetGraphicsRootDescriptorTable(3, textures_[0].srvGpu);
+						}
+						model->DrawInstanced(list_, static_cast<uint32_t>(idc.instances.size()));
+					} else {
+						// ★マルチマテリアル描画
+						for (size_t i = 0; i < subsets.size(); ++i) {
+							const auto& subset = subsets[i];
+							uint32_t texIdx = idc.tex;
+							if (subset.materialIndex > 0 && subset.materialIndex <= idc.extraTex.size()) {
+								texIdx = idc.extraTex[subset.materialIndex - 1];
+							}
+							
+							if (texIdx != 0 && texIdx < textures_.size()) {
+								list_->SetGraphicsRootDescriptorTable(3, textures_[texIdx].srvGpu);
+							} else {
+								list_->SetGraphicsRootDescriptorTable(3, textures_[0].srvGpu);
+							}
+							model->DrawSubsetInstanced(list_, static_cast<uint32_t>(idc.instances.size()), (UINT)i);
+						}
+					}
 				}
 			}
 
-			model->DrawInstanced(list_, static_cast<uint32_t>(idc.instances.size()));
+			if (sName == "EnhancedTerrain") {
+				model->DrawInstanced(list_, static_cast<uint32_t>(idc.instances.size()));
+			}
 		}
 		calls.clear();
 	};
