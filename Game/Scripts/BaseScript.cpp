@@ -116,7 +116,7 @@ void BaseScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	TagComponent& bulletTag = registry.emplace<TagComponent>(bullet);
 	bulletTag.tag = TagType::Bullet;
 
-	TransformComponent& bulletTransform = registry.emplace<TransformComponent>(bullet);
+	TransformComponent& bulletTransform = registry.get_or_emplace<TransformComponent>(bullet);
 	bulletTransform.translate = baseTransform.translate;
 
 	float muzzleOffset = 1.5f;

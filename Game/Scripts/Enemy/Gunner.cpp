@@ -32,7 +32,7 @@ void Game::Gunner::ExecuteAttack(entt::entity entity, GameScene* scene, float /*
 	TagComponent& bulletTag = registry.emplace<TagComponent>(bullet);
 	bulletTag.tag = TagType::EnemyBullet;
 
-	TransformComponent& bulletTransform = registry.emplace<TransformComponent>(bullet);
+	TransformComponent& bulletTransform = registry.get_or_emplace<TransformComponent>(bullet);
 	bulletTransform.translate = myTransform.translate;
 	bulletTransform.translate.y += 1.0f; // 少し上から発射
 	bulletTransform.rotate = myTransform.rotate;

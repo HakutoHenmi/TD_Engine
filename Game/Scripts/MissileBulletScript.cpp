@@ -390,7 +390,7 @@ void MissileBulletScript::CreateExplosionAttackArea(entt::entity entity, GameSce
 	TagComponent& explosionTag = registry.emplace<TagComponent>(explosionAttackArea);
 	explosionTag.tag = TagType::Bullet;
 
-	TransformComponent& explosionTransform = registry.emplace<TransformComponent>(explosionAttackArea);
+	TransformComponent& explosionTransform = registry.get_or_emplace<TransformComponent>(explosionAttackArea);
 	explosionTransform.translate = missileTransform.translate;
 	explosionTransform.rotate = {0.0f, 0.0f, 0.0f};
 	explosionTransform.scale = {explosionRadius_, explosionRadius_, explosionRadius_};
