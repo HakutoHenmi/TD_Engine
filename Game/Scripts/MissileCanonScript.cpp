@@ -74,17 +74,15 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 		attackTimer_ = 0.0f;
 	}
 
-	if (!registry.all_of<TransformComponent>(entity)) {
-		return;
-	}
-	if (!registry.valid(currentTarget_)) {
-		currentTarget_ = entt::null;
-		return;
-	}
+	if (currentTarget_ != entt::null) {
 
-	if (!registry.all_of<TransformComponent>(currentTarget_)) {
-		currentTarget_ = entt::null;
-		return;
+		if (!registry.valid(currentTarget_)) {
+			currentTarget_ = entt::null;
+		}
+
+		else if (!registry.all_of<TransformComponent>(currentTarget_)) {
+			currentTarget_ = entt::null;
+		}
 	}
 	TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
 
@@ -294,7 +292,7 @@ void MissileCanonScript::CreateBase(entt::entity entity, GameScene* scene) {
 
 	// updatebase
 	// UpdateBase(entity, scene);
-
+	
 	const TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
 
 	baseEntity_ = scene->CreateEntity("MissileCanonBase");
@@ -449,7 +447,7 @@ void MissileCanonScript::UpdateTarget(entt::registry& registry, GameScene* scene
 
 	if (currentTarget_ == entt::null) {
 
-		float bestDistance = attackRange_;
+		float bestDistance = attackRange_+0.01f;
 
 		const std::vector<entt::entity>& enemies = scene->GetEntitiesByTag(TagType::Enemy);
 
