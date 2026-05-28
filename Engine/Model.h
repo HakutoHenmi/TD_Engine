@@ -32,6 +32,12 @@ struct MaterialData {
 	std::vector<std::string> extraTextures; // ★追加: 地形用のスプラットマップやレイヤー
 };
 
+struct MeshSubset {
+	uint32_t indexStart = 0;
+	uint32_t indexCount = 0;
+	uint32_t materialIndex = 0;
+};
+
 // ボーン単体
 struct Bone {
 	std::string name;
@@ -99,6 +105,9 @@ struct ModelData {
 	// BVHデータ
 	std::vector<BVHNode> bvhNodes;
 	std::vector<uint32_t> bvhIndices; // 並び替えられたインデックス
+
+	// マルチマテリアル用サブセット
+	std::vector<MeshSubset> subsets;
 };
 
 class Model {
@@ -118,6 +127,10 @@ public:
 	// 描画 (Rendererの実装に合わせてデフォルト引数を調整: t0がindex 3の場合)
 	void Draw(ID3D12GraphicsCommandList* cmd, UINT rootSrvParamIndex = 3);
 	void DrawInstanced(ID3D12GraphicsCommandList* cmd, UINT instanceCount, UINT rootSrvParamIndex = 3);
+	
+	// サブセット指定描画
+	void DrawSubset(ID3D12GraphicsCommandList* cmd, UINT subsetIndex);
+	void DrawSubsetInstanced(ID3D12GraphicsCommandList* cmd, UINT instanceCount, UINT subsetIndex);
 
 	// ゲッター
 	const ModelData& GetData() const { return data_; }

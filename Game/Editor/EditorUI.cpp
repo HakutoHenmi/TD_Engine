@@ -122,6 +122,20 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 					if (comp.contains("uvOffset")) c.uvOffset = {comp["uvOffset"][0], comp["uvOffset"][1]};
 					if (!c.modelPath.empty()) c.modelHandle = Engine::Renderer::GetInstance()->LoadObjMesh(c.modelPath);
 					if (!c.texturePath.empty()) c.textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(c.texturePath);
+					
+					if (comp.contains("extraTexturePaths") && comp["extraTexturePaths"].is_array()) {
+						c.extraTexturePaths.clear();
+						c.extraTextureHandles.clear();
+						for (auto& pathJ : comp["extraTexturePaths"]) {
+							std::string path = pathJ.get<std::string>();
+							c.extraTexturePaths.push_back(path);
+							if (!path.empty()) {
+								c.extraTextureHandles.push_back(Engine::Renderer::GetInstance()->LoadTexture2D(path));
+							} else {
+								c.extraTextureHandles.push_back(0);
+							}
+						}
+					}
 				} else if (type == "BoxCollider") {
 					auto& c = reg.get_or_emplace<BoxColliderComponent>(entity);
 					c.enabled = en;
@@ -561,7 +575,16 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 	if (auto* cp = registry.try_get<MeshRendererComponent>(entity)) {
 		addComma();
 		ss << "        {\"type\": \"MeshRenderer\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"modelPath\": \"" << EscapeJson(cp->modelPath) << "\", \"texturePath\": \""
-		   << EscapeJson(cp->texturePath) << "\", \"shaderName\": \"" << EscapeJson(cp->shaderName) << "\", \"color\": [" << cp->color.x << "," << cp->color.y << "," << cp->color.z << "," << cp->color.w << "], \"uvTiling\": [" << cp->uvTiling.x << "," << cp->uvTiling.y << "], \"uvOffset\": [" << cp->uvOffset.x << "," << cp->uvOffset.y << "]}";
+		   << EscapeJson(cp->texturePath) << "\", \"shaderName\": \"" << EscapeJson(cp->shaderName) << "\", \"color\": [" << cp->color.x << "," << cp->color.y << "," << cp->color.z << "," << cp->color.w << "], \"uvTiling\": [" << cp->uvTiling.x << "," << cp->uvTiling.y << "], \"uvOffset\": [" << cp->uvOffset.x << "," << cp->uvOffset.y << "]";
+		if (!cp->extraTexturePaths.empty()) {
+			ss << ", \"extraTexturePaths\": [";
+			for (size_t i = 0; i < cp->extraTexturePaths.size(); ++i) {
+				if (i > 0) ss << ", ";
+				ss << "\"" << EscapeJson(cp->extraTexturePaths[i]) << "\"";
+			}
+			ss << "]";
+		}
+		ss << "}";
 	}
 	if (auto* cp = registry.try_get<BoxColliderComponent>(entity)) {
 		addComma();
@@ -2373,6 +2396,27 @@ void EditorUI::ShowInspector(GameScene* scene) {
 
 					if (AssetField("Texture Path", cp->texturePath, {".png", ".jpg"})) {
 						cp->textureHandle = Engine::Renderer::GetInstance()->LoadTexture2D(cp->texturePath);
+					}
+
+					// ★追加: マルチマテリアル用サブテクスチャ
+					for (size_t i = 0; i < cp->extraTexturePaths.size(); ++i) {
+						ImGui::PushID(static_cast<int>(i) + 1000);
+						std::string label = "Sub Texture " + std::to_string(i + 1);
+						if (AssetField(label.c_str(), cp->extraTexturePaths[i], {".png", ".jpg"})) {
+							cp->extraTextureHandles[i] = Engine::Renderer::GetInstance()->LoadTexture2D(cp->extraTexturePaths[i]);
+						}
+						ImGui::SameLine();
+						if (ImGui::Button("X")) {
+							cp->extraTexturePaths.erase(cp->extraTexturePaths.begin() + i);
+							cp->extraTextureHandles.erase(cp->extraTextureHandles.begin() + i);
+							ImGui::PopID();
+							break;
+						}
+						ImGui::PopID();
+					}
+					if (ImGui::Button("Add Sub Texture")) {
+						cp->extraTexturePaths.push_back("");
+						cp->extraTextureHandles.push_back(0);
 					}
 
 					// Shader Dropdown
