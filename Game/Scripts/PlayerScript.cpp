@@ -470,8 +470,8 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			auto params = renderer->GetPostProcessParams();
 			float rate = damageEffectTimer_ / DAMAGE_EFFECT_DURATION; // 1.0 -> 0.0
 
-			// ビネット強度 (最大1.5) を赤色ビネットに変更
-			params.damageVignette = rate * 1.5f;
+			// ビネット強度 (最大0.7) を赤色ビネットに変更
+			params.damageVignette = rate * 0.7f;
 			// 色収差は廃止されたのでコメントアウト
 			// params.chromaShift = rate * 0.05f;
 
@@ -501,6 +501,29 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		float targetDof = isPrep ? 0.3f : 0.0f; // ★Renderer.hに合わせた値
 		if (params.dofIntensity != targetDof) {
 			params.dofIntensity = targetDof;
+			renderer->SetPostProcessParams(params);
+		}
+
+		// ★追加: ブースト時のブラー効果
+		float targetRadialBlur = isFlying_ ? 0.015f : 0.0f; // 飛行中のブラーはさらに弱く
+		if (!isFlying_ && scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
+			auto& rb = scene->GetRegistry().get<RigidbodyComponent>(entity);
+			float speedSq = rb.velocity.x * rb.velocity.x + rb.velocity.z * rb.velocity.z;
+			if (speedSq > 900.0f) { // 速度30以上でブラー開始 (ダッシュ時は155)
+				targetRadialBlur = std::min((std::sqrt(speedSq) - 30.0f) * 0.0003f, 0.035f); // 上限と倍率を低下
+			}
+		}
+		
+		if (params.radialBlur != targetRadialBlur) {
+			params.radialBlur += (targetRadialBlur - params.radialBlur) * 15.0f * dt;
+			if (std::abs(params.radialBlur - targetRadialBlur) < 0.001f) params.radialBlur = targetRadialBlur;
+			renderer->SetPostProcessParams(params);
+		}
+
+		// ★追加: 集中線（風エフェクト）の減衰
+		if (params.speedLine > 0.0f) {
+			params.speedLine -= 2.5f * dt; // より早く自然に消えるように
+			if (params.speedLine < 0.0f) params.speedLine = 0.0f;
 			renderer->SetPostProcessParams(params);
 		}
 
@@ -652,6 +675,13 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 						recoilVelocity_ = rb.velocity; // エフェクト用に保持
 					}
 
+					// ★追加: ポストプロセスで一瞬の風エフェクト(集中線)を出す
+					if (auto* pRenderer = Engine::Renderer::GetInstance()) {
+						auto pp = pRenderer->GetPostProcessParams();
+						pp.speedLine = 0.8f;
+						pRenderer->SetPostProcessParams(pp);
+					}
+
 					// ★演出: ブースト噴射エフェクト (進行方向と逆へ大量に噴射)
 					for (int i = 0; i < 2; ++i) { // 2回生成して密度を倍増
 						entt::entity boostVfx = scene->CreateEntity("SteamBoost_VFX");
@@ -721,6 +751,13 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 					isFlying_ = true;
 					if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
 						scene->GetRegistry().get<RigidbodyComponent>(entity).velocity.y = 20.0f;
+					}
+
+					// ★追加: 飛行開始時に一瞬の風エフェクト(集中線)を出す
+					if (auto* pRenderer = Engine::Renderer::GetInstance()) {
+						auto pp = pRenderer->GetPostProcessParams();
+						pp.speedLine = 0.6f;
+						pRenderer->SetPostProcessParams(pp);
 					}
 				}
 			}
@@ -1000,14 +1037,20 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			Engine::Renderer::SdfUIDesc hpDesc{};
 			// 少し長さを増やし、左端(X=145付近)を揃える (中心520, 幅750)
 			hpDesc.centerPx = {gaugeX + 520.0f * scale, gaugeY + 52.0f * scale};
-			hpDesc.sizePx = {750.0f * scale, 12.0f * scale};
+			hpDesc.sizePx = {750.0f * scale, 20.0f * scale}; // 高さを12->20に太くする
 			hpDesc.lineWidth = 0.0f;
-			hpDesc.glow = 0.0f;                      // 枠からはみ出ないようにglowを0に
-			hpDesc.color = {0.8f, 0.2f, 0.2f, 1.0f}; // 赤色
+			hpDesc.glow = 0.0f;
+			hpDesc.color = {2.5f, 0.2f, 0.2f, 1.0f}; // HDRで濃く発光させる
 			hpDesc.shape = 0;
 			hpDesc.round = hpDesc.sizePx.y * 0.5f; // 端を完全な半円にする
 			hpDesc.progress = hpProgress;
 			hpDesc.fill = 1.0f;
+			// 背景のトラック部分を描画 (HP)
+			Engine::Renderer::SdfUIDesc hpBgDesc = hpDesc;
+			hpBgDesc.progress = 1.0f;
+			hpBgDesc.color = {0.15f, 0.02f, 0.02f, 0.8f}; // 暗い赤の半透明
+			uiRenderer->DrawSDFUI(hpBgDesc);
+
 			if (hpProgress > 0.0f)
 				uiRenderer->DrawSDFUI(hpDesc);
 
@@ -1015,14 +1058,20 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			Engine::Renderer::SdfUIDesc expDesc{};
 			// HPゲージと長さを完全に一致させる (中心520, 幅750)
 			expDesc.centerPx = {gaugeX + 520.0f * scale, gaugeY + 76.0f * scale};
-			expDesc.sizePx = {750.0f * scale, 12.0f * scale};
+			expDesc.sizePx = {750.0f * scale, 20.0f * scale}; // 高さを12->20に太くする
 			expDesc.lineWidth = 0.0f;
 			expDesc.glow = 0.0f;
-			expDesc.color = {0.2f, 0.8f, 0.2f, 1.0f}; // 緑色
+			expDesc.color = {0.2f, 2.5f, 0.5f, 1.0f}; // HDRで濃く発光させる
 			expDesc.shape = 0;
 			expDesc.round = expDesc.sizePx.y * 0.5f;
 			expDesc.progress = expProgress;
 			expDesc.fill = 1.0f;
+			// 背景のトラック部分を描画 (EXP)
+			Engine::Renderer::SdfUIDesc expBgDesc = expDesc;
+			expBgDesc.progress = 1.0f;
+			expBgDesc.color = {0.02f, 0.15f, 0.02f, 0.8f}; // 暗い緑の半透明
+			uiRenderer->DrawSDFUI(expBgDesc);
+
 			if (expProgress > 0.0f)
 				uiRenderer->DrawSDFUI(expDesc);
 
@@ -1275,6 +1324,8 @@ void PlayerScript::UpdateAttack(entt::entity entity, GameScene* scene, float dt)
 					steamPressure_ -= SWORD_CHARGE_COST;
 					if (steamPressure_ < 0.0f)
 						steamPressure_ = 0.0f;
+						
+					swordChargeDone_ = true; // プレイ目標達成
 
 					isAttacking_ = true;
 					comboCount_ = 0; // 0は溜め攻撃用
@@ -1746,6 +1797,7 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 			// ★チャージショット発射！
 			ShootChargeShot(entity, scene);
 			gunShootDone_ = true;
+			gunChargeDone_ = true; // プレイ目標達成
 			if (!isSkillActive_)
 				steamPressure_ -= cCost;
 
@@ -2745,21 +2797,80 @@ void PlayerScript::ExecuteSkill(entt::entity entity, GameScene* scene) {
 		wTc.translate.x += moveX * 2.5f;
 		wTc.translate.z += moveZ * 2.5f;
 
-		wTc.scale = {12.0f, 0.2f, 2.0f}; // 超横広な衝撃波（次元斬）
+		// 歪み（スキュー）を防ぐため親スケールは1.0にする
+		wTc.scale = {1.0f, 1.0f, 1.0f}; 
 
+		// ★パーティクルのつぶつぶ感をなくすため、複数の薄いcubeメッシュを繋げて
+		// ひとつの「ソリッドでシャープな三日月型の斬撃」を構築する
+		int segments = 12; // 滑らかな曲線にするため分割数を増やす
+		float crescentWidth = 7.0f; // 全体の幅
+		float crescentDepth = 2.0f; // 三日月の深さ(曲がり具合)
+		
 		auto* renderer = scene->GetRenderer();
 		if (renderer) {
-			auto& mr = scene->GetRegistry().emplace<MeshRendererComponent>(wave);
-			mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
-			mr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-			mr.color = {0.1f, 0.8f, 1.0f, 0.8f}; // 青白い光
+			for (int i = 0; i < segments; ++i) {
+				float t = -1.0f + 2.0f * i / (segments - 1.0f); // -1.0 to 1.0
+				
+				// 円弧の角度 (中央が0、両端が斜めになるよう調整)
+				float maxAngle = DirectX::XM_PI / 3.0f; // 約60度
+				float angle = t * maxAngle;
+				
+				// 位置の計算：サイン・コサインを使って前方に凸な弧を作る
+				float localX = std::sin(angle) * (crescentWidth / 2.0f);
+				float localZ = (std::cos(angle) - 1.0f) * crescentDepth;
+				
+				entt::entity pNode = scene->CreateEntity("WaveBladeSegment");
+				auto& pNodeTc = scene->GetRegistry().get<TransformComponent>(pNode);
+				pNodeTc.translate = {localX, 0.0f, localZ}; 
+				pNodeTc.rotate = {0.0f, angle, 0.0f}; // 弧に沿って回転させる
+				
+				// セグメントの長さを計算（隙間ができないように長めにオーバーラップさせる）
+				float segmentLength = (crescentWidth * 1.5f) / segments;
+				// 端に行くほど鋭く(細く)する
+				float thickness = 1.5f * (1.0f - std::abs(t) * 0.85f); 
+				
+				// スケール: 幅(長さ), 厚さ(Y), 奥行き(Z)
+				pNodeTc.scale = {segmentLength, 0.15f, thickness};
+				
+				scene->SetParent(pNode, wave);
+				
+				auto& mr = scene->GetRegistry().emplace<MeshRendererComponent>(pNode);
+				mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+				mr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+				
+				// 中央は白っぽく発光し、端は鮮やかな青にするグラデーション
+				float r = 0.1f + 0.9f * (1.0f - std::abs(t));
+				float g = 0.6f + 0.4f * (1.0f - std::abs(t));
+				mr.color = {r, g, 1.0f, 0.9f};
+			}
 		}
+
+		// 軌跡として、中央から少しだけパーティクルを出す（補助的なエフェクト）
+		entt::entity centerTrail = scene->CreateEntity("WaveCenterTrail");
+		auto& trailTc = scene->GetRegistry().get<TransformComponent>(centerTrail);
+		trailTc.translate = {0.0f, 0.0f, 0.0f};
+		scene->SetParent(centerTrail, wave);
+		auto& pec = scene->GetRegistry().emplace<ParticleEmitterComponent>(centerTrail);
+		pec.emitter.params.name = "Trail";
+		pec.emitter.params.texturePath = "Resources/Textures/particles/diamond_flare.png";
+		pec.emitter.params.emitRate = 40.0f;
+		pec.emitter.params.shape = Engine::EmissionShape::Sphere;
+		pec.emitter.params.shapeRadius = 0.5f;
+		pec.emitter.params.startVelocity = {0.0f, 0.0f, -2.0f};
+		pec.emitter.params.velocityVariance = {0.5f, 0.2f, 0.5f};
+		pec.emitter.params.lifeTime = 0.25f;
+		pec.emitter.params.startSize = {2.5f, 2.5f, 2.5f};
+		pec.emitter.params.endSize = {0.0f, 0.0f, 0.0f};
+		pec.emitter.params.startColor = {0.2f, 0.8f, 1.0f, 0.8f};
+		pec.emitter.params.endColor = {0.0f, 0.1f, 1.0f, 0.0f};
+		pec.emitter.params.isAdditive = true;
 
 		auto& hb = scene->GetRegistry().emplace<HitboxComponent>(wave);
 		hb.isActive = true;
-		hb.damage = 60.0f;             // ★弱体化: 150.0f -> 60.0f (次元斬スキル用)
-		hb.tag = TagType::PlayerSword; // ★プレイヤーの剣攻撃として判定
-		hb.size = {12.0f, 1.0f, 2.0f};
+		hb.damage = 60.0f;             
+		hb.tag = TagType::PlayerSword; 
+		// 親のスケールを1.0にしたので、そのままワールド幅になる
+		hb.size = {7.0f, 1.0f, 2.0f};
 
 		auto& sc = scene->GetRegistry().emplace<ScriptComponent>(wave);
 		sc.scripts.push_back({"BulletScript", "", nullptr});
@@ -2870,8 +2981,8 @@ void PlayerScript::DrawSubObjectives(GameScene* scene) {
 	Engine::Renderer::SpriteDesc bg;
 	bg.x = baseX - 10.0f;
 	bg.y = baseY - 10.0f;
-	bg.w = 420.0f;
-	bg.h = 160.0f; // 目標3つ分
+	bg.w = 520.0f;
+	bg.h = 205.0f; // 目標4つ分
 	bg.color = {0.0f, 0.0f, 0.0f, 0.6f};
 	bg.layer = 10000;
 	renderer->DrawSprite(bgTexHandle, bg);
@@ -2905,10 +3016,14 @@ void PlayerScript::DrawSubObjectives(GameScene* scene) {
 		drawTask("近接スキル使用 (E または RBボタン)", swordSkillDone_, baseY);
 		baseY += lineHeight * 1.2f;
 		drawTask("スチーム・ブースト (右クリック または B)", swordDashDone_, baseY);
+		baseY += lineHeight * 1.2f;
+		drawTask("チャージ攻撃 (左クリ長押し または Xボタン長押し)", swordChargeDone_, baseY);
 	} else {
 		drawTask("自身強化スキル (E または RBボタン)", gunSkillDone_, baseY);
 		baseY += lineHeight * 1.2f;
 		drawTask("飛行＆オート射撃 (右/左クリック または B/X)", gunFlyDone_ && gunShootDone_, baseY);
+		baseY += lineHeight * 1.2f;
+		drawTask("連射撃ち (左クリ長押し または Xボタン長押し)", gunChargeDone_, baseY);
 	}
 }
 

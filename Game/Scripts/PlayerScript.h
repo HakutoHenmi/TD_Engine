@@ -194,9 +194,11 @@ private:
 	bool switchDone_ = false; // プレイヤー切り替え
 	bool swordSkillDone_ = false; // 剣士スキル使用
 	bool swordDashDone_ = false; // スチームブースト
-	bool gunSkillDone_ = false; // 銃士スキル使用
+	bool swordChargeDone_ = false; // 剣士チャージ攻撃
+	bool gunSkillDone_ = false; // ガンナースキル使用
 	bool gunFlyDone_ = false; // 飛行
 	bool gunShootDone_ = false; // オート射撃
+	bool gunChargeDone_ = false; // ガンナーチャージ(連射)オート射撃
 	void DrawSubObjectives(GameScene* scene);
 
 

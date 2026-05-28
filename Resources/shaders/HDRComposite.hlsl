@@ -42,7 +42,8 @@ cbuffer CBPost : register(b0)
     // モードボーダー
     float gPrepModeBorder;
     float gDeleteModeBorder;
-    float2 gPad2;
+    float gRadialBlur;
+    float gSpeedLine;
 };
 
 struct VSOut
@@ -244,16 +245,55 @@ float4 main(float4 svpos : SV_POSITION, float2 uv : TEXCOORD0) : SV_TARGET
     // 3. ブルーム合成 (リニア空間で加算)
     if (gBloomIntensity > 0.0f)
     {
-        // ブルームテクスチャもリニアである前提（または近似）
         float3 bloom = gBloom.Sample(gSmp, uv).rgb;
-        
-        // バンディング対策: ブルームの弱い部分を滑らかにフェードアウトさせる
         float bloomLum = dot(bloom, float3(0.2126, 0.7152, 0.0722));
         float smoothFactor = smoothstep(0.0f, 0.05f, bloomLum);
-        
         sceneColor += bloom * smoothFactor * gBloomIntensity;
     }
     
+    // ★追加: ラジアルブラー (ブースト時用)
+    if (gRadialBlur > 0.001f) {
+        float2 dir = 0.5f - uv;
+        float3 blurColor = 0.0f;
+        float totalWeight = 0.0f;
+        for (int i = 0; i < 6; ++i) {
+            float weight = 1.0f - (float)i / 6.0f;
+            float2 sampleUV = saturate(uv + dir * (float)i * gRadialBlur);
+            
+            // FXAAまたは通常サンプリング
+            float3 sampleColor = gFXAAEnabled > 0.5f ? ApplyFXAA(sampleUV, texelSize) : gScene.Sample(gSmp, sampleUV).rgb;
+            sampleColor = pow(max(sampleColor, 0.0f), 2.2f);
+            
+            blurColor += sampleColor * weight;
+            totalWeight += weight;
+        }
+        sceneColor = lerp(sceneColor, blurColor / totalWeight, saturate(gRadialBlur * 10.0f));
+    }
+    
+    // ★追加: 風/スピードエフェクト (より自然でしつこくない表現)
+    float windIntensity = gSpeedLine + gRadialBlur * 10.0f; 
+    if (windIntensity > 0.001f) {
+        float2 d = uv - 0.5f;
+        float r = length(d);
+        float angle = atan2(d.y, d.x); 
+        
+        // ソフトな流線ノイズ
+        float noise1 = sin(angle * 15.0f + gTime * 3.0f);
+        float noise2 = sin(angle * 40.0f - gTime * 8.0f);
+        float lineNoise = smoothstep(0.2f, 1.0f, (noise1 + noise2) * 0.5f);
+        
+        // 高速で手前に流れる動き
+        float flow = frac(r * 4.0f - gTime * 25.0f + lineNoise);
+        flow = smoothstep(0.5f, 1.0f, flow);
+        
+        // 画面端のみ
+        float mask = smoothstep(0.25f, 0.7f, r);
+        float windAlpha = lineNoise * flow * mask * windIntensity * 0.15f;
+        
+        // 風っぽい淡い青白さ（加算合成）
+        sceneColor += float3(0.6f, 0.8f, 1.0f) * windAlpha;
+    }
+
     // 4. トーンマッピング (色相保持型ACES)
     // これにより、ブルームで1.0を超えた輝度が自然に圧縮され、
     // キューブの中心も青色（元の色）を保ちます。

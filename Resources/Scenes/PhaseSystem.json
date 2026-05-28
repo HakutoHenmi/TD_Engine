@@ -18,7 +18,7 @@
         {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/sword.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [0.0926641,0.65318,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
         {"type": "Script", "enabled": true, "scripts": [{"path": "BaseScript", "param": "rotationSpeed=1;attackInterval=1;damage=10;attackRange=30;"}]},
         {"type": "Health", "enabled": true, "hp": 100, "maxHp": 100, "isDead": false},
-        {"type": "Tag", "enabled": true, "tag": "Untagged"}
+        {"type": "Tag", "enabled": true, "tag": "Core"}
       ]
     },
     {

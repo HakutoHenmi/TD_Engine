@@ -128,6 +128,9 @@ void FireworkScript::Update(entt::entity entity, GameScene* scene, float dt) {
             if (state_ == 0) s = 0.5f * alpha;
             
             DirectX::XMVECTOR pPos = DirectX::XMLoadFloat3(&it->pos);
+            if (it->pos.y < 3.0f) {
+                pPos = DirectX::XMVectorSetY(pPos, DirectX::XMVectorGetY(pPos) + s * 0.35f);
+            }
             DirectX::XMVECTOR toCam = DirectX::XMVector3Normalize(DirectX::XMVectorSubtract(camPos, pPos));
             DirectX::XMVECTOR upHint = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
             DirectX::XMVECTOR right = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(upHint, toCam));
