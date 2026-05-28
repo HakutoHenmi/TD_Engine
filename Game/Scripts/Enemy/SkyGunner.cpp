@@ -25,7 +25,7 @@ void SkyGunner::ExecuteAttack(entt::entity entity, GameScene* scene, float /*dt*
 	entt::entity bullet = registry.create();
 	TagComponent& bulletTag = registry.emplace<TagComponent>(bullet);
 	bulletTag.tag = TagType::EnemyBullet;
-	TransformComponent& bulletTransform = registry.emplace<TransformComponent>(bullet);
+	TransformComponent& bulletTransform = registry.get_or_emplace<TransformComponent>(bullet);
 	bulletTransform.translate = myTransform.translate;
 	bulletTransform.translate.y -= 0.5f; // 飛んでるので少し下(お腹のあたり)から発射
 	bulletTransform.rotate = myTransform.rotate;
@@ -47,7 +47,10 @@ void SkyGunner::ExecuteAttack(entt::entity entity, GameScene* scene, float /*dt*
 	bulletScriptComponent.scripts.push_back({"BulletScript", "", nullptr});
 	if (registry.valid(currentTarget_)) {
 		SetVar(bullet, scene, "HasTarget", 1.0f);
-		SetVar(bullet, scene, "TargetEntity", static_cast<float>(static_cast<uint32_t>(currentTarget_)));
+		uint32_t targetId = static_cast<uint32_t>(currentTarget_);
+		SetVar(bullet, scene, "TargetHigh", static_cast<float>((targetId >> 16) & 0xFFFF));
+		SetVar(bullet, scene, "TargetLow", static_cast<float>(targetId & 0xFFFF));
+		SetVar(bullet, scene, "TargetEntity", static_cast<float>(targetId));
 	} else {
 		SetVar(bullet, scene, "HasTarget", 0.0f);
 	}

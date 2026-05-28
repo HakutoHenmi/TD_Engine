@@ -70,7 +70,7 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 			isEditorMode = true;
 		} else {
 			auto phase = PhaseSystemScript::IsPhase();
-			if (phase == PhaseSystemScript::PreparationPhase || phase == PhaseSystemScript::BattlePhase) {
+			if (phase == PhaseSystemScript::PreparationPhase || phase == PhaseSystemScript::BattlePhase || phase == PhaseSystemScript::InsertPhase) {
 				isPrepOrBattle = true;
 			}
 		}
@@ -86,7 +86,7 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 				if (!isEditorMode) {
 					int targetWave = 0;
 					auto phase = PhaseSystemScript::IsPhase();
-					if (phase == PhaseSystemScript::PreparationPhase) {
+					if (phase == PhaseSystemScript::PreparationPhase || phase == PhaseSystemScript::InsertPhase) {
 						targetWave = PhaseSystemScript::GetCurrentPhase();
 					} else if (phase == PhaseSystemScript::BattlePhase) {
 						targetWave = currentWave_;
@@ -170,7 +170,12 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 
 						// 3Dアイコンは常にスポナーの位置に描画する (画面に寄せる処理は廃止)
 						Engine::Transform planeTr;
-						planeTr.translate = { pFloat3.x, pFloat3.y, pFloat3.z };
+						
+						// 地形の高さを取得し、地面から一定の高さ(5.0f)にアイコンを表示して埋まらないようにする
+						float groundY = scene->GetHeightAt(pFloat3.x, pFloat3.z, 1000.0f);
+						if (groundY <= -999.0f) groundY = pFloat3.y; // 地形がない場合はフォールバック
+						
+						planeTr.translate = { pFloat3.x, groundY + 5.0f, pFloat3.z };
 						planeTr.rotate = { pitch, yaw, 0.0f };
 						planeTr.scale = { tc->scale.x * 2.0f, tc->scale.y * 2.0f, tc->scale.z * 2.0f };
 						renderer->DrawMesh(planeMeshHandle, spawnerTexHandle, planeTr, planeColor, "Unlit");

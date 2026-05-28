@@ -391,16 +391,20 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 
 	bool hasPhaseSystem = false;
+	bool hasTutorialSystem = false;
 	entt::entity gmEntity = entt::null;
 	{
 		auto scView = scene->GetRegistry().view<ScriptComponent>();
 		for (auto e : scView) {
 			auto& sc = scView.get<ScriptComponent>(e);
 			for (auto& entry : sc.scripts) {
-				if (entry.scriptPath == "PhaseSystemScript" || entry.scriptPath == "TutorialScript") {
+				if (entry.scriptPath == "PhaseSystemScript") {
 					hasPhaseSystem = true;
 					gmEntity = e;
-					break;
+				} else if (entry.scriptPath == "TutorialScript") {
+					hasTutorialSystem = true;
+					hasPhaseSystem = true;
+					gmEntity = e;
 				}
 			}
 			if (hasPhaseSystem)
@@ -523,12 +527,15 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		bool currentSwitchKeyDown = ((GetAsyncKeyState('T') & 0x8000) != 0) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->IsControllerButtonDown(XINPUT_GAMEPAD_Y));
 		if (currentSwitchKeyDown && !prevPlayerSwitchKeyDown_) {
 			SwitchPlayerType(entity, scene);
+			switchDone_ = true;
 		}
 		prevPlayerSwitchKeyDown_ = currentSwitchKeyDown;
 
 		bool currentSkillKeyDown = ((GetAsyncKeyState('E') & 0x8000) != 0) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->IsControllerButtonDown(XINPUT_GAMEPAD_RIGHT_SHOULDER));
 		if (currentSkillKeyDown && !prevSkillKeyDown_) {
 			ExecuteSkill(entity, scene);
+			if (playerType_ == PlayerType::Sword) swordSkillDone_ = true;
+			else gunSkillDone_ = true;
 		}
 		prevSkillKeyDown_ = currentSkillKeyDown;
 	} else {
@@ -607,6 +614,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		// ★追加: スチーム・ブースト（剣士モード専用の高速回避）
 		bool currentDashKeyDown = ((GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->IsControllerButtonDown(XINPUT_GAMEPAD_B)) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->GetLeftTrigger() > 0.5f);
 		if (currentDashKeyDown && !prevDashKeyDown_ && playerType_ == PlayerType::Sword) {
+			swordDashDone_ = true;
 			if (steamPressure_ > 0.0f && !isRecharging_) { // ★少しでもあれば発動可能に
 				steamPressure_ -= DASH_COST;
 				if (steamPressure_ < 0.0f)
@@ -706,6 +714,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		bool currentRightClickDown = ((GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->GetLeftTrigger() > 0.5f);
 		if (playerType_ == PlayerType::Gun && !isPrep && !isInsert) {
 			if (currentRightClickDown && !prevRightClickDown_) {
+				gunFlyDone_ = true;
 				if (isFlying_) {
 					isFlying_ = false;
 				} else if (flightPressure_ >= maxFlightPressure_) {
@@ -1039,6 +1048,10 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			float isSkillTreeOpen = 0.0f;
 			if (gmEntity != entt::null) {
 				isSkillTreeOpen = GetVar(gmEntity, scene, "IsSkillTreeOpen", 0.0f);
+			}
+
+			if (!hasTutorialSystem) {
+				DrawSubObjectives(scene);
 			}
 
 			// ==== ★追加: ロックオンレティクル & 銃レティクル ====
@@ -1427,7 +1440,7 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 						// 3. 範囲ダメージ (Hitbox)
 						entt::entity aoe = scene->GetRegistry().create();
 						scene->GetRegistry().emplace<TagComponent>(aoe).tag = TagType::PlayerSword;
-						auto& aTc = scene->GetRegistry().emplace<TransformComponent>(aoe);
+						auto& aTc = scene->GetRegistry().get_or_emplace<TransformComponent>(aoe);
 						aTc.translate = iTc.translate;
 						auto& aHb = scene->GetRegistry().emplace<HitboxComponent>(aoe);
 						aHb.isActive = true;
@@ -1732,6 +1745,7 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 		if (chargeTime_ >= CHARGE_TIME_MIN && (isSkillActive_ || steamPressure_ > 0.0f)) {
 			// ★チャージショット発射！
 			ShootChargeShot(entity, scene);
+			gunShootDone_ = true;
 			if (!isSkillActive_)
 				steamPressure_ -= cCost;
 
@@ -1758,6 +1772,7 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 		} else if (isSkillActive_ || steamPressure_ > 0.0f) {
 			// 通常射撃（短押し）- 残量に関わらず撃てる
 			ShootGun(entity, scene);
+			gunShootDone_ = true;
 			if (!isSkillActive_)
 				steamPressure_ -= nCost;
 			float normalShotInterval = 0.3f;
@@ -2455,7 +2470,7 @@ void PlayerScript::SpawnBullet(entt::entity entity, GameScene* scene, float spre
 	entt::entity bullet = scene->GetRegistry().create();
 	scene->GetRegistry().emplace<TagComponent>(bullet).tag = TagType::Bullet;
 
-	auto& bTc = scene->GetRegistry().emplace<TransformComponent>(bullet);
+	auto& bTc = scene->GetRegistry().get_or_emplace<TransformComponent>(bullet);
 	bTc.translate = pTc.translate;
 	bTc.translate.y += 1.0f; // 腰か胸の高さ
 
@@ -2720,7 +2735,7 @@ void PlayerScript::ExecuteSkill(entt::entity entity, GameScene* scene) {
 		entt::entity wave = scene->GetRegistry().create();
 		scene->GetRegistry().emplace<TagComponent>(wave).tag = TagType::PlayerSword; // ★プレイヤーの剣攻撃として判定
 
-		auto& wTc = scene->GetRegistry().emplace<TransformComponent>(wave);
+		auto& wTc = scene->GetRegistry().get_or_emplace<TransformComponent>(wave);
 		wTc.translate = pTc.translate;
 		wTc.translate.y += 1.0f;
 		wTc.rotate = pTc.rotate;
@@ -2832,6 +2847,70 @@ void PlayerScript::DrawUI(entt::entity /*entity*/, GameScene* /*scene*/) {
 }
 
 void PlayerScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
+
+void PlayerScript::DrawSubObjectives(GameScene* scene) {
+	if (!scene || scene->IsPaused()) return;
+	auto* renderer = scene->GetRenderer();
+	if (!renderer) return;
+
+	std::string fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf";
+	float fontScale = 28.0f / 64.0f; // 少し小さめのフォント
+	float lineHeight = renderer->GetTextLineHeight(fontScale, fontPath);
+	
+	// 左上に配置
+	float baseX = 20.0f;
+	float baseY = 50.0f;
+	
+	// 背景描画
+	static uint32_t bgTexHandle = 0;
+	if (bgTexHandle == 0) {
+		bgTexHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+	}
+	
+	Engine::Renderer::SpriteDesc bg;
+	bg.x = baseX - 10.0f;
+	bg.y = baseY - 10.0f;
+	bg.w = 420.0f;
+	bg.h = 160.0f; // 目標3つ分
+	bg.color = {0.0f, 0.0f, 0.0f, 0.6f};
+	bg.layer = 10000;
+	renderer->DrawSprite(bgTexHandle, bg);
+
+	// タイトル
+	renderer->DrawString("【 プレイ目標 】", baseX, baseY, fontScale * 1.2f, {1.0f, 0.9f, 0.4f, 1.0f}, fontPath);
+	baseY += lineHeight * 1.5f;
+
+	auto drawTask = [&](const std::string& text, bool isDone, float y) {
+		Engine::Vector4 color = isDone ? Engine::Vector4{0.6f, 0.6f, 0.6f, 1.0f} : Engine::Vector4{1.0f, 1.0f, 1.0f, 1.0f};
+		std::string prefix = isDone ? "☑ " : "☐ ";
+		renderer->DrawString(prefix + text, baseX, y, fontScale, color, fontPath);
+		
+		// 達成済みの取り消し線
+		if (isDone) {
+			Engine::Renderer::SpriteDesc line;
+			line.x = baseX + 25.0f;
+			line.y = y + lineHeight * 0.5f;
+			line.w = renderer->MeasureTextWidth(text, fontScale, fontPath) + 15.0f;
+			line.h = 2.0f;
+			line.color = color;
+			line.layer = 10001;
+			renderer->DrawSprite(bgTexHandle, line);
+		}
+	};
+
+	drawTask("プレイヤー切替 (T または Yボタン)", switchDone_, baseY);
+	baseY += lineHeight * 1.2f;
+	
+	if (playerType_ == PlayerType::Sword) {
+		drawTask("近接スキル使用 (E または RBボタン)", swordSkillDone_, baseY);
+		baseY += lineHeight * 1.2f;
+		drawTask("スチーム・ブースト (右クリック または B)", swordDashDone_, baseY);
+	} else {
+		drawTask("自身強化スキル (E または RBボタン)", gunSkillDone_, baseY);
+		baseY += lineHeight * 1.2f;
+		drawTask("飛行＆オート射撃 (右/左クリック または B/X)", gunFlyDone_ && gunShootDone_, baseY);
+	}
+}
 
 REGISTER_SCRIPT(PlayerScript);
 

@@ -1,0 +1,15 @@
+{
+  "prefab":
+    {
+      "id": 3145756,
+      "parentId": 4294967295,
+      "name": "steamHouse",
+      "locked": false,
+      "translate": [75.0212, 0, 13.2172],
+      "rotate": [0, 0, 0],
+      "scale": [2, 2, 2],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/steamHouse/steamHouse.obj", "texturePath": "Resources/steamHouse/freamWork.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": ["Resources/steamHouse/house.png", "Resources/steamHouse/parts.png", "Resources/steamHouse/roof.png"]}
+      ]
+    }
+}

@@ -41,10 +41,13 @@ namespace ECS {
     struct RenderComponent {
         uint32_t meshHandle = 0;
         uint32_t textureHandle = 0;
+        std::vector<uint32_t> subTextureHandles; // ★マルチマテリアル用追加
+        
         Engine::Vector4 color = {1.0f, 1.0f, 1.0f, 1.0f};
         bool isVisible = true;
 
         std::string textureName = "";
+        std::vector<std::string> subTextureNames; // ★マルチマテリアル用追加 (エディタ等用)
         std::string shaderName = "Default";
         std::string modelFileName = "";
     };

@@ -61,6 +61,8 @@ public:
 		// Hitboxを持つエンティティの更新
 		auto attackerView = registry.view<HitboxComponent, TransformComponent>();
 		for (auto attackerEntity : attackerView) {
+			if (!registry.valid(attackerEntity)) continue; // ★追加: 破壊済みエンティティスキップ
+
 			auto& hitbox = attackerView.get<HitboxComponent>(attackerEntity);
 			if (!hitbox.enabled || !hitbox.isActive) continue;
 
@@ -89,6 +91,7 @@ public:
 			for (uint32_t hurtIdx : m_nearbyIndices) {
 				const auto& hurtInfo = m_hurters[hurtIdx];
 				entt::entity defenderEntity = hurtInfo.entity;
+				if (!registry.valid(defenderEntity)) continue; // ★追加: 破壊済みエンティティスキップ
 				if (attackerEntity == defenderEntity) continue;
 
 				DirectX::XMVECTOR dCenter = DirectX::XMLoadFloat3(&hurtInfo.center);

@@ -91,6 +91,7 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	(void)entity;
 
 	s_gameOverPhase_ = 0;
+	s_gameClearPhase_ = 0; // ★追加: ゲームクリア状態も確実に初期化する
 	gameOverTimer_ = 0.0f;
 	if (scene) {
 		scene->SetGameTimeScale(1.0f);
@@ -243,7 +244,12 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			
 			DirectX::XMFLOAT3 newRot;
 			newRot.x = goStartCamRot_.x + (targetCamRot.x - goStartCamRot_.x) * ease;
-			newRot.y = goStartCamRot_.y + (targetCamRot.y - goStartCamRot_.y) * ease;
+			
+			float diff = targetCamRot.y - goStartCamRot_.y;
+			while (diff >  DirectX::XM_PI) diff -= DirectX::XM_2PI;
+			while (diff < -DirectX::XM_PI) diff += DirectX::XM_2PI;
+			newRot.y = goStartCamRot_.y + diff * ease;
+
 			newRot.z = goStartCamRot_.z + (targetCamRot.z - goStartCamRot_.z) * ease;
 
 			camera.SetPosition({newPos.x, newPos.y, newPos.z});
@@ -391,7 +397,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			if (fwTimer > 0.15f) {
 				fwTimer = 0;
 				entt::entity fwEntity = scene->CreateEntity("GameClearFirework");
-				auto& tc = scene->GetRegistry().emplace<TransformComponent>(fwEntity);
+				auto& tc = scene->GetRegistry().get_or_emplace<TransformComponent>(fwEntity);
 				tc.translate = {
 					corePos.x + (-30.0f + 60.0f * (rand() / (float)RAND_MAX)),
 					corePos.y,
@@ -428,7 +434,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			if (fwTimer2 > 0.12f) {
 				fwTimer2 = 0;
 				entt::entity fwEntity = scene->CreateEntity("GameClearFirework");
-				auto& tc = scene->GetRegistry().emplace<TransformComponent>(fwEntity);
+				auto& tc = scene->GetRegistry().get_or_emplace<TransformComponent>(fwEntity);
 				tc.translate = {
 					corePos.x + (-40.0f + 80.0f * (rand() / (float)RAND_MAX)),
 					corePos.y,
@@ -1107,23 +1113,48 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				}
 
 				// 視点の角度（見下ろし）をリセット
+				float targetYaw = 0.0f;
+				DirectX::XMFLOAT3 spawnerPos = {25.0f, 0.0f, 25.0f};
+				auto spawnerObj = scene->FindObjectByName("Spawner_W1_1");
+				if (!scene->GetRegistry().valid(spawnerObj)) {
+					auto view = scene->GetRegistry().view<NameComponent, TransformComponent>();
+					for (auto e : view) {
+						if (view.get<NameComponent>(e).name.find("Spawner") != std::string::npos) {
+							spawnerPos = view.get<TransformComponent>(e).translate;
+							break;
+						}
+					}
+				} else if (scene->GetRegistry().all_of<TransformComponent>(spawnerObj)) {
+					spawnerPos = scene->GetRegistry().get<TransformComponent>(spawnerObj).translate;
+				}
+
+				DirectX::XMFLOAT3 dir = { spawnerPos.x - coreTc.translate.x, 0.0f, spawnerPos.z - coreTc.translate.z };
+				float len = std::sqrt(dir.x * dir.x + dir.z * dir.z);
+				if (scene && scene->GetStagePath().find("Stage1") != std::string::npos) {
+					targetYaw = DirectX::XM_PIDIV4;
+				} else if (len > 0.001f) {
+					targetYaw = std::atan2(dir.x, dir.z);
+					float snapInterval = DirectX::XM_PIDIV4; // 45度スナップ
+					targetYaw = std::round(targetYaw / snapInterval) * snapInterval;
+				}
+
 				if (scene->GetRegistry().all_of<PlayerInputComponent>(prepCam)) {
 					auto& camPi = scene->GetRegistry().get<PlayerInputComponent>(prepCam);
 					camPi.cameraPitch = 1.2f; // さらに高く見下ろす角度（約68度）
-					camPi.cameraYaw = 0.0f;
+					camPi.cameraYaw = targetYaw;
 
 					// 直接カメラの回転も変更して即座に反映
 					auto& camera = scene->GetCamera();
 					auto rot = camera.Rotation();
 					rot.x = 1.2f;
-					rot.y = 0.0f;
+					rot.y = targetYaw;
 					camera.SetRotation(rot);
 				}
 
 				// ズーム距離の初期化
 				if (scene->GetRegistry().all_of<CameraTargetComponent>(prepCam)) {
 					auto& ct = scene->GetRegistry().get<CameraTargetComponent>(prepCam);
-					ct.distance = 45.0f; // 高さを出すために距離を大きく離す
+					ct.distance = 35.0f; // 高さを出すために距離を大きく離す (上限と一致)
 					ct.height = 0.0f;    // 視線のズレを防ぐため追加の高さはゼロにする
 				}
 			}
@@ -1345,7 +1376,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 				// 最初の花火を1つ打ち上げる
 				entt::entity fwEntity = scene->CreateEntity("GameClearFirework");
-				auto& tc = scene->GetRegistry().emplace<TransformComponent>(fwEntity);
+				auto& tc = scene->GetRegistry().get_or_emplace<TransformComponent>(fwEntity);
 				tc.translate = corePos;
 				auto& sc = scene->GetRegistry().emplace<ScriptComponent>(fwEntity);
 				sc.scripts.push_back({"FireworkScript", "", nullptr});
@@ -1750,7 +1781,7 @@ void PhaseSystemScript::InitializeInsertPhase(GameScene* scene) {
 
 	// 1. コアと最初のスポナーの座標を検索
 	DirectX::XMFLOAT3 corePos = {0.0f, 0.0f, 0.0f};
-	entt::entity coreObj = entt::null;
+	entt::entity coreObj = scene->FindObjectByName("Core");
 	const auto& cores = scene->GetEntitiesByTag(TagType::Core);
 	if (!cores.empty())
 		coreObj = cores[0];
@@ -1784,10 +1815,40 @@ void PhaseSystemScript::InitializeInsertPhase(GameScene* scene) {
 	originalCameraRot_ = {camera.Rotation().x, camera.Rotation().y, camera.Rotation().z};
 
 	// 3. ウェイポイントの構築 (コア -> 鳥瞰 -> スポナー -> 元に戻る)
+	// コアからスポナーへの方向ベクトルを計算し、Yaw角を求める
+	DirectX::XMFLOAT3 dir = {
+		spawnerPos.x - corePos.x,
+		0.0f,
+		spawnerPos.z - corePos.z
+	};
+	float len = std::sqrt(dir.x * dir.x + dir.z * dir.z);
+	float yaw = 0.0f;
+	if (scene && scene->GetStagePath().find("Stage1") != std::string::npos) {
+		yaw = DirectX::XM_PIDIV4;
+	} else if (len > 0.001f) {
+		dir.x /= len;
+		dir.z /= len;
+		yaw = std::atan2(dir.x, dir.z);
+		
+		// 45度(PI/4)単位でスナップする
+		float snapInterval = DirectX::XM_PIDIV4;
+		yaw = std::round(yaw / snapInterval) * snapInterval;
+	}
+
+	// Y軸回転を適用するヘルパーラムダ関数
+	auto rotateOffset = [yaw](float ox, float oy, float oz) -> DirectX::XMFLOAT3 {
+		return {
+			ox * std::cos(yaw) + oz * std::sin(yaw),
+			oy,
+			-ox * std::sin(yaw) + oz * std::cos(yaw)
+		};
+	};
+
 	// WP0: コアを見下ろす視点 (開始)
+	DirectX::XMFLOAT3 offset0 = rotateOffset(0.0f, 35.0f, -65.0f);
 	insertWaypoints_.push_back({
-	    {corePos.x, corePos.y + 12.0f, corePos.z - 20.0f},
-	    {0.45f,     0.0f,              0.0f             }, // Pitch 25度下向き
+	    {corePos.x + offset0.x, corePos.y + offset0.y, corePos.z + offset0.z},
+	    {0.55f, yaw, 0.0f}, // Pitch 31度下向き, Yawはスポナー方向
 	    3.5f
     });
 
@@ -1799,23 +1860,28 @@ void PhaseSystemScript::InitializeInsertPhase(GameScene* scene) {
 	if (spawnerGroundY <= -999.0f) spawnerGroundY = spawnerPos.y;
 
 	// WP1: ステージ全体を見下ろす鳥瞰視点
+	DirectX::XMFLOAT3 offset1 = rotateOffset(0.0f, 40.0f, -45.0f);
 	insertWaypoints_.push_back({
-	    {corePos.x, coreGroundY + 30.0f, corePos.z - 35.0f},
-	    {0.7f,      0.0f,              0.0f             }, // Pitch 40度下向き
+	    {corePos.x + offset1.x, coreGroundY + offset1.y, corePos.z + offset1.z},
+	    {0.7f, yaw, 0.0f}, // Pitch 40度下向き
 	    4.0f
     });
 
 	// WP2: 最初の敵出現地点（スポナー）にクローズアップする視点
+	DirectX::XMFLOAT3 offset2 = rotateOffset(0.0f, 15.0f, -20.0f);
 	insertWaypoints_.push_back({
-	    {spawnerPos.x, spawnerGroundY + 15.0f, spawnerPos.z - 20.0f},
-	    {0.4f,         0.0f,                0.0f                }, // Pitch 22度下向き
+	    {spawnerPos.x + offset2.x, spawnerGroundY + offset2.y, spawnerPos.z + offset2.z},
+	    {0.4f, yaw, 0.0f}, // Pitch 22度下向き
 	    4.0f
     });
 
 	// WP3: プレイヤー操作開始位置にスムーズに戻る（EndInsertPhaseのカメラ位置と一致させる）
+	// PreparationCameraのデフォルトの向き (スポナー方向のYaw) に戻す
+	// ※ distance=35.0f, pitch=1.2f に合わせてオフセットを調整
+	DirectX::XMFLOAT3 offset3 = rotateOffset(0.0f, 32.6f, -12.7f);
 	insertWaypoints_.push_back({
-	    {corePos.x, coreGroundY + 43.7f, corePos.z - 16.3f},
-        {1.2f,      0.0f,              0.0f             },
+	    {corePos.x + offset3.x, coreGroundY + offset3.y, corePos.z + offset3.z},
+        {1.2f, yaw, 0.0f},
         2.0f
     });
 
@@ -1897,7 +1963,13 @@ void PhaseSystemScript::UpdateInsertPhase(GameScene* scene, float dt) {
 
 	DirectX::XMFLOAT3 currentRot;
 	currentRot.x = startRot.x + (target.rotation.x - startRot.x) * smoothT;
-	currentRot.y = startRot.y + (target.rotation.y - startRot.y) * smoothT;
+	
+	// Y軸回転の最短距離補間
+	float diffY = target.rotation.y - startRot.y;
+	while (diffY > DirectX::XM_PI) diffY -= DirectX::XM_2PI;
+	while (diffY < -DirectX::XM_PI) diffY += DirectX::XM_2PI;
+	currentRot.y = startRot.y + diffY * smoothT;
+
 	currentRot.z = startRot.z + (target.rotation.z - startRot.z) * smoothT;
 
 	camera.SetPosition({currentPos.x, currentPos.y, currentPos.z});
@@ -1988,7 +2060,7 @@ void PhaseSystemScript::EndInsertPhase(GameScene* scene) {
 
 	// 終了時に標準の準備フェーズ用カメラ（コア見下ろし）に移行
 	auto prepCam = scene->FindObjectByName("PreparationCamera");
-	entt::entity core = entt::null;
+	entt::entity core = scene->FindObjectByName("Core");
 	const auto& cores = scene->GetEntitiesByTag(TagType::Core);
 	if (!cores.empty())
 		core = cores[0];
@@ -2001,21 +2073,47 @@ void PhaseSystemScript::EndInsertPhase(GameScene* scene) {
 			camTc.translate = coreTc.translate;
 		}
 
+		// コアからスポナーへの方向ベクトルを計算し、Yaw角を求める
+		float targetYaw = 0.0f;
+		DirectX::XMFLOAT3 spawnerPos = {25.0f, 0.0f, 25.0f};
+		auto spawnerObj = scene->FindObjectByName("Spawner_W1_1");
+		if (!scene->GetRegistry().valid(spawnerObj)) {
+			auto view = scene->GetRegistry().view<NameComponent, TransformComponent>();
+			for (auto e : view) {
+				if (view.get<NameComponent>(e).name.find("Spawner") != std::string::npos) {
+					spawnerPos = view.get<TransformComponent>(e).translate;
+					break;
+				}
+			}
+		} else if (scene->GetRegistry().all_of<TransformComponent>(spawnerObj)) {
+			spawnerPos = scene->GetRegistry().get<TransformComponent>(spawnerObj).translate;
+		}
+
+		DirectX::XMFLOAT3 dir = { spawnerPos.x - coreTc.translate.x, 0.0f, spawnerPos.z - coreTc.translate.z };
+		float len = std::sqrt(dir.x * dir.x + dir.z * dir.z);
+		if (scene && scene->GetStagePath().find("Stage1") != std::string::npos) {
+			targetYaw = DirectX::XM_PIDIV4;
+		} else if (len > 0.001f) {
+			targetYaw = std::atan2(dir.x, dir.z);
+			float snapInterval = DirectX::XM_PIDIV4; // 45度スナップ
+			targetYaw = std::round(targetYaw / snapInterval) * snapInterval;
+		}
+
 		if (scene->GetRegistry().all_of<PlayerInputComponent>(prepCam)) {
 			auto& camPi = scene->GetRegistry().get<PlayerInputComponent>(prepCam);
 			camPi.cameraPitch = 1.2f;
-			camPi.cameraYaw = 0.0f;
+			camPi.cameraYaw = targetYaw;
 
 			auto& camera = scene->GetCamera();
 			auto rot = camera.Rotation();
 			rot.x = 1.2f;
-			rot.y = 0.0f;
+			rot.y = targetYaw;
 			camera.SetRotation(rot);
 		}
 
 		if (scene->GetRegistry().all_of<CameraTargetComponent>(prepCam)) {
 			auto& ct = scene->GetRegistry().get<CameraTargetComponent>(prepCam);
-			ct.distance = 45.0f;
+			ct.distance = 35.0f;
 			ct.height = 0.0f;    // ★統一: 全準備フェーズで同じ高さ
 		}
 
@@ -2024,13 +2122,19 @@ void PhaseSystemScript::EndInsertPhase(GameScene* scene) {
 		if (coreGroundY <= -999.0f) coreGroundY = coreTc.translate.y;
 
 		// ★修正: CameraFollowSystemの計算結果と一致させてカメラの跳ね上がりを防止
-		// pitch=1.2, yaw=0, distance=45, height=0 から算出:
-		// offsetY = height + sin(1.2)*distance = 0.0 + 41.94 = 41.94
-		// offsetZ = -cos(0)*cos(1.2)*distance = -16.30
-		// targetY追加 = 1.0(プレイヤーオフセット) + 0.8(フレーミング) = 1.8
+		// pitch=1.2, targetYaw, distance=35, height=0 から算出:
+		auto rotateOffset = [targetYaw](float ox, float oy, float oz) -> DirectX::XMFLOAT3 {
+			return {
+				ox * std::cos(targetYaw) + oz * std::sin(targetYaw),
+				oy,
+				-ox * std::sin(targetYaw) + oz * std::cos(targetYaw)
+			};
+		};
+		DirectX::XMFLOAT3 offset = rotateOffset(0.0f, 32.6f, -12.7f);
+
 		auto& camera = scene->GetCamera();
-		camera.SetPosition({coreTc.translate.x, coreGroundY + 43.7f, coreTc.translate.z - 16.3f});
-		camera.SetRotation({1.2f, 0.0f, 0.0f});
+		camera.SetPosition({coreTc.translate.x + offset.x, coreGroundY + offset.y, coreTc.translate.z + offset.z});
+		camera.SetRotation({1.2f, targetYaw, 0.0f});
 	}
 
 	// 演出中に無効化していた入力を復旧
