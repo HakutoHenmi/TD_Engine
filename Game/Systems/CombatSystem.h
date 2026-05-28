@@ -113,7 +113,28 @@ public:
 					if (dTag == TagType::Canon || dTag == TagType::Cannon || dTag == TagType::IceCanon || dTag == TagType::PipeCannon || dTag == TagType::Defender || dTag == TagType::Missile || dTag == TagType::Poison) {
 						skipDamage = true;
 					}
-					if (skipDamage) continue;
+
+					// 弾が敵対勢力に当たったかどうかを判定
+					bool isBulletHitDestructible = false;
+					if (aTag == TagType::EnemyBullet) {
+						// 敵の弾がプレイヤー、コア、または防衛設備に当たった場合
+						if (dTag == TagType::Player || dTag == TagType::Core || dTag == TagType::Defender || dTag == TagType::Canon || dTag == TagType::Cannon || dTag == TagType::IceCanon || dTag == TagType::PipeCannon) {
+							isBulletHitDestructible = true;
+						}
+					} else if (aTag == TagType::Bullet) {
+						// 味方の弾が敵に当たった場合
+						if (dTag == TagType::Enemy) {
+							isBulletHitDestructible = true;
+						}
+					}
+
+					if (skipDamage) {
+						// ダメージはスキップするが、弾が着弾すべき相手なら消去する
+						if (isBulletHitDestructible && (aTag == TagType::Bullet || aTag == TagType::EnemyBullet) && ctx.scene) {
+							ctx.scene->DestroyObject(static_cast<uint32_t>(attackerEntity));
+						}
+						continue;
+					}
 
 					if (registry.all_of<HealthComponent>(defenderEntity)) {
 						auto& hc = registry.get<HealthComponent>(defenderEntity);

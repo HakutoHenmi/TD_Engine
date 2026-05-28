@@ -182,6 +182,25 @@ public:
 					if (collision) {
 						auto& rb1 = registry.get<RigidbodyComponent>(d1.entity);
 						auto& rb2 = registry.get<RigidbodyComponent>(d2.entity);
+
+						// 敵同士の衝突の場合、Y軸方向の押し出しを無効化して乗り上げを防ぐ
+						bool isEnemyVsEnemy = false;
+						if (auto* tag1 = registry.try_get<TagComponent>(d1.entity)) {
+							if (auto* tag2 = registry.try_get<TagComponent>(d2.entity)) {
+								if (tag1->tag == TagType::Enemy && tag2->tag == TagType::Enemy) {
+									isEnemyVsEnemy = true;
+								}
+							}
+						}
+						if (isEnemyVsEnemy) {
+							mtv.y = 0.0f;
+							float lenXZ = std::sqrt(mtv.x * mtv.x + mtv.z * mtv.z);
+							if (lenXZ > 0.0001f) {
+								mtv.x /= lenXZ;
+								mtv.z /= lenXZ;
+							}
+						}
+
 						float move1 = rb1.isKinematic ? 0.0f : (rb2.isKinematic ? 1.0f : 0.5f);
 						float move2 = rb2.isKinematic ? 0.0f : (rb1.isKinematic ? 1.0f : 0.5f);
 
