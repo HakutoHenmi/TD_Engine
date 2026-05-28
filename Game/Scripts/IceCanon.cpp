@@ -161,7 +161,7 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 					float dx = pTrans.translate.x - cTrans.translate.x;
 					float dy = pTrans.translate.y - cTrans.translate.y;
 					float dz = pTrans.translate.z - cTrans.translate.z;
-					float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+					float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
 
 					if (dist <= buff.buffRadius) {
 						buff.isBuffed = true;
@@ -274,14 +274,16 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 		bulletTransform.translate.x += std::cos(angle) * flowerRadius;
 		bulletTransform.translate.z += std::sin(angle) * flowerRadius;
 
-		float targetDirectionX = targetTransform.translate.x - bulletTransform.translate.x;
-		float targetDirectionY = targetTransform.translate.y - bulletTransform.translate.y;
-		float targetDirectionZ = targetTransform.translate.z - bulletTransform.translate.z;
+		float targetDirectionX = targetTransform.translate.x - canonTransform.translate.x;
+		float targetDirectionY = targetTransform.translate.y - canonTransform.translate.y;
+		float targetDirectionZ = targetTransform.translate.z - canonTransform.translate.z;
 
 		float targetYaw = std::atan2(targetDirectionX, targetDirectionZ);
 
 		float targetLengthXZ = std::sqrt(targetDirectionX * targetDirectionX + targetDirectionZ * targetDirectionZ);
-
+		if (targetLengthXZ < 0.0001f) { // ほぼ真上を向いている場合の特例処理
+			targetLengthXZ = 0.0001f;
+		}
 		float targetPitch = std::atan2(-targetDirectionY, targetLengthXZ);
 
 		bulletTransform.rotate = canonTransform.rotate;
