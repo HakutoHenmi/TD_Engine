@@ -582,8 +582,8 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		prevCursorToggle_ = false;
 	}
 
-	// ★追加: カーソル非表示時は画面中心に固定
-	if (!isCursorVisible_) {
+	// ★追加: カーソル非表示時は画面中心に固定 (時間が止まっている＝ゲームオーバーやポーズ中は固定しない)
+	if (!isCursorVisible_ && scene->GetGameTimeScale() > 0.0f) {
 		HWND hwnd = GetActiveWindow();
 		if (hwnd) {
 			RECT rect;
@@ -825,7 +825,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		// ★追加: 圧力ゲージの描画 (リチャージ中、銃モード、消費中、スキル中、または戦闘フェーズなら表示)
 		bool isBattle = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::BattlePhase);
 		bool shouldShowGauge = (playerType_ == PlayerType::Gun) || isRecharging_ || (steamPressure_ < maxSteam) || isSkillActive_ || isBattle || isFlying_ || (flightPressure_ < maxFlightPressure_);
-		if (shouldShowGauge) {
+		if (shouldShowGauge && !PhaseSystemScript::IsResultSequenceActive()) { // ゲームオーバー・クリア時は非表示
 			DrawPressureGauge(scene);
 		}
 
@@ -962,7 +962,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	// Renderer にキューを積む処理（SDFUI, DrawString, DrawLine3Dなど）は Update 内で行う必要があります。
 	{
 		auto* uiRenderer = Engine::Renderer::GetInstance();
-		if (uiRenderer) {
+		if (uiRenderer && !PhaseSystemScript::IsResultSequenceActive()) { // ★追加: ゲームオーバー・クリア時は非表示
 			// ---- HP＆経験値ゲージ (HPIN.png) ----
 			float hpProgress = 1.0f;
 			if (scene->GetRegistry().all_of<HealthComponent>(entity)) {

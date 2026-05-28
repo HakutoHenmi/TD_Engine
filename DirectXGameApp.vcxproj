@@ -201,6 +201,7 @@ exit /b 0
     <ClCompile Include="Game\Scripts\ExperienceMiner.cpp" />
     <ClCompile Include="Game\Scripts\ExperienceOrbScript.cpp" />
     <ClCompile Include="Game\Scripts\KamikazeEnemyScript.cpp" />
+    <ClCompile Include="Game\Scripts\FireworkScript.cpp" />
     <ClCompile Include="Game\Scripts\PhaseSystemScript.cpp" />
 
     <ClCompile Include="Game\Scripts\PlayerScript.cpp" />
@@ -259,6 +260,7 @@ exit /b 0
     <ClInclude Include="Game\Scripts\ExperienceOrbScript.h" />
     <ClInclude Include="Game\Scripts\IScript.h" />
     <ClInclude Include="Game\Scripts\KamikazeEnemyScript.h" />
+    <ClInclude Include="Game\Scripts\FireworkScript.h" />
     <ClInclude Include="Game\Scripts\PhaseSystemScript.h" />
     <ClInclude Include="Game\Scripts\PipeScript.h" />
     <ClInclude Include="Game\Scripts\PlayerScript.h" />

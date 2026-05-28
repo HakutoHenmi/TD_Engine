@@ -423,8 +423,10 @@ void GameScene::Update() {
 	if (dt > 1.0f / 10.0f)
 		dt = 1.0f / 60.0f; // 極端なラグ対策
 
+	float scaledDt = dt * gameTimeScale_;
+
 	// コンテキストを更新
-	ctx_.dt = dt;
+	ctx_.dt = scaledDt;
 
 	// ★追加: ESCキーでポーズ切り替え (プレイ中かつゲーム本編またはチュートリアルのみ)
 	if (isPlaying_ && (sceneName_ == "Game" || sceneName_ == "Tutorial") && Engine::Input::GetInstance()->Trigger(DIK_ESCAPE)) {
@@ -455,42 +457,10 @@ void GameScene::Update() {
 	}
 
 	if (isPlaying_)
-		playTime_ += dt;
+		playTime_ += scaledDt;
 
-	// ★ 勝利/敗北判定 - ★変更: Gameシーンのみ
-	if (isPlaying_ && sceneName_ == "Game") {
-		bool win = false;
-		if (auto waveEntity = WaveManagement::GetManagerEntity(); waveEntity != entt::null && registry_.valid(waveEntity)) {
-			if (WaveManagement::IsWaveEnded()) {
-				win = true;
-			}
-		}
-		bool loss = false;
-
-		// プレイヤーの生存確認 (Viewを直接参照して同期ズレを防ぐ)
-		// プレイヤーの生存確認
-		const auto& players = GetEntitiesByTag(TagType::Player);
-		for (auto entity : players) {
-			if (registry_.valid(entity) && registry_.all_of<HealthComponent>(entity)) {
-				if (registry_.get<HealthComponent>(entity).hp <= 0) {
-					loss = true;
-					break;
-				}
-			}
-		}
-
-		if (win || loss) {
-			Engine::SceneParameters res;
-			res.isWin = win;
-			res.score = win ? 1500 : 300;
-			res.clearTime = playTime_;
-			ResultManagerScript::pendingOriginalScene = stagePath_;
-			Engine::SceneManager::GetInstance()->RequestChange("Result", res);
-			isPlaying_ = false;
-			// 修正: 即座に return せず、以降のガード (!isPlaying_) でシステムをスキップさせつつ、
-			// フレーム末尾のクリーンアップ処理（pendingDestroys等）まで到達させる
-		}
-	}
+	// ★ 勝利/敗北判定は PhaseSystemScript 内でシネマティック演出とともに行うように変更されたため、
+	// ここでの即時シーン遷移 (RequestChange("Result")) は削除しました。
 
 	ctx_.camera = &camera_;
 	ctx_.renderer = renderer_;
@@ -526,7 +496,7 @@ void GameScene::Update() {
 				auto& meshWrapper = registry_.get<MeshRendererComponent>(entity);
 
 				if (anim.enabled && anim.isPlaying) {
-					anim.time += dt * 60.0f * anim.speed;
+					anim.time += scaledDt * 60.0f * anim.speed;
 					auto* m = renderer_->GetModel(meshWrapper.modelHandle);
 					if (m) {
 						const auto& data = m->GetData();
@@ -564,7 +534,7 @@ void GameScene::Update() {
 	}
 
 	// パーティクルエディター
-	particleEditor_.Update(dt);
+	particleEditor_.Update(dt); // エディターはリアルタイムで動作させる
 
 	// ★ カメラ状態の切り替え (Scene/Game)
 	int currentViewMode = (int)EditorUI::GetViewMode();
@@ -724,7 +694,13 @@ void GameScene::Update() {
 		}
 
 		pe.emitter.params.position = {tc.translate.x, tc.translate.y, tc.translate.z};
-		pe.emitter.Update(dt);
+		
+		float pdt = scaledDt;
+		// ゲームオーバー用のエフェクトは時間停止の影響を受けない
+		if (nc.name.find("GameOverExplosion") != std::string::npos || nc.name.find("SkyResult") != std::string::npos) {
+			pdt = dt;
+		}
+		pe.emitter.Update(pdt);
 
 		// ★追加: 更新後のアクティブパーティクル数をバジェットに登録
 		Engine::ParticleBudget::Register(pe.emitter.GetActiveCount());
