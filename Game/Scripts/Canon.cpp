@@ -42,8 +42,9 @@ void Canon::Start(entt::entity entity, GameScene* scene) {
 	if (registry.all_of<TransformComponent>(entity)) {
 		TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
 
-		TransformComponent& baseTransform = registry.emplace<TransformComponent>(baseEntity_);
+		TransformComponent& baseTransform = registry.get_or_emplace<TransformComponent>(baseEntity_);
 		baseTransform.translate = canonTransform.translate;
+		baseTransform.translate.y += 1.5f;
 		baseTransform.rotate = {0.0f, canonTransform.rotate.y, 0.0f};
 		baseTransform.scale = canonTransform.scale;
 	}
@@ -303,7 +304,7 @@ TransformComponent& targetTransform = registry.get<TransformComponent>(currentTa
 	TagComponent& bulletTag = registry.emplace<TagComponent>(bullet);
 	bulletTag.tag = TagType::Bullet;
 
-	TransformComponent& bulletTransform = registry.emplace<TransformComponent>(bullet);
+	TransformComponent& bulletTransform = registry.get_or_emplace<TransformComponent>(bullet);
 	bulletTransform.translate = canonTransform.translate;
 
 	float baseHeight = 0.0f;
@@ -338,7 +339,10 @@ TransformComponent& targetTransform = registry.get<TransformComponent>(currentTa
 	bulletScriptComponent.scripts.push_back({"BulletScript", "", nullptr});
 
 	SetVar(bullet, scene, "HasTarget", 1.0f);
-	SetVar(bullet, scene, "TargetEntity", static_cast<float>(static_cast<uint32_t>(currentTarget_)));
+	uint32_t targetId = static_cast<uint32_t>(currentTarget_);
+	SetVar(bullet, scene, "TargetHigh", static_cast<float>((targetId >> 16) & 0xFFFF));
+	SetVar(bullet, scene, "TargetLow", static_cast<float>(targetId & 0xFFFF));
+	SetVar(bullet, scene, "TargetEntity", static_cast<float>(targetId));
 	attackTimer_ = currentAttackInterval_;
 	SetVar(entity, scene, "CoolTimeRate", 0.0f);
 

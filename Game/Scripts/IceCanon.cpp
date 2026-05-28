@@ -161,7 +161,7 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 					float dx = pTrans.translate.x - cTrans.translate.x;
 					float dy = pTrans.translate.y - cTrans.translate.y;
 					float dz = pTrans.translate.z - cTrans.translate.z;
-					float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+					float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
 
 					if (dist <= buff.buffRadius) {
 						buff.isBuffed = true;
@@ -264,7 +264,7 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 		TagComponent& bulletTag = registry.emplace<TagComponent>(bullet);
 		bulletTag.tag = TagType::Bullet;
 
-		TransformComponent& bulletTransform = registry.emplace<TransformComponent>(bullet);
+		TransformComponent& bulletTransform = registry.get_or_emplace<TransformComponent>(bullet);
 		bulletTransform.translate = canonTransform.translate;
 		bulletTransform.translate.y += 1.0f;
 
@@ -274,14 +274,16 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 		bulletTransform.translate.x += std::cos(angle) * flowerRadius;
 		bulletTransform.translate.z += std::sin(angle) * flowerRadius;
 
-		float targetDirectionX = targetTransform.translate.x - bulletTransform.translate.x;
-		float targetDirectionY = targetTransform.translate.y - bulletTransform.translate.y;
-		float targetDirectionZ = targetTransform.translate.z - bulletTransform.translate.z;
+		float targetDirectionX = targetTransform.translate.x - canonTransform.translate.x;
+		float targetDirectionY = targetTransform.translate.y - canonTransform.translate.y;
+		float targetDirectionZ = targetTransform.translate.z - canonTransform.translate.z;
 
 		float targetYaw = std::atan2(targetDirectionX, targetDirectionZ);
 
 		float targetLengthXZ = std::sqrt(targetDirectionX * targetDirectionX + targetDirectionZ * targetDirectionZ);
-
+		if (targetLengthXZ < 0.0001f) { // ほぼ真上を向いている場合の特例処理
+			targetLengthXZ = 0.0001f;
+		}
 		float targetPitch = std::atan2(-targetDirectionY, targetLengthXZ);
 
 		bulletTransform.rotate = canonTransform.rotate;
@@ -308,7 +310,10 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 		sc.scripts.push_back({"IceBulletScript", "", nullptr});
 
 		SetVar(bullet, scene, "HasTarget", 1.0f);
-		SetVar(bullet, scene, "TargetEntity", (float)(uint32_t)currentTarget_);
+		uint32_t targetId = static_cast<uint32_t>(currentTarget_);
+		SetVar(bullet, scene, "TargetHigh", static_cast<float>((targetId >> 16) & 0xFFFF));
+		SetVar(bullet, scene, "TargetLow", static_cast<float>(targetId & 0xFFFF));
+		SetVar(bullet, scene, "TargetEntity", static_cast<float>(targetId));
 		SetVar(bullet, scene, "StopTime", currentStopTime);
 	}
 

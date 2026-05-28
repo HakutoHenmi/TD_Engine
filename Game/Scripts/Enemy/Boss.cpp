@@ -42,7 +42,7 @@ void Boss::Start(entt::entity entity, GameScene* scene) {
 	// シールド（ドーム）エンティティの生成
 	// ---------------------------------------------------------
 	shieldEntity_ = registry.create();
-	auto& shieldTc = registry.emplace<TransformComponent>(shieldEntity_);
+	auto& shieldTc = registry.get_or_emplace<TransformComponent>(shieldEntity_);
 	if (registry.all_of<TransformComponent>(entity)) {
 		shieldTc.translate = registry.get<TransformComponent>(entity).translate;
 	}

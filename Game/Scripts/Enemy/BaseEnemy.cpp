@@ -494,8 +494,8 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float dt) {
 		// 4. 進んでいる方向を向く
 		if (std::abs(vx) > 0.1f || std::abs(vz) > 0.1f) {
 			float targetAngle = std::atan2(vx, vz);
-			// 角度の線形補間
-			tc.rotate.y = targetAngle;
+			// 角度の線形補間 (モデルの向きを90度補正)
+			tc.rotate.y = targetAngle + 1.57079632f;
 		}
 	}
 }

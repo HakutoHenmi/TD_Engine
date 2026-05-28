@@ -299,7 +299,10 @@ void TutorialScript::DrawHighlights(GameScene* scene) {
 	entt::entity highlightEntity = entt::null;
 
 	if (tutorialStep_ == TutorialStep::Step6_CannonInstall) {
-		if (!isPlacementMode_) {
+		if (isPlacementMode_) {
+			step6_clickedCannonButton_ = true;
+		}
+		if (!isPlacementMode_ && !step6_clickedCannonButton_) {
 			needsDarken = true;
 			highlightEntity = scene->FindObjectByName("CannonButton");
 		}
@@ -324,12 +327,16 @@ void TutorialScript::DrawHighlights(GameScene* scene) {
 
 		if (tutorialStep_ == TutorialStep::Step13_SkillTree) {
 			// レベルUI部分をくり抜いて暗転を描画する
-			float holeX = 10.0f;
-			float holeY = 10.0f;
-			float holeW = 490.0f;
-			float holeH = 120.0f;
 			float sw = (float)Engine::WindowDX::kW;
 			float sh = (float)Engine::WindowDX::kH;
+			float scale = 0.55f;
+			float gaugeW = 1024.0f * scale;
+			float gaugeH = 128.0f * scale;
+			// PlayerScript.cppの配置に合わせる
+			float holeX = sw - gaugeW - 250.0f - 10.0f;
+			float holeY = sh - gaugeH - 15.0f - 40.0f;
+			float holeW = gaugeW + 20.0f;
+			float holeH = gaugeH + 50.0f;
 
 			Engine::Renderer::SpriteDesc s;
 			s.color = {0, 0, 0, 0.7f};
@@ -497,6 +504,89 @@ void TutorialScript::DrawHighlights(GameScene* scene) {
 				}
 			}
 		});
+	}
+
+	// ★追加: 大砲設置フェーズでは、大砲が置けるエリアを地面に斜線でハイライト表示する
+	if (tutorialStep_ == TutorialStep::Step6_CannonInstall) {
+		float minX = 9999.0f, maxX = -9999.0f;
+		float minZ = 9999.0f, maxZ = -9999.0f;
+		auto& registry = scene->GetRegistry();
+		for (auto [entity, nc, tc] : registry.view<NameComponent, TransformComponent>().each()) {
+			if (nc.name.find("Spawner") != std::string::npos || nc.name.find("Core") != std::string::npos) {
+				if (tc.translate.x < minX) minX = tc.translate.x;
+				if (tc.translate.x > maxX) maxX = tc.translate.x;
+				if (tc.translate.z < minZ) minZ = tc.translate.z;
+				if (tc.translate.z > maxZ) maxZ = tc.translate.z;
+			}
+		}
+
+		if (minX <= maxX) {
+			float validMinX = minX - 12.0f;
+			float validMaxX = maxX + 12.0f;
+			float validMinZ = minZ - 12.0f;
+			float validMaxZ = maxZ + 12.0f;
+
+			// 斜線を描画するステージ全体の範囲
+			float stageMinX = validMinX - 16.0f;
+			float stageMaxX = validMaxX + 16.0f;
+			float stageMinZ = validMinZ - 16.0f;
+			float stageMaxZ = validMaxZ + 16.0f;
+
+			// 障害物（既存のタワーなど）のBoundingBoxを取得
+			struct AABB { float minX, maxX, minZ, maxZ; };
+			std::vector<AABB> obstacles;
+			for (auto [e, tc] : registry.view<TransformComponent>().each()) {
+				if (!registry.any_of<MeshRendererComponent, BoxColliderComponent, GpuMeshColliderComponent>(e)) continue;
+				if (registry.all_of<NameComponent>(e)) {
+					const auto& nc = registry.get<NameComponent>(e);
+					if (nc.name.find("Terrain") != std::string::npos || nc.name.find("Floor") != std::string::npos || 
+						nc.name.find("Ground") != std::string::npos || nc.name.find("Stage") != std::string::npos || 
+						nc.name.find("Plane") != std::string::npos) continue;
+				}
+				// 障害物は大体半径2.0fの範囲を占有するとみなす
+				obstacles.push_back({tc.translate.x - 2.0f, tc.translate.x + 2.0f, tc.translate.z - 2.0f, tc.translate.z + 2.0f});
+			}
+
+			// 地面に斜線を引く
+			float spacing = 1.25f; // もっと密にして見やすくする
+			for (float d = -100.0f; d <= 100.0f; d += spacing) {
+				for (float z = stageMinZ; z < stageMaxZ; z += 1.0f) {
+					float x1 = z + d;
+					float x2 = (z + 1.0f) + d;
+					
+					// 範囲外なら描画しない
+					if (x1 < stageMinX || x2 > stageMaxX) continue;
+
+					float mx = (x1 + x2) * 0.5f;
+					float mz = z + 0.5f;
+					
+					// 有効エリア内かどうか
+					bool inValidArea = (mx >= validMinX && mx <= validMaxX && mz >= validMinZ && mz <= validMaxZ);
+					bool blocked = !inValidArea;
+					
+					// 障害物との衝突判定
+					if (!blocked) {
+						for (const auto& obs : obstacles) {
+							if (mx >= obs.minX && mx <= obs.maxX && mz >= obs.minZ && mz <= obs.maxZ) {
+								blocked = true; 
+								break;
+							}
+						}
+					}
+					
+					// 緑色(設置可能)、赤色(設置不可) - 透明度を上げて濃くする
+					Engine::Vector4 color = blocked ? Engine::Vector4{1.0f, 0.0f, 0.0f, 1.0f} : Engine::Vector4{0.0f, 1.0f, 0.0f, 0.8f};
+					Engine::Vector3 p1 = {x1, 0.05f, z};
+					Engine::Vector3 p2 = {x2, 0.05f, z + 1.0f};
+					renderer->DrawLine3D(p1, p2, color, true);
+
+					// バツ印にするため反対向きの斜線も追加
+					Engine::Vector3 p3 = {x1, 0.05f, z + 1.0f};
+					Engine::Vector3 p4 = {x2, 0.05f, z};
+					renderer->DrawLine3D(p3, p4, color, true);
+				}
+			}
+		}
 	}
 }
 
@@ -667,9 +757,9 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			if (tutorialStep_ == TutorialStep::Step11_PlayerAttack) {
 				// Step11はSPACEキーに反応しない（自動的に3秒後に進む）
 			} else if (tutorialStep_ == TutorialStep::Step13_SkillTree) {
-				// Step13 ではSPACEキーで次のテキスト（Nキーの指示）に進めるようにする
-				if (currentLineIndex_ < static_cast<int>(lines.size()) - 1) {
-					currentLineIndex_++;
+				// Step13 は「敵を倒してレベルアップしたぞ！」から「Nキーを押して～」へのみSPACEで進める
+				if (currentLineIndex_ == 0) {
+					currentLineIndex_ = 1;
 				}
 			} else {
 				if (currentLineIndex_ < static_cast<int>(lines.size()) - 1) {
@@ -1525,22 +1615,29 @@ bool TutorialScript::IsPlacementBlocked(GameScene* scene, const Engine::Vector3&
 	constexpr float kBlockHalfExtent = 2.0f;
 	auto& registry = scene->GetRegistry();
 
-	// ★ チュートリアル特有の制限：コア（タワー）付近かスポナーの付近にしか置けないようにする
+	// ★ チュートリアル特有の制限：コアとスポナーを囲む矩形領域内にしか置けないようにする
 	bool isNearValidArea = false;
+	float minX = 9999.0f, maxX = -9999.0f;
+	float minZ = 9999.0f, maxZ = -9999.0f;
 	auto viewTransform = registry.view<NameComponent, TransformComponent>();
 	for (auto [entity, nc, tc] : viewTransform.each()) {
 		if (nc.name.find("Spawner") != std::string::npos || nc.name.find("Core") != std::string::npos) {
-			float dx = tc.translate.x - hitPoint.x;
-			float dz = tc.translate.z - hitPoint.z;
-			if (dx * dx + dz * dz <= 20.0f * 20.0f) {
-				isNearValidArea = true;
-				break;
-			}
+			if (tc.translate.x < minX) minX = tc.translate.x;
+			if (tc.translate.x > maxX) maxX = tc.translate.x;
+			if (tc.translate.z < minZ) minZ = tc.translate.z;
+			if (tc.translate.z > maxZ) maxZ = tc.translate.z;
+		}
+	}
+
+	if (minX <= maxX) {
+		if (hitPoint.x >= minX - 12.0f && hitPoint.x <= maxX + 12.0f &&
+		    hitPoint.z >= minZ - 12.0f && hitPoint.z <= maxZ + 12.0f) {
+			isNearValidArea = true;
 		}
 	}
 
 	if (!isNearValidArea) {
-		return true; // コア・スポナーから遠い場合はブロックする
+		return true; // エリア外の場合はブロックする
 	}
 
 	auto view = registry.view<TransformComponent>();

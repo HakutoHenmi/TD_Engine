@@ -74,10 +74,16 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 		attackTimer_ = 0.0f;
 	}
 
-	if (!registry.all_of<TransformComponent>(entity)) {
-		return;
-	}
+	if (currentTarget_ != entt::null) {
 
+		if (!registry.valid(currentTarget_)) {
+			currentTarget_ = entt::null;
+		}
+
+		else if (!registry.all_of<TransformComponent>(currentTarget_)) {
+			currentTarget_ = entt::null;
+		}
+	}
 	TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
 
 	// --- 待機時エフェクト (Idle VFX) --- ★最適化: 永続エミッター方式
@@ -160,7 +166,7 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 					float dx = pTrans.translate.x - cTrans.translate.x;
 					float dy = pTrans.translate.y - cTrans.translate.y;
 					float dz = pTrans.translate.z - cTrans.translate.z;
-					float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+					float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
 
 					if (dist <= buff.buffRadius) {
 						buff.isBuffed = true;
@@ -211,24 +217,26 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 
 	float distanceXZ = std::sqrt(toTargetX * toTargetX + toTargetZ * toTargetZ);
 
-	if (distanceXZ <= 0.0001f) {
-		return;
+	float targetYaw = canonTransform.rotate.y;
+	float targetPitch = canonTransform.rotate.x;
+
+	if (distanceXZ > 0.0001f) {
+
+		targetYaw = std::atan2(toTargetX, toTargetZ);
+
+		targetPitch = -std::atan2(toTargetY, distanceXZ);
+
+		float rotateSmoothSpeed = 6.0f;
+
+		canonTransform.rotate.y = LerpAngle(canonTransform.rotate.y, targetYaw, rotateSmoothSpeed, dt);
+
+		canonTransform.rotate.x = LerpAngle(canonTransform.rotate.x, targetPitch, rotateSmoothSpeed, dt);
 	}
-
-	float targetYaw = std::atan2(toTargetX, toTargetZ);
-	float targetPitch = -std::atan2(toTargetY, distanceXZ);
-
-	float rotateSmoothSpeed = 6.0f;
-
-	canonTransform.rotate.y = LerpAngle(canonTransform.rotate.y, targetYaw, rotateSmoothSpeed, dt);
-
-	canonTransform.rotate.x = LerpAngle(canonTransform.rotate.x, targetPitch, rotateSmoothSpeed, dt);
 
 	if (attackTimer_ > 0.0f) {
 		return;
 	}
 
-	// 攻撃
 	FireMissile(entity, registry, scene, canonTransform, finalDamage, finalExplosionRadius, currentAttackInterval);
 }
 
@@ -284,7 +292,7 @@ void MissileCanonScript::CreateBase(entt::entity entity, GameScene* scene) {
 
 	// updatebase
 	// UpdateBase(entity, scene);
-
+	
 	const TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
 
 	baseEntity_ = scene->CreateEntity("MissileCanonBase");
@@ -292,7 +300,7 @@ void MissileCanonScript::CreateBase(entt::entity entity, GameScene* scene) {
 
 	TransformComponent& baseTransform = registry.get<TransformComponent>(baseEntity_);
 	baseTransform.translate = canonTransform.translate;
-	baseTransform.translate.y -= 0.6f;
+	baseTransform.translate.y += 0.9f;
 	baseTransform.rotate = {0.0f, 0.0f, 0.0f};
 	baseTransform.scale = {1.0f, 1.0f, 1.0};
 
@@ -402,7 +410,7 @@ void MissileCanonScript::UpdateBase(entt::entity entity, GameScene* scene) {
 	TransformComponent& baseTransform = registry.get<TransformComponent>(baseEntity_);
 
 	baseTransform.translate = canonTransform.translate;
-	baseTransform.translate.y -= 0.6f;
+	baseTransform.translate.y += 0.9f;
 
 	baseTransform.rotate = {0.0f, 0.0f, 0.0f};
 }
@@ -431,7 +439,7 @@ void MissileCanonScript::UpdateTarget(entt::registry& registry, GameScene* scene
 
 			float distance = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
 
-			if (distance > attackRange_) {
+			if (distance > attackRange_ + 1.0f) {
 				currentTarget_ = entt::null;
 			}
 		}
@@ -439,7 +447,7 @@ void MissileCanonScript::UpdateTarget(entt::registry& registry, GameScene* scene
 
 	if (currentTarget_ == entt::null) {
 
-		float bestDistance = attackRange_;
+		float bestDistance = attackRange_+0.01f;
 
 		const std::vector<entt::entity>& enemies = scene->GetEntitiesByTag(TagType::Enemy);
 
@@ -471,15 +479,15 @@ void MissileCanonScript::UpdateTarget(entt::registry& registry, GameScene* scene
 	}
 }
 
-
-void MissileCanonScript::FireMissile(entt::entity entity, entt::registry& registry, GameScene* scene, const TransformComponent& canonTransform, float finalDamage, float finalExplosionRadius, float currentAttackInterval) {
+void MissileCanonScript::FireMissile(
+    entt::entity entity, entt::registry& registry, GameScene* scene, const TransformComponent& canonTransform, float finalDamage, float finalExplosionRadius, float currentAttackInterval) {
 	entt::entity bullet = registry.create();
 
 	TagComponent& bulletTag = registry.emplace<TagComponent>(bullet);
 
 	bulletTag.tag = TagType::Bullet;
 
-	TransformComponent& bulletTransform = registry.emplace<TransformComponent>(bullet);
+	TransformComponent& bulletTransform = registry.get_or_emplace<TransformComponent>(bullet);
 
 	bulletTransform.translate = canonTransform.translate;
 
@@ -514,7 +522,10 @@ void MissileCanonScript::FireMissile(entt::entity entity, entt::registry& regist
 
 	SetVar(bullet, scene, "HasTarget", 1.0f);
 
-	SetVar(bullet, scene, "TargetEntity", static_cast<float>(static_cast<uint32_t>(currentTarget_)));
+	uint32_t targetId = static_cast<uint32_t>(currentTarget_);
+	SetVar(bullet, scene, "TargetHigh", static_cast<float>((targetId >> 16) & 0xFFFF));
+	SetVar(bullet, scene, "TargetLow", static_cast<float>(targetId & 0xFFFF));
+	SetVar(bullet, scene, "TargetEntity", static_cast<float>(targetId));
 
 	SetVar(bullet, scene, "Damage", finalDamage);
 
