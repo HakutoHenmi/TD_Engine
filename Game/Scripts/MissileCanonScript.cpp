@@ -77,7 +77,15 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 	if (!registry.all_of<TransformComponent>(entity)) {
 		return;
 	}
+	if (!registry.valid(currentTarget_)) {
+		currentTarget_ = entt::null;
+		return;
+	}
 
+	if (!registry.all_of<TransformComponent>(currentTarget_)) {
+		currentTarget_ = entt::null;
+		return;
+	}
 	TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
 
 	// --- 待機時エフェクト (Idle VFX) --- ★最適化: 永続エミッター方式
@@ -160,7 +168,7 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 					float dx = pTrans.translate.x - cTrans.translate.x;
 					float dy = pTrans.translate.y - cTrans.translate.y;
 					float dz = pTrans.translate.z - cTrans.translate.z;
-					float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+					float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
 
 					if (dist <= buff.buffRadius) {
 						buff.isBuffed = true;
@@ -211,11 +219,7 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 
 	float distanceXZ = std::sqrt(toTargetX * toTargetX + toTargetZ * toTargetZ);
 
-	if (distanceXZ <= 0.0001f) {
-		return;
-	}
-
-float targetYaw = canonTransform.rotate.y;
+	float targetYaw = canonTransform.rotate.y;
 	float targetPitch = canonTransform.rotate.x;
 
 	if (distanceXZ > 0.0001f) {
@@ -437,7 +441,7 @@ void MissileCanonScript::UpdateTarget(entt::registry& registry, GameScene* scene
 
 			float distance = std::sqrt(diffX * diffX + diffY * diffY + diffZ * diffZ);
 
-			if (distance > attackRange_) {
+			if (distance > attackRange_ + 1.0f) {
 				currentTarget_ = entt::null;
 			}
 		}
@@ -477,8 +481,8 @@ void MissileCanonScript::UpdateTarget(entt::registry& registry, GameScene* scene
 	}
 }
 
-
-void MissileCanonScript::FireMissile(entt::entity entity, entt::registry& registry, GameScene* scene, const TransformComponent& canonTransform, float finalDamage, float finalExplosionRadius, float currentAttackInterval) {
+void MissileCanonScript::FireMissile(
+    entt::entity entity, entt::registry& registry, GameScene* scene, const TransformComponent& canonTransform, float finalDamage, float finalExplosionRadius, float currentAttackInterval) {
 	entt::entity bullet = registry.create();
 
 	TagComponent& bulletTag = registry.emplace<TagComponent>(bullet);
