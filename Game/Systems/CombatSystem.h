@@ -110,11 +110,13 @@ public:
 					if (aTag == TagType::Bullet || aTag == TagType::PlayerSword || aTag == TagType::Sword || aTag == TagType::Poison) { if (dTag != TagType::Enemy) skipDamage = true; }
 					if (aTag != TagType::Untagged && aTag == dTag) skipDamage = true;
 					if (aTag == TagType::EnemyBullet && dTag == TagType::Enemy) skipDamage = true;
-					// ★ミサイル/弾がCanonタグ（タワー）に当たらないようにする
-					if ((aTag == TagType::Bullet || aTag == TagType::EnemyBullet) && dTag == TagType::Canon) skipDamage = true;
-					// ★タワー（防衛設備）は無敵にする
+					// ★味方の弾がCanonタグ（タワー）に当たらないようにする (敵の弾は当たるようにする)
+					if (aTag == TagType::Bullet && dTag == TagType::Canon) skipDamage = true;
+					// ★タワー（防衛設備）は無敵にする (ただし敵の弾や敵の近接によるダメージは通す)
 					if (dTag == TagType::Canon || dTag == TagType::Cannon || dTag == TagType::IceCanon || dTag == TagType::PipeCannon || dTag == TagType::Defender || dTag == TagType::Missile || dTag == TagType::Poison) {
-						skipDamage = true;
+						if (aTag != TagType::EnemyBullet && aTag != TagType::Enemy) {
+							skipDamage = true;
+						}
 					}
 
 					// 弾が敵対勢力に当たったかどうかを判定
