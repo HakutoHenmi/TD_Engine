@@ -300,7 +300,7 @@ void MissileCanonScript::CreateBase(entt::entity entity, GameScene* scene) {
 
 	TransformComponent& baseTransform = registry.get<TransformComponent>(baseEntity_);
 	baseTransform.translate = canonTransform.translate;
-	baseTransform.translate.y -= 0.6f;
+	baseTransform.translate.y += 0.9f;
 	baseTransform.rotate = {0.0f, 0.0f, 0.0f};
 	baseTransform.scale = {1.0f, 1.0f, 1.0};
 
@@ -410,7 +410,7 @@ void MissileCanonScript::UpdateBase(entt::entity entity, GameScene* scene) {
 	TransformComponent& baseTransform = registry.get<TransformComponent>(baseEntity_);
 
 	baseTransform.translate = canonTransform.translate;
-	baseTransform.translate.y -= 0.6f;
+	baseTransform.translate.y += 0.9f;
 
 	baseTransform.rotate = {0.0f, 0.0f, 0.0f};
 }
