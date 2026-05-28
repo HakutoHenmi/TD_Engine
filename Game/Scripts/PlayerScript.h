@@ -189,6 +189,15 @@ private:
 	void ShootChargeShot(entt::entity entity, GameScene* scene);
 	void DrawPressureGauge(GameScene* scene);
 	void DrawReticle(entt::entity playerEntity, GameScene* scene);
+	
+	// ★追加: サブ目標（クエスト）用
+	bool switchDone_ = false; // プレイヤー切り替え
+	bool swordSkillDone_ = false; // 剣士スキル使用
+	bool swordDashDone_ = false; // スチームブースト
+	bool gunSkillDone_ = false; // 銃士スキル使用
+	bool gunFlyDone_ = false; // 飛行
+	bool gunShootDone_ = false; // オート射撃
+	void DrawSubObjectives(GameScene* scene);
 
 
 	// Skills

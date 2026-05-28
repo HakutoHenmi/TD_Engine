@@ -264,7 +264,7 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 		TagComponent& bulletTag = registry.emplace<TagComponent>(bullet);
 		bulletTag.tag = TagType::Bullet;
 
-		TransformComponent& bulletTransform = registry.emplace<TransformComponent>(bullet);
+		TransformComponent& bulletTransform = registry.get_or_emplace<TransformComponent>(bullet);
 		bulletTransform.translate = canonTransform.translate;
 		bulletTransform.translate.y += 1.0f;
 

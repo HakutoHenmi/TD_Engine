@@ -276,7 +276,7 @@ void PoisonTrap::CreatePoisonAttackArea(entt::entity entity, GameScene* scene, f
 	TagComponent& poisonTag = registry.emplace<TagComponent>(poisonAttackArea);
 	poisonTag.tag = TagType::Poison;
 
-	TransformComponent& poisonTransform = registry.emplace<TransformComponent>(poisonAttackArea);
+	TransformComponent& poisonTransform = registry.get_or_emplace<TransformComponent>(poisonAttackArea);
 	poisonTransform.translate = trapTransform.translate;
 	poisonTransform.rotate = trapTransform.rotate;
 

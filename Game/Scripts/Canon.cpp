@@ -42,7 +42,7 @@ void Canon::Start(entt::entity entity, GameScene* scene) {
 	if (registry.all_of<TransformComponent>(entity)) {
 		TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
 
-		TransformComponent& baseTransform = registry.emplace<TransformComponent>(baseEntity_);
+		TransformComponent& baseTransform = registry.get_or_emplace<TransformComponent>(baseEntity_);
 		baseTransform.translate = canonTransform.translate;
 		baseTransform.rotate = {0.0f, canonTransform.rotate.y, 0.0f};
 		baseTransform.scale = canonTransform.scale;
@@ -303,7 +303,7 @@ TransformComponent& targetTransform = registry.get<TransformComponent>(currentTa
 	TagComponent& bulletTag = registry.emplace<TagComponent>(bullet);
 	bulletTag.tag = TagType::Bullet;
 
-	TransformComponent& bulletTransform = registry.emplace<TransformComponent>(bullet);
+	TransformComponent& bulletTransform = registry.get_or_emplace<TransformComponent>(bullet);
 	bulletTransform.translate = canonTransform.translate;
 
 	float baseHeight = 0.0f;

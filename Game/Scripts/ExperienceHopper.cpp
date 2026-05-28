@@ -91,7 +91,7 @@ void ExperienceHopper::Update(entt::entity entity, GameScene* scene, float dt) {
 	entt::entity orb = registry.create();
 	auto& oTag = registry.emplace<TagComponent>(orb);
 	oTag.tag = TagType::ExperienceOrb;
-	auto& oTc = registry.emplace<TransformComponent>(orb);
+	auto& oTc = registry.get_or_emplace<TransformComponent>(orb);
 	oTc.translate = tc.translate;
 	oTc.translate.y += 0.5f;
 	oTc.scale = {0.2f, 0.2f, 0.2f};

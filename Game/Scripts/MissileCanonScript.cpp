@@ -479,7 +479,7 @@ void MissileCanonScript::FireMissile(entt::entity entity, entt::registry& regist
 
 	bulletTag.tag = TagType::Bullet;
 
-	TransformComponent& bulletTransform = registry.emplace<TransformComponent>(bullet);
+	TransformComponent& bulletTransform = registry.get_or_emplace<TransformComponent>(bullet);
 
 	bulletTransform.translate = canonTransform.translate;
 

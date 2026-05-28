@@ -147,26 +147,44 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 		auto& nc = scene->GetRegistry().emplace<NameComponent>(enemy);
 		nc.name = "SpawnedEnemy_W" + std::to_string(currentWave_) + "_" + std::to_string(spawnedThisWave_);
 		
-		auto& tc = scene->GetRegistry().emplace<TransformComponent>(enemy);
+		auto& tc = scene->GetRegistry().get_or_emplace<TransformComponent>(enemy);
 		tc.translate = spawnPos;
-		tc.scale = {1.0f, 1.0f, 1.0f};
+		tc.rotate.y = 1.57079632f; // 初期の90度回転
+		if (enemyScriptPath == "Boss") {
+			tc.scale = {1.0f, 1.0f, 1.0f}; // ボスはBoss.cppで別途設定されるため1倍
+		} else {
+			tc.scale = {2.0f, 2.0f, 2.0f}; // ボス以外は今の2倍
+		}
 
 		auto* renderer = Engine::Renderer::GetInstance();
 		if (renderer) {
 			auto& mr = scene->GetRegistry().emplace<MeshRendererComponent>(enemy);
-			mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
-			mr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-			DirectX::XMFLOAT4 enemyColor = { 1.0f, 0.4f, 0.2f, 1.0f };
-			if (enemyScriptPath == "Warrior") {
-				enemyColor = {0.2f, 0.2f, 1.0f, 1.0f}; // Blue
-			} else if (enemyScriptPath == "Guardian") {
-				enemyColor = {1.0f, 0.2f, 0.2f, 1.0f}; // Red
-			} else if (enemyScriptPath == "Gunner") {
-				enemyColor = { 0.2f, 1.0f, 0.2f, 1.0f }; // Green
+			
+			std::string objPath = "";
+			if (enemyScriptPath == "Warrior" || enemyScriptPath == "Guardian" || enemyScriptPath == "Gunner" || 
+			    enemyScriptPath == "SkyGunner" || enemyScriptPath == "Boss" || enemyScriptPath == "Enchanter") {
+				objPath = "Resources/Models/3Dmodel/enemies/" + enemyScriptPath + ".obj";
 			}
-			mr.color = enemyColor;
+
+			if (!objPath.empty()) {
+				mr.modelHandle = renderer->LoadObjMesh(objPath);
+				mr.color = { 1.0f, 1.0f, 1.0f, 1.0f }; // OBJ自体の色を活かすため白にする
+			} else {
+				mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+				mr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+				DirectX::XMFLOAT4 enemyColor = { 1.0f, 0.4f, 0.2f, 1.0f };
+				if (enemyScriptPath == "Warrior") {
+					enemyColor = {0.2f, 0.2f, 1.0f, 1.0f}; // Blue
+				} else if (enemyScriptPath == "Guardian") {
+					enemyColor = {1.0f, 0.2f, 0.2f, 1.0f}; // Red
+				} else if (enemyScriptPath == "Gunner") {
+					enemyColor = { 0.2f, 1.0f, 0.2f, 1.0f }; // Green
+				}
+				mr.color = enemyColor;
+			}
+			
 			mr.shaderName = "Default";
-			mr.enabled = true; // ★パフォーマンステストのため一時的に敵の描画を完全に無効化 を戻した
+			mr.enabled = true;
 		}
 
 		auto& bcComponent = scene->GetRegistry().emplace<BoxColliderComponent>(enemy);
