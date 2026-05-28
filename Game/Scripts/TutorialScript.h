@@ -101,6 +101,7 @@ private:
 	// 各種サブ状態
 	bool step5_moved_ = false;
 	bool step5_rotated_ = false;
+	bool step6_clickedCannonButton_ = false;
 	int step6_cannonCount_ = 0;
 	bool step7_placedExtraCannon_ = false;
 	bool step7_deletedCannon_ = false;

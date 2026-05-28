@@ -234,8 +234,17 @@ bool Model::Load(ID3D12Device* device, ID3D12GraphicsCommandList* cmd, const std
 		ReadAnimation(data_, scene);
 
 	uint32_t vertexOffset = 0;
+	uint32_t indexOffset = 0; // ★追加
 	for (unsigned int m = 0; m < scene->mNumMeshes; ++m) {
 		aiMesh* mesh = scene->mMeshes[m];
+		
+		// ★追加: サブセット情報を記録
+		MeshSubset subset;
+		subset.indexStart = indexOffset;
+		subset.indexCount = mesh->mNumFaces * 3;
+		subset.materialIndex = mesh->mMaterialIndex;
+		data_.subsets.push_back(subset);
+		
 		for (unsigned int i = 0; i < mesh->mNumVertices; ++i) {
 			VertexData v{};
 			// ★修正: 手動X反転 (World.cppと一致させる)
@@ -279,6 +288,7 @@ bool Model::Load(ID3D12Device* device, ID3D12GraphicsCommandList* cmd, const std
 			}
 		}
 		vertexOffset += mesh->mNumVertices;
+		indexOffset += subset.indexCount; // ★追加
 	}
 
 	// Calculate AABB
@@ -382,6 +392,13 @@ void Model::InitializeDynamic(ID3D12Device* device, const std::vector<VertexData
 	data_.vertices = vertices;
 	data_.indices = indices;
 	hasTexture_ = false;
+	
+	data_.subsets.clear();
+	MeshSubset subset;
+	subset.indexStart = 0;
+	subset.indexCount = (uint32_t)indices.size();
+	subset.materialIndex = 0;
+	data_.subsets.push_back(subset);
 
 	vb_ = CreateBufferResource(device, sizeof(VertexData) * vertices.size());
 	UpdateVertices(vertices);
@@ -438,6 +455,22 @@ void Model::DrawInstanced(ID3D12GraphicsCommandList* cmd, UINT instanceCount, UI
 	cmd->IASetIndexBuffer(&ibv_);
 	cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	cmd->DrawIndexedInstanced(indexCount_, instanceCount, 0, 0, 0);
+}
+
+void Model::DrawSubset(ID3D12GraphicsCommandList* cmd, UINT subsetIndex) {
+	if (subsetIndex >= data_.subsets.size()) return;
+	cmd->IASetVertexBuffers(0, 1, &vbv_);
+	cmd->IASetIndexBuffer(&ibv_);
+	cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	cmd->DrawIndexedInstanced(data_.subsets[subsetIndex].indexCount, 1, data_.subsets[subsetIndex].indexStart, 0, 0);
+}
+
+void Model::DrawSubsetInstanced(ID3D12GraphicsCommandList* cmd, UINT instanceCount, UINT subsetIndex) {
+	if (subsetIndex >= data_.subsets.size()) return;
+	cmd->IASetVertexBuffers(0, 1, &vbv_);
+	cmd->IASetIndexBuffer(&ibv_);
+	cmd->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	cmd->DrawIndexedInstanced(data_.subsets[subsetIndex].indexCount, instanceCount, data_.subsets[subsetIndex].indexStart, 0, 0);
 }
 
 void Model::BuildBVH() {

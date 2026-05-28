@@ -33,7 +33,8 @@ namespace ECS {
                         render.textureHandle,
                         engTransform,
                         render.color,
-                        render.shaderName
+                        render.shaderName,
+                        render.subTextureHandles // ★追加
                     );
                 }
             }

@@ -109,7 +109,10 @@ void ScriptEngine::Execute(entt::entity entity, GameScene* scene, float dt) {
 	auto& comp = registry.get<ScriptComponent>(entity);
 	if (!comp.enabled) return;
 
-	for (auto& entry : comp.scripts) {
+	for (size_t i = 0; i < comp.scripts.size(); ++i) {
+		if (!registry.valid(entity)) break; // ★追加: 実行中に破棄された場合は抜ける
+		auto& entry = comp.scripts[i];
+
 		if (entry.scriptPath.empty()) continue;
 
 		if (entry.instance) {
@@ -132,6 +135,7 @@ void ScriptEngine::Execute(entt::entity entity, GameScene* scene, float dt) {
 			entry.isStarted = true;
 		}
 
+		if (!registry.valid(entity)) break; // ★追加: Startで破棄された場合は抜ける
 		if (entry.instance) {
 			entry.instance->Update(entity, scene, dt);
 		}

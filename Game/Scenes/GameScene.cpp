@@ -1041,13 +1041,14 @@ void GameScene::Draw() {
 	if (!renderer_)
 		return;
 	auto drawStart = std::chrono::high_resolution_clock::now();
-
-
-	renderer_->SetCamera(camera_);
+renderer_->SetCamera(camera_);
 #ifdef USE_IMGUI
 	// エディタのSceneビューでのみギズモを描画する
-	if (!isPlaying_ && EditorUI::GetViewMode() == ViewMode::Scene) {
-		DrawEditorGizmos();
+	if (!isPlaying_ && EditorUI::GetViewMode() != ViewMode::Game) {
+		auto* sm = Engine::SceneManager::GetInstance();
+		if (sm && sm->GetTransitionState() == Engine::SceneManager::TransitionState::None) {
+			DrawEditorGizmos();
+		}
 	}
 	// デバッグ時のみフローフィールドを表示
 	if (!isPlaying_ && flowField_ && EditorUI::GetViewMode() == ViewMode::Scene) {
