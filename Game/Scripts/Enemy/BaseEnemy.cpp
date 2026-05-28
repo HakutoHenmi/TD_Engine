@@ -256,12 +256,18 @@ void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
 		}
 	}
 
+	// 攻撃判定持続時間の更新
+	if (attackActiveTimer_ > 0.0f) {
+		attackActiveTimer_ -= dt;
+	}
+
 	// 実際の行動
 	if (inAttackRange) {
 		// 攻撃範囲内にいる場合
 		if (attackCooltime_ <= 0.0f) {
 			// クールタイムを満たしていれば足を止めて攻撃
 			ExecuteAttack(entity, scene, dt);
+			attackActiveTimer_ = 0.3f; // 0.3秒間は判定を維持する
 		} else {
 			// クールタイム中は移動を停止（無駄な密着やカクつきを防ぐ）
 			if (registry.all_of<RigidbodyComponent>(entity)) {
@@ -269,14 +275,19 @@ void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
 				rb.velocity.x = 0.0f;
 				rb.velocity.z = 0.0f;
 			}
-			if (registry.all_of<HitboxComponent>(entity)) {
-				registry.get<HitboxComponent>(entity).isActive = false;
+			// 持続時間が切れたら判定をオフにする
+			if (attackActiveTimer_ <= 0.0f) {
+				if (registry.all_of<HitboxComponent>(entity)) {
+					registry.get<HitboxComponent>(entity).isActive = false;
+				}
 			}
 		}
 	} else {
-		// 攻撃関数を呼んでない時は攻撃判定を消す
-		if (registry.all_of<HitboxComponent>(entity)) {
-			registry.get<HitboxComponent>(entity).isActive = false;
+		// 攻撃範囲外に出ても、持続時間が切れるまでは判定を消さない
+		if (attackActiveTimer_ <= 0.0f) {
+			if (registry.all_of<HitboxComponent>(entity)) {
+				registry.get<HitboxComponent>(entity).isActive = false;
+			}
 		}
 
 		DefaultMove(entity, scene, dt);
