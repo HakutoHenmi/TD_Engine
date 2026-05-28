@@ -215,20 +215,26 @@ void MissileCanonScript::Update(entt::entity entity, GameScene* scene, float dt)
 		return;
 	}
 
-	float targetYaw = std::atan2(toTargetX, toTargetZ);
-	float targetPitch = -std::atan2(toTargetY, distanceXZ);
+float targetYaw = canonTransform.rotate.y;
+	float targetPitch = canonTransform.rotate.x;
 
-	float rotateSmoothSpeed = 6.0f;
+	if (distanceXZ > 0.0001f) {
 
-	canonTransform.rotate.y = LerpAngle(canonTransform.rotate.y, targetYaw, rotateSmoothSpeed, dt);
+		targetYaw = std::atan2(toTargetX, toTargetZ);
 
-	canonTransform.rotate.x = LerpAngle(canonTransform.rotate.x, targetPitch, rotateSmoothSpeed, dt);
+		targetPitch = -std::atan2(toTargetY, distanceXZ);
+
+		float rotateSmoothSpeed = 6.0f;
+
+		canonTransform.rotate.y = LerpAngle(canonTransform.rotate.y, targetYaw, rotateSmoothSpeed, dt);
+
+		canonTransform.rotate.x = LerpAngle(canonTransform.rotate.x, targetPitch, rotateSmoothSpeed, dt);
+	}
 
 	if (attackTimer_ > 0.0f) {
 		return;
 	}
 
-	// 攻撃
 	FireMissile(entity, registry, scene, canonTransform, finalDamage, finalExplosionRadius, currentAttackInterval);
 }
 
