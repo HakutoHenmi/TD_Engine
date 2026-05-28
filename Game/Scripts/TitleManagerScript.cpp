@@ -341,6 +341,11 @@ void TitleManagerScript::Update(entt::entity entity, GameScene* scene, float dt)
 		// 空気遠近法（フォグ）も濃すぎると白っぽくなるため少し抑える
 		pp.fogDensity = 0.012f;
 		pp.fogStart = 10.0f;
+
+		// ゲームプレイ中のダメージやモードUI（赤黒の帯など）をリセットする
+		pp.damageVignette = 0.0f;
+		pp.prepModeBorder = 0.0f;
+		pp.deleteModeBorder = 0.0f;
 		
 		renderer->SetPostProcessParams(pp);
 		renderer->SetPostProcessEnabled(true);

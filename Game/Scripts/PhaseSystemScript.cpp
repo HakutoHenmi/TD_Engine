@@ -556,54 +556,55 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			SetVar(entity, scene, "IsSkillTreeOpen", 0.0f);
 		}
 
-		// 設置モードへの切り替え
+		if (!isTutorial) {
+			// 設置モードへの切り替え
+			if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/Canon.prefab")) {
+				selectedObjPath_ = "Resources/Prefabs/NewCannon.prefab";
+				selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
+				if (selectedObjCost_ == 0)
+					selectedObjCost_ = canonCost_;
+				isPlacementMode_ = true;
+				isSellMode_ = false;
+				placementSelectionChangedThisFrame = true;
+			}
 
-		if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/Canon.prefab")) {
-			selectedObjPath_ = "Resources/Prefabs/NewCannon.prefab";
-			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
-			if (selectedObjCost_ == 0)
-				selectedObjCost_ = canonCost_;
-			isPlacementMode_ = true;
-			isSellMode_ = false;
-			placementSelectionChangedThisFrame = true;
-		}
+			if (key4 || InstallationManager::IsButtonPressed("Resources/Prefabs/Missile.prefab")) {
+				selectedObjPath_ = "Resources/Prefabs/Missile.prefab";
+				selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
+				if (selectedObjCost_ == 0)
+					selectedObjCost_ = missileCost_;
+				isPlacementMode_ = true;
+				isSellMode_ = false;
+				placementSelectionChangedThisFrame = true;
+			}
 
-		if (key4 || InstallationManager::IsButtonPressed("Resources/Prefabs/Missile.prefab")) {
-			selectedObjPath_ = "Resources/Prefabs/Missile.prefab";
-			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
-			if (selectedObjCost_ == 0)
-				selectedObjCost_ = missileCost_;
-			isPlacementMode_ = true;
-			isSellMode_ = false;
-			placementSelectionChangedThisFrame = true;
-		}
+			if (key5 || InstallationManager::IsButtonPressed("Resources/Prefabs/Poison.prefab")) {
+				selectedObjPath_ = "Resources/Prefabs/Poison.prefab";
+				selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
+				if (selectedObjCost_ == 0)
+					selectedObjCost_ = poisonCost_;
+				isPlacementMode_ = true;
+				isSellMode_ = false;
+				placementSelectionChangedThisFrame = true;
+			}
 
-		if (key5 || InstallationManager::IsButtonPressed("Resources/Prefabs/Poison.prefab")) {
-			selectedObjPath_ = "Resources/Prefabs/Poison.prefab";
-			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
-			if (selectedObjCost_ == 0)
-				selectedObjCost_ = poisonCost_;
-			isPlacementMode_ = true;
-			isSellMode_ = false;
-			placementSelectionChangedThisFrame = true;
-		}
+			if (key6 || InstallationManager::IsButtonPressed("Resources/Prefabs/IceCanon.prefab")) {
+				selectedObjPath_ = "Resources/Prefabs/IceCanon.prefab";
+				selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
+				if (selectedObjCost_ == 0)
+					selectedObjCost_ = iceCanonCost_;
+				isPlacementMode_ = true;
+				isSellMode_ = false;
+				placementSelectionChangedThisFrame = true;
+			}
 
-		if (key6 || InstallationManager::IsButtonPressed("Resources/Prefabs/IceCanon.prefab")) {
-			selectedObjPath_ = "Resources/Prefabs/IceCanon.prefab";
-			selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
-			if (selectedObjCost_ == 0)
-				selectedObjCost_ = iceCanonCost_;
-			isPlacementMode_ = true;
-			isSellMode_ = false;
-			placementSelectionChangedThisFrame = true;
-		}
-
-		// Xキーまたは「削除機能ボタン」クリックで削除(売却)モードへの切り替え
-		if (keyX || InstallationManager::IsButtonPressedByName("DeleteButton")) {
-			isSellMode_ = true;
-			isPlacementMode_ = false;
-			placementSelectionChangedThisFrame = true;
-			EditorUI::Log("Sell Mode Activated");
+			// Xキーまたは「削除機能ボタン」クリックで削除(売却)モードへの切り替え
+			if (keyX || InstallationManager::IsButtonPressedByName("DeleteButton")) {
+				isSellMode_ = true;
+				isPlacementMode_ = false;
+				placementSelectionChangedThisFrame = true;
+				EditorUI::Log("Sell Mode Activated");
+			}
 		}
 
 		if (input->IsMouseTrigger(1) && isPlacementMode_) {
@@ -1771,7 +1772,15 @@ void PhaseSystemScript::OnEditorUI() {
 #endif
 }
 
-void PhaseSystemScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
+void PhaseSystemScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
+	// 次のシーンロード時に初期化順序の問題で古いフェーズ情報（特にBattlePhase）を
+	// スポナーなどが誤認しないように、シーン破棄時に安全なフェーズへリセットしておく
+	isPhase_ = PreparationPhase;
+	NextPhase_ = PreparationPhase;
+	currentPhase_ = 0;
+	s_gameOverPhase_ = 0;
+	s_gameClearPhase_ = 0;
+}
 
 void PhaseSystemScript::InitializeInsertPhase(GameScene* scene) {
 	if (isInsertInitialized_)

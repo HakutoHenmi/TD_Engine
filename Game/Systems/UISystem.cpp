@@ -191,12 +191,16 @@ void UISystem::DrawUI(entt::registry& registry, GameContext& ctx) {
 					ImVec2 pMin(sx - barW * 0.5f, sy - barH * 0.5f);
 					ImVec2 pMax(sx + barW * 0.5f, sy + barH * 0.5f);
 
-					// 背景
-					drawList->AddRectFilled(pMin, pMax, IM_COL32(40, 40, 40, 180));
-					// HP残量
-					drawList->AddRectFilled(pMin, ImVec2(pMin.x + curW, pMax.y), IM_COL32(50, 230, 50, 255));
-					// 枠
-					drawList->AddRect(pMin, pMax, IM_COL32(255, 255, 255, 200));
+					// 背景を暗くしてコントラストを上げる
+					drawList->AddRectFilled(pMin, pMax, IM_COL32(20, 20, 20, 220));
+					
+					// HP残量 (敵は鮮やかな赤、味方は鮮やかな緑)
+					bool isEnemyForColor = (registry.all_of<TagComponent>(e) && registry.get<TagComponent>(e).tag == TagType::Enemy);
+					ImU32 hpColor = isEnemyForColor ? IM_COL32(255, 50, 50, 255) : IM_COL32(0, 255, 60, 255);
+					drawList->AddRectFilled(pMin, ImVec2(pMin.x + curW, pMax.y), hpColor);
+					
+					// 枠 (黒で少し太くして視認性を高める)
+					drawList->AddRect(pMin, pMax, IM_COL32(0, 0, 0, 255), 0.0f, 0, 1.5f);
 
 					// ★追加: シールドバーの描画 (HPバーのすぐ上に描画)
 					if (hc.maxShieldHp > 0.0f && hc.shieldHp > 0.0f) {

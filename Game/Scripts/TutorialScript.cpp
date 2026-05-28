@@ -601,11 +601,18 @@ void TutorialScript::UpdateSellMode(GameScene* scene) {
 	if (!renderer)
 		return;
 
+	// ★修正: 1クリックで何回もトグルしないようにエッジトリガーにする
+	static bool prevDeleteBtn = false;
+	bool currDeleteBtn = InstallationManager::IsButtonPressedByName("DeleteButton");
+	bool deleteTriggered = currDeleteBtn && !prevDeleteBtn;
+	prevDeleteBtn = currDeleteBtn;
+
 	const bool keyX = input->Trigger(DIK_X) || (GetAsyncKeyState('X') & 0x8001);
-	if (keyX || InstallationManager::IsButtonPressedByName("DeleteButton")) {
+	if (keyX || deleteTriggered) {
 		isSellMode_ = !isSellMode_;
 		isPlacementMode_ = false;
 		EditorUI::Log(isSellMode_ ? "Tutorial: Sell Mode Activated" : "Tutorial: Sell Mode Deactivated");
+
 	}
 
 	if (!isSellMode_)
@@ -991,6 +998,19 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	UpdatePhaseTransition(scene);
 	UpdateCameraFocus(scene, dt);
+
+	// ★追加: チュートリアルシーンでも削除モード時に赤黒帯（警告テープ）を表示する
+	if (auto* renderer = scene->GetRenderer()) {
+		auto ppParams = renderer->GetPostProcessParams();
+		if (phaseState_ == PhaseSystemScript::PreparationPhase) {
+			ppParams.prepModeBorder = 1.0f;
+			ppParams.deleteModeBorder = isSellMode_ ? 1.0f : 0.0f;
+		} else {
+			ppParams.prepModeBorder = 0.0f;
+			ppParams.deleteModeBorder = 0.0f;
+		}
+		renderer->SetPostProcessParams(ppParams);
+	}
 }
 
 // 準備フェーズと戦闘フェーズの間で状態を切り替えるよう要求する（フェード遷移を開始する）
