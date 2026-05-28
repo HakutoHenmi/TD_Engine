@@ -39,7 +39,7 @@ void IceBulletScript::Start(entt::entity entity, GameScene* scene) {
 		}
 	}
 
-	spiralAngle_ = static_cast<float>(static_cast<uint32_t>(entity) % 6) * 1.0f;
+	spiralAngle_ = 0.0f;
 	spiralRadius_ = 0.0f;
 }
 
