@@ -310,7 +310,10 @@ void IceCanon::Update(entt::entity entity, GameScene* scene, float dt) {
 		sc.scripts.push_back({"IceBulletScript", "", nullptr});
 
 		SetVar(bullet, scene, "HasTarget", 1.0f);
-		SetVar(bullet, scene, "TargetEntity", (float)(uint32_t)currentTarget_);
+		uint32_t targetId = static_cast<uint32_t>(currentTarget_);
+		SetVar(bullet, scene, "TargetHigh", static_cast<float>((targetId >> 16) & 0xFFFF));
+		SetVar(bullet, scene, "TargetLow", static_cast<float>(targetId & 0xFFFF));
+		SetVar(bullet, scene, "TargetEntity", static_cast<float>(targetId));
 		SetVar(bullet, scene, "StopTime", currentStopTime);
 	}
 

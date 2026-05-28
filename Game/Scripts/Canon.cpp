@@ -338,7 +338,10 @@ TransformComponent& targetTransform = registry.get<TransformComponent>(currentTa
 	bulletScriptComponent.scripts.push_back({"BulletScript", "", nullptr});
 
 	SetVar(bullet, scene, "HasTarget", 1.0f);
-	SetVar(bullet, scene, "TargetEntity", static_cast<float>(static_cast<uint32_t>(currentTarget_)));
+	uint32_t targetId = static_cast<uint32_t>(currentTarget_);
+	SetVar(bullet, scene, "TargetHigh", static_cast<float>((targetId >> 16) & 0xFFFF));
+	SetVar(bullet, scene, "TargetLow", static_cast<float>(targetId & 0xFFFF));
+	SetVar(bullet, scene, "TargetEntity", static_cast<float>(targetId));
 	attackTimer_ = currentAttackInterval_;
 	SetVar(entity, scene, "CoolTimeRate", 0.0f);
 

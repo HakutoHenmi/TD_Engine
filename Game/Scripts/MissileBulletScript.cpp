@@ -26,12 +26,19 @@ void MissileBulletScript::Start(entt::entity entity, GameScene* scene) {
 
 	float hasTargetValue = GetVar(entity, scene, "HasTarget", 0.0f);
 	if (hasTargetValue > 0.5f) {
-		float targetEntityValue = GetVar(entity, scene, "TargetEntity", -1.0f);
-
-		if (targetEntityValue >= 0.0f) {
-			uint32_t targetEntityId = static_cast<uint32_t>(targetEntityValue);
-			target_ = static_cast<entt::entity>(targetEntityId);
+		float high = GetVar(entity, scene, "TargetHigh", -1.0f);
+		float low = GetVar(entity, scene, "TargetLow", -1.0f);
+		if (high >= 0.0f && low >= 0.0f) {
+			uint32_t targetId = (static_cast<uint32_t>(high) << 16) | static_cast<uint32_t>(low);
+			target_ = static_cast<entt::entity>(targetId);
 			hasTarget_ = true;
+		} else {
+			float targetEntityValue = GetVar(entity, scene, "TargetEntity", -1.0f);
+			if (targetEntityValue >= 0.0f) {
+				uint32_t targetEntityId = static_cast<uint32_t>(targetEntityValue);
+				target_ = static_cast<entt::entity>(targetEntityId);
+				hasTarget_ = true;
+			}
 		}
 	}
 
