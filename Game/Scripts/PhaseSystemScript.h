@@ -54,10 +54,16 @@ public:
 
 	static int GetCurrentPhase() { return currentPhase_; }
 	static void ResetPhaseCount() { currentPhase_ = 0; }
+	static int GetGameOverPhase() { return s_gameOverPhase_; }
+	static int GetGameClearPhase() { return s_gameClearPhase_; }
+	static void ResetGameOverPhase() { s_gameOverPhase_ = 0; s_gameClearPhase_ = 0; }
+	static bool IsResultSequenceActive() { return s_gameOverPhase_ > 0 || s_gameClearPhase_ > 0; }
 
 private:
 	inline static PhaseState isPhase_ = PreparationPhase;
 	inline static PhaseState NextPhase_ = PreparationPhase;
+	inline static int s_gameOverPhase_ = 0;
+	inline static int s_gameClearPhase_ = 0;
 	PhaseState preIsPhase_ = PreparationPhase; // フェーズ切り替わり検知用
 	inline static int currentPhase_ = 0;
 
@@ -106,6 +112,12 @@ private:
 	entt::entity skipProgressBgUI_ = entt::null;
 	DirectX::XMFLOAT3 originalCameraPos_ = {0.0f, 0.0f, 0.0f};
 	DirectX::XMFLOAT3 originalCameraRot_ = {0.0f, 0.0f, 0.0f};
+
+	// ゲームオーバー演出用
+	float gameOverTimer_ = 0.0f;
+	entt::entity resultManagerEntity_ = entt::null;
+	DirectX::XMFLOAT3 goStartCamPos_ = {0,0,0};
+	DirectX::XMFLOAT3 goStartCamRot_ = {0,0,0};
 
 	// インサートカメラ演出関連のヘルパーメソッド
 	void InitializeInsertPhase(GameScene* scene);
