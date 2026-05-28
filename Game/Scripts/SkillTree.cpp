@@ -1264,8 +1264,10 @@ void SkillTree::DrawPageButtons(Engine::Renderer* renderer, float screenW, float
 	(void)screenW;
 	(void)screenH;
 
+float arrowAnim = std::sin((float)GetTickCount64() * 0.005f) * 10.0f;
+
 	Engine::Renderer::SpriteDesc prev;
-	prev.x = prevButtonLeft_;
+	prev.x = prevButtonLeft_ - arrowAnim;
 	prev.y = prevButtonTop_;
 	prev.w = prevButtonRight_ - prevButtonLeft_;
 	prev.h = prevButtonBottom_ - prevButtonTop_;
@@ -1276,11 +1278,10 @@ void SkillTree::DrawPageButtons(Engine::Renderer* renderer, float screenW, float
 		prev.color = {4.0f, 1.8f, 1.2f, 1.0f};
 	}
 	// 前ページ戻る
-
 	renderer->DrawSprite(texPrevArrow_, prev);
 
-	Engine::Renderer::SpriteDesc next;
-	next.x = nextButtonLeft_;
+Engine::Renderer::SpriteDesc next;
+	next.x = nextButtonLeft_ + arrowAnim;
 	next.y = nextButtonTop_;
 	next.w = nextButtonRight_ - nextButtonLeft_;
 	next.h = nextButtonBottom_ - nextButtonTop_;
