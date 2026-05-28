@@ -44,6 +44,7 @@ void Canon::Start(entt::entity entity, GameScene* scene) {
 
 		TransformComponent& baseTransform = registry.get_or_emplace<TransformComponent>(baseEntity_);
 		baseTransform.translate = canonTransform.translate;
+		baseTransform.translate.y += 1.5f;
 		baseTransform.rotate = {0.0f, canonTransform.rotate.y, 0.0f};
 		baseTransform.scale = canonTransform.scale;
 	}

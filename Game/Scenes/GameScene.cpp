@@ -921,7 +921,7 @@ bool GameScene::RayCast(const Engine::Vector3& origin, const Engine::Vector3& di
 			if (registry_.all_of<TagComponent>(entity)) {
 				const auto tag = registry_.get<TagComponent>(entity).tag;
 				if (tag == TagType::Enemy || tag == TagType::Bullet || tag == TagType::Player || tag == TagType::Sword || tag == TagType::PlayerSword || tag == TagType::Projectile || tag == TagType::Pipe || tag == TagType::Canon || tag == TagType::BulletTank ||
-					tag == TagType::PipeCannon || tag == TagType::VFX || tag == TagType::HitDistortion_VFX || tag == TagType::Missile || tag == TagType::Experience || tag == TagType::ExperienceOrb) {
+					tag == TagType::PipeCannon || tag == TagType::VFX || tag == TagType::HitDistortion_VFX || tag == TagType::Missile || tag == TagType::Experience || tag == TagType::ExperienceOrb || tag == TagType::Core) {
 					isEnemyOrBullet = true;
 				}
 			}
