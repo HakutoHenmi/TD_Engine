@@ -1,6 +1,5 @@
 #include "Canon.h"
 #include "BulletScript.h"
-#include "BulletScript.h"
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
@@ -28,8 +27,6 @@ static bool HasTag(entt::registry& registry, entt::entity entity, TagType tagNam
 	return registry.get<TagComponent>(entity).tag == tagName;
 }
 
-
-
 void Canon::Start(entt::entity entity, GameScene* scene) {
 	attackTimer_ = 0.0f;
 	baseEntity_ = entt::null;
@@ -42,13 +39,8 @@ void Canon::Start(entt::entity entity, GameScene* scene) {
 
 	baseEntity_ = registry.create();
 
-
-
 	if (registry.all_of<TransformComponent>(entity)) {
 		TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
-
-
-
 
 		TransformComponent& baseTransform = registry.emplace<TransformComponent>(baseEntity_);
 		baseTransform.translate = canonTransform.translate;
@@ -94,8 +86,6 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	}
 
-
-
 	entt::entity gm = entt::null;
 	auto viewScript = registry.view<ScriptComponent>();
 	for (auto e : viewScript) {
@@ -106,10 +96,9 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 				break;
 			}
 		}
-		if (gm != entt::null) break;
+		if (gm != entt::null)
+			break;
 	}
-
-
 
 	if (gm != entt::null) {
 		skillPowerRate = GetVar(gm, scene, "AttackPowerRateCanon", 1.0f);
@@ -139,12 +128,12 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 					float dx = pTrans.translate.x - cTrans.translate.x;
 					float dy = pTrans.translate.y - cTrans.translate.y;
 					float dz = pTrans.translate.z - cTrans.translate.z;
-					float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+					float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
 
 					if (dist <= buff.buffRadius) {
 						buff.isBuffed = true;
 						// 大砲のバフ効果：連射速度（インターバル）が短縮され、攻撃力も少し上がる
-						currentAttackInterval /= buff.buffMultiplier; 
+						currentAttackInterval /= buff.buffMultiplier;
 						currentDamage *= 1.2f; // バフ時は威力も20%UP
 					}
 				}
@@ -159,8 +148,6 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (attackTimer_ > 0.0f) {
 		attackTimer_ -= dt;
 	}
-
-
 
 	TransformComponent& canonTransform = registry.get<TransformComponent>(entity);
 
@@ -179,12 +166,12 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 		isVc.SetValue("NormalX", 0.0f);
 		isVc.SetValue("NormalY", 1.0f); // 真上に噴き上がらせる
 		isVc.SetValue("NormalZ", 0.0f);
-		isVc.SetValue("Radius", 2.2f); // 煙が大きく豊かに広がるサイズ
+		isVc.SetValue("Radius", 2.2f);   // 煙が大きく豊かに広がるサイズ
 		isVc.SetValue("Duration", 2.5f); // 上空高くゆっくり立ち上って消えるまで長めに設定（ゲージをはるか上に通過）
 		isVc.SetValue("ScatterMode", 0.0f);
 		isVc.SetValue("ScatterSpeed", 11.0f); // 速度を倍増させ、ゲージの位置を瞬時に通過させる
-		isVc.SetValue("Count", 6.0f); // 1回あたりの煙の量を増やして豪華に
-		isVc.SetValue("IsFlight", 1.0f); // 火花は出さず、美しい蒸気（煙）だけを生成
+		isVc.SetValue("Count", 6.0f);         // 1回あたりの煙の量を増やして豪華に
+		isVc.SetValue("IsFlight", 1.0f);      // 火花は出さず、美しい蒸気（煙）だけを生成
 
 		auto& isSc = registry.emplace<ScriptComponent>(idleSteam);
 		isSc.scripts.push_back({"SpaceShatterScript", "", nullptr});
@@ -259,25 +246,39 @@ void Canon::Update(entt::entity entity, GameScene* scene, float dt) {
 		return;
 	}
 
-	TransformComponent& targetTransform = registry.get<TransformComponent>(currentTarget_);
+TransformComponent& targetTransform = registry.get<TransformComponent>(currentTarget_);
 
 	float toX = targetTransform.translate.x - canonTransform.translate.x;
 	float toZ = targetTransform.translate.z - canonTransform.translate.z;
 
-	if (std::fabs(toX) < 0.0001f && std::fabs(toZ) < 0.0001f) {
-		return;
+	float distanceSquared = toX * toX + toZ * toZ;
+
+	if (distanceSquared > 0.0001f) {
+
+		float desiredYaw = std::atan2(toX, toZ) + 3.14159265f;
+
+		float angleDiff = desiredYaw - canonTransform.rotate.y;
+
+		while (angleDiff > 3.14159265f) {
+			angleDiff -= 6.28318530f;
+		}
+
+		while (angleDiff < -3.14159265f) {
+			angleDiff += 6.28318530f;
+		}
+
+		canonTransform.rotate.y += angleDiff * 0.1f;
+
+		float toY = targetTransform.translate.y - canonTransform.translate.y;
+
+		float distanceXZ = std::sqrt(distanceSquared);
+
+		float desiredPitch = std::atan2(toY, distanceXZ);
+
+		canonTransform.rotate.x = desiredPitch;
 	}
 
-float desiredYaw = std::atan2(toX, toZ) + 3.14159265f;
-
-	float toY = targetTransform.translate.y - canonTransform.translate.y;
-	float distanceXZ = std::sqrt(toX * toX + toZ * toZ);
-	float desiredPitch = std::atan2(toY, distanceXZ);
-
-	canonTransform.rotate.y = desiredYaw;
-	canonTransform.rotate.x = desiredPitch;
-
-if (attackTimer_ > 0.0f) {
+	if (attackTimer_ > 0.0f) {
 
 		if (currentAttackInterval_ > 0.0f) {
 
@@ -324,7 +325,7 @@ if (attackTimer_ > 0.0f) {
 		MeshRendererComponent& bulletMeshRenderer = registry.emplace<MeshRendererComponent>(bullet);
 		bulletMeshRenderer.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
 		bulletMeshRenderer.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-		bulletMeshRenderer.color = {0.0f, 0.0f, 0.0f, 1.0f};//黒に変更
+		bulletMeshRenderer.color = {0.0f, 0.0f, 0.0f, 1.0f}; // 黒に変更
 	}
 
 	HitboxComponent& bulletHitbox = registry.emplace<HitboxComponent>(bullet);
@@ -377,12 +378,12 @@ if (attackTimer_ > 0.0f) {
 	asVc.SetValue("NormalX", 0.0f);
 	asVc.SetValue("NormalY", 1.0f); // 真上に向けて吹き出させる
 	asVc.SetValue("NormalZ", 0.0f);
-	asVc.SetValue("Radius", 2.0f); // 煙が広がる半径
+	asVc.SetValue("Radius", 2.0f);   // 煙が広がる半径
 	asVc.SetValue("Duration", 1.2f); // 寿命を伸ばし上空高くへ立ち上らせる
 	asVc.SetValue("ScatterMode", 0.0f);
 	asVc.SetValue("ScatterSpeed", 15.0f); // 噴射速度をほぼ倍増させ、ゲージの上へと一瞬で突き抜けさせる
-	asVc.SetValue("Count", 15.0f); // 煙の密度
-	asVc.SetValue("IsFlight", 1.0f); // 1.0fを設定することで火花（Shard）は出さず、美しい蒸気（煙）だけを生成
+	asVc.SetValue("Count", 15.0f);        // 煙の密度
+	asVc.SetValue("IsFlight", 1.0f);      // 1.0fを設定することで火花（Shard）は出さず、美しい蒸気（煙）だけを生成
 
 	auto& asSc = registry.emplace<ScriptComponent>(aroundSmoke);
 	asSc.scripts.push_back({"SpaceShatterScript", "", nullptr});
@@ -414,7 +415,6 @@ void Canon::OnEditorUI() {
 	ImGui::Text("Rotation: %.2f", rotationSpeed_);
 #endif
 }
-
 
 void Canon::DrawUI(entt::entity entity, GameScene* scene) {
 	if (!scene) {
