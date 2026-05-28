@@ -8,10 +8,10 @@
 #include "ObjectTypes.h"
 #include "PlayerScript.h"
 #include "ScriptEngine.h"
+#include "TutorialScript.h"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
-#include "TutorialScript.h"
 
 using json = nlohmann::json;
 
@@ -939,10 +939,13 @@ void SkillTree::DrawNodes(Engine::Renderer* renderer, float screenW, float scree
 		GetNodeScreenPos(node, screenW, screenH, nodeX, nodeY);
 
 		float halfSize = kNodeSize * 0.5f;
+
 		bool isHovered = false;
 		if (mouseX >= nodeX - halfSize && mouseX <= nodeX + halfSize && mouseY >= nodeY - halfSize && mouseY <= nodeY + halfSize) {
 			isHovered = true;
 		}
+
+		float drawSize = kNodeSize;
 
 		Engine::Vector4 bgColor;
 		Engine::Vector4 iconColor = {1.0f, 1.0f, 1.0f, 1.0f}; // アイコン自体は本来の明るい色(白)を維持
@@ -984,7 +987,7 @@ void SkillTree::DrawNodes(Engine::Renderer* renderer, float screenW, float scree
 								isTutorialTarget = true;
 							}
 						}
-						
+
 						if (isTutorialTarget) {
 							float blink = std::sin((float)GetTickCount64() * 0.01f) * 0.5f + 0.5f;
 							bgColor = {1.0f, 0.5f + 0.5f * blink, 0.0f, 1.0f}; // チュートリアル中は対象を点滅させる
@@ -997,24 +1000,41 @@ void SkillTree::DrawNodes(Engine::Renderer* renderer, float screenW, float scree
 				bgColor = {0.3f, 0.3f, 0.3f, 0.7f};   // ロック中：灰色の枠
 				iconColor = {0.4f, 0.4f, 0.4f, 1.0f}; // ロック中のアイコンは暗くする
 			}
-		}
 
+
+			if (isHovered) {
+				drawSize *= 1.15f;
+			}
+			bool canUnlockAnimation = false;
+
+			if (!node.unlocked && canUnlock && skillPoints_ >= node.cost) {
+				canUnlockAnimation = true;
+			}
+
+			if (canUnlockAnimation) {
+
+				float pulse = std::sin((float)GetTickCount64() * 0.005f);
+
+				drawSize += pulse * 6.0f;
+			}
+		}
+		
 		// ★追加: 状態を示すカラーを「背景の枠」として描画する
 		Engine::Renderer::SpriteDesc bgSprite;
-		bgSprite.x = nodeX - halfSize - 4.0f; // アイコンより少し大きくする
-		bgSprite.y = nodeY - halfSize - 4.0f;
-		bgSprite.w = kNodeSize + 8.0f;
-		bgSprite.h = kNodeSize + 8.0f;
+		bgSprite.x = nodeX - drawSize * 0.5f - 4.0f;
+		bgSprite.y = nodeY - drawSize * 0.5f - 4.0f;
+		bgSprite.w = drawSize + 8.0f;
+		bgSprite.h = drawSize + 8.0f;
 		bgSprite.color = bgColor;
 		// texPanel_ (または無地の白テクスチャ) を使って枠を描画
 		renderer->DrawSprite(texPanel_, bgSprite);
 
 		// ★修正: アイコン自体は本来の色(iconColor)で描画する
 		Engine::Renderer::SpriteDesc sprite;
-		sprite.x = nodeX - halfSize;
-		sprite.y = nodeY - halfSize;
-		sprite.w = kNodeSize;
-		sprite.h = kNodeSize;
+		sprite.x = nodeX - drawSize * 0.5f;
+		sprite.y = nodeY - drawSize * 0.5f;
+		sprite.w = drawSize;
+		sprite.h = drawSize;
 		sprite.color = iconColor;
 
 		uint32_t textureHandle = 0;
@@ -1038,11 +1058,11 @@ void SkillTree::DrawSkillPointsText(Engine::Renderer* renderer, float screenW, f
 
 	float baseX = kPanelMargin + 40.0f;
 	float baseY = screenH - kPanelMargin - 70.0f;
-	
+
 	std::string text = "スキルポイント " + std::to_string(skillPoints_);
 	float outline = 2.0f;
 	std::string font = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf";
-	
+
 	renderer->DrawString(text, baseX - outline, baseY, 0.6f, {0.0f, 0.0f, 0.0f, 1.0f}, font);
 	renderer->DrawString(text, baseX + outline, baseY, 0.6f, {0.0f, 0.0f, 0.0f, 1.0f}, font);
 	renderer->DrawString(text, baseX, baseY - outline, 0.6f, {0.0f, 0.0f, 0.0f, 1.0f}, font);
