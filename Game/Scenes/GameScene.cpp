@@ -80,11 +80,11 @@ bool IsEntityVisibleInFrustum(const Engine::Frustum& frustum, Engine::Renderer* 
 } // namespace
 
 GameScene::~GameScene() {
-	// ★追加: 破棄時にシグナルを解除し、安全にレジストリをクリアする
+	// ★修正: シグナルを解除する前にクリアすることで、OnScriptDestroyed 等を正しく発火させる
+	registry_.clear();
 	registry_.on_construct<TagComponent>().disconnect<&GameScene::OnTagAdded>(this);
 	registry_.on_destroy<TagComponent>().disconnect<&GameScene::OnTagRemoved>(this);
-	registry_.on_destroy<ScriptComponent>().disconnect<&GameScene::OnScriptDestroyed>(this); // ★追加
-	registry_.clear();
+	registry_.on_destroy<ScriptComponent>().disconnect<&GameScene::OnScriptDestroyed>(this);
 }
 
 void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& params) {
@@ -428,8 +428,16 @@ void GameScene::Update() {
 	// コンテキストを更新
 	ctx_.dt = scaledDt;
 
-	// ★追加: ESCキーでポーズ切り替え (プレイ中かつゲーム本編またはチュートリアルのみ)
-	if (isPlaying_ && (sceneName_ == "Game" || sceneName_ == "Tutorial") && Engine::Input::GetInstance()->Trigger(DIK_ESCAPE)) {
+	// ★追加: ESCキーやSTARTボタンでポーズ切り替え (タイトル・セレクト・リザルト以外のプレイ中シーン)
+	// ※ GetAsyncKeyState を用いた確実なエッジ検出(トリガー)により、長押し時の連続開閉や取りこぼしを防ぐ
+	static bool s_prevEsc = false;
+	bool s_currEsc = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
+	bool escTrigger = s_currEsc && !s_prevEsc;
+	s_prevEsc = s_currEsc;
+
+	auto* input = Engine::Input::GetInstance();
+	bool isPauseTriggered = input->Trigger(DIK_ESCAPE) || escTrigger || input->IsControllerButtonTrigger(XINPUT_GAMEPAD_START);
+	if (isPlaying_ && sceneName_ != "Title" && sceneName_ != "Select" && sceneName_ != "Result" && isPauseTriggered) {
 		isPaused_ = !isPaused_;
 		if (isPaused_) {
 			// ポーズ開始: メインメニュー表示
@@ -660,7 +668,7 @@ void GameScene::Update() {
 	Engine::ParticleBudget::ResetFrame();
 
 	auto peView = registry_.view<ParticleEmitterComponent, TransformComponent, NameComponent>();
-	peView.each([&](auto, ParticleEmitterComponent& pe, const TransformComponent& tc, const NameComponent& nc) {
+	peView.each([&](auto entity, ParticleEmitterComponent& pe, const TransformComponent& /*tc*/, const NameComponent& nc) {
 		if (!pe.enabled)
 			return;
 
@@ -677,11 +685,15 @@ void GameScene::Update() {
 			pe.originalEmitRate = pe.emitter.params.emitRate;
 		}
 
+		// ワールド座標を取得してエミッターの位置とLOD判定に使用
+		Engine::Matrix4x4 world = GetWorldMatrix(static_cast<int>(entity));
+		Engine::Vector3 worldPos = {world.m[3][0], world.m[3][1], world.m[3][2]};
+
 		// ★追加: 距離ベースのLOD (Level of Detail) とリッチ化
 		Engine::Vector3 camPos = camera_.GetPosition();
-		float distSq = (tc.translate.x - camPos.x) * (tc.translate.x - camPos.x) + 
-					   (tc.translate.y - camPos.y) * (tc.translate.y - camPos.y) + 
-					   (tc.translate.z - camPos.z) * (tc.translate.z - camPos.z);
+		float distSq = (worldPos.x - camPos.x) * (worldPos.x - camPos.x) + 
+					   (worldPos.y - camPos.y) * (worldPos.y - camPos.y) + 
+					   (worldPos.z - camPos.z) * (worldPos.z - camPos.z);
 
 		if (distSq < 400.0f) { // 距離20未満（目の前）
 			// 目の前のエフェクトは元の2倍の発生量にして超リッチにする！
@@ -693,7 +705,7 @@ void GameScene::Update() {
 			pe.emitter.params.emitRate = pe.originalEmitRate;
 		}
 
-		pe.emitter.params.position = {tc.translate.x, tc.translate.y, tc.translate.z};
+		pe.emitter.params.position = worldPos;
 		
 		float pdt = scaledDt;
 		// ゲームオーバー用のエフェクトは時間停止の影響を受けない
@@ -921,7 +933,7 @@ bool GameScene::RayCast(const Engine::Vector3& origin, const Engine::Vector3& di
 			if (registry_.all_of<TagComponent>(entity)) {
 				const auto tag = registry_.get<TagComponent>(entity).tag;
 				if (tag == TagType::Enemy || tag == TagType::Bullet || tag == TagType::Player || tag == TagType::Sword || tag == TagType::PlayerSword || tag == TagType::Projectile || tag == TagType::Pipe || tag == TagType::Canon || tag == TagType::BulletTank ||
-					tag == TagType::PipeCannon || tag == TagType::VFX || tag == TagType::HitDistortion_VFX || tag == TagType::Missile || tag == TagType::Experience || tag == TagType::ExperienceOrb) {
+					tag == TagType::PipeCannon || tag == TagType::VFX || tag == TagType::HitDistortion_VFX || tag == TagType::Missile || tag == TagType::Experience || tag == TagType::ExperienceOrb || tag == TagType::Core) {
 					isEnemyOrBullet = true;
 				}
 			}

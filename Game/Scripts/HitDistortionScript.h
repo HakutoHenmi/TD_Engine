@@ -17,6 +17,8 @@ private:
     float startScale_ = 0.1f;
     float endScale_ = 6.0f;     // 範囲縮小 (12.0 -> 6.0)
     float initialAlpha_ = 1.5f; 
+    float originalY_ = 0.0f;
+    bool isOriginalYSet_ = false;
 };
 
 } // namespace Game

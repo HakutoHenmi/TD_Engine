@@ -174,7 +174,8 @@ public:
 		// ★追加: モード用ボーダーパラメータ
 		float prepModeBorder = 0.0f;
 		float deleteModeBorder = 0.0f;
-		float _pad4[2];
+		float radialBlur = 0.0f;         // ブースト時のラジアルブラー
+		float speedLine = 0.0f;          // ★追加: 集中線（風）エフェクト
 	};
 
 	// ★追加: フレーム統計情報

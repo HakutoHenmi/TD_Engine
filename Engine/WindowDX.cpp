@@ -271,7 +271,7 @@ bool WindowDX::InitWindow_(HINSTANCE hInst, int cmdShow, HWND& outHwnd) {
 	RECT rc = {0, 0, (LONG)kW, (LONG)kH};
 	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
 
-	hwnd_ = CreateWindow(wc_.lpszClassName, L"Defectory", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, nullptr, nullptr, hInst, nullptr);
+	hwnd_ = CreateWindow(wc_.lpszClassName, L"3126_Defectory", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, rc.right - rc.left, rc.bottom - rc.top, nullptr, nullptr, hInst, nullptr);
 
 	if (!hwnd_)
 		return false;

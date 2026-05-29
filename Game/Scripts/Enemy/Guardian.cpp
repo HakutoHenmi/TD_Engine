@@ -11,6 +11,7 @@ namespace Game {
 
 		hp_ = 150.0f;
 		maxHp_ = 150.0f;
+		attackRange_ = 4.0f; // 物理コライダー(3m)の外から攻撃できるように拡大
 		attackCooltime_ = kCooltime;	
 		SetCategory(entity, scene, Tank);
 	}
@@ -27,7 +28,7 @@ namespace Game {
 		auto& hb = registry.get<HitboxComponent>(entity);
 		hb.isActive = true;
 		hb.damage = 20.0f;
-		hb.size = { 3.0f, 2.0f, 3.0f };
+		hb.size = { 4.5f, 3.0f, 4.5f }; // 離れた位置からでも届くように拡大
 
 		// クールタイムリセット
 		attackCooltime_ = kCooltime;
