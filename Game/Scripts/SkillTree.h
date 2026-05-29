@@ -86,7 +86,7 @@ private:
 	bool initialized_ = false;
 	bool dataLoaded_ = false;
 	bool eventSubscribed_ = false;
-	int skillPoints_ = 100;
+	int skillPoints_ = 0;
 	int pendingUnlockId_ = -1;
 	int currentPageId_ = 0;
 	int pageCount_ = 0;
