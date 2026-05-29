@@ -18,7 +18,7 @@
       "scale": [1, 1, 1],
       "color": [1, 1, 1, 1],
       "components": [
-        {"type": "AudioSource", "enabled": true, "soundPath": "Resources\\Audio\\BGM1.mp3", "volume": 1, "loop": true, "playOnStart": false, "is3D": false, "maxDistance": 50}
+        {"type": "AudioSource", "enabled": true, "soundPath": "Resources\\Sound\\BGM1.mp3", "volume": 1, "loop": true, "playOnStart": false, "is3D": false, "maxDistance": 50}
       ]
     },
     {
@@ -146,13 +146,13 @@
       "name": "Player",
       "locked": false,
       "modelPath": "Resources/Models/cube/cube.obj",
-      "texturePath": "Resources\\Textures\\ball.png",
+      "texturePath": "Resources/Textures/ball.png",
       "translate": [0, 1, -5],
       "rotate": [0, 0, 0],
       "scale": [1, 2, 1],
       "color": [0.2, 0.8, 0.2, 1],
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/cube/cube.obj", "texturePath": "Resources\\Textures\\ball.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "lightmapPath": ""},
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/cube/cube.obj", "texturePath": "Resources/Textures/ball.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "lightmapPath": ""},
         {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
         {"type": "Tag", "enabled": true, "tag": "Player"},
         {"type": "PlayerInput", "enabled": true},
@@ -178,5 +178,3 @@
     }
   ]
 }
-
-

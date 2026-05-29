@@ -1,4 +1,4 @@
-#include "EditorUI.h"
+﻿#include "EditorUI.h"
 #include "../../Engine/PathUtils.h"
 #include "../../externals/imgui/imgui.h"
 #include "../../externals/imgui/imgui_internal.h"
@@ -1102,12 +1102,12 @@ std::string EditorUI::GetUnifiedProjectPath(const std::string& path) {
 void EditorUI::Initialize(Engine::Renderer* renderer) {
 	if (!renderer) return;
 	// ★エディタUI用アイコンは sRGB=false でロード
-	s_icons.folder = renderer->LoadTexture2D("Resources/Editor/Icons/folder.png", false);
-	s_icons.file = renderer->LoadTexture2D("Resources/Editor/Icons/file.png", false);
-	s_icons.model = renderer->LoadTexture2D("Resources/Editor/Icons/model.png", false);
-	s_icons.prefab = renderer->LoadTexture2D("Resources/Editor/Icons/prefab.png", false);
-	s_icons.audio = renderer->LoadTexture2D("Resources/Editor/Icons/audio.png", false);
-	s_icons.script = renderer->LoadTexture2D("Resources/Editor/Icons/script.png", false);
+	s_icons.folder = renderer->LoadTexture2D("Resources/Textures/Editor/Icons/folder.png", false);
+	s_icons.file = renderer->LoadTexture2D("Resources/Textures/Editor/Icons/file.png", false);
+	s_icons.model = renderer->LoadTexture2D("Resources/Textures/Editor/Icons/model.png", false);
+	s_icons.prefab = renderer->LoadTexture2D("Resources/Textures/Editor/Icons/prefab.png", false);
+	s_icons.audio = renderer->LoadTexture2D("Resources/Textures/Editor/Icons/audio.png", false);
+	s_icons.script = renderer->LoadTexture2D("Resources/Textures/Editor/Icons/script.png", false);
 }
 
 // ====== Main UI ======
