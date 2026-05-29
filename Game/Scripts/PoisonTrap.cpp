@@ -44,6 +44,11 @@ void PoisonTrap::Start(entt::entity entity, GameScene* scene) {
 	if (!registry.all_of<BuffComponent>(entity)) {
 		registry.emplace<BuffComponent>(entity);
 	}
+	if (!registry.all_of<HealthComponent>(entity)) {
+		auto& hc = registry.emplace<HealthComponent>(entity);
+		hc.hp = 500.0f;
+		hc.maxHp = 500.0f;
+	}
 }
 
 void PoisonTrap::Update(entt::entity entity, GameScene* scene, float dt) {

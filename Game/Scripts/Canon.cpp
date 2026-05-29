@@ -58,8 +58,8 @@ void Canon::Start(entt::entity entity, GameScene* scene) {
 
 	if (!registry.all_of<HealthComponent>(entity)) {
 		HealthComponent& hc = registry.emplace<HealthComponent>(entity);
-		hc.hp = 100.0f;
-		hc.maxHp = 100.0f;
+		hc.hp = 200.0f;
+		hc.maxHp = 200.0f;
 	}
 
 	if (!registry.all_of<HurtboxComponent>(entity)) {
@@ -307,7 +307,7 @@ TransformComponent& targetTransform = registry.get<TransformComponent>(currentTa
 	TransformComponent& bulletTransform = registry.get_or_emplace<TransformComponent>(bullet);
 	bulletTransform.translate = canonTransform.translate;
 
-	float baseHeight = 0.0f;
+	float baseHeight = 2.0f;
 	bulletTransform.translate.y += baseHeight;
 
 	float muzzleOffset = -2.5f;
@@ -326,7 +326,8 @@ TransformComponent& targetTransform = registry.get<TransformComponent>(currentTa
 		MeshRendererComponent& bulletMeshRenderer = registry.emplace<MeshRendererComponent>(bullet);
 		bulletMeshRenderer.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
 		bulletMeshRenderer.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-		bulletMeshRenderer.color = {0.0f, 0.0f, 0.0f, 1.0f}; // 黒に変更
+		//bulletMeshRenderer.color = {0.0f, 0.0f, 0.0f, 1.0f}; // 黒に変更
+		bulletMeshRenderer.color = {1.0f, 1.0f, 1.0f, 1.0f};
 	}
 
 	HitboxComponent& bulletHitbox = registry.emplace<HitboxComponent>(bullet);

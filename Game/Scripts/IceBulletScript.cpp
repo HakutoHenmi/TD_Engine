@@ -6,6 +6,43 @@
 
 namespace Game {
 
+void IceBulletScript::CreateIceArea(entt::entity entity, GameScene* scene) {
+	if (!scene) {
+		return;
+	}
+
+	entt::registry& registry = scene->GetRegistry();
+
+	if (!registry.valid(entity)) {
+		return;
+	}
+
+	if (!registry.all_of<TransformComponent>(entity)) {
+		return;
+	}
+
+	const TransformComponent& bulletTransform = registry.get<TransformComponent>(entity);
+
+	entt::entity iceArea = registry.create();
+
+	TagComponent& iceTag = registry.emplace<TagComponent>(iceArea);
+	iceTag.tag = TagType::IceCanon;
+
+	TransformComponent& iceTransform = registry.get_or_emplace<TransformComponent>(iceArea);
+
+	iceTransform.translate = bulletTransform.translate;
+
+	HitboxComponent& iceHitbox = registry.emplace<HitboxComponent>(iceArea);
+
+	iceHitbox.isActive = true;
+	iceHitbox.damage = 10.0f;
+	iceHitbox.tag = TagType::IceCanon;
+	iceHitbox.size = {8.0f, 5.0f, 8.0f};
+
+	ScriptComponent& iceScript = registry.emplace<ScriptComponent>(iceArea);
+
+	iceScript.scripts.push_back({"IceAttackArea", "", nullptr});
+}
 void IceBulletScript::Start(entt::entity entity, GameScene* scene) {
 	lifeTime_ = 0.0f;
 	hasTarget_ = false;
@@ -214,6 +251,7 @@ void IceBulletScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	if (length <= 0.0001f) {
 
+		//CreateIceArea(entity, scene);
 		scene->DestroyObject(static_cast<uint32_t>(entity));
 
 		return;
