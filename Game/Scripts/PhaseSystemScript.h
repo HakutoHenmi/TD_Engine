@@ -132,6 +132,14 @@ private:
 	float battleStartHoldTime_ = 0.0f;
 	uint32_t startButtonFrameTextureHandle_ = 0;
 
+	// BGM関連
+	uint32_t battleBgmHandle_ = 0;
+	uint32_t preparationBgmHandle_ = 0;
+	size_t currentBgmVoiceHandle_ = 0;
+
+	// SE関連
+	uint32_t installationSeHandle_ = 0;
+
 public:
 	static bool isSkillTreeOpen_; // スキルツリーが開いているかどうかを管理する静的変数
 

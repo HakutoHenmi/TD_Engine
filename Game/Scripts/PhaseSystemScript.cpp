@@ -116,7 +116,16 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	}
 	
 	// ★修正: 初回Update時に確実に初期化処理(カメラ位置設定など)が走るように、preIsPhase_を現在と違う値にする
-	preIsPhase_ = static_cast<decltype(isPhase_)>(-1);
+	preIsPhase_ = static_cast<PhaseState>(-1);
+
+	// 初回BGM再生のトリガー (Update内の判定で再生されるように preIsPhase_ をズラしてあるが、Startでも念押し)
+	if (auto* audio = Engine::Audio::GetInstance()) {
+		if (isPhase_ == BattlePhase) {
+			currentBgmVoiceHandle_ = audio->Play(battleBgmHandle_, true, 0.4f);
+		} else {
+			currentBgmVoiceHandle_ = audio->Play(preparationBgmHandle_, true, 0.4f);
+		}
+	}
 
 	currentPhase_ = 0;
 	CoinCount = StartCoinCount_;
@@ -163,6 +172,13 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 		startButtonFrameTextureHandle_ = renderer->LoadTexture2D("Resources/Textures/GamaUI/successs.png");
 	}
 
+	// BGMのロード
+	if (auto* audio = Engine::Audio::GetInstance()) {
+		battleBgmHandle_ = audio->Load("Resources/Audio/BGM/Battle.mp3");
+		preparationBgmHandle_ = audio->Load("Resources/Audio/BGM/Preparation.mp3");
+		installationSeHandle_ = audio->Load("Resources/Audio/SE/installation.mp3");
+	}
+
 	// 設置開始イベントの購読
 	SubscribeString(scene, "StartInstallation", [this](const std::string& dataStr) {
 		try {
@@ -177,13 +193,15 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 
 	if (scene->GetRegistry().all_of<UITextComponent>(entity))
 		scene->GetRegistry().get<UITextComponent>(entity).text = std::to_string(CoinCount);
-
-
-
 	
-
-	
-
+	// BGMの再生 (シーン開始時のフェーズに応じて即座に再生)
+	if (auto* audio = Engine::Audio::GetInstance()) {
+		if (isPhase_ == BattlePhase) {
+			currentBgmVoiceHandle_ = audio->Play(battleBgmHandle_, true, 0.4f);
+		} else if (isPhase_ == PreparationPhase || isPhase_ == InsertPhase) {
+			currentBgmVoiceHandle_ = audio->Play(preparationBgmHandle_, true, 0.4f);
+		}
+	}
 }
 
 void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) {
@@ -947,7 +965,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				battleStartHoldTime_ += dt;
 				if (battleStartHoldTime_ >= 1.0f) {
 					RequestPhaseChange(BattlePhase);
-					isPlacementMode_ = false;
+				 isPlacementMode_ = false;
 					skillTree_.Close(scene); // フェーズ移行時にスキルツリーを閉じる
 					battleStartHoldTime_ = 0.0f;
 				}
@@ -1031,6 +1049,20 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 	if (isPhase_ != preIsPhase_) {
 		auto& nav = scene->GetNavigationManager();
+
+		// BGMの切り替え
+		if (auto* audio = Engine::Audio::GetInstance()) {
+			if (currentBgmVoiceHandle_ != 0) {
+				audio->Stop(currentBgmVoiceHandle_);
+				currentBgmVoiceHandle_ = 0;
+			}
+
+			if (isPhase_ == BattlePhase) {
+				currentBgmVoiceHandle_ = audio->Play(battleBgmHandle_, true, 0.4f);
+			} else if (isPhase_ == PreparationPhase || isPhase_ == InsertPhase) {
+				currentBgmVoiceHandle_ = audio->Play(preparationBgmHandle_, true, 0.4f);
+			}
+		}
 
 		// フェーズに応じたカメラ追従対象の切り替え
 		auto player = scene->FindObjectByName("Player");
@@ -1696,6 +1728,11 @@ void PhaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector
 	if (!renderer)
 		return;
 
+	// SEの再生
+	if (auto* audio = Engine::Audio::GetInstance()) {
+		audio->Play(installationSeHandle_, false, 0.6f);
+	}
+
 	// 何かオブジェクトを設置した場合は地形が変わった可能性があるため高さキャッシュをクリアする
 	ClearHeightCache();
 
@@ -1765,6 +1802,14 @@ void PhaseSystemScript::OnEditorUI() {
 }
 
 void PhaseSystemScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
+	// BGMの停止
+	if (auto* audio = Engine::Audio::GetInstance()) {
+		if (currentBgmVoiceHandle_ != 0) {
+			audio->Stop(currentBgmVoiceHandle_);
+			currentBgmVoiceHandle_ = 0;
+		}
+	}
+
 	// 次のシーンロード時に初期化順序の問題で古いフェーズ情報（特にBattlePhase）を
 	// スポナーなどが誤認しないように、シーン破棄時に安全なフェーズへリセットしておく
 	isPhase_ = PreparationPhase;
@@ -1800,14 +1845,12 @@ void PhaseSystemScript::InitializeInsertPhase(GameScene* scene) {
 		for (auto e : view) {
 			const auto& name = view.get<NameComponent>(e).name;
 			if (name.find("Spawner") != std::string::npos) {
-				auto& tc = view.get<TransformComponent>(e);
-				spawnerPos = {tc.translate.x, tc.translate.y, tc.translate.z};
+				spawnerPos = view.get<TransformComponent>(e).translate;
 				break;
 			}
 		}
 	} else if (scene->GetRegistry().all_of<TransformComponent>(spawnerObj)) {
-		auto& tc = scene->GetRegistry().get<TransformComponent>(spawnerObj);
-		spawnerPos = {tc.translate.x, tc.translate.y, tc.translate.z};
+		spawnerPos = scene->GetRegistry().get<TransformComponent>(spawnerObj).translate;
 	}
 
 	// 2. カメラの現在位置・回転を保存
@@ -1832,7 +1875,7 @@ void PhaseSystemScript::InitializeInsertPhase(GameScene* scene) {
 		yaw = std::atan2(dir.x, dir.z);
 		
 		// 45度(PI/4)単位でスナップする
-		float snapInterval = DirectX::XM_PIDIV4;
+		float snapInterval = DirectX::XM_PIDIV4; // 45度スナップ
 		yaw = std::round(yaw / snapInterval) * snapInterval;
 	}
 
