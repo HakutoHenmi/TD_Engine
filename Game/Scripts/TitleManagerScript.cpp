@@ -86,22 +86,26 @@ void TitleManagerScript::Start(entt::entity entity, GameScene* scene) {
 			if (reg.all_of<UITextComponent>(btnExit_)) reg.get<UITextComponent>(btnExit_).text = "";
 			if (reg.all_of<UITextComponent>(btnCredits_)) reg.get<UITextComponent>(btnCredits_).text = "";
 
-			// クレジットボタンの画像設定
-			if (reg.all_of<UIImageComponent>(btnCredits_)) {
-				auto& img = reg.get<UIImageComponent>(btnCredits_);
-				img.texturePath = "Resources/Textures/Button/creditt.png";
-				if (auto* renderer = Engine::Renderer::GetInstance()) {
-					img.textureHandle = renderer->LoadTexture2D(img.texturePath);
-				}
-				img.color = {1.0f, 1.0f, 1.0f, 1.0f};
-			}
+			// すべてのボタンのテクスチャとカラーパラメータを一括で設定（ポーズメニューと明るさを統一）
+			std::vector<std::pair<entt::entity, std::string>> titleBtns = {
+				{ btnStart_, "Resources/Textures/TitleUI/SrartLogo.png" },
+				{ btnSettings_, "Resources/Textures/TitleUI/SettingLogo.png" },
+				{ btnCredits_, "Resources/Textures/TitleUI/creditt.png" },
+				{ btnExit_, "Resources/Textures/TitleUI/EixtLogo.png" }
+			};
 
-			// 色味の調整（すべてのボタンを強制的に同じ明るさに統一する）
-			std::vector<entt::entity> titleBtns = { btnStart_, btnSettings_, btnCredits_, btnExit_ };
-			for (auto e : titleBtns) {
+			const float boostVal = 1.0f; // ガンマ補正復元にともない、標準カラー（1.0f）に統一
+			const DirectX::XMFLOAT4 uiColor = { boostVal, boostVal, boostVal, 1.0f };
+
+			for (auto& [e, path] : titleBtns) {
 				if (e != entt::null) {
 					if (reg.all_of<UIImageComponent>(e)) {
-						reg.get<UIImageComponent>(e).color = {1.0f, 1.0f, 1.0f, 1.0f};
+						auto& img = reg.get<UIImageComponent>(e);
+						img.texturePath = path;
+						if (auto* renderer = Engine::Renderer::GetInstance()) {
+							img.textureHandle = renderer->LoadTexture2D(img.texturePath);
+						}
+						img.color = uiColor;
 					}
 					if (reg.all_of<UIButtonComponent>(e)) {
 						auto& btn = reg.get<UIButtonComponent>(e);

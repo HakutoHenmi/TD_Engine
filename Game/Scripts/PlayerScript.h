@@ -186,6 +186,14 @@ private:
 	float damageEffectTimer_ = 0.0f;
 	const float DAMAGE_EFFECT_DURATION = 0.6f;
 
+	// ★追加: リスポーン関連
+	int respawnState_ = 0; // 0:なし, 1:フェードアウト中(死亡後), 2:フェードイン中(復活後)
+	float respawnTimer_ = 0.0f;
+	const float RESPAWN_FADEOUT_TIME = 1.5f; // 暗転にかかる時間
+	const float RESPAWN_FADEIN_TIME = 1.5f;  // 明転にかかる時間
+	uint32_t whiteTextureHandle_ = 0;        // フェード用の白テクスチャ
+	uint32_t tabTextureHandle_ = 0;          // Tabキーの画像テクスチャ
+
 	void ShootChargeShot(entt::entity entity, GameScene* scene);
 	void DrawPressureGauge(GameScene* scene);
 	void DrawReticle(entt::entity playerEntity, GameScene* scene);
@@ -224,6 +232,15 @@ private:
 	float buffRadius_ = 8.0f;
 	// ★追加: スキルのエフェクト用テクスチャハンドル
 	uint32_t skillFrameTextureHandle_ = 0;
+
+	// ★追加: ヘルプ画面
+	bool isHelpOpen_ = false;
+	bool prevTabKeyDown_ = false;
+	void DrawHelpUI(GameScene* scene);
+
+public:
+	static bool s_isHelpOpen;
+	static bool IsHelpOpen() { return s_isHelpOpen; }
 };
 
 } // namespace Game

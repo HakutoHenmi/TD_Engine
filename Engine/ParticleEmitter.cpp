@@ -33,14 +33,15 @@ void ParticleEmitter::ApplySystemSettings() {
 	// 最低16、最大512にクランプ
 	if (needed < 16) needed = 16;
 	if (needed > 512) needed = 512;
-	particleSystem_.Initialize(*renderer_, needed, "Resources/Models/plane.obj", params.texturePath, true, params.useBillboard);
+	particleSystem_.Initialize(*renderer_, needed, params.meshPath, params.texturePath, true, params.useBillboard);
+	currentMeshPath_ = params.meshPath;
 	currentTexturePath_ = params.texturePath;
 	currentBillboard_ = params.useBillboard;
 }
 
 void ParticleEmitter::Update(float dt) {
 	// 設定が変わっていたら再初期化
-	if (currentTexturePath_ != params.texturePath || currentBillboard_ != params.useBillboard) {
+	if (currentMeshPath_ != params.meshPath || currentTexturePath_ != params.texturePath || currentBillboard_ != params.useBillboard) {
 		ApplySystemSettings();
 	}
 
@@ -93,8 +94,7 @@ void ParticleEmitter::EmitBurst(int count) {
 				r * std::cos(phi)
 			};
 			startPos.x += offset.x; startPos.y += offset.y; startPos.z += offset.z;
-			// 速度も放射状に少しブレさせる場合はここで加算可能
-			startVel.x += offset.x * 0.5f; startVel.y += offset.y * 0.5f; startVel.z += offset.z * 0.5f;
+			// ★修正: 自動的に放射状の速度(offset * 0.5f)が加算される処理を削除し、指定したstartVelocityを正しく反映させる
 		} 
 		else if (params.shape == EmissionShape::Cone) {
 			// 円錐状（簡易）
@@ -126,6 +126,7 @@ void ParticleEmitter::EmitBurst(int count) {
 		if (life <= 0.001f) life = 0.001f;
 
 		Vector3 angVel = RandomVector3(params.angularVelocity, params.angularVelocityVariance);
+		Vector3 rot = RandomVector3(params.startRotation, params.startRotationVariance);
 
 		particleSystem_.Emit(
 			startPos,
@@ -133,7 +134,7 @@ void ParticleEmitter::EmitBurst(int count) {
 			params.acceleration,
 			startScale, endScale,
 			params.startColor, params.endColor,
-			life, angVel, params.damping
+			life, angVel, params.damping, rot
 		);
 	}
 }
@@ -168,9 +169,11 @@ bool ParticleEmitter::SaveToJson(const std::string& path) {
 	j["endColor"] = {params.endColor.x, params.endColor.y, params.endColor.z, params.endColor.w};
 
 	j["startRotation"] = {params.startRotation.x, params.startRotation.y, params.startRotation.z};
+	j["startRotationVariance"] = {params.startRotationVariance.x, params.startRotationVariance.y, params.startRotationVariance.z};
 	j["angularVelocity"] = {params.angularVelocity.x, params.angularVelocity.y, params.angularVelocity.z};
 	j["angularVelocityVariance"] = {params.angularVelocityVariance.x, params.angularVelocityVariance.y, params.angularVelocityVariance.z};
 
+	j["meshPath"] = params.meshPath;
 	j["texturePath"] = params.texturePath;
 	j["shaderName"] = params.shaderName;
 	j["useBillboard"] = params.useBillboard;
@@ -236,9 +239,11 @@ bool ParticleEmitter::LoadFromJson(const std::string& path) {
 		if (j.contains("endColor")) params.endColor = getVec4(j["endColor"]);
 
 		if (j.contains("startRotation")) params.startRotation = getVec3(j["startRotation"]);
+		if (j.contains("startRotationVariance")) params.startRotationVariance = getVec3(j["startRotationVariance"]);
 		if (j.contains("angularVelocity")) params.angularVelocity = getVec3(j["angularVelocity"]);
 		if (j.contains("angularVelocityVariance")) params.angularVelocityVariance = getVec3(j["angularVelocityVariance"]);
 
+		if (j.contains("meshPath")) params.meshPath = j["meshPath"].get<std::string>();
 		if (j.contains("texturePath")) params.texturePath = j["texturePath"].get<std::string>();
 		if (j.contains("shaderName")) params.shaderName = j["shaderName"].get<std::string>();
 		if (j.contains("useBillboard")) params.useBillboard = j["useBillboard"].get<bool>();

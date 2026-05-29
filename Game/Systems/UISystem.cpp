@@ -8,6 +8,7 @@
 #include "../Scripts/IScript.h"  // ★追加
 #include "../Scripts/IScript.h"
 #include "../Scripts/ScriptUtils.h"
+#include "../Scripts/PlayerScript.h" // ★追加
 #include <algorithm>
 #include <set>
 #include <unordered_map>
@@ -65,6 +66,11 @@ UISystem::WorldRect UISystem::CalculateWorldRect(entt::entity entity, entt::regi
 }
 
 void UISystem::Draw(entt::registry& registry, GameContext& ctx) {
+	// ★追加: ポーズ中はメインのゲーム内UIを一切描画しない
+	if (ctx.scene && ctx.scene->IsPaused()) {
+		return;
+	}
+
 	std::unordered_map<uint32_t, WorldRect> cache;
 
 	// --- 既存のUI（Canvasベース）の描画 ---
@@ -126,6 +132,11 @@ void UISystem::DrawUI(entt::registry& registry, GameContext& ctx) {
 	// 以下の3D空間UI（HPバーなど）は GameScene コンテキストが必要
 	if (!ctx.scene)
 		return;
+
+	// ★追加: ヘルプ画面またはポーズメニューが表示されている間はワールド空間UIの描画を全てスキップする
+	if (PlayerScript::IsHelpOpen() || (ctx.scene && ctx.scene->IsPaused())) {
+		return;
+	}
 
 	// スキルツリーが開いているかの判定（開いている場合はHPバーやクールタイムUIを描画しない）
 	auto viewScript = registry.view<ScriptComponent>();
@@ -425,6 +436,13 @@ void UISystem::DrawTextW(entt::entity /*entity*/, entt::registry& /*registry*/, 
 void UISystem::ProcessButton(entt::entity entity, entt::registry& registry, UIButtonComponent& btn, float worldX, float worldY, float worldW, float worldH, GameContext& ctx) {
 	if (!ctx.input)
 		return;
+
+	// ★追加: ヘルプ画面が表示されている間は、ゲーム内の通常ボタンのインタラクション（ホバーやクリック判定）を一切無効化する
+	if (PlayerScript::IsHelpOpen()) {
+		btn.isHovered = false;
+		btn.isPressed = false;
+		return;
+	}
 
 	float mx, my;
 	if (ctx.useOverrideMouse) {

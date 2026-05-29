@@ -180,6 +180,15 @@ void SelectManagerScript::Update(entt::entity entity, GameScene* scene, float dt
 		targetAngle_ = selectedIndex_ * 45.0f;
 	}
 
+	// キーボード(W/S, 上下矢印)でのスクロールもサポート
+	if (input->Trigger(DIK_W) || input->Trigger(DIK_UP)) {
+		selectedIndex_ = (selectedIndex_ - 1 + static_cast<int>(stages_.size())) % static_cast<int>(stages_.size());
+		targetAngle_ = selectedIndex_ * 45.0f;
+	} else if (input->Trigger(DIK_S) || input->Trigger(DIK_DOWN)) {
+		selectedIndex_ = (selectedIndex_ + 1) % static_cast<int>(stages_.size());
+		targetAngle_ = selectedIndex_ * 45.0f;
+	}
+
 	// 角度を滑らかに補間
 	currentAngle_ += (targetAngle_ - currentAngle_) * 10.0f * dt;
 
@@ -218,6 +227,21 @@ void SelectManagerScript::Update(entt::entity entity, GameScene* scene, float dt
 					return;
 				}
 			}
+		}
+	}
+
+	// SpaceキーまたはEnterキー：決定処理（現在選択されているステージに入る）
+	if (input->Trigger(DIK_SPACE) || input->Trigger(DIK_RETURN)) {
+		auto e = scene->FindObjectByName("StageButton_" + std::to_string(selectedIndex_));
+		if (e != entt::null && reg.all_of<VariableComponent>(e)) {
+			std::string path = reg.get<VariableComponent>(e).GetString("Path");
+			if (path.empty()) path = "Resources/Scenes/PhaseSystem.json";
+			
+			Engine::SceneParameters p;
+			p.stagePath = path;
+			p.sceneName = "Game";
+			Engine::SceneManager::GetInstance()->RequestChange("Game", p);
+			return;
 		}
 	}
 
@@ -395,13 +419,12 @@ void SelectManagerScript::CreateFallbackUI(GameScene* scene) {
 	reg.emplace<NameComponent>(title, "TitleText");
 	auto& rectTitle = reg.emplace<RectTransformComponent>(title);
 	rectTitle.pos = {0, -400};
-	rectTitle.size = {800, 100};
+	rectTitle.size = {800, 160};
 	rectTitle.anchor = {0.5f, 0.5f};
 	rectTitle.pivot = {0.5f, 0.5f};
-	auto& textTitle = reg.emplace<UITextComponent>(title);
-	textTitle.text = "SELECT STAGE";
-	textTitle.fontSize = 64.0f;
-	textTitle.color = {1, 1, 1, 1};
+	auto& imgTitle = reg.emplace<UIImageComponent>(title);
+	if (renderer) imgTitle.textureHandle = renderer->LoadTexture2D("Resources/Textures/Button/selectStage.png");
+	imgTitle.color = {1.0f, 1.0f, 1.0f, 1.0f};
 
 	// デフォルトのステージリスト（Fallback用）
 	struct LocalStageInfo {

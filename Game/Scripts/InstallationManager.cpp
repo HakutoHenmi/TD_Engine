@@ -5,6 +5,7 @@
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
 #include "TutorialScript.h"
+#include "PlayerScript.h" // ★追加
 
 #if defined(USE_IMGUI) && !defined(NDEBUG)
 #include "Editor/EditorUI.h"
@@ -116,6 +117,25 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 		return;
 	currentScene_ = scene;
 	instance_ = this;
+
+	if (scene->IsPaused()) {
+		auto& reg = scene->GetRegistry();
+		for (int i = 0; i < 5; ++i) {
+			auto& btn = buttons_[i];
+			if (reg.valid(btn.entity)) {
+				if (reg.all_of<UIImageComponent>(btn.entity))
+					reg.get<UIImageComponent>(btn.entity).enabled = false;
+				if (reg.all_of<UIButtonComponent>(btn.entity))
+					reg.get<UIButtonComponent>(btn.entity).enabled = false;
+				if (reg.all_of<RectTransformComponent>(btn.entity))
+					reg.get<RectTransformComponent>(btn.entity).enabled = false;
+			}
+		}
+		if (reg.valid(descriptionTextEntity_) && reg.all_of<UITextComponent>(descriptionTextEntity_)) {
+			reg.get<UITextComponent>(descriptionTextEntity_).text = "";
+		}
+		return;
+	}
 
 	// ページ切り替え処理
 	auto input = Engine::Input::GetInstance();
@@ -271,7 +291,8 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 	}
 	isDescriptionVisible_ = false;
 
-	for (int i = 0; i < 5; i++) {
+	if (!PlayerScript::IsHelpOpen()) {
+		for (int i = 0; i < 5; i++) {
 
 		auto& btn = buttons_[i];
 
@@ -291,6 +312,7 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 			hoveredButtonIndex_ = i;
 			break;
 		}
+	}
 	}
 	float targetX = -500.0f;
 	UITextComponent& text = registry.get<UITextComponent>(descriptionTextEntity_);
@@ -343,7 +365,7 @@ void InstallationManager::Draw(entt::entity /*entity*/, GameScene* /*scene*/) {
 
 void InstallationManager::DrawUI(entt::entity /*entity*/, GameScene* scene) {
 
-	if (!scene) {
+	if (!scene || scene->IsPaused()) {
 		return;
 	}
 
