@@ -30,8 +30,12 @@ public:
 						hc.hitFlashTimer = 0.0f;
 						mr.color = hc.baseColor; // 元の色に戻す
 					} else {
-						// フラッシュ中（白く光らせる）
-						mr.color = { 2.0f, 2.0f, 2.0f, 1.0f }; 
+						// フラッシュ中: 敵なら赤、それ以外は白く光らせる
+						if (registry.all_of<TagComponent>(entity) && registry.get<TagComponent>(entity).tag == TagType::Enemy) {
+							mr.color = { 2.0f, 0.2f, 0.2f, 1.0f };
+						} else {
+							mr.color = { 2.0f, 2.0f, 2.0f, 1.0f }; 
+						}
 					}
 				}
 			}

@@ -45,6 +45,8 @@ public:
 		NextPhase_ = phase;
 	}
 
+	void SetSellMode(bool mode) { isSellMode_ = mode; }
+
 	static void PlusCoinCount(int PlusCoin) { CoinCount += PlusCoin; } // 追加: コイン数を増減させる関数
 
 	// 返金時の計算関数

@@ -37,7 +37,8 @@ cbuffer CBPost : register(b0) {
     // モードボーダー
     float gPrepModeBorder;
     float gDeleteModeBorder;
-    float2 gPad2;
+    float gRadialBlur;
+    float gPad2;
 };
 
 // 乱数生成
@@ -157,6 +158,44 @@ float4 main(float4 svpos : SV_POSITION, float2 uv : TEXCOORD0) : SV_TARGET {
     // エッジ部分を少し暗い紫/茶色っぽい色にして馴染ませる
     float3 edgeColor = float3(0.2, 0.15, 0.25);
     baseColor = lerp(baseColor, baseColor * edgeColor, edge * 0.8);
+
+    // ★追加: ラジアルブラー (ブースト時用)
+    if (gRadialBlur > 0.001) {
+        float2 dir = 0.5 - uv;
+        float3 blurColor = 0.0;
+        float totalWeight = 0.0;
+        for (int i = 0; i < 6; ++i) {
+            float weight = 1.0 - (float)i / 6.0;
+            float2 sampleUV = saturate(uv + dir * (float)i * gRadialBlur);
+            blurColor += gScene.Sample(gSmp, sampleUV).rgb * weight;
+            totalWeight += weight;
+        }
+        baseColor = lerp(baseColor, blurColor / totalWeight, saturate(gRadialBlur * 10.0));
+    }
+
+    // ★追加: 風/スピードエフェクト (より自然でしつこくない表現)
+    float windIntensity = gSpeedLine + gRadialBlur * 10.0; 
+    if (windIntensity > 0.001) {
+        float2 d = uv - 0.5;
+        float r = length(d);
+        float angle = atan2(d.y, d.x); 
+        
+        // ソフトな流線ノイズ
+        float noise1 = sin(angle * 15.0 + gTime * 3.0);
+        float noise2 = sin(angle * 40.0 - gTime * 8.0);
+        float lineNoise = smoothstep(0.2, 1.0, (noise1 + noise2) * 0.5);
+        
+        // 高速で手前に流れる動き
+        float flow = frac(r * 4.0 - gTime * 25.0 + lineNoise);
+        flow = smoothstep(0.5, 1.0, flow);
+        
+        // 画面端のみ
+        float mask = smoothstep(0.25, 0.7, r);
+        float windAlpha = lineNoise * flow * mask * windIntensity * 0.15;
+        
+        // 風っぽい淡い青白さ（加算合成）
+        baseColor += float3(0.6, 0.8, 1.0) * windAlpha;
+    }
 
     // 4. キャンバス/筆跡ノイズのオーバーレイ
     // 画面全体に薄くノイズを乗せる
