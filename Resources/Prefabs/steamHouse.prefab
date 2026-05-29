@@ -1,4 +1,4 @@
-{
+﻿{
   "prefab":
     {
       "id": 3145756,
@@ -9,7 +9,7 @@
       "rotate": [0, 0, 0],
       "scale": [2, 2, 2],
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/steamHouse/steamHouse.obj", "texturePath": "Resources/steamHouse/freamWork.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": ["Resources/steamHouse/house.png", "Resources/steamHouse/parts.png", "Resources/steamHouse/roof.png"]}
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/steamHouse/steamHouse.obj", "texturePath": "Resources/Textures/steamHouse/freamWork.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": ["Resources/Textures/steamHouse/house.png", "Resources/Textures/steamHouse/parts.png", "Resources/Textures/steamHouse/roof.png"]}
       ]
     }
 }

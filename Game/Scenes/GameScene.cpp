@@ -1,4 +1,4 @@
-#ifndef NOMINMAX
+﻿#ifndef NOMINMAX
 #define NOMINMAX
 #endif
 #include "GameScene.h"
@@ -287,7 +287,7 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 		dust.isAdditive = true;
 		dust.useBillboard = true;
 		dust.meshPath = "Resources/Models/plane.obj";
-		dust.texturePath = "Resources/ball.png";
+		dust.texturePath = "Resources/Textures/ball.png";
 		createAmbientEmitter("AmbientDust", dust);
 
 		// ゴッドレイ

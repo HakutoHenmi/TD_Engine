@@ -59,7 +59,7 @@
       "extraTexturePaths": [],
       "shaderName": "Default",
       "components": [
-        {"type": "Script", "enabled": true, "scriptPath": "EnemySpawnerScript", "paramData": "{\"enemyScriptParams\":\"\",\"enemyScriptPath\":\"EnemyBehavior\",\"enemyType\":0,\"maxCount\":10,\"pattern\":1,\"patternRadius\":4.099999904632568,\"spawnDuration\":21.399999618530273,\"startWave\":0,\"waveCount\":3,\"waveDelay\":1.7999999523162842}"}
+        {"type": "Script", "enabled": true, "scriptPath": "EnemySpawnerScript", "paramData": "{\"enemyScriptParams\":\"\",\"enemyScriptPath\":\"EnemyBehavior\",\"enemyType\":0,\"maxCount\":10,\"pattern\":1,\"patternRadius\":4.099999904632568,\"spawnDuration\":21.399999618530273,\"startWave\":0,\"waveCount\":3,\"waveDelay\":2.0}"}
       ]
     },
     {
@@ -189,7 +189,8 @@
         {"type": "CharacterMovement", "enabled": true, "speed": 7, "jumpPower": 20, "gravity": 9.8},
         {"type": "CameraTarget", "enabled": true, "distance": 10, "height": 3, "smoothSpeed": 5},
         {"type": "Health", "enabled": true, "hp": 1000, "maxHp": 1000, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
-        {"type": "Script", "enabled": true, "scriptPath": "PlayerScript", "paramData": ""}
+        {"type": "Script", "enabled": true, "scriptPath": "PlayerScript", "paramData": ""},
+        {"type": "WorldSpaceUI", "enabled": true, "showHealthBar": true, "showDamageNumbers": true, "offset": [0,1.2,0], "barWidth": 60, "barHeight": 6}
       ]
     },
     {
