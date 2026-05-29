@@ -210,7 +210,7 @@
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [860,12], "size": [1000,500], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "RectTransform", "enabled": true, "pos": [860,-70], "size": [950,950], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TitleUI/TitleLogo.png", "color": [1,1,1,1], "layer": -75, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10}
       ]
     },

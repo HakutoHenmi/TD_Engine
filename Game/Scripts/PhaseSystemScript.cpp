@@ -26,6 +26,7 @@
 #include "ResultManagerScript.h"
 #include "TutorialScript.h"
 #include "WaveManagement.h"
+#include "PlayerScript.h" // ★追加
 
 using json = nlohmann::json;
 
@@ -957,7 +958,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			}
 
 			// 長押し開始UIの描画 (画面右端の中央付近)
-			if (renderer) {
+			if (renderer && !PlayerScript::IsHelpOpen()) {
 				float cx = (float)Engine::WindowDX::kW - 140.0f;
 				float cy = (float)Engine::WindowDX::kH * 0.5f;
 
@@ -1278,19 +1279,10 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			}
 		}
 
-		// ★追加: プレイヤーの死亡確認
-		bool isPlayerDead = false;
-		const auto& players = scene->GetEntitiesByTag(TagType::Player);
-		for (auto playerEntity : players) {
-			if (scene->GetRegistry().valid(playerEntity) && scene->GetRegistry().all_of<HealthComponent>(playerEntity)) {
-				if (scene->GetRegistry().get<HealthComponent>(playerEntity).hp <= 0.0f) {
-					isPlayerDead = true;
-					break;
-				}
-			}
-		}
+		// ★修正: プレイヤーはリスポーン仕様になったため、プレイヤー死亡によるゲームオーバー判定を削除
+		// （コアの死亡のみでゲームオーバーになるようにする）
 
-		if ((isCoreDead || isPlayerDead) && s_gameOverPhase_ == 0) {
+		if (isCoreDead && s_gameOverPhase_ == 0) {
 			s_gameOverPhase_ = 1;
 			gameOverTimer_ = 0.0f;
 			scene->SetGameTimeScale(0.0f); // 全ての時間を止める

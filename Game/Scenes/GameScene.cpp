@@ -8,6 +8,7 @@
 #include "../../Engine/SceneManager.h"
 #include "../Editor/EditorUI.h"
 #include "../Scripts/ScriptEngine.h"
+#include "../Scripts/PlayerScript.h" // ★追加
 #include "../Systems/AudioSystem.h"
 #include "../Systems/CameraFollowSystem.h"
 #include "Editor/EditorUI.h" // ★追加
@@ -254,6 +255,65 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 	// パーティクルエディターの初期化
 	particleEditor_.Initialize();
 
+	// ★追加: ゴッドレイとダスト用エミッターの生成 (3D空間用)
+	// ゲームシーン以外（Title, Select, Result）では表示しない
+	if (sceneName != "Title" && sceneName != "Select" && sceneName != "Result") {
+		auto createAmbientEmitter = [&](const std::string& name, const Engine::EmitterParams& params) {
+			auto entity = registry_.create();
+			registry_.emplace<NameComponent>(entity, name);
+			auto& tc = registry_.emplace<TransformComponent>(entity);
+			tc.translate = {params.position.x, params.position.y, params.position.z};
+			auto& pe = registry_.emplace<ParticleEmitterComponent>(entity);
+			pe.enabled = true;
+			pe.emitter.params = params;
+			pe.isInitialized = false;
+		};
+
+		// ダスト（塵）
+		Engine::EmitterParams dust;
+		dust.name = "AmbientDust";
+		dust.emitRate = 30.0f; // 増やす (15 -> 30)
+		dust.shape = Engine::EmissionShape::Sphere;
+		dust.shapeRadius = 40.0f;
+		dust.position = {0, 10, 0};
+		dust.lifeTime = 6.0f;
+		dust.lifeTimeVariance = 2.0f;
+		dust.startVelocity = {0.0f, -0.2f, 0.0f}; // ★ゆっくり舞い落ちる
+		dust.velocityVariance = {0.5f, 0.5f, 0.5f}; // ★ランダムにふわふわ漂う
+		dust.startSize = {0.15f, 0.15f, 0.15f}; // 大きく
+		dust.endSize = {0.05f, 0.05f, 0.05f};
+		dust.startColor = {1.0f, 0.95f, 0.8f, 0.35f}; // はっきり見えるように (0.15 -> 0.35)
+		dust.endColor = {1.0f, 0.95f, 0.8f, 0.0f};
+		dust.isAdditive = true;
+		dust.useBillboard = true;
+		dust.meshPath = "Resources/Models/plane.obj";
+		dust.texturePath = "Resources/ball.png";
+		createAmbientEmitter("AmbientDust", dust);
+
+		// ゴッドレイ
+		Engine::EmitterParams godRay;
+		godRay.name = "AmbientGodRays";
+		godRay.emitRate = 0.3f; // ★寿命が伸びた分、発生間隔を長くする
+		godRay.shape = Engine::EmissionShape::Sphere;
+		godRay.shapeRadius = 25.0f; 
+		godRay.position = {0, 15, 0};
+		godRay.lifeTime = 30.0f; // ★寿命を大幅に伸ばし、非常にゆっくりとフェードイン・フェードアウトさせる
+		godRay.lifeTimeVariance = 10.0f;
+		godRay.startVelocity = {0.0f, -0.0005f, 0.0f}; 
+		godRay.velocityVariance = {0.0f, 0.0f, 0.0f}; 
+		godRay.startSize = {0.15f, 50.0f, 0.15f}; // ★極細の円柱にする
+		godRay.endSize = {0.3f, 60.0f, 0.3f};
+		godRay.startColor = {1.0f, 0.95f, 0.7f, 0.05f}; // ★重なっても白飛びしないように極めて薄く
+		godRay.endColor = {1.0f, 0.95f, 0.7f, 0.0f};
+		godRay.startRotation = {0.3f, 0.0f, -0.3f}; // ★全体を同じ角度に傾ける（斜めから差す光）
+		godRay.startRotationVariance = {0.0f, 0.0f, 0.0f}; // ★すべての筋を平行にする
+		godRay.isAdditive = true;
+		godRay.useBillboard = false; // ★3Dモデルとして配置
+		godRay.meshPath = "Resources/Models/Cylinder/cylinder.obj"; // ★円柱モデル
+		godRay.texturePath = "Resources/Textures/white1x1.png"; // ★シンプルな白テクスチャ
+		createAmbientEmitter("AmbientGodRays", godRay);
+	}
+
 	// スクリプトエンジンの初期化
 	ScriptEngine::GetInstance()->Initialize();
 
@@ -424,6 +484,9 @@ void GameScene::Update() {
 		dt = 1.0f / 60.0f; // 極端なラグ対策
 
 	float scaledDt = dt * gameTimeScale_;
+	if (PlayerScript::IsHelpOpen()) {
+		scaledDt = 0.0f; // ★ヘルプ画面表示中はゲーム内の時間を一時停止
+	}
 
 	// コンテキストを更新
 	ctx_.dt = scaledDt;
@@ -668,7 +731,7 @@ void GameScene::Update() {
 	Engine::ParticleBudget::ResetFrame();
 
 	auto peView = registry_.view<ParticleEmitterComponent, TransformComponent, NameComponent>();
-	peView.each([&](auto entity, ParticleEmitterComponent& pe, const TransformComponent& /*tc*/, const NameComponent& nc) {
+	peView.each([&](auto entity, ParticleEmitterComponent& pe, TransformComponent& tc, const NameComponent& nc) {
 		if (!pe.enabled)
 			return;
 
@@ -689,8 +752,18 @@ void GameScene::Update() {
 		Engine::Matrix4x4 world = GetWorldMatrix(static_cast<int>(entity));
 		Engine::Vector3 worldPos = {world.m[3][0], world.m[3][1], world.m[3][2]};
 
-		// ★追加: 距離ベースのLOD (Level of Detail) とリッチ化
 		Engine::Vector3 camPos = camera_.GetPosition();
+
+		// ★追加: 環境エフェクト（塵、ゴッドレイ）は常にカメラ（プレイヤー）に追従させる
+		if (nc.name == "AmbientDust" || nc.name == "AmbientGodRays") {
+			tc.translate.x = camPos.x;
+			tc.translate.z = camPos.z;
+			// Y座標は初期設定（上空）を維持
+			worldPos.x = camPos.x;
+			worldPos.z = camPos.z;
+		}
+
+		// ★追加: 距離ベースのLOD (Level of Detail) とリッチ化
 		float distSq = (worldPos.x - camPos.x) * (worldPos.x - camPos.x) + 
 					   (worldPos.y - camPos.y) * (worldPos.y - camPos.y) + 
 					   (worldPos.z - camPos.z) * (worldPos.z - camPos.z);
@@ -1882,7 +1955,9 @@ entt::entity GameScene::CreatePauseButton(const std::string& text, float yPos, e
 	txt.fontSize = 32.0f;
 	txt.color = {1.0f, 1.0f, 1.0f, 1.0f};
 
-	pauseRegistry_.emplace<UIImageComponent>(entity).color = {1.0f, 1.0f, 1.0f, 1.0f};
+	auto& img = pauseRegistry_.emplace<UIImageComponent>(entity);
+	img.color = {1.0f, 1.0f, 1.0f, 1.0f}; // テキストのみのボタンの背景色用
+	img.layer = 200; // ポーズメニューUIは背景オーバーレイ(layer=100)より手前に描画
 
 	return entity;
 }
@@ -1890,52 +1965,66 @@ entt::entity GameScene::CreatePauseButton(const std::string& text, float yPos, e
 void GameScene::CreatePauseMenu() {
 	auto parent = pauseRegistry_.create();
 	auto& pRect = pauseRegistry_.emplace<RectTransformComponent>(parent);
-	// 画面中央に配置
-	pRect.pos = {(float)Engine::WindowDX::kW / 2.0f - 150.0f, (float)Engine::WindowDX::kH / 2.0f - 100.0f};
+	// 画面中央に配置 (ボタンの間隔拡大に伴い、Y位置を少し上に調整して綺麗に配置)
+	pRect.pos = {(float)Engine::WindowDX::kW / 2.0f - 175.0f, (float)Engine::WindowDX::kH / 2.0f - 130.0f};
 	pRect.size = {0, 0};
 	pRect.anchor = {0.0f, 0.0f};
 	pauseMainEntities_.push_back(parent);
 
-	// タイトルテキスト
+	// タイトルテキスト ("PAUSE" ロゴも Y軸間隔に合わせて -110px に調整)
 	auto titleText = pauseRegistry_.create();
 	auto& titleRect = pauseRegistry_.emplace<RectTransformComponent>(titleText);
-	titleRect.pos = {30.0f, -80.0f};
+	titleRect.pos = {175.0f, -110.0f};
+	titleRect.size = {700.0f, 88.0f};
 	pauseRegistry_.emplace<HierarchyComponent>(titleText, parent);
-	auto& txt = pauseRegistry_.emplace<UITextComponent>(titleText);
-	txt.text = "PAUSE";
-	txt.fontSize = 64.0f;
-	txt.color = {1.0f, 0.9f, 0.3f, 1.0f};
+	auto& titleImg = pauseRegistry_.emplace<UIImageComponent>(titleText);
+	if (renderer_) titleImg.textureHandle = renderer_->LoadTexture2D("Resources/Textures/Button/Pause.png");
+	// 背景の暗い半透明帯に沈まないよう、少し明るめ（1.4f）に微ブーストして視認性を向上
+	titleImg.color = {1.4f, 1.4f, 1.4f, 1.0f}; 
+	titleImg.layer = 200; 
 	pauseMainEntities_.push_back(titleText);
 
-	pauseBtnResume_ = CreatePauseButton(reinterpret_cast<const char*>(u8"\u30B2\u30FC\u30E0\u306B\u623B\u308B"), 0.0f, parent);
-	pauseBtnSettings_ = CreatePauseButton(reinterpret_cast<const char*>(u8"\u8A2D\u5B9A"), 80.0f, parent);
-	pauseBtnTitle_ = CreatePauseButton(reinterpret_cast<const char*>(u8"\u30BF\u30A4\u30C8\u30EB\u306B\u623B\u308B"), 160.0f, parent);
+	// 1. ゲームに戻るボタン (350x88)
+	pauseBtnResume_ = CreatePauseButton("", 0.0f, parent);
+	if (renderer_) pauseRegistry_.get<UIImageComponent>(pauseBtnResume_).textureHandle = renderer_->LoadTexture2D("Resources/Textures/Button/returnToGame.png");
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnResume_).size = {350.0f, 88.0f};
+	pauseRegistry_.get<UIImageComponent>(pauseBtnResume_).color = {1.4f, 1.4f, 1.4f, 1.0f}; // 視認性向上のため微ブースト
+	{
+		auto& btn = pauseRegistry_.get<UIButtonComponent>(pauseBtnResume_);
+		btn.normalColor = {1.0f, 1.0f, 1.0f, 1.0f};
+		btn.hoverColor = {0.8f, 0.8f, 0.8f, 1.0f};
+		btn.pressedColor = {0.5f, 0.5f, 0.5f, 1.0f};
+	}
+	
+	// 2. 設定ボタン (350x88, Y座標オフセットを 110.0f に設定してよりクッキリした隙間へ)
+	pauseBtnSettings_ = CreatePauseButton("", 110.0f, parent);
+	if(renderer_) pauseRegistry_.get<UIImageComponent>(pauseBtnSettings_).textureHandle = renderer_->LoadTexture2D("Resources/Textures/Button/setting.png");
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnSettings_).size = {350.0f, 88.0f};
+	// 少し明るめ（1.4f）に微ブースト
+	pauseRegistry_.get<UIImageComponent>(pauseBtnSettings_).color = {1.4f, 1.4f, 1.4f, 1.0f};
+	{
+		auto& btn = pauseRegistry_.get<UIButtonComponent>(pauseBtnSettings_);
+		btn.normalColor = {1.0f, 1.0f, 1.0f, 1.0f};
+		btn.hoverColor = {0.8f, 0.8f, 0.8f, 1.0f};
+		btn.pressedColor = {0.5f, 0.5f, 0.5f, 1.0f};
+	}
+
+	// 3. タイトルに戻るボタン (350x88, Y座標オフセットを 220.0f に設定)
+	pauseBtnTitle_ = CreatePauseButton("", 220.0f, parent);
+	if(renderer_) pauseRegistry_.get<UIImageComponent>(pauseBtnTitle_).textureHandle = renderer_->LoadTexture2D("Resources/Textures/Button/returnToTitle.png");
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnTitle_).size = {350.0f, 88.0f};
+	// 少し明るめ（1.4f）に微ブースト
+	pauseRegistry_.get<UIImageComponent>(pauseBtnTitle_).color = {1.4f, 1.4f, 1.4f, 1.0f};
+	{
+		auto& btn = pauseRegistry_.get<UIButtonComponent>(pauseBtnTitle_);
+		btn.normalColor = {1.0f, 1.0f, 1.0f, 1.0f};
+		btn.hoverColor = {0.8f, 0.8f, 0.8f, 1.0f};
+		btn.pressedColor = {0.5f, 0.5f, 0.5f, 1.0f};
+	}
 
 	pauseMainEntities_.push_back(pauseBtnResume_);
 	pauseMainEntities_.push_back(pauseBtnSettings_);
 	pauseMainEntities_.push_back(pauseBtnTitle_);
-
-	// 操作説明テキスト（ポーズ画面の右側に表示）
-	auto guideParent = pauseRegistry_.create();
-	auto& gRect = pauseRegistry_.emplace<RectTransformComponent>(guideParent);
-	gRect.pos = {(float)Engine::WindowDX::kW / 2.0f + 250.0f, (float)Engine::WindowDX::kH / 2.0f - 100.0f};
-	gRect.size = {0, 0};
-	gRect.anchor = {0.0f, 0.0f};
-	pauseMainEntities_.push_back(guideParent);
-
-	auto guideText = pauseRegistry_.create();
-	auto& gtRect = pauseRegistry_.emplace<RectTransformComponent>(guideText);
-	gtRect.pos = {0.0f, 0.0f};
-	pauseRegistry_.emplace<HierarchyComponent>(guideText, guideParent);
-	auto& gtTxt = pauseRegistry_.emplace<UITextComponent>(guideText);
-	gtTxt.text = "【操作説明】\n\n[WASD] 移動\n[右ドラッグ] 視点操作\n[左クリック] 攻撃 / 長押しでチャージ\n[右クリック] 特殊移動 (ブースト等)\n[E] スキル\n[T] 武器切り替え\n[N] スキルツリー";
-	gtTxt.fontSize = 28.0f;
-	gtTxt.color = {1.0f, 1.0f, 1.0f, 1.0f};
-	gtTxt.fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf";
-	gtTxt.outlineEnabled = true;
-	gtTxt.outlineColor = {0.0f, 0.0f, 0.0f, 1.0f};
-	gtTxt.outlineThickness = 2.0f;
-	pauseMainEntities_.push_back(guideText);
 }
 
 void GameScene::CreatePauseSettingsMenu() {
@@ -2025,6 +2114,10 @@ void GameScene::UpdatePauseMenu() {
 	pauseCtx_.input = Engine::Input::GetInstance();
 	pauseCtx_.viewportOffset = ctx_.viewportOffset;
 	pauseCtx_.viewportSize = ctx_.viewportSize;
+	
+	// ★追加: ボタンのホバー判定などのためUpdateを呼び出す
+	pauseUISystem_->Update(pauseRegistry_, pauseCtx_);
+	
 	pauseUISystem_->Draw(pauseRegistry_, pauseCtx_);
 
 	auto* input = Engine::Input::GetInstance();

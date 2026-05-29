@@ -59,10 +59,12 @@ struct EmitterParams {
 	
 	// Rotation
 	Vector3 startRotation{0, 0, 0};
+	Vector3 startRotationVariance{6.28318f, 6.28318f, 6.28318f}; // デフォルトは全方位ランダム
 	Vector3 angularVelocity{0, 0, 0};
 	Vector3 angularVelocityVariance{0, 0, 0};
 
 	// Rendering
+	std::string meshPath = "Resources/Models/plane.obj"; // ★追加: メッシュをカスタマイズ可能に
 	std::string texturePath = "Resources/Textures/uvChecker.png";
 	std::string shaderName = ""; // empty means default
 	bool useBillboard = true;
@@ -98,6 +100,7 @@ private:
 	ParticleSystem particleSystem_;
 	Renderer* renderer_ = nullptr;
 	float emitTimer_ = 0.0f;
+	std::string currentMeshPath_;
 	std::string currentTexturePath_;
 	bool currentBillboard_ = true;
 
