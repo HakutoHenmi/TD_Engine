@@ -29,8 +29,13 @@ private:
 	bool uiInitialized_ = false;
 	
 	int selectedIndex_ = 0;
+	int prevSelectedIndex_ = 0;
 	float currentAngle_ = 0.0f;
 	float targetAngle_ = 0.0f;
+	
+	float gearOffsetAngle_ = 0.0f;
+	float bgGearOffsets_[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+	bool initializedOffsets_ = false;
 	
 	float steamTimerH_ = 0.0f; // ★水平パイプ用タイマー
 	float steamTimerV_ = 0.5f; // ★垂直パイプ用タイマー（タイミングをずらす）

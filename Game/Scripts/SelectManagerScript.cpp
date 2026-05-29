@@ -5,6 +5,8 @@
 #include "../../Engine/Renderer.h"
 #include "../../Engine/WindowDX.h"
 #include <Windows.h>
+#include <random>
+#include <chrono>
 
 namespace Game {
 
@@ -20,6 +22,19 @@ void SelectManagerScript::Start(entt::entity entity, GameScene* scene) {
 	stages_.push_back({"チュートリアル", "Resources/Scenes/TutorialScene.json", "Standard TD map"});
 	stages_.push_back({"ステージ１", "Resources/Scenes/Stage1.json", "Standard TD map"});
 	stages_.push_back({"ステージ２", "Resources/Scenes/Stage2.json", "Advanced challenge"});
+
+	// ★追加: ギアの角度を毎回ランダムにずらす
+	static std::random_device rd;
+	// 時間とrdの両方を混ぜてより確実に非決定的なシード値を生成
+	auto seed = rd() ^ static_cast<unsigned int>(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+	static std::mt19937 gen(seed);
+	std::uniform_real_distribution<float> dist(0.0f, 360.0f);
+	
+	gearOffsetAngle_ = dist(gen);
+	for (int i = 0; i < 4; ++i) {
+		bgGearOffsets_[i] = dist(gen);
+	}
+	initializedOffsets_ = true;
 
 	// ★追加: 奥の背景ギアとパイプを動的に生成
 	auto bgPipe = scene->FindObjectByName("Pipe_Bg");
@@ -163,6 +178,22 @@ void SelectManagerScript::Update(entt::entity entity, GameScene* scene, float dt
 	(void)entity;
 	if (!scene || !uiInitialized_) return;
 	auto& reg = scene->GetRegistry();
+
+	// ★追加: 初回起動時の初期化、および「選択が切り替わってギアが回るたび」にランダムな角度オフセットを再設定
+	if (!initializedOffsets_ || selectedIndex_ != prevSelectedIndex_) {
+		static std::random_device rd;
+		auto seed = rd() ^ static_cast<unsigned int>(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+		static std::mt19937 gen(seed);
+		std::uniform_real_distribution<float> dist(0.0f, 360.0f);
+		
+		gearOffsetAngle_ = dist(gen);
+		for (int i = 0; i < 4; ++i) {
+			bgGearOffsets_[i] = dist(gen);
+		}
+		initializedOffsets_ = true;
+		prevSelectedIndex_ = selectedIndex_;
+	}
+
 	auto* input = Engine::Input::GetInstance();
 	if (!input) return;
 
@@ -290,43 +321,43 @@ void SelectManagerScript::Update(entt::entity entity, GameScene* scene, float dt
 		}
 	}
 
-	// 3Dギアモデルの回転をUIに同期
+	// 3Dギアモデルの回転をUIに同期（回転方向を反対に変更）
 	auto gear = scene->FindObjectByName("MainGear");
 	if (gear != entt::null && reg.all_of<TransformComponent>(gear)) {
 		auto& t = reg.get<TransformComponent>(gear);
 		// ギアは親オブジェクト(MainGearPivot)によって既にX軸で90度立てられています。
 		// そのため、子オブジェクトであるMainGear自体のY軸を回すことで、コマのようにならず
 		// ハンドルのように綺麗にスピンします。
-		t.rotate.y = currentAngle_ * 3.14159265f / 180.0f; 
+		t.rotate.y = -(currentAngle_ + gearOffsetAngle_) * 3.14159265f / 180.0f; 
 	}
 
-	// 小さいギアの回転同期（歯車の比率に合わせて逆回転など）
+	// 小さいギアの回転同期（MainGearの逆回転化に合わせてすべての回転方向を反転）
 	auto smallGear1 = scene->FindObjectByName("SmallGear1");
 	if (smallGear1 != entt::null && reg.all_of<TransformComponent>(smallGear1)) {
 		auto& t = reg.get<TransformComponent>(smallGear1);
-		// MainGearがScale 16, SmallGear1がScale 5 なので 16/5 = 3.2 倍速で逆回転
-		t.rotate.y = -currentAngle_ * 3.2f * 3.14159265f / 180.0f;
+		// MainGearがScale 16, SmallGear1がScale 5 なので 16/5 = 3.2 倍速で順回転に変更
+		t.rotate.y = (currentAngle_ + gearOffsetAngle_) * 3.2f * 3.14159265f / 180.0f;
 	}
 
 	auto smallGear2 = scene->FindObjectByName("SmallGear2");
 	if (smallGear2 != entt::null && reg.all_of<TransformComponent>(smallGear2)) {
 		auto& t = reg.get<TransformComponent>(smallGear2);
-		// MainGearがScale 16, SmallGear2がScale 3 なので 16/3 = 5.33 倍速で順回転（別ギア経由の想定）
-		t.rotate.y = currentAngle_ * 5.33f * 3.14159265f / 180.0f;
+		// MainGearがScale 16, SmallGear2がScale 3 なので 16/3 = 5.33 倍速で逆回転に変更
+		t.rotate.y = -(currentAngle_ + gearOffsetAngle_) * 5.33f * 3.14159265f / 180.0f;
 	}
 
 	auto smallGear3 = scene->FindObjectByName("SmallGear3");
 	if (smallGear3 != entt::null && reg.all_of<TransformComponent>(smallGear3)) {
 		auto& t = reg.get<TransformComponent>(smallGear3);
-		// Scale 4 なので 16/4 = 4.0倍速で逆回転
-		t.rotate.y = -currentAngle_ * 4.0f * 3.14159265f / 180.0f;
+		// Scale 4 なので 16/4 = 4.0倍速で順回転に変更
+		t.rotate.y = (currentAngle_ + gearOffsetAngle_) * 4.0f * 3.14159265f / 180.0f;
 	}
 
 	auto smallGear4 = scene->FindObjectByName("SmallGear4");
 	if (smallGear4 != entt::null && reg.all_of<TransformComponent>(smallGear4)) {
 		auto& t = reg.get<TransformComponent>(smallGear4);
-		// Scale 4.5 なので 16/4.5 = 3.55倍速で順回転
-		t.rotate.y = currentAngle_ * 3.55f * 3.14159265f / 180.0f;
+		// Scale 4.5 なので 16/4.5 = 3.55倍速で逆回転に変更
+		t.rotate.y = -(currentAngle_ + gearOffsetAngle_) * 3.55f * 3.14159265f / 180.0f;
 	}
 
 	// ★追加: 奥の背景ギアの回転
@@ -334,7 +365,7 @@ void SelectManagerScript::Update(entt::entity entity, GameScene* scene, float dt
 	for (int i = 0; i < 4; ++i) {
 		auto bgGear = scene->FindObjectByName("BgGear" + std::to_string(i + 1));
 		if (bgGear != entt::null && reg.all_of<TransformComponent>(bgGear)) {
-			reg.get<TransformComponent>(bgGear).rotate.y = currentAngle_ * bgSpeeds[i] * 3.14159265f / 180.0f;
+			reg.get<TransformComponent>(bgGear).rotate.y = (currentAngle_ * bgSpeeds[i] + bgGearOffsets_[i]) * 3.14159265f / 180.0f;
 		}
 	}
 
