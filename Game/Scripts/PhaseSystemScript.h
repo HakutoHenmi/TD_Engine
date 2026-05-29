@@ -88,10 +88,10 @@ private:
 
 	bool isSellMode_ = false;       // 追加: 売却（削除）モード
 
-	int canonCost_ = 150;
-	int missileCost_ = 200;
-	int poisonCost_ = 120;
-	int iceCanonCost_ = 250;
+	int canonCost_ = 100;
+	int missileCost_ = 400;
+	int poisonCost_ = 200;
+	int iceCanonCost_ = 150;
 
 	int selectedObjCost_ = 0; // 追加
 	int currentInstallationCost_ = 0; // 現在の設置コスト
