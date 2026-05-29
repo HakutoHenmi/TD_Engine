@@ -1,0 +1,368 @@
+﻿{
+  "settings": {
+    "postProcessEnabled": false,
+    "vignette": 0,
+    "distortion": 0,
+    "noiseStrength": 0,
+    "chromaShift": 0,
+    "scanline": 0
+  },
+  "objects": [
+    {
+      "id": 52,
+      "parentId": 0,
+      "name": "Base",
+      "locked": false,
+      "modelPath": "Resources/Models/sword.obj",
+      "texturePath": "",
+      "translate": [-1.7093, 0.0149813, -0.144065],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/sword.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "Tag", "enabled": true, "tag": "Base"},
+        {"type": "Script", "enabled": true, "scriptPath": "BaseScript", "paramData": "rotationSpeed=1;attackInterval=1;damage=10;attackRange=30;"}
+      ]
+    },
+    {
+      "id": 53,
+      "parentId": 0,
+      "name": "BulletTank",
+      "locked": false,
+      "modelPath": "Resources/Models/cube/cube.obj",
+      "texturePath": "Resources/Textures/white1x1.png",
+      "translate": [8.7235, 8.40951, 1.15297],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [0.46332, 0.46332, 0.46332, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "Tag", "enabled": true, "tag": "BulletTank"}
+      ]
+    },
+    {
+      "id": 54,
+      "parentId": 0,
+      "name": "Canon",
+      "locked": false,
+      "modelPath": "Resources/Models/cube/cube.obj",
+      "texturePath": "Resources/Textures/white1x1.png",
+      "translate": [5.41751, 8.70545, 0.651643],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [0, 0, 0, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "Tag", "enabled": true, "tag": "Untagged"},
+        {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [1,1,1], "damage": 10, "isActive": false, "tag": "Default"},
+        {"type": "Health", "enabled": true, "hp": 100, "maxHp": 100, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
+        {"type": "Script", "enabled": true, "scriptPath": "Canon", "paramData": ""}
+      ]
+    },
+    {
+      "id": 55,
+      "parentId": 0,
+      "name": "Empty",
+      "locked": false,
+      "modelPath": "",
+      "texturePath": "Resources/Textures/white1x1.png",
+      "translate": [0.569255, 0.184186, 1.94853],
+      "rotate": [0, 0, 0],
+      "scale": [1.47, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "AudioSource", "enabled": true, "soundPath": "Resources\\Sound\\BGM1.mp3", "volume": 1, "loop": true, "playOnStart": false, "is3D": false, "maxDistance": 50}
+      ]
+    },
+    {
+      "id": 57,
+      "parentId": 0,
+      "name": "Enemy_B_1",
+      "locked": false,
+      "modelPath": "Resources/Models/cube/cube.obj",
+      "texturePath": "Resources/Textures/white1x1.png",
+      "translate": [-5.93788, 2.18061, 6.54042],
+      "rotate": [0, 0, 0],
+      "scale": [1, 2, 1],
+      "color": [0.9, 0.2, 0.2, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/cube/cube.obj", "texturePath": "Resources/Textures/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
+        {"type": "Tag", "enabled": true, "tag": "Enemy"},
+        {"type": "Health", "enabled": true, "hp": 30, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
+        {"type": "Script", "enabled": true, "scriptPath": "EnemyAIScript", "paramData": "{\"sightRange\":100.0,\"speed\":2.0}"}
+      ]
+    },
+    {
+      "id": 58,
+      "parentId": 0,
+      "name": "Enemy_B_2",
+      "locked": false,
+      "modelPath": "Resources/Models/cube/cube.obj",
+      "texturePath": "Resources/Textures/white1x1.png",
+      "translate": [-4, 1, 12],
+      "rotate": [0, 0, 0],
+      "scale": [1, 2, 1],
+      "color": [0.9, 0.2, 0.2, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/cube/cube.obj", "texturePath": "Resources/Textures/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
+        {"type": "Tag", "enabled": true, "tag": "Enemy"},
+        {"type": "Health", "enabled": true, "hp": 30, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
+        {"type": "Script", "enabled": true, "scriptPath": "EnemyAIScript", "paramData": "{\"sightRange\":100.0,\"speed\":2.0}"}
+      ]
+    },
+    {
+      "id": 59,
+      "parentId": 0,
+      "name": "Enemy_B_3",
+      "locked": false,
+      "modelPath": "Resources/Models/cube/cube.obj",
+      "texturePath": "Resources/Textures/white1x1.png",
+      "translate": [-13.2579, 2.18061, 6.54042],
+      "rotate": [0, 0, 0],
+      "scale": [1, 2, 1],
+      "color": [0.9, 0.2, 0.2, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/cube/cube.obj", "texturePath": "Resources/Textures/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
+        {"type": "Tag", "enabled": true, "tag": "Enemy"},
+        {"type": "Health", "enabled": true, "hp": 30, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
+        {"type": "Script", "enabled": true, "scriptPath": "EnemyAIScript", "paramData": "{\"sightRange\":100.0,\"speed\":2.0}"}
+      ]
+    },
+    {
+      "id": 60,
+      "parentId": 0,
+      "name": "Enemy_B_4",
+      "locked": false,
+      "modelPath": "Resources/Models/cube/cube.obj",
+      "texturePath": "Resources/Textures/white1x1.png",
+      "translate": [6.8, 1, 12],
+      "rotate": [0, 0, 0],
+      "scale": [1, 2, 1],
+      "color": [0.9, 0.2, 0.2, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/cube/cube.obj", "texturePath": "Resources/Textures/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,2,1], "isTrigger": false},
+        {"type": "Tag", "enabled": true, "tag": "Enemy"},
+        {"type": "Health", "enabled": true, "hp": 30, "maxHp": 30, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
+        {"type": "Script", "enabled": true, "scriptPath": "EnemyAIScript", "paramData": "{\"sightRange\":100.0,\"speed\":2.0}"}
+      ]
+    },
+    {
+      "id": 69,
+      "parentId": 0,
+      "name": "ExperienceHopper",
+      "locked": false,
+      "modelPath": "Resources/Models/suzanne.obj",
+      "texturePath": "",
+      "translate": [-2.89887, 0.2942, -5.46827],
+      "rotate": [0, 3.15, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/suzanne.obj", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "Tag", "enabled": true, "tag": "ExperienceHopper"},
+        {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [1,1,1], "damage": 10, "isActive": false, "tag": "Default"},
+        {"type": "Script", "enabled": true, "scriptPath": "ExperienceHopper", "paramData": ""}
+      ]
+    },
+    {
+      "id": 68,
+      "parentId": 0,
+      "name": "ExperienceMiner",
+      "locked": false,
+      "modelPath": "Resources/Models/cube/cube.obj",
+      "texturePath": "Resources/Textures/white1x1.png",
+      "translate": [0.909827, 0.95117, -6.06578],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1.07],
+      "color": [0.259943, 0.822394, 0.104784, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "Tag", "enabled": true, "tag": "ExperienceMiner"},
+        {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "damage": 10, "isActive": false, "tag": "Default"},
+        {"type": "Script", "enabled": true, "scriptPath": "ExperienceMiner", "paramData": ""}
+      ]
+    },
+    {
+      "id": 61,
+      "parentId": 0,
+      "name": "Ground",
+      "locked": true,
+      "modelPath": "Resources/Models/plane.obj",
+      "texturePath": "Resources/Textures/white1x1.png",
+      "translate": [-1.10852, 0.446489, 0.500554],
+      "rotate": [0, 0, 0],
+      "scale": [20, 1, 20],
+      "color": [0.8, 0.8, 0.8, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/plane.obj", "texturePath": "Resources/Textures/white1x1.png", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "BoxCollider", "enabled": true, "center": [0,-0.5,0], "size": [20,1,20], "isTrigger": false}
+      ]
+    },
+    {
+      "id": 62,
+      "parentId": 0,
+      "name": "Pipe",
+      "locked": false,
+      "modelPath": "Resources/Models/cube/cube.obj",
+      "texturePath": "Resources/Textures/white1x1.png",
+      "translate": [-1.11754, 0.885897, -6.24241],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "Tag", "enabled": true, "tag": "Pipe"},
+        {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "damage": 10, "isActive": false, "tag": "Default"},
+        {"type": "Script", "enabled": true, "scriptPath": "PipeScript", "paramData": ""}
+      ]
+    },
+    {
+      "id": 63,
+      "parentId": 0,
+      "name": "Pipe_1",
+      "locked": false,
+      "modelPath": "Resources/Models/cube/cube.obj",
+      "texturePath": "Resources/Textures/white1x1.png",
+      "translate": [7.08015, 8.24044, 1.41189],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "Tag", "enabled": true, "tag": "Pipe"},
+        {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "damage": 10, "isActive": false, "tag": "Default"},
+        {"type": "Script", "enabled": true, "scriptPath": "PipeScript", "paramData": ""}
+      ]
+    },
+    {
+      "id": 64,
+      "parentId": 0,
+      "name": "Pipe_2",
+      "locked": false,
+      "modelPath": "Resources/Models/cube/cube.obj",
+      "texturePath": "Resources/Textures/white1x1.png",
+      "translate": [9.46246, -0.334103, 0.297585],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "Tag", "enabled": true, "tag": "Pipe"},
+        {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "damage": 10, "isActive": false, "tag": "Default"},
+        {"type": "Script", "enabled": true, "scriptPath": "PipeScript", "paramData": ""}
+      ]
+    },
+    {
+      "id": 65,
+      "parentId": 0,
+      "name": "Pipe_3",
+      "locked": false,
+      "modelPath": "Resources/Models/cube/cube.obj",
+      "texturePath": "Resources/Textures/white1x1.png",
+      "translate": [11.3625, -0.334103, 0.297585],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "Tag", "enabled": true, "tag": "Pipe"},
+        {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "damage": 10, "isActive": false, "tag": "Default"},
+        {"type": "Script", "enabled": true, "scriptPath": "PipeScript", "paramData": ""}
+      ]
+    },
+    {
+      "id": 70,
+      "parentId": 0,
+      "name": "Player",
+      "locked": false,
+      "modelPath": "Resources/Models/cube/cube.obj",
+      "texturePath": "Resources/Textures/white1x1.png",
+      "translate": [-8.44451, 1.45497, -9.94725],
+      "rotate": [0, 0, 0],
+      "scale": [1, 2, 1.01],
+      "color": [0.157876, 0.0673514, 0.969112, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Default"},
+        {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [2,2,2], "isTrigger": false},
+        {"type": "Tag", "enabled": true, "tag": "Player"},
+        {"type": "Rigidbody", "enabled": true, "velocity": [0,0,0], "useGravity": false, "isKinematic": false},
+        {"type": "PlayerInput", "enabled": true},
+        {"type": "CharacterMovement", "enabled": true, "speed": 5, "jumpPower": 6, "gravity": 9.8},
+        {"type": "CameraTarget", "enabled": true, "distance": 10, "height": 3, "smoothSpeed": 5},
+        {"type": "Health", "enabled": true, "hp": 100, "maxHp": 100, "stamina": 100, "maxStamina": 100, "invincibleTime": 0, "isDead": false},
+        {"type": "Script", "enabled": true, "scriptPath": "PlayerScript", "paramData": ""}
+      ]
+    },
+    {
+      "id": 67,
+      "parentId": 0,
+      "name": "Spike",
+      "locked": false,
+      "modelPath": "Resources/Models/cube/cube.obj",
+      "texturePath": "Resources/Textures/white1x1.png",
+      "translate": [-15.5559, 3.34271, -4.3997],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1.08],
+      "color": [0.235015, 0.841699, 0.149491, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "Tag", "enabled": true, "tag": "Spike"},
+        {"type": "Hitbox", "enabled": true, "center": [0,0,0], "size": [2,2,2], "damage": 10, "isActive": false, "tag": "Default"},
+        {"type": "Script", "enabled": true, "scriptPath": "SpikeScript"}
+      ]
+    },
+    {
+      "id": 66,
+      "parentId": 0,
+      "name": "Sun",
+      "locked": false,
+      "modelPath": "",
+      "texturePath": "",
+      "translate": [0, 10, 0],
+      "rotate": [0.785398, 0.523599, 0],
+      "scale": [1, 1, 1],
+      "color": [1, 1, 1, 1],
+      "extraTexturePaths": [],
+      "shaderName": "Default",
+      "components": [
+        {"type": "DirectionalLight", "enabled": true, "color": [1,1,1], "intensity": 1}
+      ]
+    }
+  ]
+}

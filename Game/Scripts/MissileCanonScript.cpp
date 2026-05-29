@@ -1,4 +1,4 @@
-#include "MissileCanonScript.h"
+﻿#include "MissileCanonScript.h"
 #include "HitDistortionScript.h"
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
@@ -511,9 +511,9 @@ void MissileCanonScript::FireMissile(
 
 		MeshRendererComponent& bulletMeshRenderer = registry.emplace<MeshRendererComponent>(bullet);
 
-		bulletMeshRenderer.modelHandle = renderer->LoadObjMesh("Resources/MisiileBullet/MisiileBullet.obj");
+		bulletMeshRenderer.modelHandle = renderer->LoadObjMesh("Resources/Models/MisiileBullet/MisiileBullet.obj");
 
-		bulletMeshRenderer.textureHandle = renderer->LoadTexture2D("Resources/MisiileBullet/MisiileBullet.png");
+		bulletMeshRenderer.textureHandle = renderer->LoadTexture2D("Resources/Textures/MisiileBullet/MisiileBullet.png");
 	}
 
 	ScriptComponent& bulletScriptComponent = registry.emplace<ScriptComponent>(bullet);

@@ -67,7 +67,7 @@
       "parentId": 0,
       "name": "Model",
       "locked": false,
-      "modelPath": "Resources\\walk.gltf",
+      "modelPath": "Resources/Models/walk.gltf",
       "texturePath": "",
       "translate": [10.4991, 3.39298, 2.15136],
       "rotate": [0, 0, 0],
@@ -76,7 +76,7 @@
       "extraTexturePaths": [],
       "shaderName": "Default",
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources\\walk.gltf", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/walk.gltf", "texturePath": "", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": [], "lightmapPath": "", "shaderName": "Toon"}
       ]
     },
     {

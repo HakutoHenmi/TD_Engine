@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <DirectXTex.h>
 #include <d3d12.h>
 #include <string>
@@ -23,7 +23,7 @@ public:
 	void Initialize(WindowDX* dx, Renderer* renderer);
 	void Shutdown();
 
-	// relPath: exeと同じフォルダからの相対パス(L"Resources/sample.png" など)
+	// relPath: exeと同じフォルダからの相対パス(L"Resources/Textures/sample.png" など)
 	TextureHandle Load(const std::wstring& relPath);
 
 	D3D12_GPU_DESCRIPTOR_HANDLE GetGPU(const TextureHandle& h) const;
