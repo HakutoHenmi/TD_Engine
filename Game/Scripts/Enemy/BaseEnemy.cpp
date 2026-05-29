@@ -299,7 +299,7 @@ void BaseEnemy::OnDestroy(entt::entity /*entity*/, GameScene* scene) {
 
 	scene->GetEventSystem().Emit("GainExp", expDrop_);
 
-	PhaseSystemScript::PlusCoinCount(10);
+	PhaseSystemScript::PlusCoinCount(50);
 
 	// その他、終了時のクリーンアップなどを記述
 }
