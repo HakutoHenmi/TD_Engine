@@ -110,13 +110,36 @@ public:
 					if (aTag == TagType::Bullet || aTag == TagType::PlayerSword || aTag == TagType::Sword || aTag == TagType::Poison) { if (dTag != TagType::Enemy) skipDamage = true; }
 					if (aTag != TagType::Untagged && aTag == dTag) skipDamage = true;
 					if (aTag == TagType::EnemyBullet && dTag == TagType::Enemy) skipDamage = true;
-					// ★ミサイル/弾がCanonタグ（タワー）に当たらないようにする
-					if ((aTag == TagType::Bullet || aTag == TagType::EnemyBullet) && dTag == TagType::Canon) skipDamage = true;
-					// ★タワー（防衛設備）は無敵にする
+					// ★味方の弾がCanonタグ（タワー）に当たらないようにする (敵の弾は当たるようにする)
+					if (aTag == TagType::Bullet && dTag == TagType::Canon) skipDamage = true;
+					// ★タワー（防衛設備）は無敵にする (ただし敵の弾や敵の近接によるダメージは通す)
 					if (dTag == TagType::Canon || dTag == TagType::Cannon || dTag == TagType::IceCanon || dTag == TagType::PipeCannon || dTag == TagType::Defender || dTag == TagType::Missile || dTag == TagType::Poison) {
-						skipDamage = true;
+						if (aTag != TagType::EnemyBullet && aTag != TagType::Enemy) {
+							skipDamage = true;
+						}
 					}
-					if (skipDamage) continue;
+
+					// 弾が敵対勢力に当たったかどうかを判定
+					bool isBulletHitDestructible = false;
+					if (aTag == TagType::EnemyBullet) {
+						// 敵の弾がプレイヤー、コア、または防衛設備に当たった場合
+						if (dTag == TagType::Player || dTag == TagType::Core || dTag == TagType::Defender || dTag == TagType::Canon || dTag == TagType::Cannon || dTag == TagType::IceCanon || dTag == TagType::PipeCannon) {
+							isBulletHitDestructible = true;
+						}
+					} else if (aTag == TagType::Bullet) {
+						// 味方の弾が敵に当たった場合
+						if (dTag == TagType::Enemy) {
+							isBulletHitDestructible = true;
+						}
+					}
+
+					if (skipDamage) {
+						// ダメージはスキップするが、弾が着弾すべき相手なら消去する
+						if (isBulletHitDestructible && (aTag == TagType::Bullet || aTag == TagType::EnemyBullet) && ctx.scene) {
+							ctx.scene->DestroyObject(static_cast<uint32_t>(attackerEntity));
+						}
+						continue;
+					}
 
 					if (registry.all_of<HealthComponent>(defenderEntity)) {
 						auto& hc = registry.get<HealthComponent>(defenderEntity);
@@ -253,29 +276,78 @@ public:
 							}
 
 							if (isIceBullet) {
-								// 敵に凍結デバフを適用
-								if (registry.all_of<VariableComponent>(attackerEntity)) {
-									float stopTime = registry.get<VariableComponent>(attackerEntity).GetValue("StopTime", 1.0f);
-									
-									auto& enemyVc = registry.all_of<VariableComponent>(defenderEntity) ? 
-										registry.get<VariableComponent>(defenderEntity) : 
-										registry.emplace<VariableComponent>(defenderEntity);
-									
-									enemyVc.SetValue("SpeedBuffTimer", stopTime);
-									enemyVc.SetValue("SpeedBuffMultiplier", 0.0f); // 速度を0に
-
-									enemyVc.SetValue("IsFrozen", 1.0f);
-									enemyVc.SetValue("FrozenTimer", stopTime);
-								}
-
-								// 地面から氷の棘（スパイク）が放射状に突き出す
 								DirectX::XMFLOAT3 impactPos = bulletTrans.translate;
 								float groundH = ctx.scene->GetHeightAt(impactPos.x, impactPos.z, impactPos.y + 1.0f, static_cast<uint32_t>(attackerEntity));
 								if (groundH > -5000.0f) {
 									impactPos.y = groundH;
 								}
 
-								int spikeCount = 8;
+								// 敵に凍結デバフ & 超巨大範囲ダメージを適用
+								if (registry.all_of<VariableComponent>(attackerEntity)) {
+									float stopTime = registry.get<VariableComponent>(attackerEntity).GetValue("StopTime", 1.0f);
+									
+									// ★さらなる超巨大範囲判定 (8.0f -> 15.0f)
+									float splashRadius = 15.0f;
+									auto enemiesView = registry.view<TagComponent, TransformComponent, HealthComponent>();
+									for (auto enemyEnt : enemiesView) {
+										if (enemiesView.get<TagComponent>(enemyEnt).tag == TagType::Enemy) {
+											auto& enemyTc = enemiesView.get<TransformComponent>(enemyEnt);
+											auto& hc = enemiesView.get<HealthComponent>(enemyEnt);
+											if (hc.isDead || hc.hp <= 0.0f) continue;
+
+											float dx = enemyTc.translate.x - impactPos.x;
+											float dy = enemyTc.translate.y - impactPos.y;
+											float dz = enemyTc.translate.z - impactPos.z;
+											float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+
+											if (dist <= splashRadius) {
+												// 凍結デバフの適用
+												auto& enemyVc = registry.all_of<VariableComponent>(enemyEnt) ? 
+													registry.get<VariableComponent>(enemyEnt) : 
+													registry.emplace<VariableComponent>(enemyEnt);
+												
+												enemyVc.SetValue("SpeedBuffTimer", stopTime);
+												enemyVc.SetValue("SpeedBuffMultiplier", 0.0f); // 速度を0に
+												enemyVc.SetValue("IsFrozen", 1.0f);
+												enemyVc.SetValue("FrozenTimer", stopTime);
+
+												// 直接当たった敵 (defenderEntity) 以外には範囲ダメージも適用 (二重ダメージ防止)
+												if (enemyEnt != defenderEntity) {
+													float shieldDamageRate = 0.1f;
+													float hpDamageRate = 2.0f;
+													
+													float rawDamage = hitbox.damage;
+													if (registry.all_of<HurtboxComponent>(enemyEnt)) {
+														rawDamage *= registry.get<HurtboxComponent>(enemyEnt).damageMultiplier;
+													}
+													float damageToApply = rawDamage;
+
+													if (hc.shieldHp > 0.0f) {
+														float effectiveShieldDamage = damageToApply * shieldDamageRate;
+														if (hc.shieldHp >= effectiveShieldDamage) {
+															hc.shieldHp -= effectiveShieldDamage;
+															damageToApply = 0.0f;
+														} else {
+															float overflowDamage = effectiveShieldDamage - hc.shieldHp;
+															hc.shieldHp = 0.0f;
+															if (auto* tutorial = TutorialScript::GetInstance()) tutorial->IncrementBrokenShieldCount();
+															damageToApply = (overflowDamage / shieldDamageRate) * hpDamageRate;
+														}
+													} else {
+														damageToApply *= hpDamageRate;
+													}
+
+													hc.hp -= damageToApply;
+													hc.hitFlashTimer = 0.2f;
+												}
+											}
+										}
+									}
+								}
+
+								// 地面から氷の棘（スパイク）が超巨大かつ放射状に突き出す
+								// ★スパイク本数を16本に増量 (8 -> 12 -> 16)
+								int spikeCount = 16;
 								for (int i = 0; i < spikeCount; ++i) {
 									float angle = (6.283185f / static_cast<float>(spikeCount)) * static_cast<float>(i);
 									
@@ -285,31 +357,37 @@ public:
 									auto& sTrans = registry.get<TransformComponent>(spike);
 									sTrans.translate = impactPos;
 									
-									float dist = 1.2f; // ★より広く (0.4f -> 1.2f)
+									// ★飛散半径を大幅に拡大 (1.2f -> 5.2f)
+									float dist = 5.2f; 
 									sTrans.translate.x += std::cos(angle) * dist;
 									sTrans.translate.z += std::sin(angle) * dist;
-									sTrans.translate.y -= 0.5f; // 地面下に埋める
+									// ★棘のスケールが非常に大きいため、地面下に深く埋めて滑らかに突き出させる
+									sTrans.translate.y -= 1.5f; 
 
 									sTrans.rotate.y = -angle;
-									sTrans.rotate.x = 0.85f; // ★もっと外側に傾ける (0.35f -> 0.85f)
-									sTrans.scale = { 0.12f, 0.01f, 0.12f };
+									// ★外側への傾きをさらに大きく (0.85f -> 0.95f)
+									sTrans.rotate.x = 0.95f; 
+									// ★棘の太さを超巨大化 (0.12f -> 0.25f -> 0.45f)
+									sTrans.scale = { 0.45f, 0.01f, 0.45f };
 
 									if (ctx.renderer) {
 										auto& mr = registry.emplace<MeshRendererComponent>(spike);
 										mr.modelHandle = ctx.renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
 										mr.textureHandle = ctx.renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-										mr.color = { 0.5f, 0.85f, 1.0f, 1.5f }; // 青白い半透明色
+										// ★より明るく、鮮明に光り輝く青白い半透明色
+										mr.color = { 0.6f, 0.9f, 1.0f, 1.8f }; 
 									}
 
 									auto& sc = registry.emplace<ScriptComponent>(spike);
 									sc.scripts.push_back({ "IceSpikeScript", "", nullptr });
 
 									auto& vc = registry.emplace<VariableComponent>(spike);
-									vc.SetValue("TargetScaleY", 1.0f + (rand() % 100) * 0.005f);
+									// ★棘の高さを超巨大に突き出させる (1.0f -> 2.2f -> 4.5f)
+									vc.SetValue("TargetScaleY", 4.5f + (rand() % 100) * 0.01f);
 									vc.SetValue("Angle", angle);
 								}
 
-								// 砕け散る氷の破片 (きらめく反射) & 凍結エフェクト
+								// 砕け散る氷の破片 (超巨大化 & 放出数増量)
 								entt::entity impactVfx = ctx.scene->CreateEntity("IceImpact_VFX");
 								ctx.scene->SetTag(impactVfx, TagType::VFX);
 								auto& iTrans = registry.get<TransformComponent>(impactVfx);
@@ -317,27 +395,31 @@ public:
 
 								auto& pecShatter = registry.emplace<ParticleEmitterComponent>(impactVfx);
 								pecShatter.emitter.params.name = "IceImpactShatter";
-								pecShatter.emitter.params.texturePath = "Resources/Textures/particles/shattered_prism.png"; // 砕けたプリズム
+								pecShatter.emitter.params.texturePath = "Resources/Textures/particles/shattered_prism.png"; 
 								pecShatter.emitter.params.emitRate = 0.0f;
 								pecShatter.emitter.params.shape = Engine::EmissionShape::Sphere;
-								pecShatter.emitter.params.shapeRadius = 1.2f;
-								pecShatter.emitter.params.lifeTime = 0.9f;
-								pecShatter.emitter.params.lifeTimeVariance = 0.25f;
-								pecShatter.emitter.params.startVelocity = { 0.0f, 1.5f, 0.0f };
-								pecShatter.emitter.params.velocityVariance = { 2.5f, 1.2f, 2.5f };
+								// ★エフェクトの発生半径を拡大 (1.2f -> 5.5f)
+								pecShatter.emitter.params.shapeRadius = 5.5f;
+								pecShatter.emitter.params.lifeTime = 1.5f;
+								pecShatter.emitter.params.lifeTimeVariance = 0.35f;
+								pecShatter.emitter.params.startVelocity = { 0.0f, 2.5f, 0.0f };
+								pecShatter.emitter.params.velocityVariance = { 6.0f, 3.0f, 6.0f };
 								pecShatter.emitter.params.damping = 0.8f;
-								pecShatter.emitter.params.startColor = { 0.65f, 0.9f, 1.0f, 1.6f };
-								pecShatter.emitter.params.endColor = { 0.3f, 0.7f, 1.0f, 0.0f };
-								pecShatter.emitter.params.startSize = { 0.35f, 0.35f, 0.35f };
-								pecShatter.emitter.params.endSize = { 1.1f, 1.1f, 1.1f };
+								// ★より光り輝く明るい色彩
+								pecShatter.emitter.params.startColor = { 0.75f, 0.95f, 1.0f, 2.0f };
+								pecShatter.emitter.params.endColor = { 0.4f, 0.8f, 1.0f, 0.0f };
+								// ★破片サイズを大幅に巨大化
+								pecShatter.emitter.params.startSize = { 0.8f, 0.8f, 0.8f };
+								pecShatter.emitter.params.endSize = { 2.5f, 2.5f, 2.5f };
 								pecShatter.emitter.params.isAdditive = true;
 								pecShatter.emitter.params.position = { bulletTrans.translate.x, bulletTrans.translate.y, bulletTrans.translate.z };
 
 								pecShatter.emitter.Initialize(*ctx.renderer, "IceImpactShatter");
 								pecShatter.isInitialized = true;
-								pecShatter.emitter.EmitBurst(22);
+								// ★放出数をほぼ3倍に増量 (22 -> 60)
+								pecShatter.emitter.EmitBurst(60);
 
-								// キラキラ光る反射スパーク
+								// キラキラ光る反射スパーク (超巨大化 & 放出数増量)
 								entt::entity sparkleVfx = ctx.scene->CreateEntity("IceImpactSparkle_VFX");
 								ctx.scene->SetTag(sparkleVfx, TagType::VFX);
 								auto& spTrans = registry.get<TransformComponent>(sparkleVfx);
@@ -345,19 +427,22 @@ public:
 
 								auto& pecSparkle = registry.emplace<ParticleEmitterComponent>(sparkleVfx);
 								pecSparkle.emitter.params.name = "IceImpactSparkle";
-								pecSparkle.emitter.params.texturePath = "Resources/Textures/particles/diamond_flare.png"; // ダイヤモンドフレア
+								pecSparkle.emitter.params.texturePath = "Resources/Textures/particles/diamond_flare.png"; 
 								pecSparkle.emitter.params.emitRate = 0.0f;
 								pecSparkle.emitter.params.shape = Engine::EmissionShape::Sphere;
-								pecSparkle.emitter.params.shapeRadius = 0.8f;
-								pecSparkle.emitter.params.lifeTime = 0.7f;
-								pecSparkle.emitter.params.lifeTimeVariance = 0.2f;
-								pecSparkle.emitter.params.startVelocity = { 0.0f, 3.5f, 0.0f };
-								pecSparkle.emitter.params.velocityVariance = { 4.5f, 3.5f, 4.5f };
+								// ★スパーク発生半径を拡大 (0.8f -> 4.5f)
+								pecSparkle.emitter.params.shapeRadius = 4.5f;
+								pecSparkle.emitter.params.lifeTime = 1.2f;
+								pecSparkle.emitter.params.lifeTimeVariance = 0.25f;
+								pecSparkle.emitter.params.startVelocity = { 0.0f, 5.0f, 0.0f };
+								pecSparkle.emitter.params.velocityVariance = { 9.0f, 6.0f, 9.0f };
 								pecSparkle.emitter.params.damping = 0.6f;
-								pecSparkle.emitter.params.startColor = { 0.8f, 0.95f, 1.0f, 1.8f };
-								pecSparkle.emitter.params.endColor = { 0.2f, 0.5f, 1.0f, 0.0f };
-								pecSparkle.emitter.params.startSize = { 0.2f, 0.2f, 0.2f };
-								pecSparkle.emitter.params.endSize = { 0.02f, 0.02f, 0.02f };
+								// ★眩しい白さを表現
+								pecSparkle.emitter.params.startColor = { 0.9f, 1.0f, 1.0f, 2.2f };
+								pecSparkle.emitter.params.endColor = { 0.3f, 0.6f, 1.0f, 0.0f };
+								// ★スパークサイズを巨大化
+								pecSparkle.emitter.params.startSize = { 0.5f, 0.5f, 0.5f };
+								pecSparkle.emitter.params.endSize = { 0.05f, 0.05f, 0.05f };
 								pecSparkle.emitter.params.angularVelocity = { 5.0f, 5.0f, 5.0f };
 								pecSparkle.emitter.params.angularVelocityVariance = { 10.0f, 10.0f, 10.0f };
 								pecSparkle.emitter.params.isAdditive = true;
@@ -365,20 +450,21 @@ public:
 
 								pecSparkle.emitter.Initialize(*ctx.renderer, "IceImpactSparkle");
 								pecSparkle.isInitialized = true;
-								pecSparkle.emitter.EmitBurst(25);
+								// ★放出数をほぼ3倍に増量 (25 -> 70)
+								pecSparkle.emitter.EmitBurst(70);
 
 								// スクリプトと寿命
 								auto& scSp = registry.emplace<ScriptComponent>(impactVfx);
 								scSp.scripts.push_back({ "BulletScript", "", nullptr });
 								auto& vcSp = registry.emplace<VariableComponent>(impactVfx);
 								vcSp.SetValue("Speed", 0.0f);
-								vcSp.SetValue("MaxLifeTime", 1.2f);
+								vcSp.SetValue("MaxLifeTime", 1.8f);
 
 								auto& scSparkle = registry.emplace<ScriptComponent>(sparkleVfx);
 								scSparkle.scripts.push_back({ "BulletScript", "", nullptr });
 								auto& vcSparkle = registry.emplace<VariableComponent>(sparkleVfx);
 								vcSparkle.SetValue("Speed", 0.0f);
-								vcSparkle.SetValue("MaxLifeTime", 1.0f);
+								vcSparkle.SetValue("MaxLifeTime", 1.5f);
 
 							} else {
 								entt::entity explosionVfx = ctx.scene->CreateEntity("CanonExplosion_VFX");

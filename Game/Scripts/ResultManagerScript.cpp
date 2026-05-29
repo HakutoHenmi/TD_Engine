@@ -89,8 +89,8 @@ void ResultManagerScript::CreateFallbackUI(GameScene* scene, bool isWin, int sco
 	auto resImage = reg.create();
 	reg.emplace<NameComponent>(resImage, "ResultImage");
 	auto& rectRes = reg.emplace<RectTransformComponent>(resImage);
-	rectRes.pos = {0, -250};
-	rectRes.size = {600, 120};
+	rectRes.pos = {0, -380};
+	rectRes.size = {1020, 204};
 	rectRes.anchor = {0.5f, 0.5f};
 	rectRes.pivot = {0.5f, 0.5f};
 	auto& imgRes = reg.emplace<UIImageComponent>(resImage);
@@ -106,8 +106,8 @@ void ResultManagerScript::CreateFallbackUI(GameScene* scene, bool isWin, int sco
 	auto scoreLabel = reg.create();
 	reg.emplace<NameComponent>(scoreLabel, "ScoreLabel");
 	auto& rectScoreL = reg.emplace<RectTransformComponent>(scoreLabel);
-	rectScoreL.pos = {0, -60};
-	rectScoreL.size = {450, 90};
+	rectScoreL.pos = {0, -120};
+	rectScoreL.size = {765, 153};
 	rectScoreL.anchor = {0.5f, 0.5f};
 	rectScoreL.pivot = {0.5f, 0.5f};
 	auto& imgScore = reg.emplace<UIImageComponent>(scoreLabel);
@@ -117,14 +117,14 @@ void ResultManagerScript::CreateFallbackUI(GameScene* scene, bool isWin, int sco
 	auto scoreText = reg.create();
 	reg.emplace<NameComponent>(scoreText, "ScoreText");
 	auto& rectScoreT = reg.emplace<RectTransformComponent>(scoreText);
-	rectScoreT.pos = {110, -60}; // バランス良く中央寄りに
+	rectScoreT.pos = {187, -120}; // バランス良く中央寄りに
 	rectScoreT.anchor = {0.5f, 0.5f};
 	rectScoreT.pivot = {0.5f, 0.5f};
 	auto& txtScore = reg.emplace<UITextComponent>(scoreText);
 	char buf[128];
 	sprintf_s(buf, "%d", score);
 	txtScore.text = buf;
-	txtScore.fontSize = 50.0f;
+	txtScore.fontSize = 85.0f;
 	txtScore.color = {0.1f, 0.1f, 0.1f, 1.0f}; // 背景に合わせて黒に近い色にする
 
 	// --- タイム ---
@@ -132,8 +132,8 @@ void ResultManagerScript::CreateFallbackUI(GameScene* scene, bool isWin, int sco
 	auto timeLabel = reg.create();
 	reg.emplace<NameComponent>(timeLabel, "TimeLabel");
 	auto& rectTimeL = reg.emplace<RectTransformComponent>(timeLabel);
-	rectTimeL.pos = {0, 60};
-	rectTimeL.size = {450, 90};
+	rectTimeL.pos = {0, 120};
+	rectTimeL.size = {765, 153};
 	rectTimeL.anchor = {0.5f, 0.5f};
 	rectTimeL.pivot = {0.5f, 0.5f};
 	auto& imgTime = reg.emplace<UIImageComponent>(timeLabel);
@@ -143,21 +143,21 @@ void ResultManagerScript::CreateFallbackUI(GameScene* scene, bool isWin, int sco
 	auto timeText = reg.create();
 	reg.emplace<NameComponent>(timeText, "TimeText");
 	auto& rectTimeT = reg.emplace<RectTransformComponent>(timeText);
-	rectTimeT.pos = {110, 60}; // バランス良く中央寄りに
+	rectTimeT.pos = {187, 120}; // バランス良く中央寄りに
 	rectTimeT.anchor = {0.5f, 0.5f};
 	rectTimeT.pivot = {0.5f, 0.5f};
 	auto& txtTime = reg.emplace<UITextComponent>(timeText);
 	sprintf_s(buf, "%.1fs", clearTime); // 小文字のsを追加
 	txtTime.text = buf;
-	txtTime.fontSize = 50.0f;
+	txtTime.fontSize = 85.0f;
 	txtTime.color = {0.1f, 0.1f, 0.1f, 1.0f}; // 背景に合わせて黒に近い色にする
 
 	// タイトルへ戻るボタン
 	auto toTitle = reg.create();
 	reg.emplace<NameComponent>(toTitle, "ToTitleButton");
 	auto& rectBtn = reg.emplace<RectTransformComponent>(toTitle);
-	rectBtn.pos = {200, 250}; 
-	rectBtn.size = {300, 80};
+	rectBtn.pos = {340, 360}; 
+	rectBtn.size = {510, 136};
 	rectBtn.anchor = {0.5f, 0.5f};
 	rectBtn.pivot = {0.5f, 0.5f};
 	auto& uiBtnTit = reg.emplace<UIButtonComponent>(toTitle);
@@ -172,8 +172,8 @@ void ResultManagerScript::CreateFallbackUI(GameScene* scene, bool isWin, int sco
 	auto toRetry = reg.create();
 	reg.emplace<NameComponent>(toRetry, "ToRetryButton");
 	auto& rectRetry = reg.emplace<RectTransformComponent>(toRetry);
-	rectRetry.pos = {-200, 250}; 
-	rectRetry.size = {300, 80};
+	rectRetry.pos = {-340, 360}; 
+	rectRetry.size = {510, 136};
 	rectRetry.anchor = {0.5f, 0.5f};
 	rectRetry.pivot = {0.5f, 0.5f};
 	auto& uiBtnRetry = reg.emplace<UIButtonComponent>(toRetry);

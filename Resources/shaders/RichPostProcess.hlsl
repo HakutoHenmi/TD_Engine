@@ -7,14 +7,38 @@ cbuffer CBPost : register(b0) {
     float gTime; 
     float gNoiseStrength; 
     float gDistortion; 
-    float gChromaShift; 
+    float gDamageVignette; // chromaShift->damageVignette
     float gVignette; 
     float gScanline; 
     float gSan;
-    float gBloomIntensity;    // ★追加: ブルーム強度
-    float gDofFocusDistance;  // ★追加: DOFフォーカス距離
-    float gDofFocusRange;     // ★追加: DOFピント範囲
-    float gDofIntensity;      // ★追加: DOFぼかし強度
+    float gBloomIntensity;
+    float gDofFocusDistance;
+    float gDofFocusRange;
+    float gDofIntensity;
+
+    // フォグパラメータ
+    float gFogDensity;
+    float gFogStart;
+    float gFogEnd;
+    float gFogHeightFalloff;
+
+    // カメラ・FXAA
+    float gNearPlane;
+    float gFarPlane;
+    float gFxaaEnabled;
+    float gExposure;
+
+    // フォグ色
+    float gFogColorR;
+    float gFogColorG;
+    float gFogColorB;
+    float gPad0;
+
+    // モードボーダー
+    float gPrepModeBorder;
+    float gDeleteModeBorder;
+    float gRadialBlur;
+    float gSpeedLine;
 };
 
 // 定数
@@ -47,7 +71,7 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
     
     float2 centerOffset = uv - 0.5;
     float dist = length(centerOffset);
-    float chromaPower = 0.005 + gChromaShift;
+    float chromaPower = 0.005 + gDamageVignette * 0.05; // gDamageVignetteを使用 (元gChromaShift)
     float2 shift = centerOffset * dist * chromaPower;
 
     float3 baseColor = 0.0;
@@ -86,6 +110,44 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
         baseColor += bloom * gBloomIntensity;
     }
 
+    // ★追加: ラジアルブラー (ブースト時用)
+    if (gRadialBlur > 0.001) {
+        float2 dir = 0.5 - uv;
+        float3 blurColor = 0.0;
+        float totalWeight = 0.0;
+        for (int i = 0; i < 6; ++i) {
+            float weight = 1.0 - (float)i / 6.0;
+            float2 sampleUV = saturate(uv + dir * (float)i * gRadialBlur);
+            blurColor += gScene.Sample(gSmp, sampleUV).rgb * weight;
+            totalWeight += weight;
+        }
+        baseColor = lerp(baseColor, blurColor / totalWeight, saturate(gRadialBlur * 10.0));
+    }
+
+    // ★追加: 風/スピードエフェクト (より自然でしつこくない表現)
+    float windIntensity = gSpeedLine + gRadialBlur * 10.0; 
+    if (windIntensity > 0.001) {
+        float2 d = uv - 0.5;
+        float r = length(d);
+        float angle = atan2(d.y, d.x); 
+        
+        // ソフトな流線ノイズ
+        float noise1 = sin(angle * 15.0 + gTime * 3.0);
+        float noise2 = sin(angle * 40.0 - gTime * 8.0);
+        float lineNoise = smoothstep(0.2, 1.0, (noise1 + noise2) * 0.5);
+        
+        // 高速で手前に流れる動き
+        float flow = frac(r * 4.0 - gTime * 25.0 + lineNoise);
+        flow = smoothstep(0.5, 1.0, flow);
+        
+        // 画面端のみ
+        float mask = smoothstep(0.25, 0.7, r);
+        float windAlpha = lineNoise * flow * mask * windIntensity * 0.15;
+        
+        // 風っぽい淡い青白さ（加算合成）
+        baseColor += float3(0.6, 0.8, 1.0) * windAlpha;
+    }
+
     // -----------------------------------------------------------------
     // 3. Vignette (周辺減光) ＆ Noise
     // -----------------------------------------------------------------
@@ -95,7 +157,9 @@ float4 main(float4 svpos:SV_POSITION, float2 uv:TEXCOORD0) : SV_TARGET {
     // 被ダメージビネット（赤色）
     float dVig = saturate(dot(centerOffset, centerOffset) * gVignette);
     float3 redColor = float3(1.0, 0.0, 0.0);
-    baseColor = lerp(baseColor, redColor, dVig * 0.9);
+    // gDamageVignette の値に応じて赤みを調整 (最大でも 0.8 程度に抑える)
+    float damageIntensity = saturate(gDamageVignette) * 0.8;
+    baseColor = lerp(baseColor, redColor, dVig * damageIntensity);
     
     // フィルムノイズ
     baseColor += (hash(uv * 1000.0 + gTime) - 0.5) * 0.03;

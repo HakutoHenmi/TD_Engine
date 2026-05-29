@@ -15,8 +15,8 @@
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [0,-400], "size": [800,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIText", "enabled": true, "text": "SELECT STAGE", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]}
+        {"type": "RectTransform", "enabled": true, "pos": [0,-400], "size": [800,160], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/selectStage.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 0, "borderBottom": 0, "borderLeft": 0, "borderRight": 0}
       ]
     },
     {

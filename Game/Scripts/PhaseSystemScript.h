@@ -45,6 +45,8 @@ public:
 		NextPhase_ = phase;
 	}
 
+	void SetSellMode(bool mode) { isSellMode_ = mode; }
+
 	static void PlusCoinCount(int PlusCoin) { CoinCount += PlusCoin; } // 追加: コイン数を増減させる関数
 
 	// 返金時の計算関数
@@ -67,7 +69,7 @@ private:
 	PhaseState preIsPhase_ = PreparationPhase; // フェーズ切り替わり検知用
 	inline static int currentPhase_ = 0;
 
-	int StartCoinCount_ = 60000; // 初期コイン数
+	int StartCoinCount_ = 300; // 初期コイン数
 
 	inline static int CoinCount; // コインの数を管理する静的変数
 
@@ -86,10 +88,10 @@ private:
 
 	bool isSellMode_ = false;       // 追加: 売却（削除）モード
 
-	int canonCost_ = 150;
-	int missileCost_ = 200;
-	int poisonCost_ = 120;
-	int iceCanonCost_ = 250;
+	int canonCost_ = 100;
+	int missileCost_ = 400;
+	int poisonCost_ = 200;
+	int iceCanonCost_ = 150;
 
 	int selectedObjCost_ = 0; // 追加
 	int currentInstallationCost_ = 0; // 現在の設置コスト

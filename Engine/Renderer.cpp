@@ -981,7 +981,8 @@ void Renderer::EndFrame() {
 			// モードボーダー
 			float prepModeBorder;
 			float deleteModeBorder;
-			float pad1[2];
+			float radialBlur;
+			float speedLine;
 		};
 #ifdef _MSC_VER
 #pragma warning(pop)
@@ -1011,6 +1012,8 @@ void Renderer::EndFrame() {
 		cb.fogColorB = ppParams_.fogColor.z;
 		cb.prepModeBorder = ppParams_.prepModeBorder;
 		cb.deleteModeBorder = ppParams_.deleteModeBorder;
+		cb.radialBlur = ppParams_.radialBlur;
+		cb.speedLine = ppParams_.speedLine;
 
 		const uint32_t off = upload_[fi].Allocate(sizeof(CBPost), 256);
 		if (off != UINT32_MAX) {

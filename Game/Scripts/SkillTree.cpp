@@ -556,21 +556,21 @@ void SkillTree::ApplyToBaseDefenseScript(entt::entity entity, GameScene* scene) 
 	// page4
 	//   Player
 	// Player
-	float playerMoveSpeedRate = 1.0f;
+	float playerMoveSpeedRate = 1.0f; // 移動速度倍率
 
-	float playerSwordAttackSpeedRate = 1.0f;
-	float playerGunAttackSpeedRate = 1.0f;
+	float playerSwordAttackSpeedRate = 1.0f; // 剣攻撃速度倍率
+	float playerGunAttackSpeedRate = 1.0f;   // 銃攻撃速度倍率
 
-	float playerSwordAttackPowerRate = 1.0f;
-	float playerGunAttackPowerRate = 1.0f;
+	float playerSwordAttackPowerRate = 1.0f; // 剣攻撃力倍率
+	float playerGunAttackPowerRate = 1.0f;   // 銃攻撃力倍率
 
-	float playerMaxSteamPressureRate = 1.0f;
+	float playerMaxSteamPressureRate = 1.0f; // 最大蒸気圧倍率
 
-	float playerSwordSkillCooldownRate = 1.0f;
-	float playerGunSkillCooldownRate = 1.0f;
+	float playerSwordSkillCooldownRate = 1.0f; // 剣スキルクールダウン倍率
+	float playerGunSkillCooldownRate = 1.0f;   // 銃スキルクールダウン倍率
 
-	float playerSwordSkillAttackPowerRate = 1.0f;
-	float playerGunSkillAttackPowerRate = 1.0f;
+	float playerSwordSkillAttackPowerRate = 1.0f; // 剣スキル攻撃力倍率
+	float playerGunSkillAttackPowerRate = 1.0f;   // 銃スキル攻撃力倍率
 
 	float buffRadiusRate = 1.0f;
 

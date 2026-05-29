@@ -225,7 +225,7 @@ void SpaceShatterScript::Draw(entt::entity /*entity*/, GameScene* scene) {
         if (sh.colorType == -1) {
             m = XMMatrixScaling(s * 0.15f, s * 0.15f, s * 3.0f) *
                 XMMatrixRotationRollPitchYaw(sh.rot.x, sh.rot.y, sh.rot.z) *
-                XMMatrixTranslation(sh.pos.x, sh.pos.y, sh.pos.z);
+                XMMatrixTranslation(sh.pos.x, sh.pos.y + (sh.pos.y < 3.0f ? s * 0.35f : 0.0f), sh.pos.z);
             Engine::Matrix4x4 world; XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&world), m);
             Engine::Vector4 color = {0.2f, 0.7f, 2.0f, lifeT};
             if (colorMode_ == 1) color = {0.3f, 0.9f, 0.1f, lifeT};
@@ -234,7 +234,7 @@ void SpaceShatterScript::Draw(entt::entity /*entity*/, GameScene* scene) {
         } else {
             m = XMMatrixScaling(s, s, s) *
                 XMMatrixRotationRollPitchYaw(sh.rot.x, sh.rot.y, sh.rot.z) *
-                XMMatrixTranslation(sh.pos.x, sh.pos.y, sh.pos.z);
+                XMMatrixTranslation(sh.pos.x, sh.pos.y + (sh.pos.y < 3.0f ? s * 0.35f : 0.0f), sh.pos.z);
             Engine::Matrix4x4 world; XMStoreFloat4x4(reinterpret_cast<XMFLOAT4X4*>(&world), m);
             Engine::Vector4 color = {1.0f, 1.0f, 1.0f, lifeT};
             if (sh.colorType == 1) color = {1.2f, 1.4f, 1.8f, lifeT};
@@ -252,6 +252,9 @@ void SpaceShatterScript::Draw(entt::entity /*entity*/, GameScene* scene) {
         float s = sm.size * (1.0f + (1.0f - lifeRatio) * 5.0f);
 
         XMVECTOR p = XMLoadFloat3(&sm.pos);
+        if (sm.pos.y < 3.0f) {
+            p = XMVectorSetY(p, XMVectorGetY(p) + s * 0.35f);
+        }
         XMVECTOR toCam = XMVector3Normalize(camPos - p);
         XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
         XMVECTOR right = XMVector3Normalize(XMVector3Cross(up, toCam));
@@ -273,6 +276,9 @@ void SpaceShatterScript::Draw(entt::entity /*entity*/, GameScene* scene) {
         float s = 1.8f * (0.8f + flashT * 0.4f); // 銃口付近の小さな光
         
         XMVECTOR muzzlePos = XMLoadFloat3(&centerPos_);
+        if (centerPos_.y < 3.0f) {
+            muzzlePos = XMVectorSetY(muzzlePos, XMVectorGetY(muzzlePos) + s * 0.35f);
+        }
         XMVECTOR toCam = XMVector3Normalize(camPos - muzzlePos);
         XMVECTOR upHint = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
         XMVECTOR right = XMVector3Normalize(XMVector3Cross(upHint, toCam));

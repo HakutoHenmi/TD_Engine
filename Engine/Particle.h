@@ -74,7 +74,7 @@ public:
 	void Emit(const Vector3& pos, const Vector3& vel, const Vector3& acceleration, 
 			  const Vector3& startScale, const Vector3& endScale,
 			  const Vector4& startColor, const Vector4& endColor, 
-			  float life, const Vector3& angVel = {0, 0, 0}, float damping = 0.0f);
+			  float life, const Vector3& angVel = {0, 0, 0}, float damping = 0.0f, const Vector3& startRot = {0, 0, 0});
 
 	// ★追加: アクティブパーティクル数を取得
 	uint32_t GetActiveCount() const;

@@ -29,7 +29,7 @@ private:
 	bool hasTarget_ = false;
 	entt::entity target_ = entt::null;
 
-	float damage_ = 2.0f;
+	float damage_ = 10.0f;
 	float stopTime_ = 1.0f;
 
 
@@ -40,6 +40,7 @@ private:
 	float spiralRadius_ = 0.0f;
 
 	DirectX::XMFLOAT3 centerPosition_ = {0.0f, 0.0f, 0.0f};
+	void CreateIceArea(entt::entity entity, GameScene* scene);
 };
 
 } // namespace Game

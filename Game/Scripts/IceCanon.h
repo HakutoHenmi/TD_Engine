@@ -26,10 +26,11 @@ private:
 
 	float attackRange_ = 30.0f;
 
-	float damage_ = 2.0f;
+	float damage_ = 10.0f;
 	float stopTime_ = 1.0f;
 	// ターゲット追尾用
 	entt::entity currentTarget_ = entt::null;
+	
 };
 
 } // namespace Game

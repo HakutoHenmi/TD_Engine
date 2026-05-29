@@ -92,6 +92,7 @@ protected: // メンバ変数
 	float poisonedParticleTimer_ = 0.0f; // 毒状態時の泡噴射タイマー
 
 	float frozenTimeSpeed_ = 1.0f; // 現在の移動速度
+	float attackActiveTimer_ = 0.0f; // 攻撃判定の持続タイマー
 };
 
 } // namespace Game

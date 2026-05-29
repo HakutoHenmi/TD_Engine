@@ -1,4 +1,5 @@
 #include "PlayerScript.h"
+#include "../Engine/WindowDX.h"
 #ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
 #endif
@@ -17,6 +18,8 @@
 #include <iostream>
 
 namespace Game {
+
+bool PlayerScript::s_isHelpOpen = false;
 
 void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 	// ★追加: シーン開始時は必ずカーソルを表示する
@@ -285,9 +288,100 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 }
 
 void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
+	// ★追加: TABキーによる操作説明ヘルプ画面のトグル開閉
+	if (!PhaseSystemScript::IsResultSequenceActive() && !scene->IsPaused()) {
+		bool currentTabKeyDown = (GetAsyncKeyState(VK_TAB) & 0x8000) != 0;
+		if (currentTabKeyDown && !prevTabKeyDown_) {
+			isHelpOpen_ = !isHelpOpen_;
+		}
+		prevTabKeyDown_ = currentTabKeyDown;
+	} else {
+		isHelpOpen_ = false; // ポーズ中やゲームオーバー時は強制的に閉じる
+		prevTabKeyDown_ = false;
+	}
+	s_isHelpOpen = isHelpOpen_;
+
 	if (scene->GetRegistry().all_of<HealthComponent>(entity)) {
-		if (scene->GetRegistry().get<HealthComponent>(entity).isDead)
-			return;
+		auto& hc = scene->GetRegistry().get<HealthComponent>(entity);
+		
+		// 死亡時の処理
+		if (hc.isDead && respawnState_ == 0) {
+			respawnState_ = 1;
+			respawnTimer_ = 0.0f;
+			isHelpOpen_ = false; // 死亡時はヘルプを閉じる
+		}
+
+		if (respawnState_ != 0) {
+			auto* pRenderer = scene->GetRenderer();
+			if (pRenderer) {
+				if (whiteTextureHandle_ == 0) {
+					whiteTextureHandle_ = pRenderer->LoadTexture2D("Resources/Textures/white1x1.png");
+				}
+				float alpha = 0.0f;
+				if (respawnState_ == 1) {
+					alpha = respawnTimer_ / RESPAWN_FADEOUT_TIME;
+				} else if (respawnState_ == 2) {
+					alpha = 1.0f - (respawnTimer_ / RESPAWN_FADEIN_TIME);
+				}
+				if (alpha < 0.0f) alpha = 0.0f;
+				if (alpha > 1.0f) alpha = 1.0f;
+				
+				Engine::Renderer::SpriteDesc fadeDesc;
+				fadeDesc.color = {0.0f, 0.0f, 0.0f, alpha}; // 黒色フェード
+				fadeDesc.x = 0.0f; // 画面左上X
+				fadeDesc.y = 0.0f; // 画面左上Y
+				fadeDesc.w = (float)Engine::WindowDX::kW; // 画面全体
+				fadeDesc.h = (float)Engine::WindowDX::kH;
+				fadeDesc.layer = 999; // 最前面に描画してUIなども覆い隠す
+				pRenderer->DrawSprite(whiteTextureHandle_, fadeDesc);
+			}
+
+			if (respawnState_ == 1) { // フェードアウト中（死亡中）
+				respawnTimer_ += dt;
+				if (respawnTimer_ >= RESPAWN_FADEOUT_TIME) {
+					// 復活処理
+					hc.hp = hc.maxHp;
+					hc.isDead = false;
+					respawnState_ = 2; // フェードインへ移行
+					respawnTimer_ = 0.0f;
+
+					if (scene->GetRegistry().all_of<TransformComponent>(entity)) {
+						auto& tc = scene->GetRegistry().get<TransformComponent>(entity);
+						// コアの近く（半径 5.0〜15.0 の範囲）のランダムな位置に復活
+						float r = (float)(rand() % 100) / 10.0f + 5.0f;
+						float angle = (float)(rand() % 628) / 100.0f;
+						tc.translate.x = r * std::cos(angle);
+						tc.translate.z = r * std::sin(angle);
+						tc.translate.y = scene->GetHeightAt(tc.translate.x, tc.translate.z, 5.0f) + 1.0f;
+
+						if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
+							scene->GetRegistry().get<RigidbodyComponent>(entity).velocity = {0,0,0};
+						}
+						// 復活の煙エフェクト（飛行スモークと同じ設定を使用）
+						entt::entity smoke = scene->CreateEntity("RespawnSmoke");
+						auto& sTc = scene->GetRegistry().get<TransformComponent>(smoke);
+						sTc.translate = tc.translate;
+						scene->SetTag(smoke, TagType::VFX);
+						auto& sVc = scene->GetRegistry().emplace<VariableComponent>(smoke);
+						sVc.SetValue("NormalY", 1.0f);
+						sVc.SetValue("Radius", 3.0f);
+						sVc.SetValue("Duration", 1.0f);
+						sVc.SetValue("ScatterSpeed", 5.0f);
+						sVc.SetValue("Count", 50.0f);
+						sVc.SetValue("IsFlight", 1.0f);
+						auto& sSc = scene->GetRegistry().emplace<ScriptComponent>(smoke);
+						sSc.scripts.push_back({"SpaceShatterScript", "", nullptr});
+					}
+				}
+				return; // 死亡中は以降の処理を行わない
+			} 
+			else if (respawnState_ == 2) { // フェードイン中（復活直後）
+				respawnTimer_ += dt;
+				if (respawnTimer_ >= RESPAWN_FADEIN_TIME) {
+					respawnState_ = 0; // 通常状態へ
+				}
+			}
+		}
 	}
 	ApplySkillEffects(entity, scene);
 	if (!isSubscribed_) {
@@ -374,8 +468,8 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		scene->GetEventSystem().Subscribe("PlayerTakeDamage", [this, entity, scene](float) {
 			if (!scene || !scene->GetContext().camera)
 				return;
-			// 1. 強めのカメラシェイク
-			scene->GetContext().camera->StartShake(0.5f, 0.4f, 0.02f);
+			// 1. 強めのカメラシェイクを少し抑える
+			scene->GetContext().camera->StartShake(0.15f, 0.2f, 0.015f);
 
 			// 2. ダメージ演出タイマーセット
 			damageEffectTimer_ = DAMAGE_EFFECT_DURATION;
@@ -412,10 +506,19 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		}
 	}
 
+	bool isPrep = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase);
+
 	if (skillCooldown_ > 0.0f)
 		skillCooldown_ -= dt;
 	if (gunShootTimer_ > 0.0f)
 		gunShootTimer_ -= dt;
+
+	// ★追加: 飛行中はカメラのターゲットロックを解除して干渉とガクつきを防ぐ
+	if (isFlying_) {
+		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) {
+			scene->GetRegistry().get<CameraTargetComponent>(entity).lockedTarget = entt::null;
+		}
+	}
 
 	float currentBuffRadius = buffRadius_ * playerBuffRangeRate_;
 	// ★追加: 設備へのバフ効果範囲の視覚化
@@ -457,56 +560,90 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		}
 	}
 
-	// ★追加: ダメージ演出の更新
-	bool isPrep = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase);
-
-	if (damageEffectTimer_ > 0.0f) {
-		damageEffectTimer_ -= dt;
-		if (damageEffectTimer_ < 0.0f)
-			damageEffectTimer_ = 0.0f;
-
+	// ★追加: リザルト（ゲームオーバー・クリア）演出中は全ての戦闘用ポストプロセス・画面歪みエフェクトを即座にリセットして綺麗にする
+	if (PhaseSystemScript::IsResultSequenceActive()) {
+		isFlying_ = false;
+		lockedEnemy_ = entt::null;
+		if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) {
+			scene->GetRegistry().get<CameraTargetComponent>(entity).lockedTarget = entt::null;
+		}
+		damageEffectTimer_ = 0.0f;
 		if (renderer) {
-			renderer->SetPostEffect("Rich"); // ★追加: 赤色ビネット対応の高品質シェーダーに切り替え
 			auto params = renderer->GetPostProcessParams();
-			float rate = damageEffectTimer_ / DAMAGE_EFFECT_DURATION; // 1.0 -> 0.0
-
-			// ビネット強度 (最大1.5) を赤色ビネットに変更
-			params.damageVignette = rate * 1.5f;
-			// 色収差は廃止されたのでコメントアウト
-			// params.chromaShift = rate * 0.05f;
-
+			params.damageVignette = 0.0f;
+			params.radialBlur = 0.0f;
+			params.speedLine = 0.0f;
+			params.dofIntensity = 0.0f;
 			renderer->SetPostProcessParams(params);
-			renderer->SetPostProcessEnabled(true);
+			renderer->SetPostEffect("Painterly"); // 標準の絵画風エフェクトに戻す
 		}
 	} else {
-		// 演出終了時はパラメータをリセットし、現在のフェーズに合わせたポストプロセスに戻す
-		if (renderer) {
-			auto params = renderer->GetPostProcessParams();
-			if (params.damageVignette > 0.0f) {
-				params.damageVignette = 0.0f;
-				renderer->SetPostProcessParams(params);
+		// ★追加: ダメージ演出の更新
+		if (damageEffectTimer_ > 0.0f) {
+			damageEffectTimer_ -= dt;
+			if (damageEffectTimer_ < 0.0f)
+				damageEffectTimer_ = 0.0f;
 
-				// ダメージ終了の瞬間に元の絵画風ポストプロセスに戻す
-				renderer->SetPostEffect("Painterly");
+			if (renderer) {
+				renderer->SetPostEffect("Rich"); // ★追加: 赤色ビネット対応の高品質シェーダーに切り替え
+				auto params = renderer->GetPostProcessParams();
+				float rate = damageEffectTimer_ / DAMAGE_EFFECT_DURATION; // 1.0 -> 0.0
+
+				// ビネット強度 (最大0.7) を赤色ビネットに変更
+				params.damageVignette = rate * 0.7f;
+
+				renderer->SetPostProcessParams(params);
+				renderer->SetPostProcessEnabled(true);
+			}
+		} else {
+			// 演出終了時はパラメータをリセットし、現在のフェーズに合わせたポストプロセスに戻す
+			if (renderer) {
+				auto params = renderer->GetPostProcessParams();
+				if (params.damageVignette > 0.0f) {
+					params.damageVignette = 0.0f;
+					renderer->SetPostProcessParams(params);
+
+					// ダメージ終了の瞬間に元の絵画風ポストプロセスに戻す
+					renderer->SetPostEffect("Painterly");
+				}
 			}
 		}
-	}
 
-	// ★追加: フェーズに応じて被写界深度(DOF)を切り替える
-	// 準備フェーズ(PreparationPhase)の時だけミニチュア風のピンボケ効果を有効化
-	if (renderer) {
-		renderer->SetPostProcessEnabled(true);
+		// ★追加: フェーズに応じて被写界深度(DOF)を切り替える
+		// 準備フェーズ(PreparationPhase)の時だけミニチュア風のピンボケ効果を有効化
+		if (renderer) {
+			renderer->SetPostProcessEnabled(true);
 
-		auto params = renderer->GetPostProcessParams();
-		float targetDof = isPrep ? 0.3f : 0.0f; // ★Renderer.hに合わせた値
-		if (params.dofIntensity != targetDof) {
-			params.dofIntensity = targetDof;
-			renderer->SetPostProcessParams(params);
+			auto params = renderer->GetPostProcessParams();
+			float targetDof = isPrep ? 0.3f : 0.0f; // ★Renderer.hに合わせた値
+			if (params.dofIntensity != targetDof) {
+				params.dofIntensity = targetDof;
+				renderer->SetPostProcessParams(params);
+			}
+
+			// ★追加: ブースト時のブラー効果
+			float targetRadialBlur = isFlying_ ? 0.015f : 0.0f; // 飛行中のブラーはさらに弱く
+			if (!isFlying_ && scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
+				auto& rb = scene->GetRegistry().get<RigidbodyComponent>(entity);
+				float speedSq = rb.velocity.x * rb.velocity.x + rb.velocity.z * rb.velocity.z;
+				if (speedSq > 900.0f) { // 速度30以上でブラー開始 (ダッシュ時は155)
+					targetRadialBlur = std::min((std::sqrt(speedSq) - 30.0f) * 0.0003f, 0.035f); // 上限と倍率を低下
+				}
+			}
+			
+			if (params.radialBlur != targetRadialBlur) {
+				params.radialBlur += (targetRadialBlur - params.radialBlur) * 15.0f * dt;
+				if (std::abs(params.radialBlur - targetRadialBlur) < 0.001f) params.radialBlur = targetRadialBlur;
+				renderer->SetPostProcessParams(params);
+			}
+
+			// ★追加: 集中線（風エフェクト）の減衰
+			if (params.speedLine > 0.0f) {
+				params.speedLine -= 2.5f * dt; // より早く自然に消えるように
+				if (params.speedLine < 0.0f) params.speedLine = 0.0f;
+				renderer->SetPostProcessParams(params);
+			}
 		}
-
-		// ★修正: 毎フレーム Rich で上書きするのではなく、ダメージを受けていない通常時は
-		// PhaseSystemScriptなどが設定したエフェクト（Painterly / Anime）を尊重するため、
-		// ここではSetPostEffectを呼ばないようにします。
 	}
 
 	// ★スキルバフ持続時間の管理
@@ -522,8 +659,8 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	isPrep = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase);
 	bool isInsert = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::InsertPhase);
 
-	// ★追加: インサート中や準備フェーズ中は武器の切り替えやスキル発動を無効化
-	if (!isPrep && !isInsert) {
+	// ★追加: インサート中や準備フェーズ中、またはリザルト画面、ヘルプ画面中は武器の切り替えやスキル発動を無効化
+	if (!isPrep && !isInsert && !PhaseSystemScript::IsResultSequenceActive() && !isHelpOpen_) {
 		bool currentSwitchKeyDown = ((GetAsyncKeyState('T') & 0x8000) != 0) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->IsControllerButtonDown(XINPUT_GAMEPAD_Y));
 		if (currentSwitchKeyDown && !prevPlayerSwitchKeyDown_) {
 			SwitchPlayerType(entity, scene);
@@ -566,7 +703,15 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	s_wasPrep = isPrep;
 
 	// ★追加: カーソル表示切り替え (Left Altキー または BACKボタン)
-	if (isPrep) {
+	if (isHelpOpen_) {
+		// ヘルプ画面表示中は強制的にカーソルを表示し、中央固定を解除する
+		if (!isCursorVisible_) {
+			isCursorVisible_ = true;
+			while (ShowCursor(TRUE) < 0)
+				;
+		}
+		prevCursorToggle_ = false;
+	} else if (isPrep) {
 		bool currentCursorToggle = ((GetAsyncKeyState(VK_LMENU) & 0x8000) != 0) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->IsControllerButtonDown(XINPUT_GAMEPAD_BACK));
 		if (currentCursorToggle && !prevCursorToggle_) {
 			isCursorVisible_ = !isCursorVisible_;
@@ -610,7 +755,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
 
-	if (!isPrep && !isInsert) {
+	if (!isPrep && !isInsert && !PhaseSystemScript::IsResultSequenceActive() && !isHelpOpen_) {
 		// ★追加: スチーム・ブースト（剣士モード専用の高速回避）
 		bool currentDashKeyDown = ((GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->IsControllerButtonDown(XINPUT_GAMEPAD_B)) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->GetLeftTrigger() > 0.5f);
 		if (currentDashKeyDown && !prevDashKeyDown_ && playerType_ == PlayerType::Sword) {
@@ -650,6 +795,13 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 						rb.velocity.x = dx * DASH_POWER;
 						rb.velocity.z = dz * DASH_POWER;
 						recoilVelocity_ = rb.velocity; // エフェクト用に保持
+					}
+
+					// ★追加: ポストプロセスで一瞬の風エフェクト(集中線)を出す
+					if (auto* pRenderer = Engine::Renderer::GetInstance()) {
+						auto pp = pRenderer->GetPostProcessParams();
+						pp.speedLine = 0.8f;
+						pRenderer->SetPostProcessParams(pp);
 					}
 
 					// ★演出: ブースト噴射エフェクト (進行方向と逆へ大量に噴射)
@@ -712,7 +864,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		}
 
 		bool currentRightClickDown = ((GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->GetLeftTrigger() > 0.5f);
-		if (playerType_ == PlayerType::Gun && !isPrep && !isInsert) {
+		if (playerType_ == PlayerType::Gun && !isPrep && !isInsert && !PhaseSystemScript::IsResultSequenceActive() && !isHelpOpen_) {
 			if (currentRightClickDown && !prevRightClickDown_) {
 				gunFlyDone_ = true;
 				if (isFlying_) {
@@ -721,6 +873,13 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 					isFlying_ = true;
 					if (scene->GetRegistry().all_of<RigidbodyComponent>(entity)) {
 						scene->GetRegistry().get<RigidbodyComponent>(entity).velocity.y = 20.0f;
+					}
+
+					// ★追加: 飛行開始時に一瞬の風エフェクト(集中線)を出す
+					if (auto* pRenderer = Engine::Renderer::GetInstance()) {
+						auto pp = pRenderer->GetPostProcessParams();
+						pp.speedLine = 0.6f;
+						pRenderer->SetPostProcessParams(pp);
 					}
 				}
 			}
@@ -834,7 +993,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		// ★追加: 圧力ゲージの描画 (リチャージ中、銃モード、消費中、スキル中、または戦闘フェーズなら表示)
 		bool isBattle = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::BattlePhase);
 		bool shouldShowGauge = (playerType_ == PlayerType::Gun) || isRecharging_ || (steamPressure_ < maxSteam) || isSkillActive_ || isBattle || isFlying_ || (flightPressure_ < maxFlightPressure_);
-		if (shouldShowGauge && !PhaseSystemScript::IsResultSequenceActive()) { // ゲームオーバー・クリア時は非表示
+		if (shouldShowGauge && !PhaseSystemScript::IsResultSequenceActive() && !isHelpOpen_) { // ゲームオーバー・クリア、またはヘルプ中は非表示
 			DrawPressureGauge(scene);
 		}
 
@@ -971,8 +1130,16 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	// Renderer にキューを積む処理（SDFUI, DrawString, DrawLine3Dなど）は Update 内で行う必要があります。
 	{
 		auto* uiRenderer = Engine::Renderer::GetInstance();
-		if (uiRenderer && !PhaseSystemScript::IsResultSequenceActive()) { // ★追加: ゲームオーバー・クリア時は非表示
-			// ---- HP＆経験値ゲージ (HPIN.png) ----
+		if (uiRenderer && !PhaseSystemScript::IsResultSequenceActive()) {
+			// ★追加: 白テクスチャの確実な読み込み (ヘルプ描画等でも使うため)
+			if (whiteTextureHandle_ == 0) {
+				whiteTextureHandle_ = uiRenderer->LoadTexture2D("Resources/Textures/white1x1.png");
+			}
+
+			if (isHelpOpen_) {
+				DrawHelpUI(scene);
+			} else {
+				// ---- HP＆経験値ゲージ (HPIN.png) ----
 			float hpProgress = 1.0f;
 			if (scene->GetRegistry().all_of<HealthComponent>(entity)) {
 				auto& hc = scene->GetRegistry().get<HealthComponent>(entity);
@@ -1000,14 +1167,20 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			Engine::Renderer::SdfUIDesc hpDesc{};
 			// 少し長さを増やし、左端(X=145付近)を揃える (中心520, 幅750)
 			hpDesc.centerPx = {gaugeX + 520.0f * scale, gaugeY + 52.0f * scale};
-			hpDesc.sizePx = {750.0f * scale, 12.0f * scale};
+			hpDesc.sizePx = {750.0f * scale, 20.0f * scale}; // 高さを12->20に太くする
 			hpDesc.lineWidth = 0.0f;
-			hpDesc.glow = 0.0f;                      // 枠からはみ出ないようにglowを0に
-			hpDesc.color = {0.8f, 0.2f, 0.2f, 1.0f}; // 赤色
+			hpDesc.glow = 0.0f;
+			hpDesc.color = {2.5f, 0.2f, 0.2f, 1.0f}; // HDRで濃く発光させる
 			hpDesc.shape = 0;
 			hpDesc.round = hpDesc.sizePx.y * 0.5f; // 端を完全な半円にする
 			hpDesc.progress = hpProgress;
 			hpDesc.fill = 1.0f;
+			// 背景のトラック部分を描画 (HP)
+			Engine::Renderer::SdfUIDesc hpBgDesc = hpDesc;
+			hpBgDesc.progress = 1.0f;
+			hpBgDesc.color = {0.15f, 0.02f, 0.02f, 0.8f}; // 暗い赤の半透明
+			uiRenderer->DrawSDFUI(hpBgDesc);
+
 			if (hpProgress > 0.0f)
 				uiRenderer->DrawSDFUI(hpDesc);
 
@@ -1015,14 +1188,20 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			Engine::Renderer::SdfUIDesc expDesc{};
 			// HPゲージと長さを完全に一致させる (中心520, 幅750)
 			expDesc.centerPx = {gaugeX + 520.0f * scale, gaugeY + 76.0f * scale};
-			expDesc.sizePx = {750.0f * scale, 12.0f * scale};
+			expDesc.sizePx = {750.0f * scale, 20.0f * scale}; // 高さを12->20に太くする
 			expDesc.lineWidth = 0.0f;
 			expDesc.glow = 0.0f;
-			expDesc.color = {0.2f, 0.8f, 0.2f, 1.0f}; // 緑色
+			expDesc.color = {0.2f, 2.5f, 0.5f, 1.0f}; // HDRで濃く発光させる
 			expDesc.shape = 0;
 			expDesc.round = expDesc.sizePx.y * 0.5f;
 			expDesc.progress = expProgress;
 			expDesc.fill = 1.0f;
+			// 背景のトラック部分を描画 (EXP)
+			Engine::Renderer::SdfUIDesc expBgDesc = expDesc;
+			expBgDesc.progress = 1.0f;
+			expBgDesc.color = {0.02f, 0.15f, 0.02f, 0.8f}; // 暗い緑の半透明
+			uiRenderer->DrawSDFUI(expBgDesc);
+
 			if (expProgress > 0.0f)
 				uiRenderer->DrawSDFUI(expDesc);
 
@@ -1052,6 +1231,40 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 			if (!hasTutorialSystem) {
 				DrawSubObjectives(scene);
+			}
+
+			// ★追加: 白テクスチャの確実な読み込み
+			if (whiteTextureHandle_ == 0 && uiRenderer) {
+				whiteTextureHandle_ = uiRenderer->LoadTexture2D("Resources/Textures/white1x1.png");
+			}
+
+			// ★追加: Tabキー画像の確実な読み込み
+			if (tabTextureHandle_ == 0 && uiRenderer) {
+				tabTextureHandle_ = uiRenderer->LoadTexture2D("Resources/Textures/Button/Tab.png");
+			}
+
+			// ★追加: 左下にTABキーヘルプの表示 (アスペクト比を維持しつつ96x96に拡大)
+			if (uiRenderer && !PhaseSystemScript::IsResultSequenceActive()) {
+				float iconX = 30.0f;
+				float iconSize = 96.0f;
+				float iconY = (float)Engine::WindowDX::kH - iconSize - 25.0f; // 下端から25px余裕を持たせる
+				std::string fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf";
+				float tabTextScale = 38.0f / 64.0f; // テキストもアイコンに合わせて大きくする
+
+				// Tab.png 画像の描画 (96px x 96px)
+				if (tabTextureHandle_ != 0) {
+					Engine::Renderer::SpriteDesc tabKeySprite{};
+					tabKeySprite.x = iconX;
+					tabKeySprite.y = iconY;
+					tabKeySprite.w = iconSize;
+					tabKeySprite.h = iconSize;
+					tabKeySprite.color = { 6.0f, 6.0f, 6.0f, 1.0f }; // さらに強力にHDR輝度ブーストして圧倒的な視認性を確保
+					tabKeySprite.layer = 10000;
+					uiRenderer->DrawSprite(tabTextureHandle_, tabKeySprite);
+				}
+
+				// 文字をアイコンの右隣に、縦中央で綺麗に並ぶよう Y 座標を調整
+				uiRenderer->DrawString("ヘルプ / 操作説明", iconX + iconSize + 15.0f, iconY + (iconSize - 38.0f) * 0.5f, tabTextScale, { 1.0f, 1.0f, 1.0f, 1.0f }, fontPath);
 			}
 
 			// ==== ★追加: ロックオンレティクル & 銃レティクル ====
@@ -1100,6 +1313,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 					}
 				}
 			}
+		}
 
 			// ==== ★追加: マズルフラッシュ描画 (3Dライン) ====
 			for (auto& mf : muzzleFlashes_) {
@@ -1181,7 +1395,7 @@ void PlayerScript::UpdateMovement(entt::entity entity, GameScene* scene, float /
 	entt::entity gmEntity = scene->FindObjectByName("GameManager");
 	if (gmEntity != entt::null) {
 		float isLevelUpPhase = GetVar(gmEntity, scene, "IsLevelUpPhase", 0.0f);
-		if (isLevelUpPhase > 0.5f) {
+		if (isLevelUpPhase > 0.5f || PhaseSystemScript::IsResultSequenceActive() || isHelpOpen_) {
 			input.moveDir.x = 0.0f;
 			input.moveDir.y = 0.0f;
 			return;
@@ -1235,6 +1449,8 @@ void PlayerScript::UpdateMovement(entt::entity entity, GameScene* scene, float /
 }
 
 void PlayerScript::UpdateAttack(entt::entity entity, GameScene* scene, float dt) {
+	if (PhaseSystemScript::IsResultSequenceActive() || isHelpOpen_) return; // ★リザルトやヘルプ中は攻撃無効
+
 	bool currentAttackKeyDown = ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->IsControllerButtonDown(XINPUT_GAMEPAD_X)) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->GetRightTrigger() > 0.5f);
 
 	// ★追加: 大剣の溜め攻撃ロジック
@@ -1275,6 +1491,8 @@ void PlayerScript::UpdateAttack(entt::entity entity, GameScene* scene, float dt)
 					steamPressure_ -= SWORD_CHARGE_COST;
 					if (steamPressure_ < 0.0f)
 						steamPressure_ = 0.0f;
+						
+					swordChargeDone_ = true; // プレイ目標達成
 
 					isAttacking_ = true;
 					comboCount_ = 0; // 0は溜め攻撃用
@@ -1603,6 +1821,7 @@ void PlayerScript::UpdateGun(entt::entity entity, GameScene* scene, float /*dt*/
 }
 
 void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float dt) {
+	if (PhaseSystemScript::IsResultSequenceActive() || isHelpOpen_) return; // ★リザルトやヘルプ中は射撃無効
 	isAiming_ = false; // 右クリックは飛行用になったためエイムは廃止
 	bool currentAttackKeyDown = ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->IsControllerButtonDown(XINPUT_GAMEPAD_X)) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->GetRightTrigger() > 0.5f);
 
@@ -1746,6 +1965,7 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 			// ★チャージショット発射！
 			ShootChargeShot(entity, scene);
 			gunShootDone_ = true;
+			gunChargeDone_ = true; // プレイ目標達成
 			if (!isSkillActive_)
 				steamPressure_ -= cCost;
 
@@ -2745,21 +2965,80 @@ void PlayerScript::ExecuteSkill(entt::entity entity, GameScene* scene) {
 		wTc.translate.x += moveX * 2.5f;
 		wTc.translate.z += moveZ * 2.5f;
 
-		wTc.scale = {12.0f, 0.2f, 2.0f}; // 超横広な衝撃波（次元斬）
+		// 歪み（スキュー）を防ぐため親スケールは1.0にする
+		wTc.scale = {1.0f, 1.0f, 1.0f}; 
 
+		// ★パーティクルのつぶつぶ感をなくすため、複数の薄いcubeメッシュを繋げて
+		// ひとつの「ソリッドでシャープな三日月型の斬撃」を構築する
+		int segments = 12; // 滑らかな曲線にするため分割数を増やす
+		float crescentWidth = 7.0f; // 全体の幅
+		float crescentDepth = 2.0f; // 三日月の深さ(曲がり具合)
+		
 		auto* renderer = scene->GetRenderer();
 		if (renderer) {
-			auto& mr = scene->GetRegistry().emplace<MeshRendererComponent>(wave);
-			mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
-			mr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
-			mr.color = {0.1f, 0.8f, 1.0f, 0.8f}; // 青白い光
+			for (int i = 0; i < segments; ++i) {
+				float t = -1.0f + 2.0f * i / (segments - 1.0f); // -1.0 to 1.0
+				
+				// 円弧の角度 (中央が0、両端が斜めになるよう調整)
+				float maxAngle = DirectX::XM_PI / 3.0f; // 約60度
+				float angle = t * maxAngle;
+				
+				// 位置の計算：サイン・コサインを使って前方に凸な弧を作る
+				float localX = std::sin(angle) * (crescentWidth / 2.0f);
+				float localZ = (std::cos(angle) - 1.0f) * crescentDepth;
+				
+				entt::entity pNode = scene->CreateEntity("WaveBladeSegment");
+				auto& pNodeTc = scene->GetRegistry().get<TransformComponent>(pNode);
+				pNodeTc.translate = {localX, 0.0f, localZ}; 
+				pNodeTc.rotate = {0.0f, angle, 0.0f}; // 弧に沿って回転させる
+				
+				// セグメントの長さを計算（隙間ができないように長めにオーバーラップさせる）
+				float segmentLength = (crescentWidth * 1.5f) / segments;
+				// 端に行くほど鋭く(細く)する
+				float thickness = 1.5f * (1.0f - std::abs(t) * 0.85f); 
+				
+				// スケール: 幅(長さ), 厚さ(Y), 奥行き(Z)
+				pNodeTc.scale = {segmentLength, 0.15f, thickness};
+				
+				scene->SetParent(pNode, wave);
+				
+				auto& mr = scene->GetRegistry().emplace<MeshRendererComponent>(pNode);
+				mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
+				mr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+				
+				// 中央は白っぽく発光し、端は鮮やかな青にするグラデーション
+				float r = 0.1f + 0.9f * (1.0f - std::abs(t));
+				float g = 0.6f + 0.4f * (1.0f - std::abs(t));
+				mr.color = {r, g, 1.0f, 0.9f};
+			}
 		}
+
+		// 軌跡として、中央から少しだけパーティクルを出す（補助的なエフェクト）
+		entt::entity centerTrail = scene->CreateEntity("WaveCenterTrail");
+		auto& trailTc = scene->GetRegistry().get<TransformComponent>(centerTrail);
+		trailTc.translate = {0.0f, 0.0f, 0.0f};
+		scene->SetParent(centerTrail, wave);
+		auto& pec = scene->GetRegistry().emplace<ParticleEmitterComponent>(centerTrail);
+		pec.emitter.params.name = "Trail";
+		pec.emitter.params.texturePath = "Resources/Textures/particles/diamond_flare.png";
+		pec.emitter.params.emitRate = 40.0f;
+		pec.emitter.params.shape = Engine::EmissionShape::Sphere;
+		pec.emitter.params.shapeRadius = 0.5f;
+		pec.emitter.params.startVelocity = {0.0f, 0.0f, -2.0f};
+		pec.emitter.params.velocityVariance = {0.5f, 0.2f, 0.5f};
+		pec.emitter.params.lifeTime = 0.25f;
+		pec.emitter.params.startSize = {2.5f, 2.5f, 2.5f};
+		pec.emitter.params.endSize = {0.0f, 0.0f, 0.0f};
+		pec.emitter.params.startColor = {0.2f, 0.8f, 1.0f, 0.8f};
+		pec.emitter.params.endColor = {0.0f, 0.1f, 1.0f, 0.0f};
+		pec.emitter.params.isAdditive = true;
 
 		auto& hb = scene->GetRegistry().emplace<HitboxComponent>(wave);
 		hb.isActive = true;
-		hb.damage = 60.0f;             // ★弱体化: 150.0f -> 60.0f (次元斬スキル用)
-		hb.tag = TagType::PlayerSword; // ★プレイヤーの剣攻撃として判定
-		hb.size = {12.0f, 1.0f, 2.0f};
+		hb.damage = 60.0f;             
+		hb.tag = TagType::PlayerSword; 
+		// 親のスケールを1.0にしたので、そのままワールド幅になる
+		hb.size = {7.0f, 1.0f, 2.0f};
 
 		auto& sc = scene->GetRegistry().emplace<ScriptComponent>(wave);
 		sc.scripts.push_back({"BulletScript", "", nullptr});
@@ -2849,7 +3128,7 @@ void PlayerScript::DrawUI(entt::entity /*entity*/, GameScene* /*scene*/) {
 void PlayerScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
 
 void PlayerScript::DrawSubObjectives(GameScene* scene) {
-	if (!scene || scene->IsPaused()) return;
+	if (!scene || scene->IsPaused() || isHelpOpen_) return;
 	auto* renderer = scene->GetRenderer();
 	if (!renderer) return;
 
@@ -2870,8 +3149,8 @@ void PlayerScript::DrawSubObjectives(GameScene* scene) {
 	Engine::Renderer::SpriteDesc bg;
 	bg.x = baseX - 10.0f;
 	bg.y = baseY - 10.0f;
-	bg.w = 420.0f;
-	bg.h = 160.0f; // 目標3つ分
+	bg.w = 520.0f;
+	bg.h = 205.0f; // 目標4つ分
 	bg.color = {0.0f, 0.0f, 0.0f, 0.6f};
 	bg.layer = 10000;
 	renderer->DrawSprite(bgTexHandle, bg);
@@ -2905,11 +3184,241 @@ void PlayerScript::DrawSubObjectives(GameScene* scene) {
 		drawTask("近接スキル使用 (E または RBボタン)", swordSkillDone_, baseY);
 		baseY += lineHeight * 1.2f;
 		drawTask("スチーム・ブースト (右クリック または B)", swordDashDone_, baseY);
+		baseY += lineHeight * 1.2f;
+		drawTask("チャージ攻撃 (左クリ長押し または Xボタン長押し)", swordChargeDone_, baseY);
 	} else {
 		drawTask("自身強化スキル (E または RBボタン)", gunSkillDone_, baseY);
 		baseY += lineHeight * 1.2f;
 		drawTask("飛行＆オート射撃 (右/左クリック または B/X)", gunFlyDone_ && gunShootDone_, baseY);
+		baseY += lineHeight * 1.2f;
+		drawTask("連射撃ち (左クリ長押し または Xボタン長押し)", gunChargeDone_, baseY);
 	}
+}
+
+void PlayerScript::DrawHelpUI(GameScene* scene) {
+	if (!scene) return;
+	auto* renderer = scene->GetRenderer();
+	if (!renderer) return;
+
+	std::string fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf";
+	float titleScale = 54.0f / 64.0f;     // タイトルをさらに大きく (48➔54)
+	float sectionScale = 36.0f / 64.0f;   // 各見出しをさらに大きく (34➔36)
+	float textScale = 30.0f / 64.0f;      // 操作テキストをさらに大きく (27➔30)
+	float lineHeight = renderer->GetTextLineHeight(textScale, fontPath);
+
+	static uint32_t bgTexHandle = 0;
+	if (bgTexHandle == 0) {
+		bgTexHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
+	}
+
+	// マウス座標を取得してUI基準（1920x1080）にマッピング
+	float mx = 0.0f, my = 0.0f;
+	auto* input = Engine::Input::GetInstance();
+	if (input) {
+		float fmx, fmy;
+		input->GetMousePos(fmx, fmy);
+		auto& gctx = scene->GetContext();
+		float rx = fmx - gctx.viewportOffset.x;
+		float ry = fmy - gctx.viewportOffset.y;
+
+		if (gctx.viewportSize.x > 0 && gctx.viewportSize.y > 0) {
+			mx = rx * (float)Engine::WindowDX::kW / gctx.viewportSize.x;
+			my = ry * (float)Engine::WindowDX::kH / gctx.viewportSize.y;
+		} else {
+			mx = rx;
+			my = ry;
+		}
+	}
+
+	// Backボタンの定義（枠の中央下）
+	float btnW = 320.0f; // ボタンも少し大きく
+	float btnH = 60.0f;
+	float btnX = 960.0f - btnW * 0.5f;
+	float btnY = 890.0f;
+
+	bool hovered = (mx >= btnX && mx <= btnX + btnW && my >= btnY && my <= btnY + btnH);
+	if (hovered && input && input->IsMouseTrigger(0)) {
+		isHelpOpen_ = false;
+		s_isHelpOpen = false;
+	}
+
+	// 1. 全面半透明オーバーレイ
+	Engine::Renderer::SpriteDesc overlay;
+	overlay.x = 0.0f;
+	overlay.y = 0.0f;
+	overlay.w = (float)Engine::WindowDX::kW;
+	overlay.h = (float)Engine::WindowDX::kH;
+	overlay.color = {0.05f, 0.05f, 0.07f, 0.85f}; // 深みのある半透明ダーク
+	overlay.layer = 9500;
+	renderer->DrawSprite(bgTexHandle, overlay);
+
+	// 2. 中央の掲示板外枠（真鍮ゴールド）
+	Engine::Renderer::SpriteDesc boardBorder;
+	boardBorder.x = 106.0f;
+	boardBorder.y = 106.0f;
+	boardBorder.w = 1708.0f;
+	boardBorder.h = 868.0f;
+	boardBorder.color = {0.8f, 0.6f, 0.25f, 0.9f}; // 真鍮ゴールド
+	boardBorder.layer = 9501;
+	renderer->DrawSprite(bgTexHandle, boardBorder);
+
+	// 3. 中央の掲示板内側（ダークグレー）
+	Engine::Renderer::SpriteDesc boardBg;
+	boardBg.x = 110.0f;
+	boardBg.y = 110.0f;
+	boardBg.w = 1700.0f;
+	boardBg.h = 860.0f;
+	boardBg.color = {0.08f, 0.08f, 0.1f, 0.95f}; // 濃いグレー
+	boardBg.layer = 9502;
+	renderer->DrawSprite(bgTexHandle, boardBg);
+
+	// 区切り線
+	Engine::Renderer::SpriteDesc divider;
+	divider.x = 140.0f;
+	divider.y = 140.0f + 60.0f;
+	divider.w = 1640.0f;
+	divider.h = 2.0f;
+	divider.color = {0.8f, 0.6f, 0.25f, 0.5f};
+	divider.layer = 9503;
+	renderer->DrawSprite(bgTexHandle, divider);
+
+	// ★アウトライン（影）付き文字描画のラムダ式
+	auto drawOutlinedText = [&](const std::string& str, float x, float y, float scale, const Engine::Vector4& col) {
+		Engine::Vector4 black = {0.0f, 0.0f, 0.0f, 0.95f};
+		float o = 1.5f; // 影・アウトラインの太さ
+		renderer->DrawString(str, x - o, y,     scale, black, fontPath);
+		renderer->DrawString(str, x + o, y,     scale, black, fontPath);
+		renderer->DrawString(str, x,     y - o, scale, black, fontPath);
+		renderer->DrawString(str, x,     y + o, scale, black, fontPath);
+		renderer->DrawString(str, x - o, y - o, scale, black, fontPath);
+		renderer->DrawString(str, x + o, y - o, scale, black, fontPath);
+		renderer->DrawString(str, x - o, y + o, scale, black, fontPath);
+		renderer->DrawString(str, x + o, y + o, scale, black, fontPath);
+		renderer->DrawString(str, x, y, scale, col, fontPath);
+	};
+
+	// タイトル
+	float titleY = 140.0f;
+	float titleTw = renderer->MeasureTextWidth("【 操作説明 & ゲームガイド 】", titleScale, fontPath);
+	drawOutlinedText("【 操作説明 & ゲームガイド 】", (1920.0f - titleTw) * 0.5f, titleY, titleScale, {1.0f, 0.9f, 0.4f, 1.0f});
+
+	// 列Yの開始位置
+	float contentY = titleY + 85.0f;
+
+	// 左列 (ゲームの概要 & コツ)
+	{
+		float cX = 140.0f;
+		float curY = contentY;
+		drawOutlinedText("◆ ゲームの概要", cX, curY, sectionScale, {0.3f, 0.85f, 1.0f, 1.0f});
+		curY += lineHeight * 1.6f;
+
+		auto drawText = [&](const std::string& str, const Engine::Vector4& col = {0.9f, 0.9f, 0.9f, 1.0f}) {
+			drawOutlinedText(str, cX + 15.0f, curY, textScale, col);
+			curY += lineHeight * 1.4f;
+		};
+
+		drawText("迫りくる敵から「コア」を守る防衛アクション！");
+		drawText("コアのHPが0になるとゲームオーバー。");
+		curY += lineHeight * 0.7f;
+
+		drawOutlinedText("◆ 防衛のコツ", cX, curY, sectionScale, {0.3f, 0.85f, 1.0f, 1.0f});
+		curY += lineHeight * 1.6f;
+
+		drawText("1. プレイヤー自身が周囲の防衛設備をバフ！");
+		drawText("   タワーの攻撃力や連射速度を大幅強化可能。");
+		drawText("   ※足元の緑色のオーラがバフ範囲。");
+		curY += lineHeight * 0.4f;
+		drawText("2. 剣士はブーストで敵を翻弄し、");
+		drawText("   強力な「溜めスラッシュ」で一網打尽！");
+		curY += lineHeight * 0.4f;
+		drawText("3. ガンナーはスチーム飛行で空を飛び、");
+		drawText("   上空から安全に高火力で狙撃！");
+	}
+
+	// 中央列 (剣士 (SWORD) 操作説明)
+	{
+		float cX = 740.0f;
+		float curY = contentY;
+		drawOutlinedText("◆ 剣士 (SWORD) 操作", cX, curY, sectionScale, {1.0f, 0.5f, 0.3f, 1.0f});
+		curY += lineHeight * 1.6f;
+
+		auto drawText = [&](const std::string& key, const std::string& desc) {
+			drawOutlinedText(key, cX + 15.0f, curY, textScale, {1.0f, 0.9f, 0.4f, 1.0f});
+			float keyW = renderer->MeasureTextWidth(key, textScale, fontPath);
+			drawOutlinedText(" : " + desc, cX + 15.0f + keyW, curY, textScale, {0.9f, 0.9f, 0.9f, 1.0f});
+			curY += lineHeight * 1.4f;
+		};
+
+		drawText("左クリック", "通常攻撃 (大剣3連コンボ)");
+		drawText("左クリック長押し", "溜め攻撃 (チャージ斬り)");
+		drawText("右クリック", "ブースト (高速移動ダッシュ)");
+		drawText("[E] キー", "スキル「オーバーリミット」");
+		drawOutlinedText("  ・攻撃速度と攻撃範囲が大幅アップ！", cX + 30.0f, curY, textScale * 0.9f, {0.75f, 0.75f, 0.75f, 1.0f});
+		curY += lineHeight * 1.1f;
+		drawOutlinedText("  ・大剣で周囲の敵を一気に一掃可能！", cX + 30.0f, curY, textScale * 0.9f, {0.75f, 0.75f, 0.75f, 1.0f});
+		curY += lineHeight * 1.5f;
+
+		drawOutlinedText("◆ その他・共通操作", cX, curY, sectionScale, {0.6f, 0.9f, 0.4f, 1.0f});
+		curY += lineHeight * 1.6f;
+
+		drawText("[T] キー / [Y] ボタン", "武器（クラス）の切り替え");
+		drawText("ホイール押し込み", "ターゲットロックオン");
+		drawText("[ESC] キー", "ポーズメニューを開く");
+		drawText("[TAB] キー", "このヘルプ画面を閉じる");
+	}
+
+	// 右列 (ガンナー (GUN) 操作説明)
+	{
+		float cX = 1300.0f;
+		float curY = contentY;
+		drawOutlinedText("◆ ガンナー (GUN) 操作", cX, curY, sectionScale, {1.0f, 0.5f, 0.3f, 1.0f});
+		curY += lineHeight * 1.6f;
+
+		auto drawText = [&](const std::string& key, const std::string& desc) {
+			drawOutlinedText(key, cX + 15.0f, curY, textScale, {1.0f, 0.9f, 0.4f, 1.0f});
+			float keyW = renderer->MeasureTextWidth(key, textScale, fontPath);
+			drawOutlinedText(" : " + desc, cX + 15.0f + keyW, curY, textScale, {0.9f, 0.9f, 0.9f, 1.0f});
+			curY += lineHeight * 1.4f;
+		};
+
+		drawText("左クリック", "通常射撃 (高速オート連射)");
+		drawText("左クリック長押し", "チャージ貫通ショット");
+		drawText("右クリック", "スチーム飛行 (オン/オフ切替)");
+		drawOutlinedText("  ・空中を自在にホバー飛行可能！", cX + 30.0f, curY, textScale * 0.9f, {0.75f, 0.75f, 0.75f, 1.0f});
+		curY += lineHeight * 1.1f;
+		drawOutlinedText("  ・飛行中は射撃速度が1.5倍にアップ！", cX + 30.0f, curY, textScale * 0.9f, {0.75f, 0.75f, 0.75f, 1.0f});
+		curY += lineHeight * 1.4f;
+		drawText("[E] キー", "スキル「オーバークロック」");
+		drawOutlinedText("  ・弾薬消費なし＆超速連射で圧倒！", cX + 30.0f, curY, textScale * 0.9f, {0.75f, 0.75f, 0.75f, 1.0f});
+		curY += lineHeight * 1.1f;
+		drawOutlinedText("  ・リチャージ中も撃ち続けられる！", cX + 30.0f, curY, textScale * 0.9f, {0.75f, 0.75f, 0.75f, 1.0f});
+	}
+
+	// 4. Back / 戻る ボタンの描画 (最前面に配置)
+	Engine::Renderer::SpriteDesc btnBorder;
+	btnBorder.x = btnX - 2.0f;
+	btnBorder.y = btnY - 2.0f;
+	btnBorder.w = btnW + 4.0f;
+	btnBorder.h = btnH + 4.0f;
+	btnBorder.color = hovered ? Engine::Vector4{1.0f, 0.85f, 0.3f, 1.0f} : Engine::Vector4{0.8f, 0.6f, 0.25f, 0.9f}; // ホバー時は輝くゴールド
+	btnBorder.layer = 9550;
+	renderer->DrawSprite(bgTexHandle, btnBorder);
+
+	Engine::Renderer::SpriteDesc btnBg;
+	btnBg.x = btnX;
+	btnBg.y = btnY;
+	btnBg.w = btnW;
+	btnBg.h = btnH;
+	btnBg.color = hovered ? Engine::Vector4{0.18f, 0.15f, 0.12f, 0.98f} : Engine::Vector4{0.1f, 0.1f, 0.12f, 0.95f}; // ホバー時は少し明るく
+	btnBg.layer = 9551;
+	renderer->DrawSprite(bgTexHandle, btnBg);
+
+	float btnTextScale = 30.0f / 64.0f; // ボタンの文字もさらに大きく
+	float btnTextTw = renderer->MeasureTextWidth("Back / 戻る", btnTextScale, fontPath);
+	Engine::Vector4 btnTextColor = hovered ? Engine::Vector4{1.0f, 0.9f, 0.4f, 1.0f} : Engine::Vector4{0.9f, 0.9f, 0.9f, 1.0f};
+
+	// 影付き文字でボタンのテキストを描画
+	drawOutlinedText("Back / 戻る", btnX + (btnW - btnTextTw) * 0.5f, btnY + 12.0f, btnTextScale, btnTextColor);
 }
 
 REGISTER_SCRIPT(PlayerScript);

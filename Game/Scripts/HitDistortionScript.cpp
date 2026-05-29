@@ -49,13 +49,29 @@ void HitDistortionScript::Update(entt::entity entity, GameScene* scene, float dt
 
     if (registry.all_of<TransformComponent>(entity)) {
         auto& tc = registry.get<TransformComponent>(entity);
+        
+        if (!isOriginalYSet_) {
+            originalY_ = tc.translate.y;
+            isOriginalYSet_ = true;
+        }
+
         // キレのある拡大: EaseOutExpo
         float scaleVal = startScale_ + (endScale_ - startScale_) * (1.0f - std::powf(2.0f, -10.0f * t));
         tc.scale = {scaleVal, scaleVal, scaleVal};
 
         // ★追加: 上昇処理 (陽炎用)
         if (riseSpeed > 0.0f) {
-            tc.translate.y += riseSpeed * dt;
+            originalY_ += riseSpeed * dt;
+        }
+
+        // ★工夫: ハードインターセクション（地面へのめり込み）の軽減
+        // 地面(Y=0)付近のエフェクトの場合、スケールが大きくなるにつれて少し上にずらし、
+        // 歪みが地面に半分埋まってスパッと切れてしまう違和感を無くす。
+        if (originalY_ < 3.0f) {
+            float lift = std::min(scaleVal * 0.15f, 1.2f);
+            tc.translate.y = originalY_ + lift;
+        } else {
+            tc.translate.y = originalY_;
         }
 
         // ★追加: ビルボード処理 (常にカメラの方を向く)

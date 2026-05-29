@@ -8,6 +8,7 @@
 #include "../Scripts/IScript.h"  // ★追加
 #include "../Scripts/IScript.h"
 #include "../Scripts/ScriptUtils.h"
+#include "../Scripts/PlayerScript.h" // ★追加
 #include <algorithm>
 #include <set>
 #include <unordered_map>
@@ -65,6 +66,11 @@ UISystem::WorldRect UISystem::CalculateWorldRect(entt::entity entity, entt::regi
 }
 
 void UISystem::Draw(entt::registry& registry, GameContext& ctx) {
+	// ★追加: ポーズ中はメインのゲーム内UIを一切描画しない
+	if (ctx.scene && ctx.scene->IsPaused()) {
+		return;
+	}
+
 	std::unordered_map<uint32_t, WorldRect> cache;
 
 	// --- 既存のUI（Canvasベース）の描画 ---
@@ -126,6 +132,11 @@ void UISystem::DrawUI(entt::registry& registry, GameContext& ctx) {
 	// 以下の3D空間UI（HPバーなど）は GameScene コンテキストが必要
 	if (!ctx.scene)
 		return;
+
+	// ★追加: ヘルプ画面またはポーズメニューが表示されている間はワールド空間UIの描画を全てスキップする
+	if (PlayerScript::IsHelpOpen() || (ctx.scene && ctx.scene->IsPaused())) {
+		return;
+	}
 
 	// スキルツリーが開いているかの判定（開いている場合はHPバーやクールタイムUIを描画しない）
 	auto viewScript = registry.view<ScriptComponent>();
@@ -191,12 +202,16 @@ void UISystem::DrawUI(entt::registry& registry, GameContext& ctx) {
 					ImVec2 pMin(sx - barW * 0.5f, sy - barH * 0.5f);
 					ImVec2 pMax(sx + barW * 0.5f, sy + barH * 0.5f);
 
-					// 背景
-					drawList->AddRectFilled(pMin, pMax, IM_COL32(40, 40, 40, 180));
-					// HP残量
-					drawList->AddRectFilled(pMin, ImVec2(pMin.x + curW, pMax.y), IM_COL32(50, 230, 50, 255));
-					// 枠
-					drawList->AddRect(pMin, pMax, IM_COL32(255, 255, 255, 200));
+					// 背景を暗くしてコントラストを上げる
+					drawList->AddRectFilled(pMin, pMax, IM_COL32(20, 20, 20, 220));
+					
+					// HP残量 (敵は鮮やかな赤、味方は鮮やかな緑)
+					bool isEnemyForColor = (registry.all_of<TagComponent>(e) && registry.get<TagComponent>(e).tag == TagType::Enemy);
+					ImU32 hpColor = isEnemyForColor ? IM_COL32(255, 50, 50, 255) : IM_COL32(0, 255, 60, 255);
+					drawList->AddRectFilled(pMin, ImVec2(pMin.x + curW, pMax.y), hpColor);
+					
+					// 枠 (黒で少し太くして視認性を高める)
+					drawList->AddRect(pMin, pMax, IM_COL32(0, 0, 0, 255), 0.0f, 0, 1.5f);
 
 					// ★追加: シールドバーの描画 (HPバーのすぐ上に描画)
 					if (hc.maxShieldHp > 0.0f && hc.shieldHp > 0.0f) {
@@ -421,6 +436,13 @@ void UISystem::DrawTextW(entt::entity /*entity*/, entt::registry& /*registry*/, 
 void UISystem::ProcessButton(entt::entity entity, entt::registry& registry, UIButtonComponent& btn, float worldX, float worldY, float worldW, float worldH, GameContext& ctx) {
 	if (!ctx.input)
 		return;
+
+	// ★追加: ヘルプ画面が表示されている間は、ゲーム内の通常ボタンのインタラクション（ホバーやクリック判定）を一切無効化する
+	if (PlayerScript::IsHelpOpen()) {
+		btn.isHovered = false;
+		btn.isPressed = false;
+		return;
+	}
 
 	float mx, my;
 	if (ctx.useOverrideMouse) {

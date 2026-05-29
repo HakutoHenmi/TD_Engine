@@ -256,14 +256,38 @@ void BaseEnemy::Update(entt::entity entity, GameScene* scene, float dt) {
 		}
 	}
 
+	// 攻撃判定持続時間の更新
+	if (attackActiveTimer_ > 0.0f) {
+		attackActiveTimer_ -= dt;
+	}
+
 	// 実際の行動
-	if (inAttackRange&& attackCooltime_ <= 0.0f) {
-		// 攻撃範囲内且つクールタイムを満たしていれば足を止めて攻撃
-		ExecuteAttack(entity, scene, dt);
+	if (inAttackRange) {
+		// 攻撃範囲内にいる場合
+		if (attackCooltime_ <= 0.0f) {
+			// クールタイムを満たしていれば足を止めて攻撃
+			ExecuteAttack(entity, scene, dt);
+			attackActiveTimer_ = 0.3f; // 0.3秒間は判定を維持する
+		} else {
+			// クールタイム中は移動を停止（無駄な密着やカクつきを防ぐ）
+			if (registry.all_of<RigidbodyComponent>(entity)) {
+				auto& rb = registry.get<RigidbodyComponent>(entity);
+				rb.velocity.x = 0.0f;
+				rb.velocity.z = 0.0f;
+			}
+			// 持続時間が切れたら判定をオフにする
+			if (attackActiveTimer_ <= 0.0f) {
+				if (registry.all_of<HitboxComponent>(entity)) {
+					registry.get<HitboxComponent>(entity).isActive = false;
+				}
+			}
+		}
 	} else {
-		// 攻撃関数を呼んでない時は攻撃判定を消す
-		if (registry.all_of<HitboxComponent>(entity)) {
-			registry.get<HitboxComponent>(entity).isActive = false;
+		// 攻撃範囲外に出ても、持続時間が切れるまでは判定を消さない
+		if (attackActiveTimer_ <= 0.0f) {
+			if (registry.all_of<HitboxComponent>(entity)) {
+				registry.get<HitboxComponent>(entity).isActive = false;
+			}
 		}
 
 		DefaultMove(entity, scene, dt);
@@ -275,7 +299,7 @@ void BaseEnemy::OnDestroy(entt::entity /*entity*/, GameScene* scene) {
 
 	scene->GetEventSystem().Emit("GainExp", expDrop_);
 
-	PhaseSystemScript::PlusCoinCount(10);
+	PhaseSystemScript::PlusCoinCount(50);
 
 	// その他、終了時のクリーンアップなどを記述
 }
@@ -331,8 +355,8 @@ void BaseEnemy::DefaultMove(entt::entity entity, GameScene* scene, float dt) {
 		DirectX::XMFLOAT3 towerPos = {};
 		float nearestTowerAttackRange = 50.0f; // デフォルトの射程
 
-		TagType towerTags[] = { TagType::Defender, TagType::Canon, TagType::Cannon, TagType::IceCanon, TagType::PipeCannon };
-		for (int i = 0; i < 5; ++i) {
+		TagType towerTags[] = { TagType::Defender, TagType::Canon, TagType::Cannon, TagType::IceCanon, TagType::PipeCannon, TagType::Poison, TagType::Missile };
+		for (int i = 0; i < 7; ++i) {
 			const auto& towers = scene->GetEntitiesByTag(towerTags[i]);
 			for (auto t : towers) {
 				if (!registry.valid(t) || !registry.all_of<TransformComponent>(t)) continue;
@@ -539,8 +563,8 @@ void BaseEnemy::SearchTarget(entt::entity entity, GameScene* scene) {
 	}
 
 	// 防衛設備（DefenderやCanonなど）を探す(プレイヤーより近ければターゲットを上書き)
-	TagType towerTags[] = { TagType::Defender, TagType::Canon, TagType::Cannon, TagType::IceCanon, TagType::PipeCannon };
-	for (int i = 0; i < 5; ++i) {
+	TagType towerTags[] = { TagType::Defender, TagType::Canon, TagType::Cannon, TagType::IceCanon, TagType::PipeCannon, TagType::Poison, TagType::Missile };
+	for (int i = 0; i < 7; ++i) {
 		const auto& towers = scene->GetEntitiesByTag(towerTags[i]);
 		for (auto d : towers) {
 			if (!registry.valid(d) || !registry.all_of<TransformComponent>(d)) continue;

@@ -36,7 +36,7 @@ uint32_t ParticleSystem::GetActiveCount() const {
 void ParticleSystem::Emit(const Vector3& pos, const Vector3& vel, const Vector3& acceleration, 
 			  const Vector3& startScale, const Vector3& endScale,
 			  const Vector4& startColor, const Vector4& endColor, 
-			  float life, const Vector3& angVel, float damping) {
+			  float life, const Vector3& angVel, float damping, const Vector3& startRot) {
 	// ★追加: グローバルバジェットチェック — 上限超過時はスキップ
 	if (!ParticleBudget::CanEmit()) return;
 
@@ -58,11 +58,7 @@ void ParticleSystem::Emit(const Vector3& pos, const Vector3& vel, const Vector3&
 
 			// 回転初期化
 			p.angVel = angVel;
-			// 初期角度をランダムに (0 ~ 2pi)
-			float r1 = (float)(rand() % 628) / 100.0f;
-			float r2 = (float)(rand() % 628) / 100.0f;
-			float r3 = (float)(rand() % 628) / 100.0f;
-			p.rotation = {r1, r2, r3};
+			p.rotation = startRot;
 
 			// ★追加: バジェットに登録
 			ParticleBudget::Register(1);

@@ -39,8 +39,8 @@ void MissileCanonScript::Start(entt::entity entity, GameScene* scene) {
 
 	if (!registry.all_of<HealthComponent>(entity)) {
 		auto& hc = registry.emplace<HealthComponent>(entity);
-		hc.hp = 100.0f;
-		hc.maxHp = 100.0f;
+		hc.hp = 300.0f;
+		hc.maxHp = 300.0f;
 	}
 	if (!registry.all_of<HurtboxComponent>(entity)) {
 		auto& hurtbox = registry.emplace<HurtboxComponent>(entity);
