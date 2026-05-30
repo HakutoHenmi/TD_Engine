@@ -114,6 +114,10 @@ void Audio::Stop(size_t voiceHandle) {
 			it->second.source->Stop();
 			it->second.source->FlushSourceBuffers();
 			it->second.source->DestroyVoice();
+			
+			char logBuf[128];
+			sprintf_s(logBuf, "[Audio] Stopped voice: handle=%zu\n", voiceHandle);
+			OutputDebugStringA(logBuf);
 		}
 		activeVoices_.erase(it);
 	}
@@ -127,6 +131,10 @@ void Audio::SetVolume(size_t voiceHandle, float volume) {
 }
 
 void Audio::StopAll() {
+	char logBuf[128];
+	sprintf_s(logBuf, "[Audio] StopAll called. Active voices: %zu\n", activeVoices_.size());
+	OutputDebugStringA(logBuf);
+
 	for(auto& pair : activeVoices_) {
 		if(pair.second.source) {
 			pair.second.source->Stop();

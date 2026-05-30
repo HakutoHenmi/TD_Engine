@@ -40,6 +40,20 @@ void TitleManagerScript::Start(entt::entity entity, GameScene* scene) {
 	auto creditsParent = scene->FindObjectByName("CreditsMenuParent");
 	btnCreditsBack_ = scene->FindObjectByName("Btn_CreditsBack");
 
+	settingsParent = scene->FindObjectByName("SettingsMenuParent");
+	if (settingsParent != entt::null && !uiInitialized_) {
+		if (btnFullscreen_ != entt::null) reg.destroy(btnFullscreen_);
+		if (btnBGMMinus_ != entt::null) reg.destroy(btnBGMMinus_);
+		if (btnBGMPlus_ != entt::null) reg.destroy(btnBGMPlus_);
+		if (btnSEMinus_ != entt::null) reg.destroy(btnSEMinus_);
+		if (btnSEPlus_ != entt::null) reg.destroy(btnSEPlus_);
+		if (textBGM_ != entt::null) reg.destroy(textBGM_);
+		if (textSE_ != entt::null) reg.destroy(textSE_);
+		if (btnBack_ != entt::null) reg.destroy(btnBack_);
+		reg.destroy(settingsParent);
+		settingsParent = entt::null;
+	}
+
 	// UIがまだ存在しない場合（初回起動 or JSONが空の場合）、フォールバックで自動生成
 	if (btnStart_ == entt::null) {
 		CreateFallbackUI(scene);
@@ -116,6 +130,134 @@ void TitleManagerScript::Start(entt::entity entity, GameScene* scene) {
 				}
 			}
 		}
+
+		if (settingsParent == entt::null) {
+			settingsParent = reg.create();
+			reg.emplace<NameComponent>(settingsParent, "SettingsMenuParent");
+			auto& pRect = reg.emplace<RectTransformComponent>(settingsParent);
+			pRect.pos = {0.0f, 0.0f}; pRect.size = {0, 0};
+			pRect.anchor = {0.0f, 0.0f}; pRect.pivot = {0.0f, 0.0f};
+			pRect.enabled = false;
+
+			// 1. 全面半透明オーバーレイ
+			auto overlay = reg.create();
+			auto& oRect = reg.emplace<RectTransformComponent>(overlay);
+			oRect.pos = {0.0f, 0.0f}; oRect.size = {1920.0f, 1080.0f};
+			oRect.anchor = {0.0f, 0.0f}; oRect.pivot = {0.0f, 0.0f};
+			scene->SetParent(overlay, settingsParent);
+			auto& oImg = reg.emplace<UIImageComponent>(overlay);
+			oImg.color = {0.05f, 0.05f, 0.07f, 0.85f};
+			oImg.layer = 150;
+			if (auto* r = Engine::Renderer::GetInstance()) oImg.textureHandle = r->LoadTexture2D("Resources/Textures/white1x1.png");
+
+			// 2. 中央の掲示板外枠（真鍮ゴールド）
+			auto border = reg.create();
+			auto& bRect = reg.emplace<RectTransformComponent>(border);
+			bRect.pos = {460.0f, 160.0f}; bRect.size = {1000.0f, 760.0f};
+			bRect.anchor = {0.0f, 0.0f}; bRect.pivot = {0.0f, 0.0f};
+			scene->SetParent(border, settingsParent);
+			auto& bImg = reg.emplace<UIImageComponent>(border);
+			bImg.color = {0.8f, 0.6f, 0.25f, 0.9f};
+			bImg.layer = 151;
+			if (auto* r = Engine::Renderer::GetInstance()) bImg.textureHandle = r->LoadTexture2D("Resources/Textures/white1x1.png");
+
+			// 3. 中央の掲示板内側（ダークグレー）
+			auto board = reg.create();
+			auto& boardRect = reg.emplace<RectTransformComponent>(board);
+			boardRect.pos = {464.0f, 164.0f}; boardRect.size = {992.0f, 752.0f};
+			boardRect.anchor = {0.0f, 0.0f}; boardRect.pivot = {0.0f, 0.0f};
+			scene->SetParent(board, settingsParent);
+			auto& boardImg = reg.emplace<UIImageComponent>(board);
+			boardImg.color = {0.08f, 0.08f, 0.1f, 0.95f};
+			boardImg.layer = 152;
+			if (auto* r = Engine::Renderer::GetInstance()) boardImg.textureHandle = r->LoadTexture2D("Resources/Textures/white1x1.png");
+
+			// タイトルテキスト
+			auto titleText = reg.create();
+			auto& titleRect = reg.emplace<RectTransformComponent>(titleText);
+			titleRect.pos = {640.0f, 220.0f};
+			titleRect.anchor = {0.0f, 0.0f}; titleRect.pivot = {0.0f, 0.0f};
+			scene->SetParent(titleText, settingsParent);
+			auto& txt = reg.emplace<UITextComponent>(titleText);
+			txt.text = reinterpret_cast<const char*>(u8"\u3010 Settings / \u8a2d\u5b9a \u3011");
+			txt.fontSize = 54.0f;
+			txt.color = {1.0f, 0.9f, 0.4f, 1.0f};
+			txt.fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf";
+			txt.outlineEnabled = true; txt.outlineColor = {0.0f, 0.0f, 0.0f, 0.95f}; txt.outlineThickness = 1.5f;
+
+			// 区切り線
+			auto divider = reg.create();
+			auto& dRect = reg.emplace<RectTransformComponent>(divider);
+			dRect.pos = {510.0f, 300.0f}; dRect.size = {900.0f, 2.0f};
+			dRect.anchor = {0.0f, 0.0f}; dRect.pivot = {0.0f, 0.0f};
+			scene->SetParent(divider, settingsParent);
+			auto& dImg = reg.emplace<UIImageComponent>(divider);
+			dImg.color = {0.8f, 0.6f, 0.25f, 0.5f}; dImg.layer = 153;
+			if (auto* r = Engine::Renderer::GetInstance()) dImg.textureHandle = r->LoadTexture2D("Resources/Textures/white1x1.png");
+
+			// Helper to create styled buttons
+			auto createBtn = [&](const std::string& name, const std::string& t, float x, float y, float w, float h) {
+				auto e = CreateTitleButton(scene, reg, t, y, settingsParent);
+				reg.emplace<NameComponent>(e, name);
+				auto& r = reg.get<RectTransformComponent>(e);
+				r.pos = {x, y}; r.size = {w, h}; r.anchor = {0,0}; r.pivot = {0,0};
+				if (auto* ren = Engine::Renderer::GetInstance()) {
+					if (reg.all_of<UIImageComponent>(e)) {
+						auto& img = reg.get<UIImageComponent>(e);
+						img.textureHandle = ren->LoadTexture2D("Resources/Textures/white1x1.png");
+						img.color = {0.8f, 0.6f, 0.25f, 0.9f}; // ゴールドテキスト枠の色
+						img.layer = 160;
+					}
+				}
+				if (reg.all_of<UITextComponent>(e)) {
+					auto& textComp = reg.get<UITextComponent>(e);
+					textComp.fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf";
+					textComp.fontSize = 40.0f;
+					textComp.outlineEnabled = true; textComp.outlineColor = {0,0,0,0.95f}; textComp.outlineThickness = 1.5f;
+				}
+				return e;
+			};
+
+			// BGM Label
+			textBGM_ = reg.create();
+			reg.emplace<NameComponent>(textBGM_, "Text_BGM");
+			auto& bgmRect = reg.emplace<RectTransformComponent>(textBGM_);
+			bgmRect.pos = {560.0f, 380.0f}; bgmRect.anchor = {0,0}; bgmRect.pivot = {0,0};
+			scene->SetParent(textBGM_, settingsParent);
+			auto& bgmTxt = reg.emplace<UITextComponent>(textBGM_);
+			bgmTxt.text = "BGM Volume"; bgmTxt.fontSize = 40.0f; bgmTxt.color = {0.9f, 0.9f, 0.9f, 1.0f};
+			bgmTxt.fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf";
+			bgmTxt.outlineEnabled = true; bgmTxt.outlineColor = {0,0,0,0.95f}; bgmTxt.outlineThickness = 1.5f;
+
+			btnBGMMinus_ = createBtn("Btn_BGMMinus", "-", 1150.0f, 370.0f, 70.0f, 70.0f);
+			btnBGMPlus_ = createBtn("Btn_BGMPlus", "+", 1250.0f, 370.0f, 70.0f, 70.0f);
+
+			// SE Label
+			textSE_ = reg.create();
+			reg.emplace<NameComponent>(textSE_, "Text_SE");
+			auto& seRect = reg.emplace<RectTransformComponent>(textSE_);
+			seRect.pos = {560.0f, 480.0f}; seRect.anchor = {0,0}; seRect.pivot = {0,0};
+			scene->SetParent(textSE_, settingsParent);
+			auto& seTxt = reg.emplace<UITextComponent>(textSE_);
+			seTxt.text = "SE Volume"; seTxt.fontSize = 40.0f; seTxt.color = {0.9f, 0.9f, 0.9f, 1.0f};
+			seTxt.fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf";
+			seTxt.outlineEnabled = true; seTxt.outlineColor = {0,0,0,0.95f}; seTxt.outlineThickness = 1.5f;
+
+			btnSEMinus_ = createBtn("Btn_SEMinus", "-", 1150.0f, 470.0f, 70.0f, 70.0f);
+			btnSEPlus_ = createBtn("Btn_SEPlus", "+", 1250.0f, 470.0f, 70.0f, 70.0f);
+
+			btnFullscreen_ = createBtn("Btn_Fullscreen", "Fullscreen: OFF", 760.0f, 600.0f, 400.0f, 70.0f);
+			textFullscreen_ = btnFullscreen_;
+
+			btnBack_ = createBtn("Btn_Back", "Back / " + std::string(reinterpret_cast<const char*>(u8"\u623B\u308B")), 780.0f, 780.0f, 360.0f, 70.0f);
+			auto& bBtn = reg.get<UIButtonComponent>(btnBack_);
+			bBtn.normalColor = {0.8f, 0.6f, 0.25f, 0.9f};
+			bBtn.hoverColor = {1.0f, 0.85f, 0.3f, 1.0f};
+			bBtn.pressedColor = {0.6f, 0.4f, 0.15f, 1.0f};
+
+			settingsEntities_.push_back(settingsParent);
+		}
+
 		if (creditsParent == entt::null) {
 			creditsParent = reg.create();
 			reg.emplace<NameComponent>(creditsParent, "CreditsMenuParent");
@@ -408,11 +550,11 @@ void TitleManagerScript::Update(entt::entity entity, GameScene* scene, float dt)
 			reg.get<UITextComponent>(textFullscreen_).text = isFS ? "Fullscreen: ON" : "Fullscreen: OFF";
 		}
 		if (audio && textBGM_ != entt::null && reg.valid(textBGM_) && reg.all_of<UITextComponent>(textBGM_)) {
-			int bgmVol = static_cast<int>(audio->GetMasterBGMVolume() * 100);
+			int bgmVol = static_cast<int>(std::round(audio->GetMasterBGMVolume() * 100.0f));
 			reg.get<UITextComponent>(textBGM_).text = "BGM Volume: " + std::to_string(bgmVol) + "%";
 		}
 		if (audio && textSE_ != entt::null && reg.valid(textSE_) && reg.all_of<UITextComponent>(textSE_)) {
-			int seVol = static_cast<int>(audio->GetMasterSEVolume() * 100);
+			int seVol = static_cast<int>(std::round(audio->GetMasterSEVolume() * 100.0f));
 			reg.get<UITextComponent>(textSE_).text = "SE Volume: " + std::to_string(seVol) + "%";
 		}
 
@@ -433,15 +575,31 @@ void TitleManagerScript::Update(entt::entity entity, GameScene* scene, float dt)
 				if (btnBGMMinus_ != entt::null && reg.valid(btnBGMMinus_) && reg.all_of<UIButtonComponent>(btnBGMMinus_) &&
 					reg.get<UIButtonComponent>(btnBGMMinus_).isHovered) {
 					audio->SetMasterBGMVolume(audio->GetMasterBGMVolume() - 0.1f);
+					for (auto e : reg.view<AudioSourceComponent>()) {
+						auto& as = reg.get<AudioSourceComponent>(e);
+						if (as.isPlaying && as.category == AudioCategory::BGM) audio->SetVolume(as.voiceHandle, as.volume * audio->GetMasterBGMVolume());
+					}
 				} else if (btnBGMPlus_ != entt::null && reg.valid(btnBGMPlus_) && reg.all_of<UIButtonComponent>(btnBGMPlus_) &&
 					reg.get<UIButtonComponent>(btnBGMPlus_).isHovered) {
 					audio->SetMasterBGMVolume(audio->GetMasterBGMVolume() + 0.1f);
+					for (auto e : reg.view<AudioSourceComponent>()) {
+						auto& as = reg.get<AudioSourceComponent>(e);
+						if (as.isPlaying && as.category == AudioCategory::BGM) audio->SetVolume(as.voiceHandle, as.volume * audio->GetMasterBGMVolume());
+					}
 				} else if (btnSEMinus_ != entt::null && reg.valid(btnSEMinus_) && reg.all_of<UIButtonComponent>(btnSEMinus_) &&
 					reg.get<UIButtonComponent>(btnSEMinus_).isHovered) {
 					audio->SetMasterSEVolume(audio->GetMasterSEVolume() - 0.1f);
+					for (auto e : reg.view<AudioSourceComponent>()) {
+						auto& as = reg.get<AudioSourceComponent>(e);
+						if (as.isPlaying && as.category == AudioCategory::SE) audio->SetVolume(as.voiceHandle, as.volume * audio->GetMasterSEVolume());
+					}
 				} else if (btnSEPlus_ != entt::null && reg.valid(btnSEPlus_) && reg.all_of<UIButtonComponent>(btnSEPlus_) &&
 					reg.get<UIButtonComponent>(btnSEPlus_).isHovered) {
 					audio->SetMasterSEVolume(audio->GetMasterSEVolume() + 0.1f);
+					for (auto e : reg.view<AudioSourceComponent>()) {
+						auto& as = reg.get<AudioSourceComponent>(e);
+						if (as.isPlaying && as.category == AudioCategory::SE) audio->SetVolume(as.voiceHandle, as.volume * audio->GetMasterSEVolume());
+					}
 				}
 			}
 		}
@@ -501,6 +659,7 @@ entt::entity TitleManagerScript::CreateTitleButton(GameScene* scene, entt::regis
 
 	auto& img = reg.emplace<UIImageComponent>(entity);
 	img.color = {1.0f, 1.0f, 1.0f, 1.0f};
+	img.layer = 160;
 
 	return entity;
 }
