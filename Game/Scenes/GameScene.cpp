@@ -1149,7 +1149,7 @@ void GameScene::Draw() {
 renderer_->SetCamera(camera_);
 #ifdef USE_IMGUI
 	// エディタのSceneビューでのみギズモを描画する
-	if (!isPlaying_ && EditorUI::GetViewMode() != ViewMode::Game) {
+	if (!isPlaying_ && !isExiting_ && EditorUI::GetViewMode() != ViewMode::Game) {
 		auto* sm = Engine::SceneManager::GetInstance();
 		if (sm && sm->GetTransitionState() == Engine::SceneManager::TransitionState::None) {
 			DrawEditorGizmos();
@@ -2269,6 +2269,7 @@ void GameScene::UpdatePauseMenu() {
 				// タイトルに戻る
 				isPaused_ = false;
 				isPlaying_ = false;
+				isExiting_ = true; // ★シーン終了中として、意図しないエディタ描画を防ぐ
 				
 				// ポーズメニューのUIを非表示
 				for (auto e : pauseMainEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
