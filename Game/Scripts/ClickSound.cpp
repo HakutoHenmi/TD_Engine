@@ -1,5 +1,6 @@
 #include "ClickSound.h"
 #include "../../Engine/Audio.h"
+#include "../../Engine/Input.h"
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
@@ -18,11 +19,20 @@ void ClickSound::Update(entt::entity entity, GameScene* scene, float /*dt*/) {
 
 	// ★追加: マスターボリュームの反映（PhaseSystemが直接再生するBGM用）
 	if (scene->GetRegistry().all_of<UIButtonComponent>(entity)) {
-		if (scene->GetRegistry().get<UIButtonComponent>(entity).isPressed == true) {
-			if (auto* audio = Engine::Audio::GetInstance()) {
-				//audio->Play(clickSeHandle_, false, 0.6f * audio->GetMasterSEVolume());
+		auto& btn = scene->GetRegistry().get<UIButtonComponent>(entity);
+		if (btn.isPressed) {
+			if (auto input = Engine::Input::GetInstance(); input && input->IsMouseTrigger(0)) {
+				if (auto* audio = Engine::Audio::GetInstance()) {
+					audio->Play(clickSeHandle_, false, 0.6f * audio->GetMasterSEVolume());
+				}
 			}
 		}
+	}
+}
+
+void ClickSound::OnClick(entt::entity /*entity*/, GameScene* /*scene*/, const std::string& /*callbackName*/) {
+	if (auto* audio = Engine::Audio::GetInstance()) {
+		audio->Play(clickSeHandle_, false, 0.6f * audio->GetMasterSEVolume());
 	}
 }
 

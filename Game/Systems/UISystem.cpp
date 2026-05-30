@@ -1,4 +1,5 @@
 #include "UISystem.h"
+#include "../../Engine/Audio.h"
 #include "../../Engine/Input.h"
 #include "../../Engine/Renderer.h"
 #include "../../Engine/WindowDX.h"
@@ -481,6 +482,32 @@ void UISystem::ProcessButton(entt::entity entity, entt::registry& registry, UIBu
 	btn.isPressed = hovered && ctx.input->IsMouseDown(0); // 左ボタン
 
 	if (hovered && ctx.input->IsMouseTrigger(0)) {
+		// ClickSoundスクリプトがアタッチされているかチェック
+		bool hasClickSoundScript = false;
+		if (registry.all_of<ScriptComponent>(entity)) {
+			const auto& sc = registry.get<ScriptComponent>(entity);
+			if (sc.enabled) {
+				for (const auto& entry : sc.scripts) {
+					if (entry.scriptPath == "ClickSound") {
+						hasClickSoundScript = true;
+						break;
+					}
+				}
+			}
+		}
+
+		if (!hasClickSoundScript) {
+			if (auto* audio = Engine::Audio::GetInstance()) {
+				static uint32_t clickSoundHandle = 0xFFFFFFFF;
+				if (clickSoundHandle == 0xFFFFFFFF) {
+					clickSoundHandle = audio->Load("Resources/Audio/SE/Click.mp3");
+				}
+				if (clickSoundHandle != 0xFFFFFFFF) {
+					audio->Play(clickSoundHandle, false, 0.6f * audio->GetMasterSEVolume());
+				}
+			}
+		}
+
 		// クリック時: スクリプト側へ通知
 		if (registry.all_of<ScriptComponent>(entity)) {
 			auto& sc = registry.get<ScriptComponent>(entity);
@@ -488,7 +515,7 @@ void UISystem::ProcessButton(entt::entity entity, entt::registry& registry, UIBu
 				for (auto& entry : sc.scripts) {
 					if (entry.instance) {
 						// To DO: on click needs to accept entt::entity instead of SceneObject
-						// entry.instance->OnClick(entity, ctx.scene, btn.onClickCallback);
+						entry.instance->OnClick(entity, ctx.scene, btn.onClickCallback);
 					}
 				}
 			}
