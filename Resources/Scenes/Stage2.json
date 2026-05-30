@@ -253,7 +253,7 @@
         {"type": "Variable", "enabled": true, "values": {"IsSkillTreeOpen": 0}, "strings": {}},
         {"type": "RectTransform", "enabled": true, "pos": [741,-488], "size": [768,96], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/GamaUI/PriceMeter.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIText", "enabled": true, "text": "$60000", "fontSize": 50, "fontPath": "C:\\Windows\\Fonts\\msgothic.ttc", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]}
+        {"type": "UIText", "enabled": true, "text": "$60000", "fontSize": 48, "fontPath": "Resources\\\\Fonts\\\\Kiwi_Maru\\\\KiwiMaru-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]}
       ]
     },
     {
@@ -389,7 +389,7 @@
       "rotate": [0, 0, 0],
       "scale": [0.5, 0.5, 0.5],
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Scenes/Map/Ground.obj", "texturePath": "", "shaderName": "Default", "color": [0.644788,0.363471,0.363471,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Scenes/Map/Ground.obj", "texturePath": "Resources/Textures/Plane/ground.png", "shaderName": "Ground", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
         {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,1,1], "isTrigger": false},
         {"type": "Tag", "enabled": true, "tag": "Default"}
       ]

@@ -549,33 +549,33 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				skillTree_.Toggle(scene);
 			}
 
-			// スキルツリーが開いている間はスキルツリーの更新のみ
+			// スキルツリーのUIコンテキストを常に更新
+			float mx = 0.0f;
+			float my = 0.0f;
+			float tW = (float)Engine::WindowDX::kW;
+			float tH = (float)Engine::WindowDX::kH;
+
+#if defined(USE_IMGUI) && !defined(NDEBUG)
+			ImVec2 mousePos = ImGui::GetMousePos();
+			ImVec2 gameMin = EditorUI::GetGameImageMin();
+			ImVec2 gameMax = EditorUI::GetGameImageMax();
+			float viewW = gameMax.x - gameMin.x;
+			float viewH = gameMax.y - gameMin.y;
+
+			if (viewW > 0.0f && viewH > 0.0f) {
+				mx = (mousePos.x - gameMin.x) * (tW / viewW);
+				my = (mousePos.y - gameMin.y) * (tH / viewH);
+			}
+#else
+			input->GetMousePos(mx, my);
+#endif
+			skillTree_.SetUIContext(renderer, tW, tH, mx, my);
+			skillTree_.Update(entity, scene, dt);
+
+			// スキルツリーが開いている間は他の更新をストップ
 			if (skillTree_.IsOpen()) {
 				SetVar(entity, scene, "IsSkillTreeOpen", 1.0f);
 				PhaseSystemScript::isSkillTreeOpen_ = true;
-				float mx = 0.0f;
-				float my = 0.0f;
-				float tW = (float)Engine::WindowDX::kW;
-				float tH = (float)Engine::WindowDX::kH;
-
-#if defined(USE_IMGUI) && !defined(NDEBUG)
-				ImVec2 mousePos = ImGui::GetMousePos();
-				ImVec2 gameMin = EditorUI::GetGameImageMin();
-				ImVec2 gameMax = EditorUI::GetGameImageMax();
-				float viewW = gameMax.x - gameMin.x;
-				float viewH = gameMax.y - gameMin.y;
-
-				if (viewW > 0.0f && viewH > 0.0f) {
-					mx = (mousePos.x - gameMin.x) * (tW / viewW);
-					my = (mousePos.y - gameMin.y) * (tH / viewH);
-				}
-#else
-				input->GetMousePos(mx, my);
-#endif
-
-				skillTree_.SetUIContext(renderer, tW, tH, mx, my);
-				skillTree_.Update(entity, scene, dt);
-
 				preKeyN_ = keyN;
 				return;
 			}
@@ -1032,13 +1032,27 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				renderer->DrawSprite(startButtonFrameTextureHandle_, desc);
 				// テキスト表示
 				std::string promptStr = "[SPACE]長押しで開始";
-				float tw = renderer->MeasureTextWidth(promptStr, 0.35f);
-				renderer->DrawString(promptStr, cx - tw * 0.5f, cy + 65.0f, 0.35f, {1.0f, 1.0f, 1.0f, 1.0f});
+				float tw = renderer->MeasureTextWidth(promptStr, 0.45f);
+				float pX = cx - tw * 0.5f;
+				float pY = cy + 65.0f;
+				// アウトライン描画
+				renderer->DrawString(promptStr, pX - 2.0f, pY, 0.45f, {0, 0, 0, 1});
+				renderer->DrawString(promptStr, pX + 2.0f, pY, 0.45f, {0, 0, 0, 1});
+				renderer->DrawString(promptStr, pX, pY - 2.0f, 0.45f, {0, 0, 0, 1});
+				renderer->DrawString(promptStr, pX, pY + 2.0f, 0.45f, {0, 0, 0, 1});
+				renderer->DrawString(promptStr, pX, pY, 0.45f, {1.0f, 1.0f, 1.0f, 1.0f});
 
 				// ゲージ中央のアイコン的なテキスト
 				std::string centerStr = "開始";
-				float cw = renderer->MeasureTextWidth(centerStr, 0.3f);
-				renderer->DrawString(centerStr, cx - cw * 0.5f, cy - 8.0f, 0.3f, {0.9f, 0.9f, 0.9f, 1.0f});
+				float cw = renderer->MeasureTextWidth(centerStr, 0.5f);
+				float cX = cx - cw * 0.5f;
+				float cY = cy - 12.0f;
+				// アウトライン描画
+				renderer->DrawString(centerStr, cX - 2.0f, cY, 0.5f, {0, 0, 0, 1});
+				renderer->DrawString(centerStr, cX + 2.0f, cY, 0.5f, {0, 0, 0, 1});
+				renderer->DrawString(centerStr, cX, cY - 2.0f, 0.5f, {0, 0, 0, 1});
+				renderer->DrawString(centerStr, cX, cY + 2.0f, 0.5f, {0, 0, 0, 1});
+				renderer->DrawString(centerStr, cX, cY, 0.5f, {1.0f, 1.0f, 1.0f, 1.0f});
 			}
 		}
 

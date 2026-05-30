@@ -138,6 +138,13 @@ void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& 
 		}
 #endif
 
+		// ★シーン遷移時に各種マネージャーの静的状態をリセットする
+		WaveManagement::ResetState();
+		Game::PhaseSystemScript::ForcePhaseState(Game::PhaseSystemScript::PreparationPhase);
+		Game::PhaseSystemScript::ResetPhaseCount();
+		Game::PhaseSystemScript::ResetGameOverPhase();
+		Game::PhaseSystemScript::isSkillTreeOpen_ = false;
+
 		if (useSnapshot) {
 			auto* sm = Engine::SceneManager::GetInstance();
 			OutputDebugStringA(("[GameScene] Restoring from global snapshot for " + scenePath + "...\n").c_str());

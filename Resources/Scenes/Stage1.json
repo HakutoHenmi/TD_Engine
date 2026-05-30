@@ -260,7 +260,7 @@
       "rotate": [-1.57, 0, 0],
       "scale": [100, 80, 1],
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/plane.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Hologram", "color": [0.0684247,0.0779424,0.11583,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/plane.obj", "texturePath": "Resources/Textures/Plane/ground.png", "shaderName": "Ground", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
         {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,1,1], "isTrigger": false},
         {"type": "Tag", "enabled": true, "tag": "Untagged"}
       ]
@@ -317,7 +317,7 @@
         {"type": "Variable", "enabled": true, "values": {"IsSkillTreeOpen": 0}, "strings": {}},
         {"type": "RectTransform", "enabled": true, "pos": [741,-488], "size": [768,96], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/GamaUI/PriceMeter.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIText", "enabled": true, "text": "$60000", "fontSize": 57, "fontPath": "C:\\Windows\\Fonts\\msgothic.ttc", "color": [0,0,0,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]}
+        {"type": "UIText", "enabled": true, "text": "$60000", "fontSize": 48, "fontPath": "Resources\\\\Fonts\\\\Kiwi_Maru\\\\KiwiMaru-Regular.ttf", "color": [0,0,0,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]}
       ]
     },
     {

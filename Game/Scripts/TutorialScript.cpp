@@ -35,7 +35,7 @@ namespace {
 // 簡単に文言や行数を変更できます。SPACEキーで次の行に進みます。
 const std::unordered_map<TutorialScript::TutorialStep, std::vector<std::string>> kTutorialTexts = {
     {TutorialScript::TutorialStep::Step1_Greeting,         {"こんにちは！チュートリアルへようこそ！", "このゲームは[RED]『準備フェーズ』[/RED]と[RED]『戦闘フェーズ』[/RED]を\n交互に繰り返すぞ。"}},
-    {TutorialScript::TutorialStep::Step2_CoreIntro,        {"まずはあそこにある青い[RED]『コア』[/RED]だ。", "敵はこれを破壊しにくる。コアを守り切るのが君の目的だ！"}                             },
+    {TutorialScript::TutorialStep::Step2_CoreIntro,        {"まずはあそこにある[RED]『コア』[/RED]だ。", "敵はこれを破壊しにくる。コアを守り切るのが君の目的だ！"}                             },
     {TutorialScript::TutorialStep::Step3_SpawnerIntro,     {"次にあちらに見えるのが[RED]『敵のスポナー』[/RED]だ。", "戦闘フェーズになると、ここから敵が出現するぞ。"}                             },
     {TutorialScript::TutorialStep::Step4_PhaseIntro,       {"現在は[RED]『準備フェーズ』[/RED]だ。", "このフェーズで防衛設備を整えよう！"}                                                         },
     {TutorialScript::TutorialStep::Step5_CameraControl,

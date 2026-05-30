@@ -102,6 +102,8 @@ private:
 	uint32_t texPrevArrow_ = 0;
 	uint32_t texNextArrow_ = 0;
 	uint32_t texSkillPoint_ = 0;
+	uint32_t texNButton_ = 0;
+	float nButtonAnimTimer_ = 0.0f;
 	uint32_t texPanel_ = 0;
 	entt::entity yesTextEntity_ = entt::null;
 	entt::entity noTextEntity_ = entt::null;
