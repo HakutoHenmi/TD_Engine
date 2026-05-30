@@ -2,10 +2,10 @@
 #include "../../Engine/ThirdParty/nlohmann/json.hpp"
 #include "ObjectTypes.h"
 #include "PhaseSystemScript.h"
+#include "PlayerScript.h" // ★追加
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
 #include "TutorialScript.h"
-#include "PlayerScript.h" // ★追加
 
 #if defined(USE_IMGUI) && !defined(NDEBUG)
 #include "Editor/EditorUI.h"
@@ -89,7 +89,7 @@ void InstallationManager::Start(entt::entity /*entity*/, GameScene* scene) {
 	descriptionTextEntity_ = scene->CreateEntity("DescriptionText");
 	auto& textRect = registry.emplace<RectTransformComponent>(descriptionTextEntity_);
 
-	textRect.pos = {50.0f, 150.0f};
+	textRect.pos = {50.0f, 450.0f};
 	textRect.size = {400.0f, 200.0f};
 
 	textRect.anchor = {0.0f, 0.0f};
@@ -166,7 +166,7 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 		}
 
 		// サイズと位置の自動設定
-		btn.size = { 160.0f, 160.0f }; // ★変更: 140だと小さすぎたので160に拡大
+		btn.size = {160.0f, 160.0f}; // ★変更: 140だと小さすぎたので160に拡大
 
 		btn.pos.y = 300.0f; // ★変更: 右下のHPゲージと被らないよう、Y位置を上に上げて回避
 
@@ -175,13 +175,13 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 			bool isTutScene = false;
 			if (scene) {
 				const auto& path = scene->GetStagePath();
-				if (path.find("Tutorial") != std::string::npos || path.find("tutorial") != std::string::npos) isTutScene = true;
+				if (path.find("Tutorial") != std::string::npos || path.find("tutorial") != std::string::npos)
+					isTutScene = true;
 			}
 			if (isTutScene) {
 				if (auto* tutorial = TutorialScript::GetInstance()) {
 					auto step = tutorial->GetCurrentStep();
-					if (step == TutorialScript::TutorialStep::Step6_CannonInstall ||
-						step == TutorialScript::TutorialStep::Step7_DeleteIntro) {
+					if (step == TutorialScript::TutorialStep::Step6_CannonInstall || step == TutorialScript::TutorialStep::Step7_DeleteIntro) {
 						isTutorialSoloButton = true;
 					}
 				}
@@ -218,7 +218,8 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 				bool isTutScene = false;
 				if (scene) {
 					const auto& path = scene->GetStagePath();
-					if (path.find("Tutorial") != std::string::npos || path.find("tutorial") != std::string::npos) isTutScene = true;
+					if (path.find("Tutorial") != std::string::npos || path.find("tutorial") != std::string::npos)
+						isTutScene = true;
 				}
 				if (isTutScene) {
 					if (auto* tutorial = TutorialScript::GetInstance()) {
@@ -261,7 +262,8 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 			bool isTutScene = false;
 			if (scene) {
 				const auto& path = scene->GetStagePath();
-				if (path.find("Tutorial") != std::string::npos || path.find("tutorial") != std::string::npos) isTutScene = true;
+				if (path.find("Tutorial") != std::string::npos || path.find("tutorial") != std::string::npos)
+					isTutScene = true;
 			}
 			if (isTutScene) {
 				if (auto* tutorial = TutorialScript::GetInstance()) {
@@ -271,11 +273,13 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 					if (step >= TutorialScript::TutorialStep::Step1_Greeting && step < TutorialScript::TutorialStep::Step14_EndExplanation) {
 						enabled = false; // 基本はすべて非表示
 						if (step == TutorialScript::TutorialStep::Step6_CannonInstall) {
-							if (btn.prefabPath == "Resources/Prefabs/Canon.prefab") enabled = true;
-						}
-						else if (step == TutorialScript::TutorialStep::Step7_DeleteIntro) {
-							if (btn.prefabPath == "Resources/Prefabs/Canon.prefab") enabled = true;
-							if (btn.name == "DeleteButton") enabled = true;
+							if (btn.prefabPath == "Resources/Prefabs/Canon.prefab")
+								enabled = true;
+						} else if (step == TutorialScript::TutorialStep::Step7_DeleteIntro) {
+							if (btn.prefabPath == "Resources/Prefabs/Canon.prefab")
+								enabled = true;
+							if (btn.name == "DeleteButton")
+								enabled = true;
 						}
 					}
 				}
@@ -294,44 +298,54 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 	if (!PlayerScript::IsHelpOpen()) {
 		for (int i = 0; i < 5; i++) {
 
-		auto& btn = buttons_[i];
+			auto& btn = buttons_[i];
 
-		if (!registry.valid(btn.entity)) {
-			continue;
+			if (!registry.valid(btn.entity)) {
+				continue;
+			}
+
+			if (!registry.all_of<UIButtonComponent>(btn.entity)) {
+				continue;
+			}
+
+			UIButtonComponent& button = registry.get<UIButtonComponent>(btn.entity);
+
+			if (button.isHovered) {
+
+				isDescriptionVisible_ = true;
+				hoveredButtonIndex_ = i;
+				break;
+			}
 		}
-
-		if (!registry.all_of<UIButtonComponent>(btn.entity)) {
-			continue;
-		}
-
-		UIButtonComponent& button = registry.get<UIButtonComponent>(btn.entity);
-
-		if (button.isHovered) {
-
-			isDescriptionVisible_ = true;
-			hoveredButtonIndex_ = i;
-			break;
-		}
-	}
 	}
 	float targetX = -500.0f;
 	UITextComponent& text = registry.get<UITextComponent>(descriptionTextEntity_);
 	if (hoveredButtonIndex_ == 0) {
-		text.text = "施設を削除";
+		text.text = "施設を削除\n"
+		            "設置済みの施設を\n"
+		            "削除します";
 	}
 
 	if (hoveredButtonIndex_ == 1) {
-		text.text = "標準的な大砲";
+		text.text = "標準的な大砲\n"
+		            "最も基本的な防衛施設\n"
+		            "敵を自動的に攻撃します";
 	}
 
 	if (hoveredButtonIndex_ == 2) {
-		text.text = "爆発ミサイル";
+		text.text = "ミサイル砲台\n"
+		            "着弾地点で爆発\n"
+		            "複数の敵をまとめて攻撃";
 	}
 	if (hoveredButtonIndex_ == 3) {
-		text.text = "毒トラップ";
+		text.text = "毒トラップ\n"
+		            "敵に継続ダメージを与える\n"
+		            "通路の要所に有効";
 	}
 	if (hoveredButtonIndex_ == 4) {
-		text.text = "アイスキャノン";
+		text.text = "アイスキャノン\n"
+		            "敵の動きを凍結\n"
+		            "進軍速度を大きく低下";
 	}
 	if (!isDescriptionVisible_) {
 		text.text = "";
@@ -349,7 +363,7 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 	Engine::Renderer::SpriteDesc panel;
 
 	panel.x = descriptionPanelX_;
-	panel.y = 100.0f;
+	panel.y = 400.0f;
 
 	panel.w = 400.0f;
 	panel.h = 500.0f;
