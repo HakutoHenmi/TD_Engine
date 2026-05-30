@@ -169,6 +169,32 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 			if (!objPath.empty()) {
 				mr.modelHandle = renderer->LoadObjMesh(objPath);
 				mr.color = { 1.0f, 1.0f, 1.0f, 1.0f }; // OBJ自体の色を活かすため白にする
+
+				mr.extraTextureHandles.clear(); // 最初にクリアしておく
+				if (enemyScriptPath == "Warrior") {
+					// Warrior の場合のテクスチャ
+					mr.textureHandle = renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/Warrior_Body.png");
+					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/Warrior_Sword.png"));
+					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/Warrior_Shield.png"));
+				} 
+				else if (enemyScriptPath == "Gunner") {
+					// Gunner の場合のテクスチャ
+					mr.textureHandle = renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/Gunner_MainTex.png");
+					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/Gunner_Weapon.png"));
+				} 
+				else if (enemyScriptPath == "Boss") {
+					// Boss の場合のテクスチャ
+					mr.textureHandle = renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/Boss_Texture_01.png");
+					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/Boss_Texture_02.png"));
+
+				}
+				else if (enemyScriptPath == "Guardian") {
+				
+				}
+				else {
+					// それ以外の敵（またはテクスチャが1枚だけの敵）
+					mr.textureHandle = renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/" + enemyScriptPath + ".png");
+				}
 			} else {
 				mr.modelHandle = renderer->LoadObjMesh("Resources/Models/cube/cube.obj");
 				mr.textureHandle = renderer->LoadTexture2D("Resources/Textures/white1x1.png");
