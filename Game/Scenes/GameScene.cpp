@@ -91,6 +91,9 @@ GameScene::~GameScene() {
 void GameScene::Initialize(Engine::WindowDX* dx, const Engine::SceneParameters& params) {
 	dx_ = dx;
 	renderer_ = Engine::Renderer::GetInstance();
+	if (auto* audio = Engine::Audio::GetInstance()) {
+		audio->StopAll(); // ★追加: シーン遷移時に前のシーンの音をすべて停止する
+	}
 	eventSystem_.Clear(); // ★追加: イベントリスナーをクリア
 	WaveManagement::ResetState(); // ★追加: ゲーム状態を完全にリセット
 	playTime_ = 0.0f;
@@ -1811,6 +1814,11 @@ void GameScene::SetIsPlaying(bool play) {
 
 		isPlaying_ = false;
 
+		// ★追加: プレイ停止時は再生中のすべての音を強制停止する
+		if (auto* audio = Engine::Audio::GetInstance()) {
+			audio->StopAll();
+		}
+
 		// ★修正: SceneManagerのグローバルスナップショットを優先（シーン遷移を跨いだ復元のため）
 		std::string restoreSnapshot = sceneSnapshot_;
 		std::string restorePath;
@@ -1956,18 +1964,23 @@ entt::entity GameScene::CreatePauseButton(const std::string& text, float yPos, e
 	}
 
 	auto& btn = pauseRegistry_.emplace<UIButtonComponent>(entity);
-	btn.normalColor = {0.15f, 0.15f, 0.2f, 0.9f};
-	btn.hoverColor = {0.3f, 0.3f, 0.45f, 1.0f};
+	btn.normalColor = {0.1f, 0.1f, 0.12f, 0.95f};
+	btn.hoverColor = {0.18f, 0.15f, 0.12f, 0.98f};
 	btn.pressedColor = {0.1f, 0.1f, 0.15f, 1.0f};
 
 	auto& txt = pauseRegistry_.emplace<UITextComponent>(entity);
 	txt.text = text;
-	txt.fontSize = 32.0f;
-	txt.color = {1.0f, 1.0f, 1.0f, 1.0f};
+	txt.fontSize = 30.0f;
+	txt.color = {0.9f, 0.9f, 0.9f, 1.0f};
+	txt.fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf";
+	txt.outlineEnabled = true;
+	txt.outlineColor = {0.0f, 0.0f, 0.0f, 0.95f};
+	txt.outlineThickness = 1.5f;
 
 	auto& img = pauseRegistry_.emplace<UIImageComponent>(entity);
 	img.color = {1.0f, 1.0f, 1.0f, 1.0f}; // テキストのみのボタンの背景色用
-	img.layer = 200; // ポーズメニューUIは背景オーバーレイ(layer=100)より手前に描画
+	img.layer = 160; // ポーズメニューUIは背景オーバーレイ(layer=150)より手前に描画
+	if(renderer_) img.textureHandle = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
 
 	return entity;
 }
@@ -2040,81 +2053,172 @@ void GameScene::CreatePauseMenu() {
 void GameScene::CreatePauseSettingsMenu() {
 	auto parent = pauseRegistry_.create();
 	auto& pRect = pauseRegistry_.emplace<RectTransformComponent>(parent);
-	pRect.pos = {(float)Engine::WindowDX::kW / 2.0f - 150.0f, (float)Engine::WindowDX::kH / 2.0f - 100.0f};
+	pRect.pos = {0.0f, 0.0f};
 	pRect.size = {0, 0};
 	pRect.anchor = {0.0f, 0.0f};
+	pRect.pivot = {0.0f, 0.0f};
 	pRect.enabled = false;
 	pauseSettingsEntities_.push_back(parent);
 
-	// タイトルテキスト
+	// 1. 全面半透明オーバーレイ
+	auto overlay = pauseRegistry_.create();
+	auto& oRect = pauseRegistry_.emplace<RectTransformComponent>(overlay);
+	oRect.pos = {0.0f, 0.0f};
+	oRect.size = {1920.0f, 1080.0f};
+	oRect.anchor = {0.0f, 0.0f};
+	oRect.pivot = {0.0f, 0.0f};
+	oRect.enabled = false;
+	pauseRegistry_.emplace<HierarchyComponent>(overlay, parent);
+	auto& oImg = pauseRegistry_.emplace<UIImageComponent>(overlay);
+	oImg.color = {0.05f, 0.05f, 0.07f, 0.85f};
+	oImg.layer = 150;
+	if(renderer_) oImg.textureHandle = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
+	pauseSettingsEntities_.push_back(overlay);
+
+	// 2. 中央の掲示板外枠（真鍮ゴールド）
+	auto border = pauseRegistry_.create();
+	auto& bRect = pauseRegistry_.emplace<RectTransformComponent>(border);
+	bRect.pos = {610.0f, 274.0f};
+	bRect.size = {700.0f, 532.0f};
+	bRect.anchor = {0.0f, 0.0f};
+	bRect.pivot = {0.0f, 0.0f};
+	bRect.enabled = false;
+	pauseRegistry_.emplace<HierarchyComponent>(border, parent);
+	auto& bImg = pauseRegistry_.emplace<UIImageComponent>(border);
+	bImg.color = {0.8f, 0.6f, 0.25f, 0.9f};
+	bImg.layer = 151;
+	if(renderer_) bImg.textureHandle = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
+	pauseSettingsEntities_.push_back(border);
+
+	// 3. 中央の掲示板内側（ダークグレー）
+	auto board = pauseRegistry_.create();
+	auto& boardRect = pauseRegistry_.emplace<RectTransformComponent>(board);
+	boardRect.pos = {613.0f, 277.0f};
+	boardRect.size = {694.0f, 526.0f};
+	boardRect.anchor = {0.0f, 0.0f};
+	boardRect.pivot = {0.0f, 0.0f};
+	boardRect.enabled = false;
+	pauseRegistry_.emplace<HierarchyComponent>(board, parent);
+	auto& boardImg = pauseRegistry_.emplace<UIImageComponent>(board);
+	boardImg.color = {0.08f, 0.08f, 0.1f, 0.95f};
+	boardImg.layer = 152;
+	if(renderer_) boardImg.textureHandle = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
+	pauseSettingsEntities_.push_back(board);
+
+	// タイトルテキスト "【 Settings / 設定 】"
 	auto titleText = pauseRegistry_.create();
 	auto& titleRect = pauseRegistry_.emplace<RectTransformComponent>(titleText);
-	titleRect.pos = {30.0f, -80.0f};
+	titleRect.pos = {736.0f, 316.0f};
+	titleRect.anchor = {0.0f, 0.0f};
+	titleRect.pivot = {0.0f, 0.0f};
 	titleRect.enabled = false;
 	pauseRegistry_.emplace<HierarchyComponent>(titleText, parent);
 	auto& txt = pauseRegistry_.emplace<UITextComponent>(titleText);
-	txt.text = "Settings";
-	txt.fontSize = 64.0f;
-	txt.color = {1.0f, 0.9f, 0.3f, 1.0f};
+	txt.text = reinterpret_cast<const char*>(u8"\u3010 Settings / \u8a2d\u5b9a \u3011"); // 【 Settings / 設定 】
+	txt.fontSize = 38.0f;
+	txt.color = {1.0f, 0.9f, 0.4f, 1.0f}; // ゴールドテキスト
+	txt.fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf";
+	txt.outlineEnabled = true;
+	txt.outlineColor = {0.0f, 0.0f, 0.0f, 0.95f};
+	txt.outlineThickness = 1.5f;
 	pauseSettingsEntities_.push_back(titleText);
 
-	// フルスクリーン
-	pauseBtnFullscreen_ = CreatePauseButton("Fullscreen: OFF", 0.0f, parent);
-	pauseRegistry_.get<RectTransformComponent>(pauseBtnFullscreen_).enabled = false;
-	pauseTextFullscreen_ = pauseBtnFullscreen_;
+	// 区切り線
+	auto divider = pauseRegistry_.create();
+	auto& dRect = pauseRegistry_.emplace<RectTransformComponent>(divider);
+	dRect.pos = {645.0f, 372.0f};
+	dRect.size = {630.0f, 2.0f};
+	dRect.anchor = {0.0f, 0.0f};
+	dRect.pivot = {0.0f, 0.0f};
+	dRect.enabled = false;
+	pauseRegistry_.emplace<HierarchyComponent>(divider, parent);
+	auto& dImg = pauseRegistry_.emplace<UIImageComponent>(divider);
+	dImg.color = {0.8f, 0.6f, 0.25f, 0.5f};
+	dImg.layer = 153;
+	if(renderer_) dImg.textureHandle = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
+	pauseSettingsEntities_.push_back(divider);
 
-	// BGM 音量
+	// BGM 音量ラベル
 	auto bgmLabel = pauseRegistry_.create();
 	auto& bgmRect = pauseRegistry_.emplace<RectTransformComponent>(bgmLabel);
-	bgmRect.pos = {0.0f, 80.0f};
+	bgmRect.pos = {680.0f, 428.0f};
+	bgmRect.anchor = {0.0f, 0.0f};
+	bgmRect.pivot = {0.0f, 0.0f};
 	bgmRect.enabled = false;
 	pauseRegistry_.emplace<HierarchyComponent>(bgmLabel, parent);
 	auto& bgmTxt = pauseRegistry_.emplace<UITextComponent>(bgmLabel);
 	bgmTxt.text = "BGM Volume";
-	bgmTxt.fontSize = 32.0f;
+	bgmTxt.fontSize = 28.0f;
+	bgmTxt.color = {0.9f, 0.9f, 0.9f, 1.0f};
+	bgmTxt.fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf";
+	bgmTxt.outlineEnabled = true;
+	bgmTxt.outlineColor = {0.0f, 0.0f, 0.0f, 0.95f};
+	bgmTxt.outlineThickness = 1.5f;
 	pauseTextBGM_ = bgmLabel;
+	pauseSettingsEntities_.push_back(bgmLabel);
 
-	pauseBtnBGMMinus_ = CreatePauseButton("-", 80.0f, parent);
-	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMMinus_).size = {60.0f, 60.0f};
-	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMMinus_).pos = {310.0f, 80.0f};
-	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMMinus_).enabled = false;
+	pauseBtnBGMMinus_ = CreatePauseButton("-", 421.0f, parent);
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMMinus_).size = {49.0f, 49.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMMinus_).pos = {1093.0f, 421.0f};
+	pauseRegistry_.get<UITextComponent>(pauseBtnBGMMinus_).fontSize = 21.0f;
+	pauseSettingsEntities_.push_back(pauseBtnBGMMinus_);
 
-	pauseBtnBGMPlus_ = CreatePauseButton("+", 80.0f, parent);
-	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMPlus_).size = {60.0f, 60.0f};
-	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMPlus_).pos = {380.0f, 80.0f};
-	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMPlus_).enabled = false;
+	pauseBtnBGMPlus_ = CreatePauseButton("+", 421.0f, parent);
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMPlus_).size = {49.0f, 49.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBGMPlus_).pos = {1163.0f, 421.0f};
+	pauseRegistry_.get<UITextComponent>(pauseBtnBGMPlus_).fontSize = 21.0f;
+	pauseSettingsEntities_.push_back(pauseBtnBGMPlus_);
 
-	// SE 音量
+	// SE 音量ラベル
 	auto seLabel = pauseRegistry_.create();
 	auto& seRect = pauseRegistry_.emplace<RectTransformComponent>(seLabel);
-	seRect.pos = {0.0f, 160.0f};
+	seRect.pos = {680.0f, 498.0f};
+	seRect.anchor = {0.0f, 0.0f};
+	seRect.pivot = {0.0f, 0.0f};
 	seRect.enabled = false;
 	pauseRegistry_.emplace<HierarchyComponent>(seLabel, parent);
 	auto& seTxt = pauseRegistry_.emplace<UITextComponent>(seLabel);
 	seTxt.text = "SE Volume";
-	seTxt.fontSize = 32.0f;
+	seTxt.fontSize = 28.0f;
+	seTxt.color = {0.9f, 0.9f, 0.9f, 1.0f};
+	seTxt.fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf";
+	seTxt.outlineEnabled = true;
+	seTxt.outlineColor = {0.0f, 0.0f, 0.0f, 0.95f};
+	seTxt.outlineThickness = 1.5f;
 	pauseTextSE_ = seLabel;
-
-	pauseBtnSEMinus_ = CreatePauseButton("-", 160.0f, parent);
-	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEMinus_).size = {60.0f, 60.0f};
-	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEMinus_).pos = {310.0f, 160.0f};
-	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEMinus_).enabled = false;
-
-	pauseBtnSEPlus_ = CreatePauseButton("+", 160.0f, parent);
-	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEPlus_).size = {60.0f, 60.0f};
-	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEPlus_).pos = {380.0f, 160.0f};
-	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEPlus_).enabled = false;
-
-	pauseBtnBack_ = CreatePauseButton(reinterpret_cast<const char*>(u8"\u623B\u308B"), 260.0f, parent);
-	pauseRegistry_.get<RectTransformComponent>(pauseBtnBack_).enabled = false;
-
-	pauseSettingsEntities_.push_back(bgmLabel);
-	pauseSettingsEntities_.push_back(pauseBtnFullscreen_);
-	pauseSettingsEntities_.push_back(pauseBtnBGMMinus_);
-	pauseSettingsEntities_.push_back(pauseBtnBGMPlus_);
 	pauseSettingsEntities_.push_back(seLabel);
+
+	pauseBtnSEMinus_ = CreatePauseButton("-", 491.0f, parent);
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEMinus_).size = {49.0f, 49.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEMinus_).pos = {1093.0f, 491.0f};
+	pauseRegistry_.get<UITextComponent>(pauseBtnSEMinus_).fontSize = 21.0f;
 	pauseSettingsEntities_.push_back(pauseBtnSEMinus_);
+
+	pauseBtnSEPlus_ = CreatePauseButton("+", 491.0f, parent);
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEPlus_).size = {49.0f, 49.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnSEPlus_).pos = {1163.0f, 491.0f};
+	pauseRegistry_.get<UITextComponent>(pauseBtnSEPlus_).fontSize = 21.0f;
 	pauseSettingsEntities_.push_back(pauseBtnSEPlus_);
+
+	// フルスクリーン切替ボタン
+	pauseBtnFullscreen_ = CreatePauseButton("Fullscreen: OFF", 582.0f, parent);
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnFullscreen_).size = {280.0f, 49.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnFullscreen_).pos = {820.0f, 582.0f};
+	pauseRegistry_.get<UITextComponent>(pauseBtnFullscreen_).fontSize = 21.0f;
+	pauseTextFullscreen_ = pauseBtnFullscreen_;
+	pauseSettingsEntities_.push_back(pauseBtnFullscreen_);
+
+	// 戻るボタン
+	pauseBtnBack_ = CreatePauseButton("Back / " + std::string(reinterpret_cast<const char*>(u8"\u623B\u308B")), 708.0f, parent);
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBack_).size = {252.0f, 49.0f};
+	pauseRegistry_.get<RectTransformComponent>(pauseBtnBack_).pos = {834.0f, 708.0f};
+	pauseRegistry_.get<UITextComponent>(pauseBtnBack_).fontSize = 21.0f;
+	{
+		auto& btn = pauseRegistry_.get<UIButtonComponent>(pauseBtnBack_);
+		btn.normalColor = {0.8f, 0.6f, 0.25f, 0.9f}; // ゴールド色
+		btn.hoverColor = {1.0f, 0.85f, 0.3f, 1.0f};
+		btn.pressedColor = {0.6f, 0.4f, 0.15f, 1.0f};
+	}
 	pauseSettingsEntities_.push_back(pauseBtnBack_);
 }
 
@@ -2177,9 +2281,9 @@ void GameScene::UpdatePauseMenu() {
 
 		// 音量テキスト更新
 		if (audio) {
-			int bgmVol = static_cast<int>(audio->GetMasterBGMVolume() * 100);
+			int bgmVol = static_cast<int>(std::round(audio->GetMasterBGMVolume() * 100.0f));
 			pauseRegistry_.get<UITextComponent>(pauseTextBGM_).text = "BGM Volume: " + std::to_string(bgmVol) + "%";
-			int seVol = static_cast<int>(audio->GetMasterSEVolume() * 100);
+			int seVol = static_cast<int>(std::round(audio->GetMasterSEVolume() * 100.0f));
 			pauseRegistry_.get<UITextComponent>(pauseTextSE_).text = "SE Volume: " + std::to_string(seVol) + "%";
 		}
 
@@ -2192,13 +2296,65 @@ void GameScene::UpdatePauseMenu() {
 			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnFullscreen_).isHovered) {
 				if (dx_) dx_->ToggleFullscreen();
 			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnBGMMinus_).isHovered) {
-				if (audio) audio->SetMasterBGMVolume(audio->GetMasterBGMVolume() - 0.1f);
+				if (audio) {
+					audio->SetMasterBGMVolume(audio->GetMasterBGMVolume() - 0.1f);
+					for (auto e : registry_.view<AudioSourceComponent>()) {
+						auto& as = registry_.get<AudioSourceComponent>(e);
+						if (as.isPlaying && as.category == AudioCategory::BGM) audio->SetVolume(as.voiceHandle, as.volume * audio->GetMasterBGMVolume());
+					}
+					// ★追加: PhaseSystemScriptが直接再生しているBGMにも即座に反映
+					for (auto entity : registry_.view<ScriptComponent>()) {
+						auto& sc = registry_.get<ScriptComponent>(entity);
+						for (auto& s : sc.scripts) {
+							if (s.scriptPath == "PhaseSystemScript" && s.instance) {
+								if (auto* ps = static_cast<PhaseSystemScript*>(s.instance.get())) {
+									if (ps->currentBgmVoiceHandle_ != 0) {
+										float baseVol = ps->isResultBgmPlaying_ ? 0.5f : 0.4f;
+										audio->SetVolume(ps->currentBgmVoiceHandle_, baseVol * audio->GetMasterBGMVolume());
+									}
+								}
+							}
+						}
+					}
+				}
 			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnBGMPlus_).isHovered) {
-				if (audio) audio->SetMasterBGMVolume(audio->GetMasterBGMVolume() + 0.1f);
+				if (audio) {
+					audio->SetMasterBGMVolume(audio->GetMasterBGMVolume() + 0.1f);
+					for (auto e : registry_.view<AudioSourceComponent>()) {
+						auto& as = registry_.get<AudioSourceComponent>(e);
+						if (as.isPlaying && as.category == AudioCategory::BGM) audio->SetVolume(as.voiceHandle, as.volume * audio->GetMasterBGMVolume());
+					}
+					// ★追加: PhaseSystemScriptが直接再生しているBGMにも即座に反映
+					for (auto entity : registry_.view<ScriptComponent>()) {
+						auto& sc = registry_.get<ScriptComponent>(entity);
+						for (auto& s : sc.scripts) {
+							if (s.scriptPath == "PhaseSystemScript" && s.instance) {
+								if (auto* ps = static_cast<PhaseSystemScript*>(s.instance.get())) {
+									if (ps->currentBgmVoiceHandle_ != 0) {
+										float baseVol = ps->isResultBgmPlaying_ ? 0.5f : 0.4f;
+										audio->SetVolume(ps->currentBgmVoiceHandle_, baseVol * audio->GetMasterBGMVolume());
+									}
+								}
+							}
+						}
+					}
+				}
 			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnSEMinus_).isHovered) {
-				if (audio) audio->SetMasterSEVolume(audio->GetMasterSEVolume() - 0.1f);
+				if (audio) {
+					audio->SetMasterSEVolume(audio->GetMasterSEVolume() - 0.1f);
+					for (auto e : registry_.view<AudioSourceComponent>()) {
+						auto& as = registry_.get<AudioSourceComponent>(e);
+						if (as.isPlaying && as.category == AudioCategory::SE) audio->SetVolume(as.voiceHandle, as.volume * audio->GetMasterSEVolume());
+					}
+				}
 			} else if (pauseRegistry_.get<UIButtonComponent>(pauseBtnSEPlus_).isHovered) {
-				if (audio) audio->SetMasterSEVolume(audio->GetMasterSEVolume() + 0.1f);
+				if (audio) {
+					audio->SetMasterSEVolume(audio->GetMasterSEVolume() + 0.1f);
+					for (auto e : registry_.view<AudioSourceComponent>()) {
+						auto& as = registry_.get<AudioSourceComponent>(e);
+						if (as.isPlaying && as.category == AudioCategory::SE) audio->SetVolume(as.voiceHandle, as.volume * audio->GetMasterSEVolume());
+					}
+				}
 			}
 		}
 	}

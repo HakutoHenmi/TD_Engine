@@ -118,15 +118,7 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	// ★修正: 初回Update時に確実に初期化処理(カメラ位置設定など)が走るように、preIsPhase_を現在と違う値にする
 	preIsPhase_ = static_cast<PhaseState>(-1);
 
-	// 初回BGM再生のトリガー (Update内の判定で再生されるように preIsPhase_ をズラしてあるが、Startでも念押し)
-	if (auto* audio = Engine::Audio::GetInstance()) {
-		if (isPhase_ == BattlePhase) {
-			currentBgmVoiceHandle_ = audio->Play(battleBgmHandle_, true, 0.4f);
-		} else {
-			currentBgmVoiceHandle_ = audio->Play(preparationBgmHandle_, true, 0.4f);
-		}
-	}
-
+	// 初回BGM再生のトリガーはファイルのロード後に最後に行うため、ここでのPlay呼び出しは削除しました。
 	currentPhase_ = 0;
 	CoinCount = StartCoinCount_;
 
@@ -200,15 +192,25 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	// BGMの再生 (シーン開始時のフェーズに応じて即座に再生)
 	if (auto* audio = Engine::Audio::GetInstance()) {
 		if (isPhase_ == BattlePhase) {
-			currentBgmVoiceHandle_ = audio->Play(battleBgmHandle_, true, 0.4f);
+			currentBgmVoiceHandle_ = audio->Play(battleBgmHandle_, true, 0.4f * audio->GetMasterBGMVolume());
+			OutputDebugStringA(("[PhaseSystem] Start -> BattlePhase BGM handle: " + std::to_string(currentBgmVoiceHandle_) + "\n").c_str());
 		} else if (isPhase_ == PreparationPhase || isPhase_ == InsertPhase) {
-			currentBgmVoiceHandle_ = audio->Play(preparationBgmHandle_, true, 0.4f);
+			currentBgmVoiceHandle_ = audio->Play(preparationBgmHandle_, true, 0.4f * audio->GetMasterBGMVolume());
+			OutputDebugStringA(("[PhaseSystem] Start -> PreparationPhase BGM handle: " + std::to_string(currentBgmVoiceHandle_) + "\n").c_str());
 		}
 	}
 }
 
 void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	(void)entity;
+
+	// ★追加: マスターボリュームの反映（PhaseSystemが直接再生するBGM用）
+	if (auto* audio = Engine::Audio::GetInstance()) {
+		if (currentBgmVoiceHandle_ != 0) {
+			float baseVol = isResultBgmPlaying_ ? 0.5f : 0.4f;
+			audio->SetVolume(currentBgmVoiceHandle_, baseVol * audio->GetMasterBGMVolume());
+		}
+	}
 
 	// === Game Over Sequence Update ===
 	if (s_gameOverPhase_ > 0) {
@@ -1064,9 +1066,11 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			}
 
 			if (isPhase_ == BattlePhase) {
-				currentBgmVoiceHandle_ = audio->Play(battleBgmHandle_, true, 0.4f);
+				currentBgmVoiceHandle_ = audio->Play(battleBgmHandle_, true, 0.4f * audio->GetMasterBGMVolume());
+				OutputDebugStringA(("[PhaseSystem] Update -> BattlePhase BGM handle: " + std::to_string(currentBgmVoiceHandle_) + "\n").c_str());
 			} else if (isPhase_ == PreparationPhase || isPhase_ == InsertPhase) {
-				currentBgmVoiceHandle_ = audio->Play(preparationBgmHandle_, true, 0.4f);
+				currentBgmVoiceHandle_ = audio->Play(preparationBgmHandle_, true, 0.4f * audio->GetMasterBGMVolume());
+				OutputDebugStringA(("[PhaseSystem] Update -> PreparationPhase BGM handle: " + std::to_string(currentBgmVoiceHandle_) + "\n").c_str());
 			}
 		}
 
@@ -1754,7 +1758,7 @@ void PhaseSystemScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector
 
 	// SEの再生
 	if (auto* audio = Engine::Audio::GetInstance()) {
-		audio->Play(installationSeHandle_, false, 0.6f);
+		audio->Play(installationSeHandle_, false, 0.6f * audio->GetMasterSEVolume());
 	}
 
 	// 何かオブジェクトを設置した場合は地形が変わった可能性があるため高さキャッシュをクリアする

@@ -1,4 +1,4 @@
-﻿#include "EditorUI.h"
+#include "EditorUI.h"
 #include "../../Engine/PathUtils.h"
 #include "../../externals/imgui/imgui.h"
 #include "../../externals/imgui/imgui_internal.h"
@@ -49,6 +49,11 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 		reg.clear();
 		scene->GetSelectedEntities().clear();
 		scene->SetSelectedEntity(entt::null);
+
+		// ★追加: シーンの完全リロード時は、前のシーンの音をすべて停止する
+		if (auto* audio = Engine::Audio::GetInstance()) {
+			audio->StopAll();
+		}
 	}
 
 	// settings の復元
@@ -215,6 +220,11 @@ static std::vector<entt::entity> RestoreSceneFromJson(GameScene* scene, const js
 					auto& c = reg.get_or_emplace<AudioSourceComponent>(entity);
 					c.enabled = en; c.soundPath = comp.value("soundPath", ""); c.volume = comp.value("volume", 1.0f);
 					c.loop = comp.value("loop", false); c.playOnStart = comp.value("playOnStart", false);
+					int defaultCat = c.loop ? 0 : 1;
+					c.category = static_cast<AudioCategory>(comp.value("category", defaultCat));
+					if (!c.soundPath.empty() && Engine::Audio::GetInstance()) {
+						c.soundHandle = Engine::Audio::GetInstance()->Load(c.soundPath);
+					}
 				} else if (type == "PlayerInput") {
 					reg.get_or_emplace<PlayerInputComponent>(entity).enabled = en;
 				} else if (type == "CharacterMovement") {
@@ -599,7 +609,7 @@ static std::string SerializeEntity(entt::registry& registry, entt::entity entity
 	if (auto* cp = registry.try_get<AudioSourceComponent>(entity)) {
 		addComma();
 		ss << "        {\"type\": \"AudioSource\", \"enabled\": " << (cp->enabled ? "true" : "false") << ", \"soundPath\": \"" << EscapeJson(cp->soundPath) << "\", \"volume\": " << cp->volume
-		   << ", \"loop\": " << (cp->loop ? "true" : "false") << ", \"playOnStart\": " << (cp->playOnStart ? "true" : "false") << "}";
+		   << ", \"loop\": " << (cp->loop ? "true" : "false") << ", \"playOnStart\": " << (cp->playOnStart ? "true" : "false") << ", \"category\": " << static_cast<int>(cp->category) << "}";
 	}
 	if (auto* cp = registry.try_get<ScriptComponent>(entity)) {
 		addComma();
@@ -2500,6 +2510,10 @@ void EditorUI::ShowInspector(GameScene* scene) {
 					ImGui::Checkbox("Loop", &as->loop);
 					ImGui::Checkbox("Play on Start", &as->playOnStart);
 					ImGui::Checkbox("Is 3D", &as->is3D);
+					int cat = static_cast<int>(as->category);
+					if (ImGui::Combo("Category", &cat, "BGM\0SE\0")) {
+						as->category = static_cast<AudioCategory>(cat);
+					}
 					if (ImGui::Button("Remove##AS")) registry.remove<AudioSourceComponent>(entity);
 				}
 			}

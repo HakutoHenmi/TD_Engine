@@ -498,10 +498,10 @@
     {
       "id": 9437217,
       "parentId": 4294967295,
-      "name": "MovieSign_1",
+      "name": "MovieSign",
       "locked": false,
-      "translate": [82.0539, 0, 28.0977],
-      "rotate": [0, -1.57, 0],
+      "translate": [26.3711, 0, 75.6283],
+      "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
         {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/MovieSign/MovieSign.obj", "texturePath": "Resources/Models/MapObjct/MovieSign/MovieSign.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
