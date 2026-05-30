@@ -1392,7 +1392,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 					s_flightSeHandle = audio->Load("Resources/Audio/SE/Flight.mp3");
 				}
 				if (s_flightSeHandle != 0xFFFFFFFF) {
-					flightVoiceHandle_ = audio->Play(s_flightSeHandle, true, 0.6f * audio->GetMasterSEVolume());
+					flightVoiceHandle_ = audio->Play(s_flightSeHandle, true, 1.3f * audio->GetMasterSEVolume());
 				}
 			}
 		}
