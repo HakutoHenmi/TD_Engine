@@ -583,7 +583,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		if (!isTutorial) {
 			// 設置モードへの切り替え
-			if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/Canon.prefab")) {
+			if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/NewCannon.prefab")) {
 				selectedObjPath_ = "Resources/Prefabs/NewCannon.prefab";
 				selectedObjCost_ = InstallationManager::GetCost(selectedObjPath_);
 				if (selectedObjCost_ == 0)

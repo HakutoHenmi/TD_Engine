@@ -33,7 +33,7 @@ InstallationManager::InstallationManager() {
 	buttons_[0].cost = 0;
 
 	// ★ここでパスを直接設定してください（ImGuiでの入力によるクラッシュを回避）
-	prefabPaths_[1] = "Resources/Prefabs/Canon.prefab";
+	prefabPaths_[1] = "Resources/Prefabs/NewCannon.prefab";
 	texPaths_[1] = "Resources/Textures/Button/CannonButton.png";
 	buttons_[1].name = "CannonButton";
 	buttons_[1].cost = 150;
@@ -273,10 +273,10 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 					if (step >= TutorialScript::TutorialStep::Step1_Greeting && step < TutorialScript::TutorialStep::Step14_EndExplanation) {
 						enabled = false; // 基本はすべて非表示
 						if (step == TutorialScript::TutorialStep::Step6_CannonInstall) {
-							if (btn.prefabPath == "Resources/Prefabs/Canon.prefab")
+							if (btn.prefabPath == "Resources/Prefabs/NewCannon.prefab")
 								enabled = true;
 						} else if (step == TutorialScript::TutorialStep::Step7_DeleteIntro) {
-							if (btn.prefabPath == "Resources/Prefabs/Canon.prefab")
+							if (btn.prefabPath == "Resources/Prefabs/NewCannon.prefab")
 								enabled = true;
 							if (btn.name == "DeleteButton")
 								enabled = true;

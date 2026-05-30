@@ -792,8 +792,8 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
 			break;
 
-		if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/Canon.prefab")) {
-			selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
+		if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/NewCannon.prefab")) {
+			selectedObjPath_ = "Resources/Prefabs/NewCannon.prefab";
 			isPlacementMode_ = true;
 			placementSelectionChangedThisFrame = true;
 		}
@@ -954,8 +954,8 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	case TutorialStep::Step15_FreePlayBattle:
 		if (phaseState_ == PhaseSystemScript::PreparationPhase && !isPhaseTransitioning_) {
-			if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/Canon.prefab")) {
-				selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
+			if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/NewCannon.prefab")) {
+				selectedObjPath_ = "Resources/Prefabs/NewCannon.prefab";
 				isPlacementMode_ = true;
 				placementSelectionChangedThisFrame = true;
 			}
