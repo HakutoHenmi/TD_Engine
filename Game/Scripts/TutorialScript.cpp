@@ -138,6 +138,12 @@ void TutorialScript::Start(entt::entity entity, GameScene* scene) {
 	if (scene) {
 		ShowStepGuide();
 
+		// SEのロード
+		if (auto* audio = Engine::Audio::GetInstance()) {
+			installationSeHandle_ = audio->Load("Resources/Audio/SE/installation.mp3");
+			collapseSeHandle_ = audio->Load("Resources/Audio/SE/Collapse.mp3");
+		}
+
 		// 設置開始イベントの購読
 		SubscribeString(scene, "StartInstallation", [this](const std::string& dataStr) {
 			try {
@@ -701,6 +707,11 @@ void TutorialScript::UpdateSellMode(GameScene* scene) {
 
 			if (input->IsMouseTrigger(0)) {
 				scene->DestroyObject(static_cast<uint32_t>(hoverEntity));
+				if (auto* audio = Engine::Audio::GetInstance()) {
+					if (collapseSeHandle_ != 0 && collapseSeHandle_ != 0xFFFFFFFF) {
+						audio->Play(collapseSeHandle_, false, 1.2f * audio->GetMasterSEVolume());
+					}
+				}
 				isSellMode_ = false;
 				step7_deletedCannon_ = true;
 				EditorUI::Log("Tutorial: Object deleted successfully");
@@ -1690,6 +1701,13 @@ void TutorialScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector3& 
 	auto* renderer = scene->GetRenderer();
 	if (!renderer)
 		return;
+
+	// SEの再生
+	if (auto* audio = Engine::Audio::GetInstance()) {
+		if (installationSeHandle_ != 0 && installationSeHandle_ != 0xFFFFFFFF) {
+			audio->Play(installationSeHandle_, false, 0.6f * audio->GetMasterSEVolume());
+		}
+	}
 
 	auto& registry = scene->GetRegistry();
 

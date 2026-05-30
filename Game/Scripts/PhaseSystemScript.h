@@ -155,6 +155,7 @@ private:
 	
 	// SE関連
 	uint32_t installationSeHandle_ = 0;
+	uint32_t collapseSeHandle_ = 0;
 
 public:
 	inline static size_t currentBgmVoiceHandle_ = 0;

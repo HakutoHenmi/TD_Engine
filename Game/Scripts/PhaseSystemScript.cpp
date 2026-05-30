@@ -173,6 +173,7 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 		preparationBgmHandle_ = audio->Load("Resources/Audio/BGM/Preparation.mp3");
 		resultBgmHandle_ = audio->Load("Resources/Audio/BGM/Result.mp3");
 		installationSeHandle_ = audio->Load("Resources/Audio/SE/installation.mp3");
+		collapseSeHandle_ = audio->Load("Resources/Audio/SE/Collapse.mp3");
 	}
 
 	isResultBgmPlaying_ = false;
@@ -965,6 +966,12 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 								// エンティティを削除
 								scene->DestroyObject(static_cast<uint32_t>(rootToDelete));
+							}
+
+							if (!deletedRoots.empty()) {
+								if (auto* audio = Engine::Audio::GetInstance()) {
+									audio->Play(collapseSeHandle_, false, 1.2f * audio->GetMasterSEVolume());
+								}
 							}
 
 							CoinCount += totalRefund;

@@ -131,6 +131,10 @@ private:
 	DirectX::XMFLOAT3 startTarget_{0,0,0};
 	std::vector<entt::entity> cameraTargetEntities_;
 	
+	// SE関連
+	uint32_t installationSeHandle_ = 0;
+	uint32_t collapseSeHandle_ = 0;
+	
 	void UpdateCameraFocus(GameScene* scene, float dt);
 };
 
