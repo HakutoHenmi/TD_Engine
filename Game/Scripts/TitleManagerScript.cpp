@@ -222,29 +222,29 @@ void TitleManagerScript::Start(entt::entity entity, GameScene* scene) {
 			textBGM_ = reg.create();
 			reg.emplace<NameComponent>(textBGM_, "Text_BGM");
 			auto& bgmRect = reg.emplace<RectTransformComponent>(textBGM_);
-			bgmRect.pos = {560.0f, 380.0f}; bgmRect.anchor = {0,0}; bgmRect.pivot = {0,0};
+			bgmRect.pos = {560.0f, 365.0f}; bgmRect.anchor = {0,0}; bgmRect.pivot = {0,0};
 			scene->SetParent(textBGM_, settingsParent);
 			auto& bgmTxt = reg.emplace<UITextComponent>(textBGM_);
 			bgmTxt.text = "BGM Volume"; bgmTxt.fontSize = 40.0f; bgmTxt.color = {0.9f, 0.9f, 0.9f, 1.0f};
 			bgmTxt.fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf";
 			bgmTxt.outlineEnabled = true; bgmTxt.outlineColor = {0,0,0,0.95f}; bgmTxt.outlineThickness = 1.5f;
 
-			btnBGMMinus_ = createBtn("Btn_BGMMinus", "-", 1150.0f, 370.0f, 70.0f, 70.0f);
-			btnBGMPlus_ = createBtn("Btn_BGMPlus", "+", 1250.0f, 370.0f, 70.0f, 70.0f);
+			btnBGMMinus_ = createBtn("Btn_BGMMinus", "-", 1150.0f, 380.0f, 70.0f, 70.0f);
+			btnBGMPlus_ = createBtn("Btn_BGMPlus", "+", 1250.0f, 380.0f, 70.0f, 70.0f);
 
 			// SE Label
 			textSE_ = reg.create();
 			reg.emplace<NameComponent>(textSE_, "Text_SE");
 			auto& seRect = reg.emplace<RectTransformComponent>(textSE_);
-			seRect.pos = {560.0f, 480.0f}; seRect.anchor = {0,0}; seRect.pivot = {0,0};
+			seRect.pos = {560.0f, 465.0f}; seRect.anchor = {0,0}; seRect.pivot = {0,0};
 			scene->SetParent(textSE_, settingsParent);
 			auto& seTxt = reg.emplace<UITextComponent>(textSE_);
 			seTxt.text = "SE Volume"; seTxt.fontSize = 40.0f; seTxt.color = {0.9f, 0.9f, 0.9f, 1.0f};
 			seTxt.fontPath = "Resources\\Fonts\\Kiwi_Maru\\KiwiMaru-Regular.ttf";
 			seTxt.outlineEnabled = true; seTxt.outlineColor = {0,0,0,0.95f}; seTxt.outlineThickness = 1.5f;
 
-			btnSEMinus_ = createBtn("Btn_SEMinus", "-", 1150.0f, 470.0f, 70.0f, 70.0f);
-			btnSEPlus_ = createBtn("Btn_SEPlus", "+", 1250.0f, 470.0f, 70.0f, 70.0f);
+			btnSEMinus_ = createBtn("Btn_SEMinus", "-", 1150.0f, 480.0f, 70.0f, 70.0f);
+			btnSEPlus_ = createBtn("Btn_SEPlus", "+", 1250.0f, 480.0f, 70.0f, 70.0f);
 
 			btnFullscreen_ = createBtn("Btn_Fullscreen", "Fullscreen: OFF", 760.0f, 600.0f, 400.0f, 70.0f);
 			textFullscreen_ = btnFullscreen_;
