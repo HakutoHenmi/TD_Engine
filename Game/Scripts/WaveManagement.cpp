@@ -96,6 +96,14 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 				// (チュートリアル中のアイコン非表示処理は削除しました)
 
 				if (static_cast<int>(wi) != targetWave) {
+					// 対象でないスポナーのライトは消す
+					for (entt::entity spawnerEntity : enemySpawners_[wi]) {
+						if (scene->GetRegistry().valid(spawnerEntity)) {
+							if (auto* pl = scene->GetRegistry().try_get<PointLightComponent>(spawnerEntity)) {
+								pl->enabled = false;
+							}
+						}
+					}
 					continue;
 				}
 			}
@@ -110,6 +118,9 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 						pl.intensity = 3.5f;
 						pl.range = 8.0f;
 						pl.offset = {0.0f, 1.5f, 0.0f}; // ★ ライトを少し上にオフセット
+						pl.enabled = true;
+					} else {
+						auto& pl = scene->GetRegistry().get<PointLightComponent>(spawnerEntity);
 						pl.enabled = true;
 					}
 

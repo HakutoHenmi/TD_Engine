@@ -1995,17 +1995,17 @@ entt::entity GameScene::CreatePauseButton(const std::string& text, float yPos, e
 void GameScene::CreatePauseMenu() {
 	auto parent = pauseRegistry_.create();
 	auto& pRect = pauseRegistry_.emplace<RectTransformComponent>(parent);
-	// 画面中央に配置 (ボタンの間隔拡大に伴い、Y位置を少し上に調整して綺麗に配置)
-	pRect.pos = {(float)Engine::WindowDX::kW / 2.0f - 175.0f, (float)Engine::WindowDX::kH / 2.0f - 130.0f};
+	// 画面中央に配置 (ボタンの間隔拡大に伴い、Y位置を少し調整)
+	pRect.pos = {(float)Engine::WindowDX::kW / 2.0f - 175.0f, (float)Engine::WindowDX::kH / 2.0f - 120.0f};
 	pRect.size = {0, 0};
 	pRect.anchor = {0.0f, 0.0f};
 	pauseMainEntities_.push_back(parent);
 
-	// タイトルテキスト ("PAUSE" ロゴも Y軸間隔に合わせて -110px に調整)
+	// タイトルテキスト ("PAUSE" ロゴも Y軸間隔に合わせて上に調整し、大きくする)
 	auto titleText = pauseRegistry_.create();
 	auto& titleRect = pauseRegistry_.emplace<RectTransformComponent>(titleText);
-	titleRect.pos = {175.0f, -110.0f};
-	titleRect.size = {700.0f, 88.0f};
+	titleRect.pos = {175.0f, -180.0f};
+	titleRect.size = {1050.0f, 132.0f};
 	pauseRegistry_.emplace<HierarchyComponent>(titleText, parent);
 	auto& titleImg = pauseRegistry_.emplace<UIImageComponent>(titleText);
 	if (renderer_) titleImg.textureHandle = renderer_->LoadTexture2D("Resources/Textures/Button/Pause.png");
@@ -2026,8 +2026,8 @@ void GameScene::CreatePauseMenu() {
 		btn.pressedColor = {0.5f, 0.5f, 0.5f, 1.0f};
 	}
 	
-	// 2. 設定ボタン (350x88, Y座標オフセットを 110.0f に設定してよりクッキリした隙間へ)
-	pauseBtnSettings_ = CreatePauseButton("", 110.0f, parent);
+	// 2. 設定ボタン (Y座標オフセットを 150.0f に設定してより大きく隙間を開ける)
+	pauseBtnSettings_ = CreatePauseButton("", 150.0f, parent);
 	if(renderer_) pauseRegistry_.get<UIImageComponent>(pauseBtnSettings_).textureHandle = renderer_->LoadTexture2D("Resources/Textures/Button/setting.png");
 	pauseRegistry_.get<RectTransformComponent>(pauseBtnSettings_).size = {350.0f, 88.0f};
 	// 少し明るめ（1.4f）に微ブースト
@@ -2039,8 +2039,8 @@ void GameScene::CreatePauseMenu() {
 		btn.pressedColor = {0.5f, 0.5f, 0.5f, 1.0f};
 	}
 
-	// 3. タイトルに戻るボタン (350x88, Y座標オフセットを 220.0f に設定)
-	pauseBtnTitle_ = CreatePauseButton("", 220.0f, parent);
+	// 3. タイトルに戻るボタン (Y座標オフセットを 300.0f に設定してより大きく隙間を開ける)
+	pauseBtnTitle_ = CreatePauseButton("", 300.0f, parent);
 	if(renderer_) pauseRegistry_.get<UIImageComponent>(pauseBtnTitle_).textureHandle = renderer_->LoadTexture2D("Resources/Textures/Button/returnToTitle.png");
 	pauseRegistry_.get<RectTransformComponent>(pauseBtnTitle_).size = {350.0f, 88.0f};
 	// 少し明るめ（1.4f）に微ブースト
