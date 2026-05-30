@@ -26,6 +26,9 @@ static uint32_t s_swingSeHandle = 0xFFFFFFFF;
 static uint32_t s_damageSeHandle = 0xFFFFFFFF;
 static uint32_t s_flightSeHandle = 0xFFFFFFFF;
 static uint32_t s_dashSeHandle = 0xFFFFFFFF;
+static uint32_t s_swingingHitSeHandle = 0xFFFFFFFF;
+static uint32_t s_chargeAttackSeHandle = 0xFFFFFFFF;
+static uint32_t s_swordSkillsSeHandle = 0xFFFFFFFF;
 
 
 bool PlayerScript::s_isHelpOpen = false;
@@ -429,6 +432,27 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 				cam->StartShake(0.15f, 0.35f); // 中
 			} else {
 				cam->StartShake(0.2f, 0.6f); // 強
+			}
+
+			// チャージ攻撃中はHitSEを流さない
+			bool isChargeAttackActive = false;
+			entt::entity sword = scene->FindObjectByName(swordName_);
+			if (sword != entt::null && scene->GetRegistry().all_of<MotionComponent>(sword)) {
+				auto& motion = scene->GetRegistry().get<MotionComponent>(sword);
+				if (motion.activeClip == "SwordChargeAttack") {
+					isChargeAttackActive = true;
+				}
+			}
+
+			if (!isChargeAttackActive) {
+				if (auto* audio = Engine::Audio::GetInstance()) {
+					if (s_swingingHitSeHandle == 0xFFFFFFFF) {
+						s_swingingHitSeHandle = audio->Load("Resources/Audio/SE/SwingingHit.mp3");
+					}
+					if (s_swingingHitSeHandle != 0xFFFFFFFF) {
+						audio->Play(s_swingingHitSeHandle, false, 0.7f * audio->GetMasterSEVolume());
+					}
+				}
 			}
 		});
 		// ★追加: 強化弾ヒットイベント → 鏡割れエフェクト生成
@@ -1734,6 +1758,15 @@ void PlayerScript::UpdateSword(entt::entity /*entity*/, GameScene* scene, float 
 
 						if (auto* camera = scene->GetContext().camera) {
 							camera->StartShake(0.5f, 0.8f, 0.04f); // 激しい揺れ
+						}
+
+						if (auto* audio = Engine::Audio::GetInstance()) {
+							if (s_chargeAttackSeHandle == 0xFFFFFFFF) {
+								s_chargeAttackSeHandle = audio->Load("Resources/Audio/SE/ChargeAttack.mp3");
+							}
+							if (s_chargeAttackSeHandle != 0xFFFFFFFF) {
+								audio->Play(s_chargeAttackSeHandle, false, 0.8f * audio->GetMasterSEVolume());
+							}
 						}
 					}
 					if (t < 0.1f)
@@ -3171,11 +3204,11 @@ void PlayerScript::ExecuteSkill(entt::entity entity, GameScene* scene) {
 			motion.PlayAnimation("Combo2"); // 振り下ろすモーション
 			isAttacking_ = true;
 			if (auto* audio = Engine::Audio::GetInstance()) {
-				if (s_swingSeHandle == 0xFFFFFFFF) {
-					s_swingSeHandle = audio->Load("Resources/Audio/SE/Swinging.mp3");
+				if (s_swordSkillsSeHandle == 0xFFFFFFFF) {
+					s_swordSkillsSeHandle = audio->Load("Resources/Audio/SE/SwordSkills.mp3");
 				}
-				if (s_swingSeHandle != 0xFFFFFFFF) {
-					audio->Play(s_swingSeHandle, false, 0.7f * audio->GetMasterSEVolume());
+				if (s_swordSkillsSeHandle != 0xFFFFFFFF) {
+					audio->Play(s_swordSkillsSeHandle, false, 0.7f * audio->GetMasterSEVolume());
 				}
 			}
 		}
