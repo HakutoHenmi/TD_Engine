@@ -285,6 +285,7 @@ void PlayerScript::Start(entt::entity entity, GameScene* scene) {
 		std::cout << "PlayerScript Started: Greatsword & Gun Initialized.\n";
 	}
 	skillFrameTextureHandle_ = renderer->LoadTexture2D("Resources/Textures/GamaUI/swordSkillCoolDown.png");
+	skillFrameTextureHandleGun_ = renderer->LoadTexture2D("Resources/Textures/GamaUI/overClock.png");
 }
 
 void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
@@ -2332,9 +2333,9 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 
 	// ===== 11. スキルクールタイム/バフ円形UI =====
 	{
-		float skillGaugeX = gaugeX - 50.0f; // 圧力計の左上
+		float skillGaugeX = gaugeX - 40.0f; // 圧力計の左上
 		float skillGaugeY = gaugeY - 90.0f;
-		float sR = 30.0f;
+		float sR = 35.0f;
 		
 		float skillRatio = 0.0f;
 		Engine::Vector4 skillColor = {0.5f, 0.5f, 0.5f, 1.0f};
@@ -2355,15 +2356,15 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 
 		// ゲージ
 		renderer->DrawSDFUI({
-			{skillGaugeX, skillGaugeY}, {sR, sR},
+			{skillGaugeX-5.0f, skillGaugeY+4.0f}, {sR, sR},
 			0, (skillRatio >= 1.0f) ? 3.0f : 0.0f, skillColor,
 			1, 0, 0, 0, skillRatio, 1.0f, false // shape = 1 (Circle)
 		});
 		// 背景
 		Engine::Renderer::SpriteDesc skillDesc;
 
-		skillDesc.w = 120.0f;
-		skillDesc.h = 120.0f;
+		skillDesc.w = 160.0f;
+		skillDesc.h = 160.0f;
 
 		skillDesc.x = skillGaugeX - skillDesc.w * 0.5f;
 		skillDesc.y = skillGaugeY - skillDesc.h * 0.5f;
@@ -2374,8 +2375,14 @@ void PlayerScript::DrawPressureGauge(GameScene* scene) {
 		} else {
 			skillDesc.color = {1.0f, 1.0f, 1.0f, 1.0f}; // 白くハッキリ
 		}
+		uint32_t skillTextureHandle = 0;
 
-		renderer->DrawSprite(skillFrameTextureHandle_, skillDesc);
+		if (playerType_ == PlayerType::Gun) {
+			skillTextureHandle = skillFrameTextureHandleGun_;
+		} else {
+			skillTextureHandle = skillFrameTextureHandle_;
+		}
+		renderer->DrawSprite(skillTextureHandle, skillDesc);
 		// ラベル "E" または "SKILL"
 		float tw = renderer->MeasureTextWidth("E", 0.35f);
 		renderer->DrawString("E", skillGaugeX - tw * 0.5f, skillGaugeY - 10.0f, 0.35f, {1, 1, 1, 0.9f});

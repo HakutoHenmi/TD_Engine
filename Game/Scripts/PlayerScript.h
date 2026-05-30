@@ -232,7 +232,7 @@ private:
 	float buffRadius_ = 8.0f;
 	// ★追加: スキルのエフェクト用テクスチャハンドル
 	uint32_t skillFrameTextureHandle_ = 0;
-
+	uint32_t skillFrameTextureHandleGun_ = 0;
 	// ★追加: ヘルプ画面
 	bool isHelpOpen_ = false;
 	bool prevTabKeyDown_ = false;
