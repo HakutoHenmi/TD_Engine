@@ -27,6 +27,9 @@ public:
 	void OnEditorUI() override;
 	void OnDestroy(entt::entity entity, GameScene* scene) override;
 
+	std::string SerializeParameters() override;
+	void DeserializeParameters(const std::string& data) override;
+
 	void Installation(GameScene* scene, const std::string& objPath);
 	bool TryGetTerrainHitPoint(GameScene* scene, Engine::Vector3& outHitPoint) const;
 	void DrawPlacementPreview(GameScene* scene, const Engine::Vector3& hitPoint, const std::string& objPath, bool canPlace, bool drawExtras = true);
@@ -102,6 +105,14 @@ private:
 
 	entt::entity enemyCountUI_ = entt::null;
 	entt::entity installationCostUI_ = entt::null;
+	entt::entity waveCountUI_ = entt::null;
+
+	std::string waveCountFrameTexPath_ = "";
+	std::string enemyCountFrameTexPath_ = "";
+	DirectX::XMFLOAT2 waveCountFrameSize_ = {300.0f, 100.0f};
+	DirectX::XMFLOAT2 enemyCountFrameSize_ = {300.0f, 100.0f};
+	entt::entity waveCountFrameUI_ = entt::null;
+	entt::entity enemyCountFrameUI_ = entt::null;
 
 	// インサートカメラ演出用
 	std::vector<CameraWaypoint> insertWaypoints_;

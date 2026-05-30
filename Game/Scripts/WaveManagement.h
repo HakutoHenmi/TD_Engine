@@ -32,6 +32,8 @@ public:
 		return currentWave_ >= static_cast<int>(instance_->enemySpawners_.size()) - 1;
 	}
 	static void EndGame() { isEnded_ = true; }
+	static int GetCurrentWave() { return currentWave_; }
+	int GetTotalWaves() const { return static_cast<int>(enemySpawners_.size()); }
 
 	int GetTotalMaxEnemies(GameScene* scene);
 	int GetTotalRemainingEnemies(GameScene* scene);
