@@ -551,8 +551,8 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 				float theta2 = (2.0f * 3.14159265f * (i + 1)) / segments;
 				Engine::Vector3 p1 = {pTc.translate.x + currentBuffRadius * std::cos(theta1), pTc.translate.y + 0.15f, pTc.translate.z + currentBuffRadius * std::sin(theta1)};
 				Engine::Vector3 p2 = {pTc.translate.x + currentBuffRadius * std::cos(theta2), pTc.translate.y + 0.15f, pTc.translate.z + currentBuffRadius * std::sin(theta2)};
-				// 発光する黄緑色のラインでオーラ範囲を描画
-				renderer->DrawLine3D(p1, p2, {0.6f, 1.0f, 0.2f, 1.0f}, true);
+				// 発光する青色のラインでオーラ範囲を描画
+				renderer->DrawLine3D(p1, p2, {0.0f, 0.8f, 1.0f, 1.0f}, true);
 			}
 
 			// ★追加: バフ中のタワーへのエネルギー線を描画 (案1)
@@ -564,11 +564,11 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 					Engine::Vector3 tCenter = {tTc.translate.x, tTc.translate.y + 1.5f, tTc.translate.z};
 					
 					// 少し線を太く/光って見せるため、微小なオフセットをつけて複数本描画
-					renderer->DrawLine3D(pCenter, tCenter, {0.5f, 1.0f, 0.2f, 1.0f}, true);
+					renderer->DrawLine3D(pCenter, tCenter, {0.0f, 0.8f, 1.0f, 1.0f}, true);
 					Engine::Vector3 o1 = {tCenter.x + 0.05f, tCenter.y, tCenter.z + 0.05f};
-					renderer->DrawLine3D(pCenter, o1, {0.5f, 1.0f, 0.2f, 0.6f}, true);
+					renderer->DrawLine3D(pCenter, o1, {0.0f, 0.8f, 1.0f, 0.6f}, true);
 					Engine::Vector3 o2 = {tCenter.x - 0.05f, tCenter.y, tCenter.z - 0.05f};
-					renderer->DrawLine3D(pCenter, o2, {0.5f, 1.0f, 0.2f, 0.6f}, true);
+					renderer->DrawLine3D(pCenter, o2, {0.0f, 0.8f, 1.0f, 0.6f}, true);
 				}
 			}
 		}
@@ -3331,7 +3331,7 @@ void PlayerScript::DrawHelpUI(GameScene* scene) {
 
 		drawText("1. プレイヤー自身が周囲の防衛設備をバフ！");
 		drawText("   タワーの攻撃力や連射速度を大幅強化可能。");
-		drawText("   ※足元の緑色のオーラがバフ範囲。");
+		drawText("   ※足元の青色のオーラがバフ範囲。");
 		curY += lineHeight * 0.4f;
 		drawText("2. 剣士はブーストで敵を翻弄し、");
 		drawText("   強力な「溜めスラッシュ」で一網打尽！");

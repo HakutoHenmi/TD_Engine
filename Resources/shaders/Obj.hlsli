@@ -104,7 +104,7 @@ cbuffer LightGroup : register(b2)
 // マテリアル定数 (固定値)
 static const float3 m_ambient = float3(0.3, 0.3, 0.3);
 static const float3 m_diffuse = float3(1.0, 1.0, 1.0);
-static const float3 m_specular = float3(0.5, 0.5, 0.5);
+static const float3 m_specular = float3(0.05, 0.05, 0.05);
 static const float m_alpha = 1.0;
 static const float3 m_uv_scale = float3(1.0, 1.0, 1.0);
 static const float3 m_uv_offset = float3(0.0, 0.0, 0.0);

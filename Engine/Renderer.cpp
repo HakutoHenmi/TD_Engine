@@ -2357,6 +2357,13 @@ float4 main(PSIn i) : SV_TARGET { return i.color; }
 		if (vsUnlit && psUnlit) {
 			CreatePSO("Unlit", vsUnlit.Get(), psUnlit.Get());
 		}
+
+		// --- Ground (地面用マットシェーダー) ---
+		auto vsGround = CompileShaderFromFile(L"Resources/shaders/ObjVS.hlsl", "main", "vs_5_0");
+		auto psGround = CompileShaderFromFile(L"Resources/shaders/GroundPS.hlsl", "main", "ps_5_0");
+		if (vsGround && psGround) {
+			CreatePSO("Ground", vsGround.Get(), psGround.Get());
+		}
 	}
 
 	// ★追加: 川用シェーダー
