@@ -4,6 +4,7 @@
 #include "../../Engine/Input.h"
 #include "../../Engine/Renderer.h"
 #include "../../Engine/WindowDX.h"
+#include "../../Engine/Audio.h"
 #include <Windows.h>
 #include <random>
 #include <chrono>
@@ -16,6 +17,11 @@ void SelectManagerScript::Start(entt::entity entity, GameScene* scene) {
 
 	// ★追加: セレクト画面ではUI操作のためにカーソルを強制表示
 	while (ShowCursor(TRUE) < 0);
+
+	// gear_roll SEをロード
+	if (auto* audio = Engine::Audio::GetInstance()) {
+		gearRollSeHandle_ = audio->Load("Resources/Audio/SE/gear_roll.mp3");
+	}
 
 	// ステージリスト
 	stages_.clear();
@@ -179,6 +185,19 @@ void SelectManagerScript::Update(entt::entity entity, GameScene* scene, float dt
 	if (!scene || !uiInitialized_) return;
 	auto& reg = scene->GetRegistry();
 
+	// gear_roll SEのタイマー更新と停止処理
+	if (gearRollTimer_ > 0.0f) {
+		gearRollTimer_ -= dt;
+		if (gearRollTimer_ <= 0.0f) {
+			if (gearRollVoiceHandle_ != 0) {
+				if (auto* audio = Engine::Audio::GetInstance()) {
+					audio->Stop(gearRollVoiceHandle_);
+				}
+				gearRollVoiceHandle_ = 0;
+			}
+		}
+	}
+
 	// ★追加: 初回起動時の初期化、および「選択が切り替わってギアが回るたび」にランダムな角度オフセットを再設定
 	if (!initializedOffsets_ || selectedIndex_ != prevSelectedIndex_) {
 		static std::random_device rd;
@@ -190,6 +209,17 @@ void SelectManagerScript::Update(entt::entity entity, GameScene* scene, float dt
 		for (int i = 0; i < 4; ++i) {
 			bgGearOffsets_[i] = dist(gen);
 		}
+
+		if (initializedOffsets_ && selectedIndex_ != prevSelectedIndex_) {
+			if (auto* audio = Engine::Audio::GetInstance()) {
+				if (gearRollVoiceHandle_ != 0) {
+					audio->Stop(gearRollVoiceHandle_);
+				}
+				gearRollVoiceHandle_ = audio->Play(gearRollSeHandle_, false, 0.6f * audio->GetMasterSEVolume());
+				gearRollTimer_ = 1.0f;
+			}
+		}
+
 		initializedOffsets_ = true;
 		prevSelectedIndex_ = selectedIndex_;
 	}

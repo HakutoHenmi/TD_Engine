@@ -39,6 +39,9 @@ private:
 	
 	float steamTimerH_ = 0.0f; // ★水平パイプ用タイマー
 	float steamTimerV_ = 0.5f; // ★垂直パイプ用タイマー（タイミングをずらす）
+	uint32_t gearRollSeHandle_ = 0xFFFFFFFF;
+	size_t gearRollVoiceHandle_ = 0;
+	float gearRollTimer_ = 0.0f;
 };
 
 } // namespace Game
