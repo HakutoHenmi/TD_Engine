@@ -794,6 +794,15 @@ bool SkillTree::HandlePageButtonInput(float screenW, float screenH, float mouseX
 		}
 		if (currentPageId_ > 0) {
 			currentPageId_ -= 1;
+			if (auto* audio = Engine::Audio::GetInstance()) {
+				static uint32_t s_turnOverSeHandle = 0xFFFFFFFF;
+				if (s_turnOverSeHandle == 0xFFFFFFFF) {
+					s_turnOverSeHandle = audio->Load("Resources/Audio/SE/TurnOver.mp3");
+				}
+				if (s_turnOverSeHandle != 0xFFFFFFFF) {
+					audio->Play(s_turnOverSeHandle, false, 0.9f * audio->GetMasterSEVolume());
+				}
+			}
 		}
 		return true;
 	}
@@ -806,6 +815,15 @@ bool SkillTree::HandlePageButtonInput(float screenW, float screenH, float mouseX
 		}
 		if (currentPageId_ < pageCount_ - 1) {
 			currentPageId_ += 1;
+			if (auto* audio = Engine::Audio::GetInstance()) {
+				static uint32_t s_turnOverSeHandle = 0xFFFFFFFF;
+				if (s_turnOverSeHandle == 0xFFFFFFFF) {
+					s_turnOverSeHandle = audio->Load("Resources/Audio/SE/TurnOver.mp3");
+				}
+				if (s_turnOverSeHandle != 0xFFFFFFFF) {
+					audio->Play(s_turnOverSeHandle, false, 0.6f * audio->GetMasterSEVolume());
+				}
+			}
 		}
 		return true;
 	}
