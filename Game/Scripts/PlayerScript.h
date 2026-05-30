@@ -180,6 +180,8 @@ private:
 	const float SWORD_CHARGE_MAX = 1.2f;
 	const float SWORD_CHARGE_COST = 35.0f;
 
+	size_t chargeVoiceHandle_ = 0;
+
 	// ★追加: 反動後退
 	DirectX::XMFLOAT3 recoilVelocity_ = {0, 0, 0};
 

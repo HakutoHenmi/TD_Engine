@@ -21,6 +21,7 @@
 namespace Game {
 
 static uint32_t s_shotSeHandle = 0xFFFFFFFF;
+static uint32_t s_chargeSeHandle = 0xFFFFFFFF;
 
 
 bool PlayerScript::s_isHelpOpen = false;
@@ -525,6 +526,23 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 
 	bool isPrep = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase);
+	bool isInsert = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::InsertPhase);
+
+	bool isDead = false;
+	if (scene->GetRegistry().all_of<HealthComponent>(entity)) {
+		isDead = scene->GetRegistry().get<HealthComponent>(entity).isDead;
+	}
+
+	if (isPrep || isInsert || PhaseSystemScript::IsResultSequenceActive() || isHelpOpen_ || isDead || scene->IsPaused()) {
+		if (chargeVoiceHandle_ != 0) {
+			if (auto* audio = Engine::Audio::GetInstance()) {
+				audio->Stop(chargeVoiceHandle_);
+			}
+			chargeVoiceHandle_ = 0;
+		}
+		isCharging_ = false;
+		isSwordCharging_ = false;
+	}
 
 	if (skillCooldown_ > 0.0f)
 		skillCooldown_ -= dt;
@@ -675,7 +693,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 
 	isPrep = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::PreparationPhase);
-	bool isInsert = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::InsertPhase);
+	isInsert = (hasPhaseSystem && PhaseSystemScript::IsPhase() == PhaseSystemScript::InsertPhase);
 
 	// ★追加: インサート中や準備フェーズ中、またはリザルト画面、ヘルプ画面中は武器の切り替えやスキル発動を無効化
 	if (!isPrep && !isInsert && !PhaseSystemScript::IsResultSequenceActive() && !isHelpOpen_) {
@@ -1417,6 +1435,14 @@ void PlayerScript::UpdateAttack(entt::entity entity, GameScene* scene, float dt)
 			if (!isAttacking_ && !isSwordCharging_) {
 				isSwordCharging_ = true;
 				swordChargeTime_ = 0.0f;
+				if (auto* audio = Engine::Audio::GetInstance()) {
+					if (s_chargeSeHandle == 0xFFFFFFFF) {
+						s_chargeSeHandle = audio->Load("Resources/Audio/SE/charge.mp3");
+					}
+					if (s_chargeSeHandle != 0xFFFFFFFF && chargeVoiceHandle_ == 0) {
+						chargeVoiceHandle_ = audio->Play(s_chargeSeHandle, true, 0.7f * audio->GetMasterSEVolume());
+					}
+				}
 			}
 
 			if (isSwordCharging_) {
@@ -1444,6 +1470,12 @@ void PlayerScript::UpdateAttack(entt::entity entity, GameScene* scene, float dt)
 		} else {
 			if (isSwordCharging_) {
 				isSwordCharging_ = false;
+				if (chargeVoiceHandle_ != 0) {
+					if (auto* audio = Engine::Audio::GetInstance()) {
+						audio->Stop(chargeVoiceHandle_);
+					}
+					chargeVoiceHandle_ = 0;
+				}
 				if (swordChargeTime_ >= 0.35f && (steamPressure_ > 0.0f || isSkillActive_)) { // ★少しでもあれば発動可能
 					// ★溜め攻撃発動！
 					steamPressure_ -= SWORD_CHARGE_COST;
@@ -1851,6 +1883,14 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 			isCharging_ = true;
 			chargeTime_ = 0.0f;
 			chargeVfxTimer_ = 0.0f;
+			if (auto* audio = Engine::Audio::GetInstance()) {
+				if (s_chargeSeHandle == 0xFFFFFFFF) {
+					s_chargeSeHandle = audio->Load("Resources/Audio/SE/charge.mp3");
+				}
+				if (s_chargeSeHandle != 0xFFFFFFFF && chargeVoiceHandle_ == 0) {
+					chargeVoiceHandle_ = audio->Play(s_chargeSeHandle, true, 0.7f * audio->GetMasterSEVolume());
+				}
+			}
 		}
 
 		if (isCharging_) {
@@ -1914,6 +1954,12 @@ void PlayerScript::UpdateGunAttack(entt::entity entity, GameScene* scene, float 
 	// ★ボタンを離した時の処理
 	if (!currentAttackKeyDown && prevAttackKeyDown_ && isCharging_) {
 		isCharging_ = false;
+		if (chargeVoiceHandle_ != 0) {
+			if (auto* audio = Engine::Audio::GetInstance()) {
+				audio->Stop(chargeVoiceHandle_);
+			}
+			chargeVoiceHandle_ = 0;
+		}
 
 		// スキル発動中（オーバークロック）はコストを無視して撃てる
 		float cCost = CHARGE_SHOT_COST * (isFlying_ ? 0.5f : 1.0f); // ★飛行中はコスト半減
@@ -2935,6 +2981,13 @@ void PlayerScript::SwitchPlayerType(entt::entity /*entity*/, GameScene* scene) {
 
 	isCharging_ = false;
 	chargeTime_ = 0.0f;
+
+	if (chargeVoiceHandle_ != 0) {
+		if (auto* audio = Engine::Audio::GetInstance()) {
+			audio->Stop(chargeVoiceHandle_);
+		}
+		chargeVoiceHandle_ = 0;
+	}
 
 	// アニメーション中のフラグやタイマーもリセット
 	gunComboStep_ = 0;
