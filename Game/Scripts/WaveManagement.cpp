@@ -328,6 +328,8 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 			auto view = scene->GetRegistry().view<TagComponent>();
 			for (auto e : view) {
 				if (view.get<TagComponent>(e).tag == TagType::Enemy) {
+					// ScriptComponentを持たないエンティティ（BossShieldなど）は敵数に含めない
+					if (!scene->GetRegistry().all_of<ScriptComponent>(e)) continue;
 					aliveCount++;
 				}
 			}
