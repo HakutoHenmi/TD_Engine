@@ -520,6 +520,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 	// ★ スキルツリーの入力処理: スキルツリーのUI開閉処理 (NキーまたはコントローラーのBACKボタン)
 	bool keyN = input->Trigger(DIK_N) || (GetAsyncKeyState('N') & 0x8001) || input->IsControllerButtonTrigger(XINPUT_GAMEPAD_BACK);
+	bool keyEsc = input->Trigger(DIK_ESCAPE) || (GetAsyncKeyState(VK_ESCAPE) & 0x8001); // ★追加: ESCキー
 
 	// 外部(EnemySpawnerScript など)からのフェーズ変更要求を反映
 	if (!isPhaseTransitioning_ && isPhase_ != Transition && NextPhase_ != isPhase_) {
@@ -539,8 +540,10 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		}
 
 		if (!isTutorial) {
-			// Nキーでスキルツリーの開閉
+			// NキーまたはESCキー(開いている場合)でスキルツリーの開閉
 			if (keyN && !preKeyN_) {
+				skillTree_.Toggle(scene);
+			} else if (skillTree_.IsOpen() && keyEsc) {
 				skillTree_.Toggle(scene);
 			}
 

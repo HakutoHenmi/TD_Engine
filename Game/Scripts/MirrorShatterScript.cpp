@@ -362,6 +362,8 @@ void MirrorShatterScript::SpawnSparks(int count) {
 		sp.velocity = {n.x * spd, n.y * spd, n.z * spd};
 		sp.life = 0.2f + (rand() % 100) / 100.0f * 0.5f;
 		sp.maxLife = sp.life;
+		sp.size = 1.0f;
+		sp.colorType = 0;
 		sparks_.push_back(sp);
 	}
 }
