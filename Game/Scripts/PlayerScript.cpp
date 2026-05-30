@@ -22,6 +22,10 @@ namespace Game {
 
 static uint32_t s_shotSeHandle = 0xFFFFFFFF;
 static uint32_t s_chargeSeHandle = 0xFFFFFFFF;
+static uint32_t s_swingSeHandle = 0xFFFFFFFF;
+static uint32_t s_damageSeHandle = 0xFFFFFFFF;
+static uint32_t s_flightSeHandle = 0xFFFFFFFF;
+static uint32_t s_dashSeHandle = 0xFFFFFFFF;
 
 
 bool PlayerScript::s_isHelpOpen = false;
@@ -498,6 +502,16 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 				auto& hc = scene->GetRegistry().get<HealthComponent>(entity);
 				hc.invincibleTime = 1.0f;
 			}
+
+			// 4. 被ダメージ音（DamageSE）を再生
+			if (auto* audio = Engine::Audio::GetInstance()) {
+				if (s_damageSeHandle == 0xFFFFFFFF) {
+					s_damageSeHandle = audio->Load("Resources/Audio/SE/Damage.mp3");
+				}
+				if (s_damageSeHandle != 0xFFFFFFFF) {
+					audio->Play(s_damageSeHandle, false, 0.8f * audio->GetMasterSEVolume());
+				}
+			}
 		});
 		debugSubscribeCount_ += 1;
 		isSubscribed_ = true;
@@ -785,6 +799,15 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 				steamPressure_ -= DASH_COST;
 				if (steamPressure_ < 0.0f)
 					steamPressure_ = 0.0f; // リチャージ判定へ
+
+				if (auto* audio = Engine::Audio::GetInstance()) {
+					if (s_dashSeHandle == 0xFFFFFFFF) {
+						s_dashSeHandle = audio->Load("Resources/Audio/SE/Dash.mp3");
+					}
+					if (s_dashSeHandle != 0xFFFFFFFF) {
+						audio->Play(s_dashSeHandle, false, 0.7f * audio->GetMasterSEVolume());
+					}
+				}
 
 				float dx = 0.0f, dz = 0.0f;
 				if (scene->GetRegistry().all_of<PlayerInputComponent>(entity)) {
@@ -1360,6 +1383,28 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		}
 	}
 
+	// Update Flight SE based on isFlying_ state
+	bool shouldPlayFlight = isFlying_ && !scene->IsPaused() && !PhaseSystemScript::IsResultSequenceActive() && !isHelpOpen_ && !isDead && !isPrep && !isInsert;
+	if (shouldPlayFlight) {
+		if (flightVoiceHandle_ == 0) {
+			if (auto* audio = Engine::Audio::GetInstance()) {
+				if (s_flightSeHandle == 0xFFFFFFFF) {
+					s_flightSeHandle = audio->Load("Resources/Audio/SE/Flight.mp3");
+				}
+				if (s_flightSeHandle != 0xFFFFFFFF) {
+					flightVoiceHandle_ = audio->Play(s_flightSeHandle, true, 0.6f * audio->GetMasterSEVolume());
+				}
+			}
+		}
+	} else {
+		if (flightVoiceHandle_ != 0) {
+			if (auto* audio = Engine::Audio::GetInstance()) {
+				audio->Stop(flightVoiceHandle_);
+			}
+			flightVoiceHandle_ = 0;
+		}
+	}
+
 	// Update 内での ImGui 呼び出しは例外の原因となる可能性があるため、OnEditorUI に移動しました。
 }
 
@@ -1490,6 +1535,14 @@ void PlayerScript::UpdateAttack(entt::entity entity, GameScene* scene, float dt)
 					if (sword != entt::null) {
 						auto& motion = scene->GetRegistry().get<MotionComponent>(sword);
 						motion.PlayAnimation("SwordChargeAttack");
+						if (auto* audio = Engine::Audio::GetInstance()) {
+							if (s_swingSeHandle == 0xFFFFFFFF) {
+								s_swingSeHandle = audio->Load("Resources/Audio/SE/Swinging.mp3");
+							}
+							if (s_swingSeHandle != 0xFFFFFFFF) {
+								audio->Play(s_swingSeHandle, false, 0.7f * audio->GetMasterSEVolume());
+							}
+						}
 
 						// ★前方にジャンプする推進力を与える
 						auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
@@ -1536,6 +1589,14 @@ void PlayerScript::UpdateAttack(entt::entity entity, GameScene* scene, float dt)
 				comboCount_++;
 				attackQueued_ = false;
 				motion.PlayAnimation("Combo" + std::to_string(comboCount_));
+				if (auto* audio = Engine::Audio::GetInstance()) {
+					if (s_swingSeHandle == 0xFFFFFFFF) {
+						s_swingSeHandle = audio->Load("Resources/Audio/SE/Swinging.mp3");
+					}
+					if (s_swingSeHandle != 0xFFFFFFFF) {
+						audio->Play(s_swingSeHandle, false, 0.5f * audio->GetMasterSEVolume());
+					}
+				}
 			} else {
 				isAttacking_ = false;
 				comboCount_ = 0;
@@ -1549,6 +1610,14 @@ void PlayerScript::UpdateAttack(entt::entity entity, GameScene* scene, float dt)
 			comboCount_ = 1;
 			attackQueued_ = false;
 			motion.PlayAnimation("Combo1");
+			if (auto* audio = Engine::Audio::GetInstance()) {
+				if (s_swingSeHandle == 0xFFFFFFFF) {
+					s_swingSeHandle = audio->Load("Resources/Audio/SE/Swinging.mp3");
+				}
+				if (s_swingSeHandle != 0xFFFFFFFF) {
+					audio->Play(s_swingSeHandle, false, 0.5f * audio->GetMasterSEVolume());
+				}
+			}
 		} else {
 			if (!isSheathed_) {
 				sheatheTimer_ += scene->GetContext().dt;
@@ -3101,6 +3170,14 @@ void PlayerScript::ExecuteSkill(entt::entity entity, GameScene* scene) {
 			auto& motion = scene->GetRegistry().get<MotionComponent>(sword);
 			motion.PlayAnimation("Combo2"); // 振り下ろすモーション
 			isAttacking_ = true;
+			if (auto* audio = Engine::Audio::GetInstance()) {
+				if (s_swingSeHandle == 0xFFFFFFFF) {
+					s_swingSeHandle = audio->Load("Resources/Audio/SE/Swinging.mp3");
+				}
+				if (s_swingSeHandle != 0xFFFFFFFF) {
+					audio->Play(s_swingSeHandle, false, 0.7f * audio->GetMasterSEVolume());
+				}
+			}
 		}
 		std::cout << "Executed Sword Skill: Dimension Wave\n";
 	} else {
