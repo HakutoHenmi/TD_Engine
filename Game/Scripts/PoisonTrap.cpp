@@ -49,6 +49,11 @@ void PoisonTrap::Start(entt::entity entity, GameScene* scene) {
 		hc.hp = 500.0f;
 		hc.maxHp = 500.0f;
 	}
+
+	if (!registry.all_of<HurtboxComponent>(entity)) {
+		HurtboxComponent& hurtbox = registry.emplace<HurtboxComponent>(entity);
+		hurtbox.size = {2.0f, 2.0f, 2.0f}; // 見た目に合わせてサイズは調整してね！
+	}
 }
 
 void PoisonTrap::Update(entt::entity entity, GameScene* scene, float dt) {

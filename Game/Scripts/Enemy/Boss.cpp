@@ -13,7 +13,7 @@ void Boss::Start(entt::entity entity, GameScene* scene) {
 	// ボスのステータス設定
 	hp_ = 2000.0f;
 	maxHp_ = 2000.0f;
-	speed_ = 1.0f; // ボスなので遅め
+	speed_ = 5.0f; // ボスなので遅め
 	searchRange_ = 30.0f;
 	attackRange_ = 5.0f;
 
