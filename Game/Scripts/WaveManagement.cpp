@@ -1,22 +1,22 @@
 #include "WaveManagement.h"
+#include "../../Engine/Renderer.h"
+#include "../../Engine/SceneManager.h"
+#include "../../Engine/ThirdParty/nlohmann/json.hpp"
+#include "../../Engine/WindowDX.h"
+#include "EnemySpawnerScript.h"
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
-#include "EnemySpawnerScript.h"
-#include "../../Engine/Renderer.h"
-#include "../../Engine/SceneManager.h"
-#include "../../Engine/WindowDX.h"
-#include "../../Engine/ThirdParty/nlohmann/json.hpp"
 #ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
 #endif
+#include <algorithm>
 #include <cmath>
 #include <iostream>
-#include <algorithm>
 
 #include "PhaseSystemScript.h"
-#include "TutorialScript.h"
 #include "PlayerScript.h" // ★追加
+#include "TutorialScript.h"
 
 using json = nlohmann::json;
 
@@ -25,7 +25,8 @@ namespace Game {
 int WaveManagement::currentWave_ = -1;
 
 void WaveManagement::Start(entt::entity entity, GameScene* scene) {
-	if (!scene) return;
+	if (!scene)
+		return;
 
 	instance_ = this;
 
@@ -36,7 +37,6 @@ void WaveManagement::Start(entt::entity entity, GameScene* scene) {
 	currentWave_ = -1;
 	previousWave_ = -2;
 	isEnded_ = false;
-
 
 	// 名前に基づいてエンティティを解決
 	enemySpawners_.clear();
@@ -84,39 +84,39 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 	if (renderer && (isEditorMode || isPrepOrBattle) && !PhaseSystemScript::IsResultSequenceActive() && !PlayerScript::IsHelpOpen()) {
 		for (size_t wi = 0; wi < enemySpawners_.size(); ++wi) {
 			// ゲームプレイ中は現在の（次に来る）ウェーブのものだけ表示する
-				if (!isEditorMode) {
-					int targetWave = 0;
-					auto phase = PhaseSystemScript::IsPhase();
-					if (phase == PhaseSystemScript::PreparationPhase || phase == PhaseSystemScript::InsertPhase) {
-						targetWave = PhaseSystemScript::GetCurrentPhase();
-					} else if (phase == PhaseSystemScript::BattlePhase) {
-						targetWave = currentWave_;
-					}
-
-					// (チュートリアル中のアイコン非表示処理は削除しました)
-
-					if (static_cast<int>(wi) != targetWave) {
-						continue;
-					}
+			if (!isEditorMode) {
+				int targetWave = 0;
+				auto phase = PhaseSystemScript::IsPhase();
+				if (phase == PhaseSystemScript::PreparationPhase || phase == PhaseSystemScript::InsertPhase) {
+					targetWave = PhaseSystemScript::GetCurrentPhase();
+				} else if (phase == PhaseSystemScript::BattlePhase) {
+					targetWave = currentWave_;
 				}
+
+				// (チュートリアル中のアイコン非表示処理は削除しました)
+
+				if (static_cast<int>(wi) != targetWave) {
+					continue;
+				}
+			}
 
 			for (entt::entity spawnerEntity : enemySpawners_[wi]) {
 				if (scene->GetRegistry().valid(spawnerEntity)) {
-					
+
 					// ★追加: スポナーの足元を照らすポイントライトを付与（黄色/オレンジ系）
 					if (!scene->GetRegistry().all_of<PointLightComponent>(spawnerEntity)) {
 						auto& pl = scene->GetRegistry().emplace<PointLightComponent>(spawnerEntity);
-						pl.color = { 1.0f, 0.8f, 0.2f };
+						pl.color = {1.0f, 0.8f, 0.2f};
 						pl.intensity = 3.5f;
 						pl.range = 8.0f;
-						pl.offset = { 0.0f, 1.5f, 0.0f }; // ★ ライトを少し上にオフセット
+						pl.offset = {0.0f, 1.5f, 0.0f}; // ★ ライトを少し上にオフセット
 						pl.enabled = true;
 					}
 
 					// スポナーの位置にプレビューを描画
 					if (auto* tc = scene->GetRegistry().try_get<TransformComponent>(spawnerEntity)) {
 						Engine::Matrix4x4 wm = scene->GetWorldMatrix(static_cast<int>(spawnerEntity));
-						Engine::Vector3 p = { wm.m[3][0], wm.m[3][1], wm.m[3][2] };
+						Engine::Vector3 p = {wm.m[3][0], wm.m[3][1], wm.m[3][2]};
 
 						// ビルボード付きのplaneを描画
 						static uint32_t planeMeshHandle = 0;
@@ -134,7 +134,7 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 						float pitch = -camRot.x;
 
 						// ★変更: アイコン自体を発光させるため、HDRカラー（1.0以上の値）を設定
-						Engine::Vector4 planeColor = { 2.5f, 2.2f, 0.5f, 1.0f };
+						Engine::Vector4 planeColor = {2.5f, 2.2f, 0.5f, 1.0f};
 
 						if (auto* sc = scene->GetRegistry().try_get<ScriptComponent>(spawnerEntity)) {
 							for (auto& entry : sc->scripts) {
@@ -159,7 +159,7 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 							}
 						}
 
-						DirectX::XMFLOAT3 pFloat3 = { p.x, p.y, p.z };
+						DirectX::XMFLOAT3 pFloat3 = {p.x, p.y, p.z};
 						DirectX::XMMATRIX view = cam.View();
 
 						// 距離に応じた縮尺の計算 (元のスポナーの座標 pFloat3 とカメラの距離)
@@ -171,25 +171,26 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 
 						// 3Dアイコンは常にスポナーの位置に描画する (画面に寄せる処理は廃止)
 						Engine::Transform planeTr;
-						
+
 						// 地形の高さを取得し、地面から一定の高さ(5.0f)にアイコンを表示して埋まらないようにする
 						float groundY = scene->GetHeightAt(pFloat3.x, pFloat3.z, 1000.0f);
-						if (groundY <= -999.0f) groundY = pFloat3.y; // 地形がない場合はフォールバック
-						
-						planeTr.translate = { pFloat3.x, groundY + 5.0f, pFloat3.z };
-						planeTr.rotate = { pitch, yaw, 0.0f };
-						planeTr.scale = { tc->scale.x * 2.0f, tc->scale.y * 2.0f, tc->scale.z * 2.0f };
+						if (groundY <= -999.0f)
+							groundY = pFloat3.y; // 地形がない場合はフォールバック
+
+						planeTr.translate = {pFloat3.x, groundY + 5.0f, pFloat3.z};
+						planeTr.rotate = {pitch, yaw, 0.0f};
+						planeTr.scale = {tc->scale.x * 2.0f, tc->scale.y * 2.0f, tc->scale.z * 2.0f};
 						renderer->DrawMesh(planeMeshHandle, spawnerTexHandle, planeTr, planeColor, "Unlit");
 
 						// 2D Sprite表示 (距離が30m以上のとき画面上部にコンパスバー＋アイコン表示)
 						if (distance >= 30.0f) {
 							// ====== テクスチャパス設定 (ここを変えるだけで差し替え可能) ======
-							static const char* kCompassBarTexPath  = "Resources/Textures/Direction.png";  // 方角バー背景
-							static const char* kIndicatorTexPath   = "Resources/Textures/white1x1.png";  // 縦線インジケーター
+							static const char* kCompassBarTexPath = "Resources/Textures/Direction.png";     // 方角バー背景
+							static const char* kIndicatorTexPath = "Resources/Textures/DirectionFrame.png"; // 縦線インジケーター
 
 							// ====== テクスチャハンドルのロード (初回のみ) ======
 							static uint32_t compassBarTexHandle = 0;
-							static uint32_t indicatorTexHandle  = 0;
+							static uint32_t indicatorTexHandle = 0;
 							if (compassBarTexHandle == 0) {
 								compassBarTexHandle = renderer->LoadTexture2D(kCompassBarTexPath, false);
 							}
@@ -215,8 +216,10 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 							float angleDiff = spawnerAngle - camAngle;
 							// 角度差を [-PI, PI] にクランプ
 							const float PI_VAL = 3.1415926535f;
-							while (angleDiff < -PI_VAL) angleDiff += 2.0f * PI_VAL;
-							while (angleDiff > PI_VAL) angleDiff -= 2.0f * PI_VAL;
+							while (angleDiff < -PI_VAL)
+								angleDiff += 2.0f * PI_VAL;
+							while (angleDiff > PI_VAL)
+								angleDiff -= 2.0f * PI_VAL;
 
 							// 画面幅の 30% から 70% の範囲に角度をマッピングする
 							float screenW = (float)Engine::WindowDX::kW;
@@ -230,10 +233,10 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 							float targetX = startX + t * barWidth;
 
 							// ====== レイアウト定数 ======
-							const float barH       = 70.0f;    // 方角バーの高さ
-							const float barY       = 20.0f;   // 方角バーのY位置
-							const float iconSize   = 50.0f;   // 敵アイコンのサイズ
-							const float iconY      = barY + (barH - iconSize) * 0.5f; // アイコンをバーの中央に配置
+							const float barH = 70.0f;                            // 方角バーの高さ
+							const float barY = 20.0f;                            // 方角バーのY位置
+							const float iconSize = 50.0f;                        // 敵アイコンのサイズ
+							const float iconY = barY + (barH - iconSize) * 0.5f; // アイコンをバーの中央に配置
 
 							// ① 方角バー背景を描画 (全スポナーで共通、1回だけ描画)
 							//    カメラのヨー角に応じてUVをスクロールさせ、方角を反映する
@@ -241,16 +244,21 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 								// カメラの+Z（北）方向を向いたときにテクスチャの真ん中（N）が中央に来るようにオフセットを調整
 								float camYawNorm = (camAngle - (PI_VAL / 2.0f)) / (2.0f * PI_VAL);
 
+								
+
+								// ---- 方角バー (Direction) の描画 ----
+								// フレームの手前に配置し、カメラに合わせて動かす（UVスクロールあり）
 								Engine::Renderer::SpriteDesc barDesc;
 								barDesc.x = startX;
 								barDesc.y = barY;
 								barDesc.w = barWidth;
 								barDesc.h = barH;
-								barDesc.color = {1.0f, 1.0f, 1.0f, 0.6f};
+								barDesc.color = {1.0f, 1.0f, 1.0f, 1.0f};               // バーもくっきり表示
 								barDesc.uvScaleOffset = {1.0f, 1.0f, camYawNorm, 0.0f}; // X方向にUVスクロール
 								barDesc.rotationRad = 0.0f;
-								barDesc.layer = 99;
+								barDesc.layer = 98;
 								renderer->DrawSprite(compassBarTexHandle, barDesc);
+
 								compassBarDrawn = true;
 							}
 
@@ -263,9 +271,22 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 								iconDesc.h = iconSize;
 								iconDesc.color = {1.0f, 1.0f, 1.0f, 1.0f};
 								iconDesc.rotationRad = 0.0f;
-								iconDesc.layer = 101; // バーより手前
+								iconDesc.layer = 99; // バーより手前
 								renderer->DrawSprite(spawnerTexHandle, iconDesc);
 							}
+
+							// ---- フレーム (DirectionFrame) の描画 ----
+							Engine::Renderer::SpriteDesc frameDesc;
+							frameDesc.x = startX - 55;
+							frameDesc.y = barY - 40;
+							frameDesc.w = barWidth + 110.0f;
+							frameDesc.h = barH + 80.0f;
+							frameDesc.color = {1.0f, 1.0f, 1.0f, 1.0f};         // フレームは不透明
+							frameDesc.uvScaleOffset = {1.0f, 1.0f, 0.0f, 0.0f}; // UVスクロールなし
+							frameDesc.rotationRad = 0.0f;
+							frameDesc.layer = 100; // Directionより奥のレイヤー
+							renderer->DrawSprite(indicatorTexHandle, frameDesc);
+
 						}
 					}
 				}
@@ -333,7 +354,8 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 		}
 
 		int spawnedThisFrame = currentTotalSpawned - lastTotalSpawned_;
-		if (spawnedThisFrame < 0) spawnedThisFrame = 0;
+		if (spawnedThisFrame < 0)
+			spawnedThisFrame = 0;
 
 		int killedThisFrame = (lastAliveCount_ + spawnedThisFrame) - aliveCount;
 		if (killedThisFrame > 0) {
@@ -354,7 +376,8 @@ void WaveManagement::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
 }
 
 void WaveManagement::SpawnSpanner(int currentWave, GameScene* scene) {
-	if (!scene) return;
+	if (!scene)
+		return;
 
 	// すべてのスポナーを無効化する
 	for (auto& waveSpawners : enemySpawners_) {
@@ -367,7 +390,8 @@ void WaveManagement::SpawnSpanner(int currentWave, GameScene* scene) {
 		}
 	}
 
-	if (currentWave < 0 || currentWave >= static_cast<int>(enemySpawners_.size())) return;
+	if (currentWave < 0 || currentWave >= static_cast<int>(enemySpawners_.size()))
+		return;
 
 	// 現在のウェーブのスポナーだけを有効化し、スクリプトを初期化する
 	for (entt::entity e : enemySpawners_[currentWave]) {
@@ -511,7 +535,8 @@ void WaveManagement::OnEditorUI() {
 			// スポナーリストの描画
 			for (size_t si = 0; si < enemySpawners_[wi].size(); ++si) {
 				entt::entity spawner = enemySpawners_[wi][si];
-				if (!cachedScene_->GetRegistry().valid(spawner)) continue;
+				if (!cachedScene_->GetRegistry().valid(spawner))
+					continue;
 
 				auto* nc = cachedScene_->GetRegistry().try_get<NameComponent>(spawner);
 				std::string sname = nc ? nc->name : "Spawner";
@@ -597,7 +622,8 @@ std::string WaveManagement::SerializeParameters() {
 }
 
 void WaveManagement::DeserializeParameters(const std::string& data) {
-	if (data.empty()) return;
+	if (data.empty())
+		return;
 	try {
 		json j = json::parse(data);
 		if (j.contains("spawners")) {
