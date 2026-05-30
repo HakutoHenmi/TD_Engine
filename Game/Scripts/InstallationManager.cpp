@@ -306,7 +306,7 @@ void InstallationManager::Update(entt::entity /*entity*/, GameScene* scene, floa
 
 		UIButtonComponent& button = registry.get<UIButtonComponent>(btn.entity);
 
-		if (button.isHovered) {
+		if (button.isHovered && button.enabled) {
 
 			isDescriptionVisible_ = true;
 			hoveredButtonIndex_ = i;

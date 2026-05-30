@@ -159,7 +159,8 @@ public:
 						if (len > 0.0001f) {
 							Engine::Vector3 rayDir = {desiredX / len, 0, desiredZ / len};
 							float hitDist = 0;
-							if (ctx.scene->RayCast(rayOrig, rayDir, 0.6f, static_cast<uint32_t>(entity), hitDist)) {
+							float checkDist = std::max(0.6f, len + 0.3f); // ★移動量が大きい場合はレイの長さを伸ばす
+							if (ctx.scene->RayCast(rayOrig, rayDir, checkDist, static_cast<uint32_t>(entity), hitDist)) {
 								desiredX = 0;
 								desiredZ = 0;
 								rb.velocity.x = 0; rb.velocity.z = 0;

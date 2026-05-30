@@ -1,4 +1,4 @@
-﻿#ifndef NOMINMAX
+#ifndef NOMINMAX
 #define NOMINMAX
 #endif
 #include "GameScene.h"
@@ -500,6 +500,12 @@ void GameScene::Update() {
 
 	auto* input = Engine::Input::GetInstance();
 	bool isPauseTriggered = input->Trigger(DIK_ESCAPE) || escTrigger || input->IsControllerButtonTrigger(XINPUT_GAMEPAD_START);
+	
+	// ★追加: スキルツリーやヘルプ画面が開いている場合はポーズしない (ESCで閉じる操作と競合するため)
+	if (Game::PhaseSystemScript::isSkillTreeOpen_ || Game::PlayerScript::IsHelpOpen()) {
+		isPauseTriggered = false;
+	}
+
 	if (isPlaying_ && sceneName_ != "Title" && sceneName_ != "Select" && sceneName_ != "Result" && isPauseTriggered) {
 		isPaused_ = !isPaused_;
 		if (isPaused_) {
@@ -509,7 +515,9 @@ void GameScene::Update() {
 			for (auto e : pauseSettingsEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
 			
 			// ★追加: ポーズ開始時は確実にマウスカーソルを表示する
-			while (ShowCursor(TRUE) < 0);
+			int c = ShowCursor(TRUE);
+			while (c < 0) { c = ShowCursor(TRUE); }
+			while (c > 0) { c = ShowCursor(FALSE); }
 		} else {
 			// ポーズ解除: 全メニュー非表示
 			for (auto e : pauseMainEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
@@ -517,7 +525,9 @@ void GameScene::Update() {
 			
 			// ★追加: ポーズ解除時は、自動的にPlayerScriptがカーソルを制御するため、
 			// ここで一度カーソルを非表示にして同期を取る（非戦闘時はPlayerScriptで再表示される）
-			while (ShowCursor(FALSE) >= 0);
+			int c = ShowCursor(FALSE);
+			while (c >= 0) { c = ShowCursor(FALSE); }
+			while (c < -1) { c = ShowCursor(TRUE); }
 		}
 	}
 
@@ -2142,6 +2152,17 @@ void GameScene::UpdatePauseMenu() {
 				// タイトルに戻る
 				isPaused_ = false;
 				isPlaying_ = false;
+				
+				// ポーズメニューのUIを非表示
+				for (auto e : pauseMainEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+				for (auto e : pauseSettingsEntities_) pauseRegistry_.get<RectTransformComponent>(e).enabled = false;
+				
+				// ゲーム内の全てのUI（HPバー、コイン数など）もフェードアウト中に表示されないよう非表示にする
+				auto uiView = registry_.view<RectTransformComponent>();
+				for (auto e : uiView) {
+					registry_.get<RectTransformComponent>(e).enabled = false;
+				}
+
 				Engine::SceneManager::GetInstance()->RequestChange("Title");
 			}
 		}

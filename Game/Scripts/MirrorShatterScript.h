@@ -3,7 +3,7 @@
 #include "ObjectTypes.h"
 #include <DirectXMath.h>
 #include <vector>
-#include <deque>
+#include <vector>
 
 namespace Game {
 
@@ -73,7 +73,7 @@ private:
         float life, maxLife, size;
         int colorType;
     };
-    std::deque<SparkParticle> sparks_;
+    std::vector<SparkParticle> sparks_;
 
     void GenerateShards(GameScene* scene, int count);
     void GenerateGlassPanel(GameScene* scene, int count);

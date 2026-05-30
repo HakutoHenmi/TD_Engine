@@ -294,6 +294,13 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		if (currentTabKeyDown && !prevTabKeyDown_) {
 			isHelpOpen_ = !isHelpOpen_;
 		}
+		
+		// ★追加: ヘルプ画面が開いている時にESCキーが押されたら閉じる
+		auto* input = Engine::Input::GetInstance();
+		if (isHelpOpen_ && input && (input->Trigger(DIK_ESCAPE) || (GetAsyncKeyState(VK_ESCAPE) & 0x8001))) {
+			isHelpOpen_ = false;
+		}
+
 		prevTabKeyDown_ = currentTabKeyDown;
 	} else {
 		isHelpOpen_ = false; // ポーズ中やゲームオーバー時は強制的に閉じる
@@ -304,8 +311,14 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (scene->GetRegistry().all_of<HealthComponent>(entity)) {
 		auto& hc = scene->GetRegistry().get<HealthComponent>(entity);
 		
+		// リザルト演出中（クリア・ゲームオーバー）はリスポーン処理をキャンセル
+		if (PhaseSystemScript::IsResultSequenceActive()) {
+			respawnState_ = 0;
+			respawnTimer_ = 0.0f;
+		}
+
 		// 死亡時の処理
-		if (hc.isDead && respawnState_ == 0) {
+		if (hc.isDead && respawnState_ == 0 && !PhaseSystemScript::IsResultSequenceActive()) {
 			respawnState_ = 1;
 			respawnTimer_ = 0.0f;
 			isHelpOpen_ = false; // 死亡時はヘルプを閉じる
@@ -702,36 +715,21 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 	s_wasPrep = isPrep;
 
-	// ★追加: カーソル表示切り替え (Left Altキー または BACKボタン)
-	if (isHelpOpen_) {
-		// ヘルプ画面表示中は強制的にカーソルを表示し、中央固定を解除する
-		if (!isCursorVisible_) {
-			isCursorVisible_ = true;
-			while (ShowCursor(TRUE) < 0)
-				;
-		}
-		prevCursorToggle_ = false;
-	} else if (isPrep) {
-		bool currentCursorToggle = ((GetAsyncKeyState(VK_LMENU) & 0x8000) != 0) || (Engine::Input::GetInstance() && Engine::Input::GetInstance()->IsControllerButtonDown(XINPUT_GAMEPAD_BACK));
-		if (currentCursorToggle && !prevCursorToggle_) {
-			isCursorVisible_ = !isCursorVisible_;
-			if (isCursorVisible_) {
-				while (ShowCursor(TRUE) < 0)
-					;
-			} else {
-				while (ShowCursor(FALSE) >= 0)
-					;
-			}
-		}
-		prevCursorToggle_ = currentCursorToggle;
+	// ★追加: カーソル表示切り替え (準備フェーズ、スキルツリー、ヘルプ、リザルト中は強制表示)
+	bool needsCursor = isHelpOpen_ || Game::PhaseSystemScript::isSkillTreeOpen_ || isPrep || Game::PhaseSystemScript::IsResultSequenceActive();
+
+	if (needsCursor) {
+		isCursorVisible_ = true;
+		// カーソルの内部カウンターを正確に 0（表示）に固定する
+		int c = ShowCursor(TRUE);
+		while (c < 0) { c = ShowCursor(TRUE); }
+		while (c > 0) { c = ShowCursor(FALSE); }
 	} else {
-		// 準備フェーズ以外は強制的に非表示
-		if (isCursorVisible_) {
-			isCursorVisible_ = false;
-			while (ShowCursor(FALSE) >= 0)
-				;
-		}
-		prevCursorToggle_ = false;
+		isCursorVisible_ = false;
+		// カーソルの内部カウンターを正確に -1（非表示）に固定する
+		int c = ShowCursor(FALSE);
+		while (c >= 0) { c = ShowCursor(FALSE); }
+		while (c < -1) { c = ShowCursor(TRUE); }
 	}
 
 	// ★追加: カーソル非表示時は画面中心に固定 (時間が止まっている＝ゲームオーバーやポーズ中は固定しない)
