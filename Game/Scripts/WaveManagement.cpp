@@ -164,6 +164,10 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 											spawnerTexHandle = renderer->LoadTexture2D("Resources/Textures/EnemyLogo/Guardian.png", false);
 										} else if (spawner->enemyScriptPath == "Gunner") {
 											spawnerTexHandle = renderer->LoadTexture2D("Resources/Textures/EnemyLogo/Gunner.png", false);
+										} else if (spawner->enemyScriptPath == "Enchanter") {
+											spawnerTexHandle = renderer->LoadTexture2D("Resources/Textures/EnemyLogo/Enchanter.png", false);
+										} else if (spawner->enemyScriptPath == "Boss") {
+											spawnerTexHandle = renderer->LoadTexture2D("Resources/Textures/EnemyLogo/Boss.png", false);
 										}
 									}
 								}
@@ -255,8 +259,6 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 								// カメラの+Z（北）方向を向いたときにテクスチャの真ん中（N）が中央に来るようにオフセットを調整
 								float camYawNorm = (camAngle - (PI_VAL / 2.0f)) / (2.0f * PI_VAL);
 
-								
-
 								// ---- 方角バー (Direction) の描画 ----
 								// フレームの手前に配置し、カメラに合わせて動かす（UVスクロールあり）
 								Engine::Renderer::SpriteDesc barDesc;
@@ -297,7 +299,6 @@ void WaveManagement::Update(entt::entity entity, GameScene* scene, float /*dt*/)
 							frameDesc.rotationRad = 0.0f;
 							frameDesc.layer = 100; // Directionより奥のレイヤー
 							renderer->DrawSprite(indicatorTexHandle, frameDesc);
-
 						}
 					}
 				}
