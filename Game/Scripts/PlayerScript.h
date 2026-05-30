@@ -182,6 +182,7 @@ private:
 
 	size_t chargeVoiceHandle_ = 0;
 	size_t flightVoiceHandle_ = 0;
+	size_t gunEnhancementVoiceHandle_ = 0;
 
 	// ★追加: 反動後退
 	DirectX::XMFLOAT3 recoilVelocity_ = {0, 0, 0};

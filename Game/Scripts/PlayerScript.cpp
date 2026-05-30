@@ -29,6 +29,7 @@ static uint32_t s_dashSeHandle = 0xFFFFFFFF;
 static uint32_t s_swingingHitSeHandle = 0xFFFFFFFF;
 static uint32_t s_chargeAttackSeHandle = 0xFFFFFFFF;
 static uint32_t s_swordSkillsSeHandle = 0xFFFFFFFF;
+static uint32_t s_gunEnhancementSeHandle = 0xFFFFFFFF;
 
 
 bool PlayerScript::s_isHelpOpen = false;
@@ -335,6 +336,22 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			respawnState_ = 1;
 			respawnTimer_ = 0.0f;
 			isHelpOpen_ = false; // 死亡時はヘルプを閉じる
+			isSkillActive_ = false;
+			skillDuration_ = 0.0f;
+			if (auto* audio = Engine::Audio::GetInstance()) {
+				if (chargeVoiceHandle_ != 0) {
+					audio->Stop(chargeVoiceHandle_);
+					chargeVoiceHandle_ = 0;
+				}
+				if (flightVoiceHandle_ != 0) {
+					audio->Stop(flightVoiceHandle_);
+					flightVoiceHandle_ = 0;
+				}
+				if (gunEnhancementVoiceHandle_ != 0) {
+					audio->Stop(gunEnhancementVoiceHandle_);
+					gunEnhancementVoiceHandle_ = 0;
+				}
+			}
 		}
 
 		if (respawnState_ != 0) {
@@ -727,6 +744,12 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 			isSkillActive_ = false;
 			skillDuration_ = 0.0f;
 			std::cout << "Gun Skill Deactivated\n";
+			if (gunEnhancementVoiceHandle_ != 0) {
+				if (auto* audio = Engine::Audio::GetInstance()) {
+					audio->Stop(gunEnhancementVoiceHandle_);
+				}
+				gunEnhancementVoiceHandle_ = 0;
+			}
 		}
 	}
 
@@ -3091,6 +3114,15 @@ void PlayerScript::SwitchPlayerType(entt::entity /*entity*/, GameScene* scene) {
 		chargeVoiceHandle_ = 0;
 	}
 
+	if (gunEnhancementVoiceHandle_ != 0) {
+		if (auto* audio = Engine::Audio::GetInstance()) {
+			audio->Stop(gunEnhancementVoiceHandle_);
+		}
+		gunEnhancementVoiceHandle_ = 0;
+	}
+	isSkillActive_ = false;
+	skillDuration_ = 0.0f;
+
 	// アニメーション中のフラグやタイマーもリセット
 	gunComboStep_ = 0;
 	gunComboResetTimer_ = 0.0f;
@@ -3221,6 +3253,14 @@ void PlayerScript::ExecuteSkill(entt::entity entity, GameScene* scene) {
 		steamPressure_ = maxSteam; // ★オーバークロック発動時に圧力を100まで戻す
 		isRecharging_ = false;     // リチャージ状態も強制解除
 		std::cout << "Gun Skill Activated: Crystal Enhancement!\n";
+		if (auto* audio = Engine::Audio::GetInstance()) {
+			if (s_gunEnhancementSeHandle == 0xFFFFFFFF) {
+				s_gunEnhancementSeHandle = audio->Load("Resources/Audio/SE/GunEnhancement.mp3");
+			}
+			if (s_gunEnhancementSeHandle != 0xFFFFFFFF && gunEnhancementVoiceHandle_ == 0) {
+				gunEnhancementVoiceHandle_ = audio->Play(s_gunEnhancementSeHandle, true, 0.7f * audio->GetMasterSEVolume());
+			}
+		}
 	}
 }
 
@@ -3344,7 +3384,14 @@ void PlayerScript::DrawUI(entt::entity /*entity*/, GameScene* /*scene*/) {
 	// ゲーム内のUI描画（SDFやテキストなど）は Update 内で行うように移動しました。
 }
 
-void PlayerScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {}
+void PlayerScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/) {
+	if (gunEnhancementVoiceHandle_ != 0) {
+		if (auto* audio = Engine::Audio::GetInstance()) {
+			audio->Stop(gunEnhancementVoiceHandle_);
+		}
+		gunEnhancementVoiceHandle_ = 0;
+	}
+}
 
 void PlayerScript::DrawSubObjectives(GameScene* scene) {
 	if (!scene || scene->IsPaused() || isHelpOpen_) return;
