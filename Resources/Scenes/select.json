@@ -2,86 +2,204 @@
   "settings": {
     "postProcessEnabled": false,
     "ambientColor": [0.4, 0.4, 0.45],
-    "vignette": 0,
+    "vignette": 0.2,
     "noiseStrength": 0
   },
   "objects": [
     {
-      "id": 1048581,
+      "id": 4194325,
       "parentId": 4294967295,
-      "name": "TitleText",
+      "name": "SelectBGM",
       "locked": false,
       "translate": [0, 0, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [0,-400], "size": [800,160], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/selectStage.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 0, "borderBottom": 0, "borderLeft": 0, "borderRight": 0}
+        {"type": "AudioSource", "enabled": true, "soundPath": "Resources/Audio/BGM/Select.mp3", "volume": 1, "loop": true, "playOnStart": true}
       ]
     },
     {
-      "id": 1048580,
-      "parentId": 4294967295,
-      "name": "StageButton_0",
+      "id": 4194324,
+      "parentId": 4194323,
+      "name": "MainGear",
       "locked": false,
       "translate": [0, 0, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Tag", "enabled": true, "tag": "Default"},
-        {"type": "Variable", "enabled": true, "values": {}, "strings": {"Path": "Resources/Scenes/TutorialScene.json"}},
-        {"type": "RectTransform", "enabled": true, "pos": [300,-150.0], "size": [400,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/tutorial.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6,0.5,0.3,1], "uvTiling": [1,1], "uvOffset": [0,0]}
       ]
     },
     {
-      "id": 1048579,
+      "id": 4194323,
       "parentId": 4294967295,
-      "name": "StageButton_1",
+      "name": "MainGearPivot",
+      "locked": false,
+      "translate": [12, 0, 6],
+      "rotate": [1.5708, 0, 0],
+      "scale": [16, 16, 16],
+      "components": [
+
+      ]
+    },
+    {
+      "id": 4194322,
+      "parentId": 4194321,
+      "name": "SmallGear4",
       "locked": false,
       "translate": [0, 0, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Tag", "enabled": true, "tag": "Default"},
-        {"type": "Variable", "enabled": true, "values": {}, "strings": {"Path": "Resources/Scenes/Stage1.json"}},
-        {"type": "RectTransform", "enabled": true, "pos": [200,0.0], "size": [400,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/Stage1.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6,0.6,0.6,1], "uvTiling": [1,1], "uvOffset": [0,0]}
       ]
     },
     {
-      "id": 1048578,
+      "id": 4194321,
       "parentId": 4294967295,
-      "name": "StageButton_2",
+      "name": "SmallGear4Pivot",
+      "locked": false,
+      "translate": [-5, -5, 9],
+      "rotate": [1.5708, 0, 0],
+      "scale": [4.5, 4.5, 4.5],
+      "components": [
+
+      ]
+    },
+    {
+      "id": 4194320,
+      "parentId": 4194319,
+      "name": "SmallGear3",
       "locked": false,
       "translate": [0, 0, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Tag", "enabled": true, "tag": "Default"},
-        {"type": "Variable", "enabled": true, "values": {}, "strings": {"Path": "Resources/Scenes/Stage2.json"}},
-        {"type": "RectTransform", "enabled": true, "pos": [300,150.0], "size": [400,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/Stage2.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.8,0.5,0.3,1], "uvTiling": [1,1], "uvOffset": [0,0]}
       ]
     },
     {
-      "id": 1048582,
+      "id": 4194319,
       "parentId": 4294967295,
-      "name": "Background",
-      "locked": true,
+      "name": "SmallGear3Pivot",
+      "locked": false,
+      "translate": [2, 6, 7],
+      "rotate": [1.5708, 0, 0],
+      "scale": [4, 4, 4],
+      "components": [
+
+      ]
+    },
+    {
+      "id": 4194318,
+      "parentId": 4194317,
+      "name": "SmallGear2",
+      "locked": false,
       "translate": [0, 0, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [0,0], "size": [1920,1080], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [0.1,0.1,0.15,0], "layer": -10, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10}
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.5,0.5,0.5,1], "uvTiling": [1,1], "uvOffset": [0,0]}
       ]
     },
     {
-      "id": 1048577,
+      "id": 4194317,
+      "parentId": 4294967295,
+      "name": "SmallGear2Pivot",
+      "locked": false,
+      "translate": [4, -4, 10],
+      "rotate": [1.5708, 0, 0],
+      "scale": [3, 3, 3],
+      "components": [
+
+      ]
+    },
+    {
+      "id": 4194316,
+      "parentId": 4194315,
+      "name": "SmallGear1",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.7,0.6,0.4,1], "uvTiling": [1,1], "uvOffset": [0,0]}
+      ]
+    },
+    {
+      "id": 4194315,
+      "parentId": 4294967295,
+      "name": "SmallGear1Pivot",
+      "locked": false,
+      "translate": [-2, 5, 8],
+      "rotate": [1.5708, 0, 0],
+      "scale": [5, 5, 5],
+      "components": [
+
+      ]
+    },
+    {
+      "id": 4194314,
+      "parentId": 4294967295,
+      "name": "Pipe_H",
+      "locked": false,
+      "translate": [0, -4, 12],
+      "rotate": [0, 0, 0],
+      "scale": [40, 3.5, 3.5],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe2.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.5,0.3,0.2,1], "uvTiling": [1,1], "uvOffset": [0,0]}
+      ]
+    },
+    {
+      "id": 4194313,
+      "parentId": 4294967295,
+      "name": "Pipe_V",
+      "locked": false,
+      "translate": [-6, 0, 10],
+      "rotate": [0, 0, 1.5708],
+      "scale": [40, 2.5, 2.5],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.4,0.35,0.3,1], "uvTiling": [1,1], "uvOffset": [0,0]}
+      ]
+    },
+    {
+      "id": 4194312,
+      "parentId": 4294967295,
+      "name": "DirLight",
+      "locked": false,
+      "translate": [0, 10, -10],
+      "rotate": [0.5, 0.5, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "DirectionalLight", "enabled": true, "color": [1,0.8,0.7], "intensity": 1.5}
+      ]
+    },
+    {
+      "id": 4194311,
+      "parentId": 4294967295,
+      "name": "TitleCamera",
+      "locked": false,
+      "translate": [0, 2, -25],
+      "rotate": [0.05, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+
+      ]
+    },
+    {
+      "id": 4194310,
+      "parentId": 4294967295,
+      "name": "SelectManager",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Script", "enabled": true, "scripts": [{"path": "SelectManagerScript", "param": ""}]}
+      ]
+    },
+    {
+      "id": 4194309,
       "parentId": 4294967295,
       "name": "BackButton",
       "locked": false,
@@ -95,86 +213,78 @@
       ]
     },
     {
-      "id": 1048576,
+      "id": 4194308,
       "parentId": 4294967295,
-      "name": "SelectManager",
+      "name": "Background",
+      "locked": true,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "RectTransform", "enabled": true, "pos": [0,0], "size": [1920,1080], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [0.1,0.1,0.15,0], "layer": -10, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10}
+      ]
+    },
+    {
+      "id": 4194307,
+      "parentId": 4294967295,
+      "name": "StageButton_2",
       "locked": false,
       "translate": [0, 0, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "SelectManagerScript", "param": ""}]}
+        {"type": "Tag", "enabled": true, "tag": "Default"},
+        {"type": "Variable", "enabled": true, "values": {}, "strings": {"Path": "Resources/Scenes/Stage2.json"}},
+        {"type": "RectTransform", "enabled": true, "pos": [300,150], "size": [400,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/Stage2.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
-      "id": 1048600, "parentId": 4294967295, "name": "TitleCamera", "locked": false,
-      "translate": [0, 2, -25], "rotate": [0.05, 0, 0], "scale": [1, 1, 1],
-      "components": [{"type": "Camera", "enabled": true}]
+      "id": 4194306,
+      "parentId": 4294967295,
+      "name": "StageButton_1",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Tag", "enabled": true, "tag": "Default"},
+        {"type": "Variable", "enabled": true, "values": {}, "strings": {"Path": "Resources/Scenes/Stage1.json"}},
+        {"type": "RectTransform", "enabled": true, "pos": [200,0], "size": [400,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/Stage1.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+      ]
     },
     {
-      "id": 1048601, "parentId": 4294967295, "name": "DirLight", "locked": false,
-      "translate": [0, 10, -10], "rotate": [0.5, 0.5, 0], "scale": [1, 1, 1],
-      "components": [{"type": "DirectionalLight", "enabled": true, "color": [1.0, 0.8, 0.7], "intensity": 1.5}]
+      "id": 4194305,
+      "parentId": 4294967295,
+      "name": "StageButton_0",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Tag", "enabled": true, "tag": "Default"},
+        {"type": "Variable", "enabled": true, "values": {}, "strings": {"Path": "Resources/Scenes/TutorialScene.json"}},
+        {"type": "RectTransform", "enabled": true, "pos": [300,-150], "size": [400,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/tutorial.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+      ]
     },
     {
-      "id": 1048610, "parentId": 4294967295, "name": "Pipe_V", "locked": false,
-      "translate": [-6, 0, 10], "rotate": [0, 0, 1.5708], "scale": [40, 2.5, 2.5],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.4, 0.35, 0.3, 1.0]}]
-    },
-    {
-      "id": 1048611, "parentId": 4294967295, "name": "Pipe_H", "locked": false,
-      "translate": [0, -4, 12], "rotate": [0, 0, 0], "scale": [40, 3.5, 3.5],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe2.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.5, 0.3, 0.2, 1.0]}]
-    },
-    {
-      "id": 1048612, "parentId": 4294967295, "name": "SmallGear1Pivot", "locked": false,
-      "translate": [-2, 5, 8], "rotate": [1.5708, 0, 0], "scale": [5, 5, 5],
-      "components": []
-    },
-    {
-      "id": 1048613, "parentId": 1048612, "name": "SmallGear1", "locked": false,
-      "translate": [0, 0, 0], "rotate": [0, 0, 0], "scale": [1, 1, 1],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.7, 0.6, 0.4, 1.0]}]
-    },
-    {
-      "id": 1048614, "parentId": 4294967295, "name": "SmallGear2Pivot", "locked": false,
-      "translate": [4, -4, 10], "rotate": [1.5708, 0, 0], "scale": [3, 3, 3],
-      "components": []
-    },
-    {
-      "id": 1048615, "parentId": 1048614, "name": "SmallGear2", "locked": false,
-      "translate": [0, 0, 0], "rotate": [0, 0, 0], "scale": [1, 1, 1],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.5, 0.5, 0.5, 1.0]}]
-    },
-    {
-      "id": 1048616, "parentId": 4294967295, "name": "SmallGear3Pivot", "locked": false,
-      "translate": [2, 6, 7], "rotate": [1.5708, 0, 0], "scale": [4, 4, 4],
-      "components": []
-    },
-    {
-      "id": 1048617, "parentId": 1048616, "name": "SmallGear3", "locked": false,
-      "translate": [0, 0, 0], "rotate": [0, 0, 0], "scale": [1, 1, 1],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.8, 0.5, 0.3, 1.0]}]
-    },
-    {
-      "id": 1048618, "parentId": 4294967295, "name": "SmallGear4Pivot", "locked": false,
-      "translate": [-5, -5, 9], "rotate": [1.5708, 0, 0], "scale": [4.5, 4.5, 4.5],
-      "components": []
-    },
-    {
-      "id": 1048619, "parentId": 1048618, "name": "SmallGear4", "locked": false,
-      "translate": [0, 0, 0], "rotate": [0, 0, 0], "scale": [1, 1, 1],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6, 0.6, 0.6, 1.0]}]
-    },
-    {
-      "id": 1048602, "parentId": 4294967295, "name": "MainGearPivot", "locked": false,
-      "translate": [12, 0, 6], "rotate": [1.5708, 0, 0], "scale": [16, 16, 16],
-      "components": []
-    },
-    {
-      "id": 1048603, "parentId": 1048602, "name": "MainGear", "locked": false,
-      "translate": [0, 0, 0], "rotate": [0, 0, 0], "scale": [1, 1, 1],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6, 0.5, 0.3, 1.0]}]
+      "id": 4194304,
+      "parentId": 4294967295,
+      "name": "TitleText",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "RectTransform", "enabled": true, "pos": [0,-400], "size": [800,160], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/Button/selectStage.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 0, "borderBottom": 0, "borderLeft": 0, "borderRight": 0}
+      ]
     }
   ]
 }

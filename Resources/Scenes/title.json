@@ -1,127 +1,310 @@
 {
   "settings": {
-    "postProcessEnabled": false,
+    "postProcessEnabled": true,
     "ambientColor": [0.4, 0.4, 0.45],
-    "vignette": 0.3,
+    "vignette": 0.2,
     "noiseStrength": 0
   },
   "objects": [
     {
-      "id": 1048591,
+      "id": 4194337,
       "parentId": 4294967295,
-      "name": "TitleManager",
+      "name": "Pipe_4",
       "locked": false,
-      "translate": [0, 0, 0],
+      "translate": [-1, 0, 10],
       "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
+      "scale": [1.5, 30, 1.5],
       "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "TitleManagerScript", "param": ""}]}
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.8,0.4,0.1,0.7], "uvTiling": [1,1], "uvOffset": [0,0]}
       ]
     },
     {
-      "id": 1048590,
-      "parentId": 1048581,
-      "name": "Btn_Back",
+      "id": 4194336,
+      "parentId": 4294967295,
+      "name": "Pipe_3",
+      "locked": false,
+      "translate": [8, 0, 2.5],
+      "rotate": [0, 0, 0],
+      "scale": [1.2, 30, 1.2],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.3,0.3,0.3,0.7], "uvTiling": [1,1], "uvOffset": [0,0]}
+      ]
+    },
+    {
+      "id": 4194335,
+      "parentId": 4294967295,
+      "name": "Pipe_2",
+      "locked": false,
+      "translate": [-8, 0, 3.5],
+      "rotate": [0, 0, 0],
+      "scale": [1, 30, 1],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6,0.8,0.2,0.7], "uvTiling": [1,1], "uvOffset": [0,0]}
+      ]
+    },
+    {
+      "id": 4194334,
+      "parentId": 4294967295,
+      "name": "Pipe_1",
+      "locked": false,
+      "translate": [0, -2.5, 4],
+      "rotate": [0, 0, 0],
+      "scale": [30, 1.2, 1.2],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.8,0.4,0.1,0.6], "uvTiling": [1,1], "uvOffset": [0,0]}
+      ]
+    },
+    {
+      "id": 4194333,
+      "parentId": 4294967295,
+      "name": "Pipe_0",
+      "locked": false,
+      "translate": [0, 8, 3],
+      "rotate": [0, 0, 0],
+      "scale": [30, 1, 1],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.3,0.3,0.3,0.6], "uvTiling": [1,1], "uvOffset": [0,0]}
+      ]
+    },
+    {
+      "id": 4194332,
+      "parentId": 4294967295,
+      "name": "Gear_9",
+      "locked": false,
+      "translate": [0, -6, 5],
+      "rotate": [0, 0, 0],
+      "scale": [3, 3, 3],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6,0.8,0.2,0.5], "uvTiling": [1,1], "uvOffset": [0,0]}
+      ]
+    },
+    {
+      "id": 4194331,
+      "parentId": 4294967295,
+      "name": "Gear_8",
+      "locked": false,
+      "translate": [5, -5, 7],
+      "rotate": [0, 0, 0],
+      "scale": [4, 4, 4],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.8,0.4,0.1,0.5], "uvTiling": [1,1], "uvOffset": [0,0]}
+      ]
+    },
+    {
+      "id": 4194330,
+      "parentId": 4294967295,
+      "name": "Gear_7",
+      "locked": false,
+      "translate": [-6, -3, 6],
+      "rotate": [0, 0, 0],
+      "scale": [3.5, 3.5, 3.5],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.3,0.3,0.3,0.5], "uvTiling": [1,1], "uvOffset": [0,0]}
+      ]
+    },
+    {
+      "id": 4194329,
+      "parentId": 4294967295,
+      "name": "Gear_6",
+      "locked": false,
+      "translate": [1.5, 0, 3.2],
+      "rotate": [0, 0, 0],
+      "scale": [1.5, 1.5, 1.5],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6,0.8,0.2,0.5], "uvTiling": [1,1], "uvOffset": [0,0]}
+      ]
+    },
+    {
+      "id": 4194328,
+      "parentId": 4294967295,
+      "name": "Gear_5",
+      "locked": false,
+      "translate": [-2, 1, 3],
+      "rotate": [0, 0, 0],
+      "scale": [1.2, 1.2, 1.2],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.8,0.4,0.1,0.5], "uvTiling": [1,1], "uvOffset": [0,0]}
+      ]
+    },
+    {
+      "id": 4194327,
+      "parentId": 4294967295,
+      "name": "Gear_4",
+      "locked": false,
+      "translate": [4, 2, 4.5],
+      "rotate": [0, 0, 0],
+      "scale": [2, 2, 2],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.3,0.3,0.3,0.5], "uvTiling": [1,1], "uvOffset": [0,0]}
+      ]
+    },
+    {
+      "id": 4194326,
+      "parentId": 4294967295,
+      "name": "Gear_3",
+      "locked": false,
+      "translate": [-4, 3, 5],
+      "rotate": [0, 0, 0],
+      "scale": [2.5, 2.5, 2.5],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6,0.8,0.2,0.5], "uvTiling": [1,1], "uvOffset": [0,0]}
+      ]
+    },
+    {
+      "id": 4194325,
+      "parentId": 4294967295,
+      "name": "Gear_2",
+      "locked": false,
+      "translate": [7, 6, 7.5],
+      "rotate": [0, 0, 0],
+      "scale": [4.5, 4.5, 4.5],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.8,0.4,0.1,0.5], "uvTiling": [1,1], "uvOffset": [0,0]}
+      ]
+    },
+    {
+      "id": 4194324,
+      "parentId": 4294967295,
+      "name": "Gear_1",
+      "locked": false,
+      "translate": [-6, 8, 8],
+      "rotate": [0, 0, 0],
+      "scale": [5, 5, 5],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6,0.8,0.2,0.5], "uvTiling": [1,1], "uvOffset": [0,0]}
+      ]
+    },
+    {
+      "id": 4194323,
+      "parentId": 4294967295,
+      "name": "Gear_0",
+      "locked": false,
+      "translate": [0, 5, 12],
+      "rotate": [0, 0, 0],
+      "scale": [12, 12, 12],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.3,0.3,0.3,0.5], "uvTiling": [1,1], "uvOffset": [0,0]}
+      ]
+    },
+    {
+      "id": 4194322,
+      "parentId": 4294967295,
+      "name": "DirLight",
+      "locked": false,
+      "translate": [0, 10, -10],
+      "rotate": [0.5, 0.5, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "DirectionalLight", "enabled": true, "color": [1,0.8,0.7], "intensity": 1.5}
+      ]
+    },
+    {
+      "id": 4194321,
+      "parentId": 4294967295,
+      "name": "TitleCamera",
+      "locked": false,
+      "translate": [0, 3, -15],
+      "rotate": [0.1, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+
+      ]
+    },
+    {
+      "id": 4194320,
+      "parentId": 4294967295,
+      "name": "MainMenuParent",
       "locked": false,
       "translate": [0, 0, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [681.223,387.86], "size": [300,60], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIText", "enabled": true, "text": "Back", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
+        {"type": "RectTransform", "enabled": true, "pos": [100,300], "size": [0,0], "anchor": [0,0], "pivot": [0.5,0.5], "rotation": 0}
+      ]
+    },
+    {
+      "id": 4194319,
+      "parentId": 4194320,
+      "name": "TitleText",
+      "locked": false,
+      "translate": [860, 1, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "RectTransform", "enabled": true, "pos": [860,-70], "size": [950,950], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TitleUI/TitleLogo.png", "color": [1,1,1,1], "layer": -75, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10}
+      ]
+    },
+    {
+      "id": 4194318,
+      "parentId": 4194320,
+      "name": "Btn_Start",
+      "locked": false,
+      "translate": [600, 200, 0],
+      "rotate": [0.24, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "RectTransform", "enabled": true, "pos": [600,200], "size": [512,128], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TitleUI/SrartLogo.png", "color": [1,1,1,1], "layer": 100, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
-      "id": 1048589,
-      "parentId": 1048581,
-      "name": "Btn_SEPlus",
+      "id": 4194317,
+      "parentId": 4194320,
+      "name": "Btn_Settings",
       "locked": false,
-      "translate": [0, 0, 0],
+      "translate": [600, 350, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [975.284,296.245], "size": [60,60], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIText", "enabled": true, "text": "+", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
+        {"type": "RectTransform", "enabled": true, "pos": [600,350], "size": [512,128], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TitleUI/SettingLogo.png", "color": [1,1,1,1], "layer": 4, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
-      "id": 1048588,
-      "parentId": 1048581,
-      "name": "Btn_SEMinus",
+      "id": 4194316,
+      "parentId": 4194320,
+      "name": "Btn_Exit",
       "locked": false,
-      "translate": [0, 0, 0],
+      "translate": [600, 500, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [888.515,300.437], "size": [60,60], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIText", "enabled": true, "text": "-", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
+        {"type": "RectTransform", "enabled": true, "pos": [600,500], "size": [512,128], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TitleUI/EixtLogo.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
         {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
-      "id": 1048587,
-      "parentId": 1048581,
-      "name": "Text_SE",
+      "id": 4194315,
+      "parentId": 4294967295,
+      "name": "SettingsMenuParent",
       "locked": false,
       "translate": [0, 0, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [687.511,289.956], "size": [100,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIText", "enabled": true, "text": "SE Volume", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]}
+        {"type": "RectTransform", "enabled": false, "pos": [100,300], "size": [0,0], "anchor": [0,0], "pivot": [0.5,0.5], "rotation": 0}
       ]
     },
     {
-      "id": 1048586,
-      "parentId": 1048581,
-      "name": "Btn_BGMPlus",
+      "id": 4194314,
+      "parentId": 4194315,
+      "name": "SettingsTitle",
       "locked": false,
-      "translate": [0, 0, 0],
+      "translate": [711, 0, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [975.284,193.188], "size": [60,60], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIText", "enabled": true, "text": "+", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
-        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+        {"type": "RectTransform", "enabled": true, "pos": [855.629,3.0131], "size": [100,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIText", "enabled": true, "text": "Settings", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]}
       ]
     },
     {
-      "id": 1048585,
-      "parentId": 1048581,
-      "name": "Btn_BGMMinus",
-      "locked": false,
-      "translate": [0, 0, 0],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [888.515,186.9], "size": [60,60], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIText", "enabled": true, "text": "-", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
-        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
-      ]
-    },
-    {
-      "id": 1048584,
-      "parentId": 1048581,
-      "name": "Text_BGM",
-      "locked": false,
-      "translate": [0, 0, 0],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [691.703,180.611], "size": [100,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIText", "enabled": true, "text": "BGM Volume", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]}
-      ]
-    },
-    {
-      "id": 1048583,
-      "parentId": 1048581,
+      "id": 4194313,
+      "parentId": 4194315,
       "name": "Btn_Fullscreen",
       "locked": false,
       "translate": [0, 0, 0],
@@ -135,181 +318,129 @@
       ]
     },
     {
-      "id": 1048582,
-      "parentId": 1048581,
-      "name": "SettingsTitle",
-      "locked": false,
-      "translate": [711, 0, 0],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [855.629,3.0131], "size": [100,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIText", "enabled": true, "text": "Settings", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]}
-      ]
-    },
-    {
-      "id": 1048581,
-      "parentId": 4294967295,
-      "name": "SettingsMenuParent",
+      "id": 4194312,
+      "parentId": 4194315,
+      "name": "Text_BGM",
       "locked": false,
       "translate": [0, 0, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "RectTransform", "enabled": false, "pos": [100,300], "size": [0,0], "anchor": [0,0], "pivot": [0.5,0.5], "rotation": 0}
+        {"type": "RectTransform", "enabled": true, "pos": [691.703,180.611], "size": [100,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIText", "enabled": true, "text": "BGM Volume", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]}
       ]
     },
     {
-      "id": 1048580,
-      "parentId": 1048576,
-      "name": "Btn_Exit",
-      "locked": false,
-      "translate": [600, 500, 0],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [600,500], "size": [512,128], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TitleUI/EixtLogo.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
-      ]
-    },
-    {
-      "id": 1048579,
-      "parentId": 1048576,
-      "name": "Btn_Settings",
-      "locked": false,
-      "translate": [600, 350, 0],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [600,350], "size": [512,128], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TitleUI/SettingLogo.png", "color": [1,1,1,1], "layer": 4, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
-      ]
-    },
-    {
-      "id": 1048578,
-      "parentId": 1048576,
-      "name": "Btn_Start",
-      "locked": false,
-      "translate": [600, 200, 0],
-      "rotate": [0.24, 0, 0],
-      "scale": [1, 1, 1],
-      "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [600,200], "size": [512,128], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TitleUI/SrartLogo.png", "color": [1,1,1,1], "layer": 100, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
-      ]
-    },
-    {
-      "id": 1048577,
-      "parentId": 1048576,
-      "name": "TitleText",
-      "locked": false,
-      "translate": [860, 1, 0],
-      "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
-      "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [860,-70], "size": [950,950], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/TitleUI/TitleLogo.png", "color": [1,1,1,1], "layer": -75, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10}
-      ]
-    },
-    {
-      "id": 1048576,
-      "parentId": 4294967295,
-      "name": "MainMenuParent",
+      "id": 4194311,
+      "parentId": 4194315,
+      "name": "Btn_BGMMinus",
       "locked": false,
       "translate": [0, 0, 0],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "RectTransform", "enabled": true, "pos": [100,300], "size": [0,0], "anchor": [0,0], "pivot": [0.5,0.5], "rotation": 0}
+        {"type": "RectTransform", "enabled": true, "pos": [888.515,186.9], "size": [60,60], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIText", "enabled": true, "text": "-", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
       ]
     },
     {
-      "id": 1048600, "parentId": 4294967295, "name": "TitleCamera", "locked": false,
-      "translate": [0, 3, -15], "rotate": [0.1, 0, 0], "scale": [1, 1, 1],
-      "components": [{"type": "Camera", "enabled": true}]
+      "id": 4194310,
+      "parentId": 4194315,
+      "name": "Btn_BGMPlus",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "RectTransform", "enabled": true, "pos": [975.284,193.188], "size": [60,60], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIText", "enabled": true, "text": "+", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+      ]
     },
     {
-      "id": 1048601, "parentId": 4294967295, "name": "DirLight", "locked": false,
-      "translate": [0, 10, -10], "rotate": [0.5, 0.5, 0], "scale": [1, 1, 1],
-      "components": [{"type": "DirectionalLight", "enabled": true, "color": [1.0, 0.8, 0.7], "intensity": 1.5}]
+      "id": 4194309,
+      "parentId": 4194315,
+      "name": "Text_SE",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "RectTransform", "enabled": true, "pos": [687.511,289.956], "size": [100,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
+        {"type": "UIText", "enabled": true, "text": "SE Volume", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]}
+      ]
     },
     {
-      "id": 1048602, "parentId": 4294967295, "name": "Gear_0", "locked": false,
-      "translate": [0, 5, 12], "rotate": [0, 0, 0], "scale": [12, 12, 12],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.3, 0.3, 0.3, 0.5]}]
+      "id": 4194308,
+      "parentId": 4194315,
+      "name": "Btn_SEMinus",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "RectTransform", "enabled": true, "pos": [888.515,300.437], "size": [60,60], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIText", "enabled": true, "text": "-", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+      ]
     },
     {
-      "id": 1048603, "parentId": 4294967295, "name": "Gear_1", "locked": false,
-      "translate": [-6, 8, 8], "rotate": [0, 0, 0], "scale": [5, 5, 5],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6, 0.8, 0.2, 0.5]}]
+      "id": 4194307,
+      "parentId": 4194315,
+      "name": "Btn_SEPlus",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "RectTransform", "enabled": true, "pos": [975.284,296.245], "size": [60,60], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIText", "enabled": true, "text": "+", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+      ]
     },
     {
-      "id": 1048604, "parentId": 4294967295, "name": "Gear_2", "locked": false,
-      "translate": [7, 6, 7.5], "rotate": [0, 0, 0], "scale": [4.5, 4.5, 4.5],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.8, 0.4, 0.1, 0.5]}]
+      "id": 4194306,
+      "parentId": 4194315,
+      "name": "Btn_Back",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "RectTransform", "enabled": true, "pos": [681.223,387.86], "size": [300,60], "anchor": [0,0], "pivot": [0,0.5], "rotation": 0},
+        {"type": "UIImage", "enabled": true, "texturePath": "", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
+        {"type": "UIText", "enabled": true, "text": "Back", "fontSize": 70, "fontPath": "Resources\\Fonts\\ZenAntique-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]},
+        {"type": "UIButton", "enabled": true, "normalColor": [1,1,1,1], "hoverColor": [0.8,0.8,0.8,1], "pressedColor": [0.5,0.5,0.5,1], "onClickCallback": "", "hitboxOffset": [0,0], "hitboxScale": [1,1]}
+      ]
     },
     {
-      "id": 1048605, "parentId": 4294967295, "name": "Gear_3", "locked": false,
-      "translate": [-4, 3, 5], "rotate": [0, 0, 0], "scale": [2.5, 2.5, 2.5],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6, 0.8, 0.2, 0.5]}]
+      "id": 4194305,
+      "parentId": 4294967295,
+      "name": "TitleManager",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Script", "enabled": true, "scripts": [{"path": "TitleManagerScript", "param": ""}]}
+      ]
     },
     {
-      "id": 1048606, "parentId": 4294967295, "name": "Gear_4", "locked": false,
-      "translate": [4, 2, 4.5], "rotate": [0, 0, 0], "scale": [2.0, 2.0, 2.0],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.3, 0.3, 0.3, 0.5]}]
-    },
-    {
-      "id": 1048607, "parentId": 4294967295, "name": "Gear_5", "locked": false,
-      "translate": [-2, 1, 3], "rotate": [0, 0, 0], "scale": [1.2, 1.2, 1.2],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.8, 0.4, 0.1, 0.5]}]
-    },
-    {
-      "id": 1048608, "parentId": 4294967295, "name": "Gear_6", "locked": false,
-      "translate": [1.5, 0, 3.2], "rotate": [0, 0, 0], "scale": [1.5, 1.5, 1.5],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6, 0.8, 0.2, 0.5]}]
-    },
-    {
-      "id": 1048609, "parentId": 4294967295, "name": "Gear_7", "locked": false,
-      "translate": [-6, -3, 6], "rotate": [0, 0, 0], "scale": [3.5, 3.5, 3.5],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.3, 0.3, 0.3, 0.5]}]
-    },
-    {
-      "id": 1048610, "parentId": 4294967295, "name": "Gear_8", "locked": false,
-      "translate": [5, -5, 7], "rotate": [0, 0, 0], "scale": [4, 4, 4],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.8, 0.4, 0.1, 0.5]}]
-    },
-    {
-      "id": 1048611, "parentId": 4294967295, "name": "Gear_9", "locked": false,
-      "translate": [0, -6, 5], "rotate": [0, 0, 0], "scale": [3, 3, 3],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/gear/gear.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6, 0.8, 0.2, 0.5]}]
-    },
-    {
-      "id": 1048612, "parentId": 4294967295, "name": "Pipe_0", "locked": false,
-      "translate": [0, 8, 3], "rotate": [0, 0, 0], "scale": [30, 1, 1],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.3, 0.3, 0.3, 0.6]}]
-    },
-    {
-      "id": 1048613, "parentId": 4294967295, "name": "Pipe_1", "locked": false,
-      "translate": [0, -2.5, 4], "rotate": [0, 0, 0], "scale": [30, 1.2, 1.2],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.8, 0.4, 0.1, 0.6]}]
-    },
-    {
-      "id": 1048614, "parentId": 4294967295, "name": "Pipe_2", "locked": false,
-      "translate": [-8, 0, 3.5], "rotate": [0, 0, 0], "scale": [1, 30, 1],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.6, 0.8, 0.2, 0.7]}]
-    },
-    {
-      "id": 1048615, "parentId": 4294967295, "name": "Pipe_3", "locked": false,
-      "translate": [8, 0, 2.5], "rotate": [0, 0, 0], "scale": [1.2, 30, 1.2],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.3, 0.3, 0.3, 0.7]}]
-    },
-    {
-      "id": 1048616, "parentId": 4294967295, "name": "Pipe_4", "locked": false,
-      "translate": [-1, 0, 10], "rotate": [0, 0, 0], "scale": [1.5, 30, 1.5],
-      "components": [{"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/3Dmodel/pipe/pipe1.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Steampunk", "color": [0.8, 0.4, 0.1, 0.7]}]
+      "id": 4194304,
+      "parentId": 4294967295,
+      "name": "TitleBGM",
+      "locked": false,
+      "translate": [0, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "AudioSource", "enabled": true, "soundPath": "Resources/Audio/BGM/Title.mp3", "volume": 1, "loop": true, "playOnStart": true}
+      ]
     }
   ]
 }
