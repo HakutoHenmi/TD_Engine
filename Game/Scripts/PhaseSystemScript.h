@@ -71,6 +71,7 @@ private:
 	inline static int s_gameClearPhase_ = 0;
 	PhaseState preIsPhase_ = PreparationPhase; // フェーズ切り替わり検知用
 	inline static int currentPhase_ = 0;
+	inline static float totalBattleTime_ = 0.0f;
 
 	int StartCoinCount_ = 300; // 初期コイン数
 
@@ -109,10 +110,14 @@ private:
 
 	std::string waveCountFrameTexPath_ = "";
 	std::string enemyCountFrameTexPath_ = "";
+	std::string timerFrameTexPath_ = "";
 	DirectX::XMFLOAT2 waveCountFrameSize_ = {300.0f, 100.0f};
 	DirectX::XMFLOAT2 enemyCountFrameSize_ = {300.0f, 100.0f};
+	DirectX::XMFLOAT2 timerFrameSize_ = {300.0f, 100.0f};
 	entt::entity waveCountFrameUI_ = entt::null;
 	entt::entity enemyCountFrameUI_ = entt::null;
+	entt::entity timerUI_ = entt::null;
+	entt::entity timerFrameUI_ = entt::null;
 
 	// インサートカメラ演出用
 	std::vector<CameraWaypoint> insertWaypoints_;

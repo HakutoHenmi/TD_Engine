@@ -120,6 +120,7 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 
 	// 初回BGM再生のトリガーはファイルのロード後に最後に行うため、ここでのPlay呼び出しは削除しました。
 	currentPhase_ = 0;
+	totalBattleTime_ = 0.0f;
 	CoinCount = StartCoinCount_;
 
 	// 状態フラグの初期化
@@ -131,6 +132,7 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	enemyCountUI_ = entt::null;
 	installationCostUI_ = entt::null;
 	waveCountUI_ = entt::null;
+	timerUI_ = entt::null;
 
 	// インサートカメラ変数の初期化
 	isInsertInitialized_ = false;
@@ -204,6 +206,10 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 
 void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	(void)entity;
+
+	if (isPhase_ == BattlePhase && scene->IsPlaying()) {
+		totalBattleTime_ += dt;
+	}
 
 	// ★追加: マスターボリュームの反映（PhaseSystemが直接再生するBGM用）
 	if (auto* audio = Engine::Audio::GetInstance()) {
@@ -340,7 +346,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				scene->GetRegistry().emplace<VariableComponent>(resultManagerEntity_);
 				scene->SetVar(resultManagerEntity_, "isWin", 0.0f);
 				scene->SetVar(resultManagerEntity_, "score", 300.0f);
-				scene->SetVar(resultManagerEntity_, "clearTime", scene->GetPlayTime());
+				scene->SetVar(resultManagerEntity_, "clearTime", totalBattleTime_);
 
 				auto& sc = scene->GetRegistry().emplace<ScriptComponent>(resultManagerEntity_);
 				ScriptEntry entry;
@@ -479,7 +485,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				scene->GetRegistry().emplace<VariableComponent>(resultManagerEntity_);
 				scene->SetVar(resultManagerEntity_, "isWin", 1.0f);
 				scene->SetVar(resultManagerEntity_, "score", 1500.0f);
-				scene->SetVar(resultManagerEntity_, "clearTime", scene->GetPlayTime());
+				scene->SetVar(resultManagerEntity_, "clearTime", totalBattleTime_);
 
 				auto& sc = scene->GetRegistry().emplace<ScriptComponent>(resultManagerEntity_);
 				ScriptEntry entry;
@@ -1238,8 +1244,8 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 						if (enemyCountUI_ == entt::null || !scene->GetRegistry().valid(enemyCountUI_)) {
 							enemyCountUI_ = scene->CreateEntity("EnemyCountUI");
 							auto& rect = scene->GetRegistry().emplace<RectTransformComponent>(enemyCountUI_);
-							rect.pos = {0, -450};       // 画面上部中央
-							rect.anchor = {0.5f, 0.5f}; // 中央基準で上へ
+							rect.pos = {720, -280};
+							rect.anchor = {0.5f, 0.5f};
 							rect.pivot = {0.5f, 0.5f};
 
 							auto& text = scene->GetRegistry().emplace<UITextComponent>(enemyCountUI_);
@@ -1256,7 +1262,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 						if (waveCountUI_ == entt::null || !scene->GetRegistry().valid(waveCountUI_)) {
 							waveCountUI_ = scene->CreateEntity("WaveCountUI");
 							auto& rect = scene->GetRegistry().emplace<RectTransformComponent>(waveCountUI_);
-							rect.pos = {0, -500};       // enemyCountUI_ の上
+							rect.pos = {700, -350};
 							rect.anchor = {0.5f, 0.5f};
 							rect.pivot = {0.5f, 0.5f};
 
@@ -1271,6 +1277,30 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 						auto& waveText = scene->GetRegistry().get<UITextComponent>(waveCountUI_);
 						waveText.text = "WAVE " + std::to_string(currentWaveForDisplay) + " / " + std::to_string(totalWaves);
 						scene->GetRegistry().get<RectTransformComponent>(waveCountUI_).enabled = true;
+
+						// タイマーUIの作成
+						if (timerUI_ == entt::null || !scene->GetRegistry().valid(timerUI_)) {
+							timerUI_ = scene->CreateEntity("TimerUI");
+							auto& rect = scene->GetRegistry().emplace<RectTransformComponent>(timerUI_);
+							rect.pos = {700, -400};
+							rect.anchor = {0.5f, 0.5f};
+							rect.pivot = {0.5f, 0.5f};
+
+							auto& timerText = scene->GetRegistry().emplace<UITextComponent>(timerUI_);
+							timerText.fontSize = 42.0f;
+							timerText.color = {1, 1, 1, 1};
+							timerText.outlineEnabled = true;
+						}
+						
+						float playTime = totalBattleTime_;
+						int minutes = static_cast<int>(playTime) / 60;
+						int seconds = static_cast<int>(playTime) % 60;
+						char timeStr[16];
+						snprintf(timeStr, sizeof(timeStr), "%02d:%02d", minutes, seconds);
+						
+						auto& tText = scene->GetRegistry().get<UITextComponent>(timerUI_);
+						tText.text = timeStr;
+						scene->GetRegistry().get<RectTransformComponent>(timerUI_).enabled = true;
 					}
 				}
 			}
@@ -1282,6 +1312,9 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 		}
 		if (waveCountUI_ != entt::null && scene->GetRegistry().valid(waveCountUI_)) {
 			scene->GetRegistry().get<RectTransformComponent>(waveCountUI_).enabled = false;
+		}
+		if (timerUI_ != entt::null && scene->GetRegistry().valid(timerUI_)) {
+			scene->GetRegistry().get<RectTransformComponent>(timerUI_).enabled = false;
 		}
 	}
 
@@ -1358,11 +1391,13 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 	}
 	
 	if (showEnemyCount) {
-		updateCustomUI(enemyCountFrameUI_, enemyCountFrameTexPath_, enemyCountFrameSize_, {0, -450}, 0);
-		updateCustomUI(waveCountFrameUI_, waveCountFrameTexPath_, waveCountFrameSize_, {0, -500}, 0);
+		updateCustomUI(timerFrameUI_, timerFrameTexPath_, timerFrameSize_, {700, -400}, 0);
+		updateCustomUI(waveCountFrameUI_, waveCountFrameTexPath_, waveCountFrameSize_, {700, -350}, 0);
+		updateCustomUI(enemyCountFrameUI_, enemyCountFrameTexPath_, enemyCountFrameSize_, {700, -280}, 0);
 	} else {
-		updateCustomUI(enemyCountFrameUI_, "", enemyCountFrameSize_, {0, -450}, 0);
-		updateCustomUI(waveCountFrameUI_, "", waveCountFrameSize_, {0, -500}, 0);
+		updateCustomUI(timerFrameUI_, "", timerFrameSize_, {700, -400}, 0);
+		updateCustomUI(waveCountFrameUI_, "", waveCountFrameSize_, {700, -350}, 0);
+		updateCustomUI(enemyCountFrameUI_, "", enemyCountFrameSize_, {700, -280}, 0);
 	}
 
 	// ★ ゲームオーバー / リザルトへの遷移チェック
@@ -1908,6 +1943,14 @@ void PhaseSystemScript::OnEditorUI() {
 	if (ImGui::InputText("Wave Frame Path", wPath, sizeof(wPath))) {
 		waveCountFrameTexPath_ = wPath;
 	}
+	if (ImGui::BeginDragDropTarget()) {
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROJECT_ASSET")) {
+			std::string sPath = (const char*)payload->Data;
+			for (char& c : sPath) { if (c == '\\') c = '/'; }
+			waveCountFrameTexPath_ = sPath;
+		}
+		ImGui::EndDragDropTarget();
+	}
 	ImGui::DragFloat2("Wave Frame Size", &waveCountFrameSize_.x);
 	
 	char ePath[256];
@@ -1915,7 +1958,30 @@ void PhaseSystemScript::OnEditorUI() {
 	if (ImGui::InputText("Enemy Frame Path", ePath, sizeof(ePath))) {
 		enemyCountFrameTexPath_ = ePath;
 	}
+	if (ImGui::BeginDragDropTarget()) {
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROJECT_ASSET")) {
+			std::string sPath = (const char*)payload->Data;
+			for (char& c : sPath) { if (c == '\\') c = '/'; }
+			enemyCountFrameTexPath_ = sPath;
+		}
+		ImGui::EndDragDropTarget();
+	}
 	ImGui::DragFloat2("Enemy Frame Size", &enemyCountFrameSize_.x);
+
+	char tPath[256];
+	strcpy_s(tPath, timerFrameTexPath_.c_str());
+	if (ImGui::InputText("Timer Frame Path", tPath, sizeof(tPath))) {
+		timerFrameTexPath_ = tPath;
+	}
+	if (ImGui::BeginDragDropTarget()) {
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROJECT_ASSET")) {
+			std::string sPath = (const char*)payload->Data;
+			for (char& c : sPath) { if (c == '\\') c = '/'; }
+			timerFrameTexPath_ = sPath;
+		}
+		ImGui::EndDragDropTarget();
+	}
+	ImGui::DragFloat2("Timer Frame Size", &timerFrameSize_.x);
 #endif
 }
 
@@ -1923,8 +1989,10 @@ std::string PhaseSystemScript::SerializeParameters() {
 	json j;
 	j["waveCountFrameTexPath"] = waveCountFrameTexPath_;
 	j["enemyCountFrameTexPath"] = enemyCountFrameTexPath_;
+	j["timerFrameTexPath"] = timerFrameTexPath_;
 	j["waveCountFrameSize"] = {waveCountFrameSize_.x, waveCountFrameSize_.y};
 	j["enemyCountFrameSize"] = {enemyCountFrameSize_.x, enemyCountFrameSize_.y};
+	j["timerFrameSize"] = {timerFrameSize_.x, timerFrameSize_.y};
 	return j.dump();
 }
 
@@ -1934,6 +2002,7 @@ void PhaseSystemScript::DeserializeParameters(const std::string& data) {
 		json j = json::parse(data);
 		if (j.contains("waveCountFrameTexPath")) waveCountFrameTexPath_ = j["waveCountFrameTexPath"];
 		if (j.contains("enemyCountFrameTexPath")) enemyCountFrameTexPath_ = j["enemyCountFrameTexPath"];
+		if (j.contains("timerFrameTexPath")) timerFrameTexPath_ = j["timerFrameTexPath"];
 		if (j.contains("waveCountFrameSize")) {
 			waveCountFrameSize_.x = j["waveCountFrameSize"][0];
 			waveCountFrameSize_.y = j["waveCountFrameSize"][1];
@@ -1941,6 +2010,10 @@ void PhaseSystemScript::DeserializeParameters(const std::string& data) {
 		if (j.contains("enemyCountFrameSize")) {
 			enemyCountFrameSize_.x = j["enemyCountFrameSize"][0];
 			enemyCountFrameSize_.y = j["enemyCountFrameSize"][1];
+		}
+		if (j.contains("timerFrameSize")) {
+			timerFrameSize_.x = j["timerFrameSize"][0];
+			timerFrameSize_.y = j["timerFrameSize"][1];
 		}
 	} catch (const std::exception& e) {
 		std::cerr << "PhaseSystemScript Deserialize Error: " << e.what() << "\n";
