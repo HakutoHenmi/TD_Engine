@@ -32,8 +32,18 @@ public:
 			if (!as.enabled) continue;
 
 			if (as.playOnStart && !as.isPlaying && as.soundHandle != 0xFFFFFFFF) {
-				as.voiceHandle = audio->Play(as.soundHandle, as.loop, as.volume);
+				float initialVol = as.volume;
+				if (as.category == AudioCategory::BGM) {
+					initialVol *= audio->GetMasterBGMVolume();
+				} else {
+					initialVol *= audio->GetMasterSEVolume();
+				}
+				as.voiceHandle = audio->Play(as.soundHandle, as.loop, initialVol);
 				as.isPlaying = true;
+				
+				char logBuf[256];
+				sprintf_s(logBuf, "[AudioSystem] Played AudioSourceComponent: entity=%u, soundHandle=%u, voiceHandle=%zu\n", static_cast<uint32_t>(entity), as.soundHandle, as.voiceHandle);
+				OutputDebugStringA(logBuf);
 			}
 
 			if (as.isPlaying && as.voiceHandle != 0) {
