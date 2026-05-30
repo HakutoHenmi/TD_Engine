@@ -7,7 +7,202 @@
   },
   "objects": [
     {
-      "id": 4194320,
+      "id": 2097185,
+      "parentId": 4294967295,
+      "name": "steamHouse_5",
+      "locked": false,
+      "translate": [87.5638, 1.5, -44.538],
+      "rotate": [0, 1.567, 0],
+      "scale": [2, 2, 2],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/steamHouse/steamHouse.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Wall"}
+      ]
+    },
+    {
+      "id": 2097184,
+      "parentId": 4294967295,
+      "name": "steamHouse2_3",
+      "locked": false,
+      "translate": [68.2466, 1, -46.0457],
+      "rotate": [0, 1.57, 0],
+      "scale": [2, 2, 2],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/steamHouse2/steamHouse2.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Wall"}
+      ]
+    },
+    {
+      "id": 2097183,
+      "parentId": 4294967295,
+      "name": "House1_2",
+      "locked": false,
+      "translate": [49.7302, -0.536936, -50.6272],
+      "rotate": [0, 1.57, 0],
+      "scale": [3, 3, 3],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/House1/House1.obj", "texturePath": "Resources/Models/MapObjct/House1/House1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Wall"}
+      ]
+    },
+    {
+      "id": 2097182,
+      "parentId": 4294967295,
+      "name": "House1_1",
+      "locked": false,
+      "translate": [30.3537, -0.289905, -50.1272],
+      "rotate": [0, 1.57, 0],
+      "scale": [3, 3, 3],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/House1/House1.obj", "texturePath": "Resources/Models/MapObjct/House1/House1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Wall"}
+      ]
+    },
+    {
+      "id": 2097181,
+      "parentId": 4294967295,
+      "name": "steamHouse_4",
+      "locked": false,
+      "translate": [12.225, 1, -44.038],
+      "rotate": [0, 1.567, 0],
+      "scale": [2, 2, 2],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/steamHouse/steamHouse.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Wall"}
+      ]
+    },
+    {
+      "id": 2097180,
+      "parentId": 4294967295,
+      "name": "steamHouse2_2",
+      "locked": false,
+      "translate": [-8.14606, 0.5, -46.66],
+      "rotate": [0, 1.57, 0],
+      "scale": [2, 2, 2],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/steamHouse2/steamHouse2.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Wall"}
+      ]
+    },
+    {
+      "id": 3145755,
+      "parentId": 4294967295,
+      "name": "steamHouse_3",
+      "locked": false,
+      "translate": [-27.3361, 0.5, -43.538],
+      "rotate": [0, 1.567, 0],
+      "scale": [2, 2, 2],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/steamHouse/steamHouse.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Wall"}
+      ]
+    },
+    {
+      "id": 2097178,
+      "parentId": 4294967295,
+      "name": "Shop",
+      "locked": false,
+      "translate": [-50.7146, 0.453311, -49.4087],
+      "rotate": [0, 1.57, 0],
+      "scale": [0.5, 0.5, 0.5],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/Shop/Shop.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Wall"}
+      ]
+    },
+    {
+      "id": 2097177,
+      "parentId": 4294967295,
+      "name": "steamHouse_2",
+      "locked": false,
+      "translate": [81.411, 0, 43.0376],
+      "rotate": [0, -1.567, 0],
+      "scale": [2, 2, 2],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/steamHouse/steamHouse.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Wall"}
+      ]
+    },
+    {
+      "id": 2097176,
+      "parentId": 4294967295,
+      "name": "steamHouse2_1",
+      "locked": false,
+      "translate": [60.6312, 0, 46.6605],
+      "rotate": [0, -1.57, 0],
+      "scale": [2, 2, 2],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/steamHouse2/steamHouse2.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Wall"}
+      ]
+    },
+    {
+      "id": 2097175,
+      "parentId": 4294967295,
+      "name": "steamHouse_1",
+      "locked": false,
+      "translate": [40.7615, 0, 43.5376],
+      "rotate": [0, -1.567, 0],
+      "scale": [2, 2, 2],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/steamHouse/steamHouse.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Wall"}
+      ]
+    },
+    {
+      "id": 2097174,
+      "parentId": 4294967295,
+      "name": "steamHouse2",
+      "locked": false,
+      "translate": [21.4366, 0, 47.1605],
+      "rotate": [0, -1.57, 0],
+      "scale": [2, 2, 2],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/steamHouse2/steamHouse2.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Wall"}
+      ]
+    },
+    {
+      "id": 2097173,
+      "parentId": 4294967295,
+      "name": "steamHouse",
+      "locked": false,
+      "translate": [2.38422, 0, 44.0376],
+      "rotate": [0, -1.567, 0],
+      "scale": [2, 2, 2],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/steamHouse/steamHouse.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Wall"}
+      ]
+    },
+    {
+      "id": 3145748,
+      "parentId": 4294967295,
+      "name": "House1",
+      "locked": false,
+      "translate": [-15.2333, -0.789905, 48.4227],
+      "rotate": [0, -1.57, 0],
+      "scale": [3, 3, 3],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/House1/House1.obj", "texturePath": "Resources/Models/MapObjct/House1/House1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Wall"}
+      ]
+    },
+    {
+      "id": 2097171,
+      "parentId": 4294967295,
+      "name": "MovieTheatre",
+      "locked": false,
+      "translate": [-71.9535, 0.402087, -47.112],
+      "rotate": [0, 3.14, 0],
+      "scale": [0.5, 0.5, 0.5],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/MovieTheatre/MovieTheatre.obj", "texturePath": "Resources/Models/MapObjct/MovieTheatre/MovieTheatre.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Wall"}
+      ]
+    },
+    {
+      "id": 2097170,
       "parentId": 4294967295,
       "name": "Sun",
       "locked": true,
@@ -19,8 +214,8 @@
       ]
     },
     {
-      "id": 4194319,
-      "parentId": 4194315,
+      "id": 2097169,
+      "parentId": 2097165,
       "name": "PlayerGun",
       "locked": false,
       "translate": [0.8, 0.7, 0.6],
@@ -31,7 +226,7 @@
       ]
     },
     {
-      "id": 5242885,
+      "id": 2097168,
       "parentId": 4294967295,
       "name": "Spawner_W1_2",
       "locked": false,
@@ -43,7 +238,7 @@
       ]
     },
     {
-      "id": 36700456,
+      "id": 2097167,
       "parentId": 4294967295,
       "name": "Fede",
       "locked": true,
@@ -57,13 +252,13 @@
       ]
     },
     {
-      "id": 4194316,
+      "id": 2097166,
       "parentId": 4294967295,
       "name": "Floor",
-      "locked": true,
+      "locked": false,
       "translate": [0, 0, 0],
       "rotate": [-1.57, 0, 0],
-      "scale": [100, 40, 1],
+      "scale": [100, 80, 1],
       "components": [
         {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/plane.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Hologram", "color": [0.0684247,0.0779424,0.11583,1], "uvTiling": [1,1], "uvOffset": [0,0]},
         {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,1,1], "isTrigger": false},
@@ -71,7 +266,7 @@
       ]
     },
     {
-      "id": 4194315,
+      "id": 2097165,
       "parentId": 4294967295,
       "name": "Player",
       "locked": true,
@@ -92,7 +287,7 @@
       ]
     },
     {
-      "id": 4194314,
+      "id": 2097164,
       "parentId": 4294967295,
       "name": "PreparationCamera",
       "locked": false,
@@ -110,7 +305,7 @@
       ]
     },
     {
-      "id": 4194313,
+      "id": 2097163,
       "parentId": 4294967295,
       "name": "PhysicsSystem",
       "locked": true,
@@ -126,20 +321,21 @@
       ]
     },
     {
-      "id": 4194312,
+      "id": 2097162,
       "parentId": 4294967295,
-      "name": "hei2",
+      "name": "MovieSign",
       "locked": false,
-      "translate": [0.5, 10, -40],
-      "rotate": [0, 0, 0],
-      "scale": [100, 10, 1],
+      "translate": [-89.8722, 0, -40.4099],
+      "rotate": [0, 1.57, 0],
+      "scale": [0.5, 0.5, 0.5],
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/plane.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [0.281853,0.281853,0.281853,1], "uvTiling": [1,1], "uvOffset": [0,0]}
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/MovieSign/MovieSign.obj", "texturePath": "Resources/Models/MapObjct/MovieSign/MovieSign.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Wall"}
       ]
     },
     {
-      "id": 4194311,
-      "parentId": 4194315,
+      "id": 2097161,
+      "parentId": 2097165,
       "name": "PlayerSword",
       "locked": false,
       "translate": [-0.3, 1.2, -0.6],
@@ -183,7 +379,7 @@
       ]
     },
     {
-      "id": 4194310,
+      "id": 2097160,
       "parentId": 4294967295,
       "name": "Core",
       "locked": false,
@@ -198,7 +394,7 @@
       ]
     },
     {
-      "id": 4194323,
+      "id": 2097159,
       "parentId": 4294967295,
       "name": "Spawner_W2_1",
       "locked": false,
@@ -210,7 +406,7 @@
       ]
     },
     {
-      "id": 4194308,
+      "id": 2097158,
       "parentId": 4294967295,
       "name": "Spawner_W2_2",
       "locked": false,
@@ -222,7 +418,7 @@
       ]
     },
     {
-      "id": 4194307,
+      "id": 2097157,
       "parentId": 4294967295,
       "name": "Spawner_W2_3",
       "locked": false,
@@ -234,7 +430,7 @@
       ]
     },
     {
-      "id": 4194322,
+      "id": 2097156,
       "parentId": 4294967295,
       "name": "Spawner_W1_1",
       "locked": false,
@@ -246,19 +442,20 @@
       ]
     },
     {
-      "id": 4194321,
+      "id": 2097155,
       "parentId": 4294967295,
-      "name": "hei1",
+      "name": "House2",
       "locked": false,
-      "translate": [0, 10, 40],
-      "rotate": [3.14, 0, 0],
-      "scale": [100, 10, 1],
+      "translate": [-83.4675, 0, 50.5103],
+      "rotate": [0, 0, 0],
+      "scale": [0.5, 0.5, 0.5],
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/plane.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [0.281853,0.281853,0.281853,1], "uvTiling": [1,1], "uvOffset": [0,0]}
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/House2/House2.obj", "texturePath": "Resources/Models/MapObjct/House2/House2.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Wall"}
       ]
     },
     {
-      "id": 4194304,
+      "id": 2097154,
       "parentId": 4294967295,
       "name": "Spawner_W3_1",
       "locked": false,
@@ -267,6 +464,32 @@
       "scale": [1, 1, 1],
       "components": [
         {"type": "Script", "enabled": true, "scripts": [{"path": "EnemySpawnerScript", "param": "{\"enemyScriptParams\":\"{\\\"cautionRange\\\":75.0,\\\"expDrop\\\":10.0,\\\"maxWaitTime\\\":3.0,\\\"moveType\\\":0,\\\"speed\\\":2.799999952316284}\",\"enemyScriptPath\":\"Boss\",\"enemyType\":0,\"maxCount\":2,\"pattern\":2,\"patternRadius\":3.0,\"spawnDuration\":10.0,\"startWave\":0,\"waveCount\":1,\"waveDelay\":2.0}"}]}
+      ]
+    },
+    {
+      "id": 2097153,
+      "parentId": 4294967295,
+      "name": "LightTower",
+      "locked": false,
+      "translate": [-33.9214, 0, 48.8542],
+      "rotate": [0, 0, 0],
+      "scale": [3, 3, 3],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/LightTower/LightTower.obj", "texturePath": "Resources/Textures/white1x1.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Wall"}
+      ]
+    },
+    {
+      "id": 2097152,
+      "parentId": 4294967295,
+      "name": "House2_1",
+      "locked": false,
+      "translate": [-56.4589, 0, 50.0103],
+      "rotate": [0, 0, 0],
+      "scale": [0.5, 0.5, 0.5],
+      "components": [
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/House2/House2.obj", "texturePath": "Resources/Models/MapObjct/House2/House2.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "Tag", "enabled": true, "tag": "Wall"}
       ]
     }
   ]
