@@ -7,7 +7,7 @@
   },
   "objects": [
     {
-      "id": 3145775,
+      "id": 72,
       "parentId": 4294967295,
       "name": "House2_11",
       "locked": false,
@@ -20,7 +20,7 @@
       ]
     },
     {
-      "id": 3145774,
+      "id": 71,
       "parentId": 4294967295,
       "name": "House2_10",
       "locked": false,
@@ -33,7 +33,7 @@
       ]
     },
     {
-      "id": 2097217,
+      "id": 70,
       "parentId": 4294967295,
       "name": "House2_9",
       "locked": false,
@@ -46,7 +46,7 @@
       ]
     },
     {
-      "id": 2097216,
+      "id": 69,
       "parentId": 4294967295,
       "name": "House2_8",
       "locked": false,
@@ -59,7 +59,7 @@
       ]
     },
     {
-      "id": 2097215,
+      "id": 68,
       "parentId": 4294967295,
       "name": "House2_7",
       "locked": false,
@@ -72,7 +72,7 @@
       ]
     },
     {
-      "id": 2097214,
+      "id": 67,
       "parentId": 4294967295,
       "name": "MovieSign_3",
       "locked": false,
@@ -85,7 +85,7 @@
       ]
     },
     {
-      "id": 2097213,
+      "id": 66,
       "parentId": 4294967295,
       "name": "Spawner_W3_3",
       "locked": false,
@@ -97,7 +97,7 @@
       ]
     },
     {
-      "id": 2097212,
+      "id": 65,
       "parentId": 4294967295,
       "name": "Spawner_W3_2",
       "locked": false,
@@ -109,7 +109,7 @@
       ]
     },
     {
-      "id": 2097211,
+      "id": 64,
       "parentId": 4294967295,
       "name": "Spawner_W3_1",
       "locked": false,
@@ -121,19 +121,19 @@
       ]
     },
     {
-      "id": 2097210,
+      "id": 63,
       "parentId": 4294967295,
       "name": "Spawner_W2_4",
       "locked": false,
-      "translate": [150, 0, 0],
+      "translate": [150, 0, -9.91758],
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": false, "scripts": [{"path": "EnemySpawnerScript", "param": "{\"enemyScriptParams\":\"{\\\"cautionRange\\\":75.0,\\\"expDrop\\\":10.0,\\\"maxWaitTime\\\":3.0,\\\"moveType\\\":0,\\\"speed\\\":2.799999952316284}\",\"enemyScriptPath\":\"Warrior\",\"enemyType\":0,\"maxCount\":5,\"pattern\":0,\"patternRadius\":3.0,\"spawnDuration\":5.0,\"startWave\":0,\"waveCount\":2,\"waveDelay\":2.0}"}]}
+        {"type": "Script", "enabled": false, "scripts": [{"path": "EnemySpawnerScript", "param": "{\"enemyScriptParams\":\"{\\\"cautionRange\\\":75.0,\\\"expDrop\\\":10.0,\\\"maxWaitTime\\\":3.0,\\\"moveType\\\":0,\\\"speed\\\":2.799999952316284}\",\"enemyScriptPath\":\"Enchanter\",\"enemyType\":0,\"maxCount\":1,\"pattern\":0,\"patternRadius\":3.0,\"spawnDuration\":5.0,\"startWave\":0,\"waveCount\":1,\"waveDelay\":2.0}"}]}
       ]
     },
     {
-      "id": 2097209,
+      "id": 62,
       "parentId": 4294967295,
       "name": "Spawner_W3_4",
       "locked": false,
@@ -145,7 +145,7 @@
       ]
     },
     {
-      "id": 2097208,
+      "id": 61,
       "parentId": 4294967295,
       "name": "Spawner_W2_2",
       "locked": false,
@@ -157,7 +157,7 @@
       ]
     },
     {
-      "id": 2097207,
+      "id": 60,
       "parentId": 4294967295,
       "name": "Spawner_W2_1",
       "locked": false,
@@ -169,8 +169,8 @@
       ]
     },
     {
-      "id": 2097206,
-      "parentId": 3145772,
+      "id": 59,
+      "parentId": 49,
       "name": "PlayerSword",
       "locked": false,
       "translate": [-0.3, 1.2, -0.6],
@@ -214,7 +214,7 @@
       ]
     },
     {
-      "id": 2097205,
+      "id": 58,
       "parentId": 4294967295,
       "name": "Core",
       "locked": false,
@@ -229,8 +229,8 @@
       ]
     },
     {
-      "id": 2097204,
-      "parentId": 3145772,
+      "id": 57,
+      "parentId": 49,
       "name": "PlayerGun",
       "locked": false,
       "translate": [0.8, 0.7, 0.6],
@@ -241,7 +241,7 @@
       ]
     },
     {
-      "id": 2097203,
+      "id": 56,
       "parentId": 4294967295,
       "name": "PhysicsSystem",
       "locked": true,
@@ -249,15 +249,15 @@
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "PhaseSystemScript", "param": ""}, {"path": "WaveManagement", "param": "{\"spawners\":[[\"Spawner_W1_1\",\"Spawner_W1_2\",\"Spawner_W1_3\",\"Spawner_W1_4\"],[\"Spawner_W2_1\",\"Spawner_W2_2\",\"Spawner_W2_3\",\"Spawner_W2_4\"],[\"Spawner_W3_1\",\"Spawner_W3_2\",\"Spawner_W3_3\",\"Spawner_W3_4\"]]}"}, {"path": "InstallationManager", "param": "{\"buttons\":[{\"cost\":0,\"name\":\"DeleteButton\",\"posX\":0.0,\"posY\":0.0,\"prefabPath\":\"\",\"sizeX\":100.0,\"sizeY\":100.0,\"texturePath\":\"\"},{\"cost\":0,\"name\":\"CannonButton\",\"posX\":0.0,\"posY\":0.0,\"prefabPath\":\"\",\"sizeX\":100.0,\"sizeY\":100.0,\"texturePath\":\"\"},{\"cost\":0,\"name\":\"MissikeButton\",\"posX\":0.0,\"posY\":0.0,\"prefabPath\":\"\",\"sizeX\":100.0,\"sizeY\":100.0,\"texturePath\":\"\"},{\"cost\":0,\"name\":\"PoisonTrapButton\",\"posX\":0.0,\"posY\":0.0,\"prefabPath\":\"\",\"sizeX\":100.0,\"sizeY\":100.0,\"texturePath\":\"\"},{\"cost\":0,\"name\":\"IceCannonButton\",\"posX\":0.0,\"posY\":0.0,\"prefabPath\":\"\",\"sizeX\":100.0,\"sizeY\":100.0,\"texturePath\":\"\"}]}"}]},
+        {"type": "Script", "enabled": true, "scripts": [{"path": "PhaseSystemScript", "param": ""}, {"path": "WaveManagement", "param": "{\"spawners\":[[\"Spawner_W1_1\",\"Spawner_W1_2\",\"Spawner_W1_3\",\"Spawner_W1_4\"],[\"Spawner_W2_1\",\"Spawner_W2_2\",\"Spawner_W2_3\",\"Spawner_W2_4\"],[\"Spawner_W3_1\",\"Spawner_W3_2\",\"Spawner_W3_3\",\"Spawner_W3_4\"],[\"Spawner_W4_1\",\"Spawner_W4_2\",\"Spawner_W4_3\",\"Spawner_W4_4\",\"Spawner_W4_5\"]]}"}, {"path": "InstallationManager", "param": "{\"buttons\":[{\"cost\":0,\"name\":\"DeleteButton\",\"posX\":0.0,\"posY\":0.0,\"prefabPath\":\"\",\"sizeX\":100.0,\"sizeY\":100.0,\"texturePath\":\"\"},{\"cost\":0,\"name\":\"CannonButton\",\"posX\":0.0,\"posY\":0.0,\"prefabPath\":\"\",\"sizeX\":100.0,\"sizeY\":100.0,\"texturePath\":\"\"},{\"cost\":0,\"name\":\"MissikeButton\",\"posX\":0.0,\"posY\":0.0,\"prefabPath\":\"\",\"sizeX\":100.0,\"sizeY\":100.0,\"texturePath\":\"\"},{\"cost\":0,\"name\":\"PoisonTrapButton\",\"posX\":0.0,\"posY\":0.0,\"prefabPath\":\"\",\"sizeX\":100.0,\"sizeY\":100.0,\"texturePath\":\"\"},{\"cost\":0,\"name\":\"IceCannonButton\",\"posX\":0.0,\"posY\":0.0,\"prefabPath\":\"\",\"sizeX\":100.0,\"sizeY\":100.0,\"texturePath\":\"\"}]}"}]},
         {"type": "Variable", "enabled": true, "values": {"IsSkillTreeOpen": 0}, "strings": {}},
         {"type": "RectTransform", "enabled": true, "pos": [741,-488], "size": [768,96], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
         {"type": "UIImage", "enabled": true, "texturePath": "Resources/Textures/GamaUI/PriceMeter.png", "color": [1,1,1,1], "layer": 0, "is9Slice": false, "borderTop": 10, "borderBottom": 10, "borderLeft": 10, "borderRight": 10},
-        {"type": "UIText", "enabled": true, "text": "$60000", "fontSize": 50, "fontPath": "C:\\Windows\\Fonts\\msgothic.ttc", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]}
+        {"type": "UIText", "enabled": true, "text": "$60000", "fontSize": 48, "fontPath": "Resources\\\\Fonts\\\\Kiwi_Maru\\\\KiwiMaru-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]}
       ]
     },
     {
-      "id": 3145778,
+      "id": 55,
       "parentId": 4294967295,
       "name": "CannonButton",
       "locked": false,
@@ -271,7 +271,7 @@
       ]
     },
     {
-      "id": 3145777,
+      "id": 54,
       "parentId": 4294967295,
       "name": "MissikeButton",
       "locked": false,
@@ -285,7 +285,7 @@
       ]
     },
     {
-      "id": 2097223,
+      "id": 53,
       "parentId": 4294967295,
       "name": "TankButton",
       "locked": false,
@@ -299,7 +299,7 @@
       ]
     },
     {
-      "id": 2097219,
+      "id": 52,
       "parentId": 4294967295,
       "name": "PipeButton",
       "locked": false,
@@ -313,7 +313,7 @@
       ]
     },
     {
-      "id": 2097218,
+      "id": 51,
       "parentId": 4294967295,
       "name": "PoisonTrapButton",
       "locked": false,
@@ -327,7 +327,7 @@
       ]
     },
     {
-      "id": 2097197,
+      "id": 50,
       "parentId": 4294967295,
       "name": "Fede",
       "locked": true,
@@ -342,7 +342,7 @@
       ]
     },
     {
-      "id": 3145772,
+      "id": 49,
       "parentId": 4294967295,
       "name": "Player",
       "locked": true,
@@ -363,7 +363,7 @@
       ]
     },
     {
-      "id": 3145771,
+      "id": 48,
       "parentId": 4294967295,
       "name": "PreparationCamera",
       "locked": false,
@@ -381,7 +381,7 @@
       ]
     },
     {
-      "id": 3145770,
+      "id": 47,
       "parentId": 4294967295,
       "name": "Ground",
       "locked": true,
@@ -389,13 +389,13 @@
       "rotate": [0, 0, 0],
       "scale": [0.5, 0.5, 0.5],
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Scenes/Map/Ground.obj", "texturePath": "", "shaderName": "Default", "color": [0.644788,0.363471,0.363471,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Scenes/Map/Ground.obj", "texturePath": "Resources/Textures/Plane/ground.png", "shaderName": "Ground", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
         {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,1,1], "isTrigger": false},
         {"type": "Tag", "enabled": true, "tag": "Default"}
       ]
     },
     {
-      "id": 3145769,
+      "id": 46,
       "parentId": 4294967295,
       "name": "Sun",
       "locked": true,
@@ -407,7 +407,7 @@
       ]
     },
     {
-      "id": 3145768,
+      "id": 45,
       "parentId": 4294967295,
       "name": "Spawner_W1_1",
       "locked": false,
@@ -415,11 +415,11 @@
       "rotate": [0, 0, 0],
       "scale": [1, 1, 1],
       "components": [
-        {"type": "Script", "enabled": true, "scripts": [{"path": "EnemySpawnerScript", "param": "{\"enemyScriptParams\":\"{\\\"cautionRange\\\":75.0,\\\"expDrop\\\":10.0,\\\"maxWaitTime\\\":3.0,\\\"moveType\\\":0,\\\"speed\\\":2.799999952316284}\",\"enemyScriptPath\":\"Warrior\",\"enemyType\":0,\"maxCount\":5,\"pattern\":0,\"patternRadius\":3.0,\"spawnDuration\":5.0,\"startWave\":0,\"waveCount\":1,\"waveDelay\":2.0}"}]}
+        {"type": "Script", "enabled": true, "scripts": [{"path": "EnemySpawnerScript", "param": "{\"enemyScriptParams\":\"{\\\"cautionRange\\\":75.0,\\\"expDrop\\\":10.0,\\\"maxWaitTime\\\":3.0,\\\"moveType\\\":0,\\\"speed\\\":2.799999952316284}\",\"enemyScriptPath\":\"Guardian\",\"enemyType\":0,\"maxCount\":5,\"pattern\":0,\"patternRadius\":3.0,\"spawnDuration\":5.0,\"startWave\":0,\"waveCount\":1,\"waveDelay\":2.0}"}]}
       ]
     },
     {
-      "id": 3145767,
+      "id": 1048620,
       "parentId": 4294967295,
       "name": "Spawner_W1_2",
       "locked": false,
@@ -431,7 +431,7 @@
       ]
     },
     {
-      "id": 3145766,
+      "id": 1048619,
       "parentId": 4294967295,
       "name": "Shop",
       "locked": false,
@@ -444,7 +444,7 @@
       ]
     },
     {
-      "id": 3145765,
+      "id": 1048618,
       "parentId": 4294967295,
       "name": "Shop_1",
       "locked": false,
@@ -457,7 +457,7 @@
       ]
     },
     {
-      "id": 3145764,
+      "id": 1048617,
       "parentId": 4294967295,
       "name": "MovieTheatre",
       "locked": false,
@@ -470,7 +470,7 @@
       ]
     },
     {
-      "id": 3145763,
+      "id": 1048616,
       "parentId": 4294967295,
       "name": "MovieTheatre_1",
       "locked": false,
@@ -483,7 +483,7 @@
       ]
     },
     {
-      "id": 4194338,
+      "id": 1048615,
       "parentId": 4294967295,
       "name": "MovieSign",
       "locked": false,
@@ -496,7 +496,7 @@
       ]
     },
     {
-      "id": 6291480,
+      "id": 1048614,
       "parentId": 4294967295,
       "name": "MovieSign_1",
       "locked": false,
@@ -509,7 +509,7 @@
       ]
     },
     {
-      "id": 6291482,
+      "id": 1048613,
       "parentId": 4294967295,
       "name": "House2",
       "locked": false,
@@ -522,7 +522,7 @@
       ]
     },
     {
-      "id": 6291483,
+      "id": 1048612,
       "parentId": 4294967295,
       "name": "House2_1",
       "locked": false,
@@ -535,7 +535,7 @@
       ]
     },
     {
-      "id": 6291485,
+      "id": 1048611,
       "parentId": 4294967295,
       "name": "House2_2",
       "locked": false,
@@ -548,7 +548,7 @@
       ]
     },
     {
-      "id": 6291486,
+      "id": 1048610,
       "parentId": 4294967295,
       "name": "House2_3",
       "locked": false,
@@ -561,7 +561,7 @@
       ]
     },
     {
-      "id": 6291481,
+      "id": 3145752,
       "parentId": 4294967295,
       "name": "House2_4",
       "locked": false,
@@ -574,7 +574,7 @@
       ]
     },
     {
-      "id": 6291484,
+      "id": 3145754,
       "parentId": 4294967295,
       "name": "House2_5",
       "locked": false,
@@ -587,7 +587,7 @@
       ]
     },
     {
-      "id": 6291487,
+      "id": 3145755,
       "parentId": 4294967295,
       "name": "House2_6",
       "locked": false,
@@ -600,7 +600,7 @@
       ]
     },
     {
-      "id": 6291478,
+      "id": 3145757,
       "parentId": 4294967295,
       "name": "MovieSign_2",
       "locked": false,
@@ -613,7 +613,7 @@
       ]
     },
     {
-      "id": 5242913,
+      "id": 3145758,
       "parentId": 4294967295,
       "name": "House1",
       "locked": false,
@@ -626,7 +626,7 @@
       ]
     },
     {
-      "id": 5242903,
+      "id": 3145753,
       "parentId": 4294967295,
       "name": "steamHouse",
       "locked": false,
@@ -639,7 +639,7 @@
       ]
     },
     {
-      "id": 5242912,
+      "id": 3145756,
       "parentId": 4294967295,
       "name": "steamHouse2",
       "locked": false,
@@ -652,7 +652,7 @@
       ]
     },
     {
-      "id": 5242901,
+      "id": 3145759,
       "parentId": 4294967295,
       "name": "steamHouse_1",
       "locked": false,
@@ -665,7 +665,7 @@
       ]
     },
     {
-      "id": 5242900,
+      "id": 3145750,
       "parentId": 4294967295,
       "name": "steamHouse_2",
       "locked": false,
@@ -678,7 +678,7 @@
       ]
     },
     {
-      "id": 5242899,
+      "id": 2097185,
       "parentId": 4294967295,
       "name": "steamHouse_3",
       "locked": false,
@@ -691,7 +691,7 @@
       ]
     },
     {
-      "id": 5242898,
+      "id": 2097175,
       "parentId": 4294967295,
       "name": "steamHouse2_1",
       "locked": false,
@@ -704,7 +704,7 @@
       ]
     },
     {
-      "id": 5242897,
+      "id": 2097184,
       "parentId": 4294967295,
       "name": "House1_1",
       "locked": false,
@@ -717,7 +717,7 @@
       ]
     },
     {
-      "id": 5242896,
+      "id": 2097173,
       "parentId": 4294967295,
       "name": "House1_2",
       "locked": false,
@@ -730,7 +730,7 @@
       ]
     },
     {
-      "id": 5242895,
+      "id": 2097172,
       "parentId": 4294967295,
       "name": "steamHouse2_2",
       "locked": false,
@@ -743,7 +743,7 @@
       ]
     },
     {
-      "id": 5242894,
+      "id": 2097171,
       "parentId": 4294967295,
       "name": "House1_3",
       "locked": false,
@@ -756,7 +756,7 @@
       ]
     },
     {
-      "id": 5242893,
+      "id": 2097170,
       "parentId": 4294967295,
       "name": "steamHouse2_3",
       "locked": false,
@@ -769,7 +769,7 @@
       ]
     },
     {
-      "id": 5242892,
+      "id": 2097169,
       "parentId": 4294967295,
       "name": "steamHouse_4",
       "locked": false,
@@ -782,7 +782,7 @@
       ]
     },
     {
-      "id": 5242891,
+      "id": 2097168,
       "parentId": 4294967295,
       "name": "steamHouse2_4",
       "locked": false,
@@ -795,7 +795,7 @@
       ]
     },
     {
-      "id": 5242890,
+      "id": 2097167,
       "parentId": 4294967295,
       "name": "steamHouse2",
       "locked": false,
@@ -808,7 +808,7 @@
       ]
     },
     {
-      "id": 5242889,
+      "id": 2097166,
       "parentId": 4294967295,
       "name": "steamHouse2_5",
       "locked": false,
@@ -821,7 +821,7 @@
       ]
     },
     {
-      "id": 5242888,
+      "id": 2097165,
       "parentId": 4294967295,
       "name": "steamHouse",
       "locked": false,
@@ -834,7 +834,7 @@
       ]
     },
     {
-      "id": 5242887,
+      "id": 2097164,
       "parentId": 4294967295,
       "name": "House1",
       "locked": false,
@@ -846,7 +846,7 @@
       ]
     },
     {
-      "id": 5242886,
+      "id": 2097163,
       "parentId": 4294967295,
       "name": "House1_4",
       "locked": false,
@@ -858,7 +858,7 @@
       ]
     },
     {
-      "id": 5242885,
+      "id": 2097162,
       "parentId": 4294967295,
       "name": "steamHouse_5",
       "locked": false,
@@ -871,7 +871,7 @@
       ]
     },
     {
-      "id": 5242884,
+      "id": 2097161,
       "parentId": 4294967295,
       "name": "steamHouse2_6",
       "locked": false,
@@ -884,7 +884,7 @@
       ]
     },
     {
-      "id": 5242883,
+      "id": 2097160,
       "parentId": 4294967295,
       "name": "steamHouse_6",
       "locked": false,
@@ -897,7 +897,7 @@
       ]
     },
     {
-      "id": 5242882,
+      "id": 2097159,
       "parentId": 4294967295,
       "name": "steamHouse2_7",
       "locked": false,
@@ -910,7 +910,7 @@
       ]
     },
     {
-      "id": 5242881,
+      "id": 2097158,
       "parentId": 4294967295,
       "name": "steamHouse2_8",
       "locked": false,
@@ -923,7 +923,7 @@
       ]
     },
     {
-      "id": 5242880,
+      "id": 2097157,
       "parentId": 4294967295,
       "name": "steamHouse_7",
       "locked": false,
@@ -933,6 +933,66 @@
       "components": [
         {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Models/MapObjct/steamHouse/steamHouse.obj", "texturePath": "Resources/Models/MapObjct/steamHouse/freamWork.png", "shaderName": "Default", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0], "extraTexturePaths": ["Resources/Models/MapObjct/steamHouse/house.png", "Resources/Models/MapObjct/steamHouse/parts.png", "Resources/Models/MapObjct/steamHouse/roof.png"]},
         {"type": "Tag", "enabled": true, "tag": "Wall"}
+      ]
+    },
+    {
+      "id": 2097156,
+      "parentId": 4294967295,
+      "name": "Spawner_W4_1",
+      "locked": false,
+      "translate": [-135.445, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Script", "enabled": true, "scripts": [{"path": "EnemySpawnerScript", "param": "{\"enemyScriptParams\":\"{\\\"cautionRange\\\":75.0,\\\"expDrop\\\":10.0,\\\"maxWaitTime\\\":3.0,\\\"moveType\\\":0,\\\"speed\\\":2.799999952316284}\",\"enemyScriptPath\":\"Boss\",\"enemyType\":0,\"maxCount\":1,\"pattern\":0,\"patternRadius\":3.0,\"spawnDuration\":20.399999618530273,\"startWave\":0,\"waveCount\":2,\"waveDelay\":2.0}"}]}
+      ]
+    },
+    {
+      "id": 2097155,
+      "parentId": 4294967295,
+      "name": "Spawner_W4_2",
+      "locked": false,
+      "translate": [-131.67, 0, -13.0154],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Script", "enabled": true, "scripts": [{"path": "EnemySpawnerScript", "param": "{\"enemyScriptParams\":\"{\\\"cautionRange\\\":75.0,\\\"expDrop\\\":10.0,\\\"maxWaitTime\\\":3.0,\\\"moveType\\\":0,\\\"speed\\\":2.799999952316284}\",\"enemyScriptPath\":\"Enchanter\",\"enemyType\":0,\"maxCount\":1,\"pattern\":0,\"patternRadius\":3.0,\"spawnDuration\":10.0,\"startWave\":0,\"waveCount\":1,\"waveDelay\":2.0}"}]}
+      ]
+    },
+    {
+      "id": 2097154,
+      "parentId": 4294967295,
+      "name": "Spawner_W4_3",
+      "locked": false,
+      "translate": [0, -1.49489, 132.12],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Script", "enabled": true, "scripts": [{"path": "EnemySpawnerScript", "param": "{\"enemyScriptParams\":\"{\\\"cautionRange\\\":75.0,\\\"expDrop\\\":10.0,\\\"maxWaitTime\\\":3.0,\\\"moveType\\\":0,\\\"speed\\\":2.799999952316284}\",\"enemyScriptPath\":\"Gunner\",\"enemyType\":0,\"maxCount\":5,\"pattern\":0,\"patternRadius\":3.0,\"spawnDuration\":10.0,\"startWave\":0,\"waveCount\":1,\"waveDelay\":2.0}"}]}
+      ]
+    },
+    {
+      "id": 2097153,
+      "parentId": 4294967295,
+      "name": "Spawner_W4_4",
+      "locked": false,
+      "translate": [120.323, 0, 0],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Script", "enabled": true, "scripts": [{"path": "EnemySpawnerScript", "param": "{\"enemyScriptParams\":\"{\\\"cautionRange\\\":75.0,\\\"expDrop\\\":10.0,\\\"maxWaitTime\\\":3.0,\\\"moveType\\\":0,\\\"speed\\\":2.799999952316284}\",\"enemyScriptPath\":\"Boss\",\"enemyType\":0,\"maxCount\":2,\"pattern\":0,\"patternRadius\":3.0,\"spawnDuration\":10.0,\"startWave\":0,\"waveCount\":1,\"waveDelay\":2.0}"}]}
+      ]
+    },
+    {
+      "id": 2097152,
+      "parentId": 4294967295,
+      "name": "Spawner_W4_5",
+      "locked": false,
+      "translate": [0, 0, -151.505],
+      "rotate": [0, 0, 0],
+      "scale": [1, 1, 1],
+      "components": [
+        {"type": "Script", "enabled": true, "scripts": [{"path": "EnemySpawnerScript", "param": "{\"enemyScriptParams\":\"{\\\"cautionRange\\\":75.0,\\\"expDrop\\\":10.0,\\\"maxWaitTime\\\":3.0,\\\"moveType\\\":0,\\\"speed\\\":2.799999952316284}\",\"enemyScriptPath\":\"Guardian\",\"enemyType\":0,\"maxCount\":3,\"pattern\":0,\"patternRadius\":3.0,\"spawnDuration\":10.0,\"startWave\":0,\"waveCount\":1,\"waveDelay\":2.0}"}]}
       ]
     }
   ]

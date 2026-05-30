@@ -78,7 +78,7 @@
       "components": [
         {"type": "Script", "enabled": true, "scripts": [{"path": "PhaseSystemScript", "param": ""}, {"path": "WaveManagement", "param": "{\"spawners\":[[\"Spawner_W1_1\",\"Spawner_W1_2\",\"Spawner_W1_3\"]]}"}]},
         {"type": "RectTransform", "enabled": true, "pos": [869,-488], "size": [100,100], "anchor": [0.5,0.5], "pivot": [0.5,0.5], "rotation": 0},
-        {"type": "UIText", "enabled": true, "text": "100000", "fontSize": 50, "fontPath": "C:\\Windows\\Fonts\\msgothic.ttc", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]}
+        {"type": "UIText", "enabled": true, "text": "100000", "fontSize": 48, "fontPath": "Resources\\\\Fonts\\\\Kiwi_Maru\\\\KiwiMaru-Regular.ttf", "color": [1,1,1,1], "outlineEnabled": false, "outlineThickness": 2, "outlineColor": [0,0,0,1]}
       ]
     },
     {
