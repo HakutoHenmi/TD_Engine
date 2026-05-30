@@ -450,7 +450,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 						s_swingingHitSeHandle = audio->Load("Resources/Audio/SE/SwingingHit.mp3");
 					}
 					if (s_swingingHitSeHandle != 0xFFFFFFFF) {
-						audio->Play(s_swingingHitSeHandle, false, 0.7f * audio->GetMasterSEVolume());
+						audio->Play(s_swingingHitSeHandle, false, 0.35f * audio->GetMasterSEVolume());
 					}
 				}
 			}
