@@ -1,4 +1,5 @@
 #include "SkillTree.h"
+#include "../../Engine/Audio.h"
 #include "../../Engine/Input.h"
 #include "../../Engine/Renderer.h"
 #include "../../Engine/ThirdParty/nlohmann/json.hpp"
@@ -883,6 +884,15 @@ void SkillTree::ConfirmUnlock() {
 		skillPoints_ -= totalCost;
 		for (int idx : neededIndices) {
 			nodes_[idx].unlocked = true;
+		}
+		if (auto* audio = Engine::Audio::GetInstance()) {
+			static uint32_t s_levelUpSeHandle = 0xFFFFFFFF;
+			if (s_levelUpSeHandle == 0xFFFFFFFF) {
+				s_levelUpSeHandle = audio->Load("Resources/Audio/SE/LevelUp.mp3");
+			}
+			if (s_levelUpSeHandle != 0xFFFFFFFF) {
+				audio->Play(s_levelUpSeHandle, false, 0.8f * audio->GetMasterSEVolume());
+			}
 		}
 	}
 
