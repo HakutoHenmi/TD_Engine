@@ -176,8 +176,11 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	if (auto* audio = Engine::Audio::GetInstance()) {
 		battleBgmHandle_ = audio->Load("Resources/Audio/BGM/Battle.mp3");
 		preparationBgmHandle_ = audio->Load("Resources/Audio/BGM/Preparation.mp3");
+		resultBgmHandle_ = audio->Load("Resources/Audio/BGM/Result.mp3");
 		installationSeHandle_ = audio->Load("Resources/Audio/SE/installation.mp3");
 	}
+
+	isResultBgmPlaying_ = false;
 
 	// 設置開始イベントの購読
 	SubscribeString(scene, "StartInstallation", [this](const std::string& dataStr) {
@@ -1319,6 +1322,15 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 			gameOverTimer_ = 0.0f;
 			scene->SetGameTimeScale(0.0f); // 全ての時間を止める
 
+			// BGMの切り替え
+			if (auto* audio = Engine::Audio::GetInstance()) {
+				if (currentBgmVoiceHandle_ != 0) {
+					audio->Stop(currentBgmVoiceHandle_);
+				}
+				currentBgmVoiceHandle_ = audio->Play(resultBgmHandle_, true, 0.5f);
+				isResultBgmPlaying_ = true;
+			}
+
 			// ★追加: リザルト画面や演出に不要なワールドUIを非表示にする
 			auto wsUIView = scene->GetRegistry().view<WorldSpaceUIComponent>();
 			for (auto e : wsUIView) {
@@ -1367,6 +1379,15 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 				s_gameClearPhase_ = 1;
 				gameOverTimer_ = 0.0f;
 				scene->SetGameTimeScale(0.0f); // 全ての時間を止める
+
+				// BGMの切り替え
+				if (auto* audio = Engine::Audio::GetInstance()) {
+					if (currentBgmVoiceHandle_ != 0) {
+						audio->Stop(currentBgmVoiceHandle_);
+					}
+					currentBgmVoiceHandle_ = audio->Play(resultBgmHandle_, true, 0.5f);
+					isResultBgmPlaying_ = true;
+				}
 
 				// リザルト画面や演出に不要なワールドUIを非表示にする
 				auto wsUIView = scene->GetRegistry().view<WorldSpaceUIComponent>();
