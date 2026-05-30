@@ -17,6 +17,8 @@ void Guardian::Start(entt::entity entity, GameScene* scene) {
 }
 
 void Game::Guardian::ExecuteAttack(entt::entity entity, GameScene* scene, float /*dt*/) {
+	PlayEnemySound(scene, entity, "Resources/Audio/SE/blow.mp3", 0.8f);
+
 	auto& registry = scene->GetRegistry();
 
 	// HitBoxが無ければ該当コンポーネントを追加

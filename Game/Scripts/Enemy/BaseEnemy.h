@@ -51,6 +51,9 @@ protected:
 	// カテゴリーを設定する（変数コンポーネントにも保存）
 	void SetCategory(entt::entity entity, GameScene* scene, EnemyCategory category);
 
+	// 距離減衰付き効果音をAudioSourceComponent経由で再生する
+	void PlayEnemySound(GameScene* scene, entt::entity entity, const std::string& soundPath, float baseVolume);
+
 protected: // メンバ変数
 	// 自身の情報を持たせておく
 	uint32_t ownerId_ = 0; // 自分のオブジェクトのID

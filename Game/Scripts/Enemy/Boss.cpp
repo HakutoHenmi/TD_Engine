@@ -119,9 +119,10 @@ void Boss::Update(entt::entity entity, GameScene* scene, float dt) {
 	}
 }
 
-void Boss::ExecuteAttack(entt::entity /*entity*/, GameScene* /*scene*/, float /*dt*/) {
+void Boss::ExecuteAttack(entt::entity entity, GameScene* scene, float /*dt*/) {
 	// ボス専用の攻撃処理
 	// 現状は近接攻撃などはBaseEnemy側に任せる、もしくは追加の衝撃波などをここで実装可能
+	PlayEnemySound(scene, entity, "Resources/Audio/SE/blow.mp3", 1.0f);
 }
 
 void Boss::OnDestroy(entt::entity entity, GameScene* scene) {

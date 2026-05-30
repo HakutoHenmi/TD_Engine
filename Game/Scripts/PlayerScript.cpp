@@ -1,5 +1,6 @@
 #include "PlayerScript.h"
 #include "../Engine/WindowDX.h"
+#include "../../Engine/Audio.h"
 #ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
 #endif
@@ -18,6 +19,9 @@
 #include <iostream>
 
 namespace Game {
+
+static uint32_t s_shotSeHandle = 0xFFFFFFFF;
+
 
 bool PlayerScript::s_isHelpOpen = false;
 
@@ -1986,6 +1990,14 @@ void PlayerScript::ShootChargeShot(entt::entity entity, GameScene* scene) {
 		damage *= playerGunSkillAttackPowerRate_;
 	}
 
+	if (auto* audio = Engine::Audio::GetInstance()) {
+		if (s_shotSeHandle == 0xFFFFFFFF) {
+			s_shotSeHandle = audio->Load("Resources/Audio/SE/shot.mp3");
+		}
+		if (s_shotSeHandle != 0xFFFFFFFF) {
+			audio->Play(s_shotSeHandle, false, 0.7f * audio->GetMasterSEVolume());
+		}
+	}
 	SpawnBullet(entity, scene, 0.0f, 0.0f, damage, 3.0f, true, true);
 
 	auto& pTc = scene->GetRegistry().get<TransformComponent>(entity);
@@ -2591,6 +2603,14 @@ void PlayerScript::ShootGun(entt::entity entity, GameScene* scene) {
 	if (isSkillActive_) {
 		damage *= SKILL_DAMAGE_MULTIPLIER;
 		damage *= playerGunSkillAttackPowerRate_;
+	}
+	if (auto* audio = Engine::Audio::GetInstance()) {
+		if (s_shotSeHandle == 0xFFFFFFFF) {
+			s_shotSeHandle = audio->Load("Resources/Audio/SE/shot.mp3");
+		}
+		if (s_shotSeHandle != 0xFFFFFFFF) {
+			audio->Play(s_shotSeHandle, false, 0.4f * audio->GetMasterSEVolume());
+		}
 	}
 	SpawnBullet(entity, scene, 0.0f, 0.0f, damage, 2.0f, isSkillActive_, false);
 

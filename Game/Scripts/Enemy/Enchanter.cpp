@@ -22,6 +22,7 @@ void Enchanter::Update(entt::entity entity, GameScene* scene, float dt) {
 	buffTimer_ += dt;
 	if (buffTimer_ >= buffInterval_) {
 		buffTimer_ = 0.0f;
+		PlayEnemySound(scene, entity, "Resources/Audio/SE/Enchant.mp3", 0.8f);
 
 		auto& registry = scene->GetRegistry();
 		if (!registry.all_of<TransformComponent>(entity)) {

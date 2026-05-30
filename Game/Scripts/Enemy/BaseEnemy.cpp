@@ -1,4 +1,5 @@
 #include "BaseEnemy.h"
+#include "../../Engine/Audio.h"
 #include "../../Engine/ThirdParty/nlohmann/json.hpp"
 #ifdef USE_IMGUI
 #include "../../externals/imgui/imgui.h"
@@ -611,6 +612,29 @@ void BaseEnemy::SetCategory(entt::entity entity, GameScene* scene, EnemyCategory
 		registry.emplace<VariableComponent>(entity);
 	}
 	registry.get<VariableComponent>(entity).SetValue("EnemyCategory", (float)category_);
+}
+
+void BaseEnemy::PlayEnemySound(GameScene* scene, entt::entity entity, const std::string& soundPath, float baseVolume) {
+	auto& registry = scene->GetRegistry();
+	if (!registry.all_of<AudioSourceComponent>(entity)) {
+		registry.emplace<AudioSourceComponent>(entity);
+	}
+	auto& as = registry.get<AudioSourceComponent>(entity);
+	as.soundPath = soundPath;
+	as.volume = baseVolume;
+	as.is3D = true;
+	as.maxDistance = 50.0f;
+	as.category = AudioCategory::SE;
+
+	if (auto* audio = Engine::Audio::GetInstance()) {
+		if (as.soundHandle == 0xFFFFFFFF && !as.soundPath.empty()) {
+			as.soundHandle = audio->Load(as.soundPath);
+		}
+		if (as.soundHandle != 0xFFFFFFFF) {
+			as.voiceHandle = audio->Play(as.soundHandle, false, as.volume);
+			as.isPlaying = true;
+		}
+	}
 }
 
 } // namespace Game

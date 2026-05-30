@@ -1,6 +1,7 @@
 #include "Gunner.h"
 #include "../ScriptEngine.h"
 #include "../ScriptUtils.h"
+
 // 攻撃のクールタイム
 static inline const float kCooltime = 2.0f;	// 秒
 
@@ -19,6 +20,8 @@ void Gunner::Start(entt::entity entity, GameScene* scene) {
 }
 
 void Game::Gunner::ExecuteAttack(entt::entity entity, GameScene* scene, float /*dt*/) {
+	PlayEnemySound(scene, entity, "Resources/Audio/SE/shot.mp3", 0.3f);
+
 	auto& registry = scene->GetRegistry();
 
 	if (!registry.all_of<TransformComponent>(entity)) {
