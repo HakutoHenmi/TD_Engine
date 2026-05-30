@@ -76,21 +76,37 @@ void TitleManagerScript::Start(entt::entity entity, GameScene* scene) {
 			if (reg.all_of<RectTransformComponent>(btnStart_) && reg.all_of<RectTransformComponent>(btnSettings_)) {
 				auto& startRect = reg.get<RectTransformComponent>(btnStart_);
 				auto& setRect = reg.get<RectTransformComponent>(btnSettings_);
-				float spacing = setRect.pos.y - startRect.pos.y;
+				
+				// 全てのボタンが被らないよう、さらに間隔を広めに再設定する
+				float spacing = 115.0f;
+				setRect.pos.y = startRect.pos.y + spacing;
 
 				if (reg.all_of<RectTransformComponent>(btnCredits_)) {
 					auto& credRect = reg.get<RectTransformComponent>(btnCredits_);
-					credRect.pos.x = setRect.pos.x;
-					credRect.pos.y = setRect.pos.y + spacing;
 					credRect.anchor = setRect.anchor;
 					credRect.pivot = setRect.pivot;
-					credRect.size = setRect.size;
+					// CREDITは縦横比が異なるため、横を長めに、縦を抑えめに拡大して周りと合わせる
+					credRect.size.x = setRect.size.x * 1.7f;
+					credRect.size.y = setRect.size.y * 1.25f;
+					// 中心位置が他のボタンと同じになるように左端をオフセットする (見た目のバランスを取るためさらに右に微調整)
+					credRect.pos.x = setRect.pos.x - (credRect.size.x - setRect.size.x) / 2.0f + 18.0f;
+					// 他のボタンと確実に干渉しないよう、少し下方向に微調整
+					credRect.pos.y = setRect.pos.y + spacing + 10.0f;
+
+					// ★追加: 画像の透明余白（巻物の上下など）による判定ズレを補正する
+					if (reg.all_of<UIButtonComponent>(btnCredits_)) {
+						auto& btn = reg.get<UIButtonComponent>(btnCredits_);
+						btn.hitboxScale.x = 0.85f;  // 左右の青い巻物の端を判定から除外
+						btn.hitboxScale.y = 0.55f;  // 上下にはみ出た飾りを判定から除外
+						btn.hitboxOffset.y = -5.0f; // 見た目の中心に判定が来るよう微調整
+					}
 				}
 
 				if (reg.all_of<RectTransformComponent>(btnExit_)) {
 					auto& exitRect = reg.get<RectTransformComponent>(btnExit_);
 					exitRect.pos.x = setRect.pos.x;
-					exitRect.pos.y = setRect.pos.y + spacing * 2.0f;
+					// CREDITを下にずらした分、EXITボタンもさらに下にずらす
+					exitRect.pos.y = setRect.pos.y + spacing * 2.0f + 15.0f;
 				}
 			}
 
