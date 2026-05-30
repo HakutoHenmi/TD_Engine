@@ -178,9 +178,9 @@
       "locked": false,
       "translate": [0, 0, 0],
       "rotate": [0, 0, 0],
-      "scale": [1, 1, 1],
+      "scale": [100, 1, 100],
       "components": [
-        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Scenes/Map/Ground.obj", "texturePath": "Resources/Textures/steampunk_stone_pavement.png", "shaderName": "Default", "color": [0.99,0.99,0.99,1], "uvTiling": [1,1], "uvOffset": [0,0]},
+        {"type": "MeshRenderer", "enabled": true, "modelPath": "Resources/Scenes/Map/Ground.obj", "texturePath": "Resources/Textures/Plane/ground.png", "shaderName": "Ground", "color": [1,1,1,1], "uvTiling": [1,1], "uvOffset": [0,0]},
         {"type": "BoxCollider", "enabled": true, "center": [0,0,0], "size": [1,1,1], "isTrigger": false},
         {"type": "Tag", "enabled": true, "tag": "Default"}
       ]

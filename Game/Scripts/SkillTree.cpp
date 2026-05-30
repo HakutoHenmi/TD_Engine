@@ -9,6 +9,7 @@
 #include "PlayerScript.h"
 #include "ScriptEngine.h"
 #include "TutorialScript.h"
+#include "PhaseSystemScript.h"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -104,6 +105,7 @@ void SkillTree::Start(entt::entity entity, GameScene* scene) {
 		texPrevArrow_ = renderer_->LoadTexture2D("Resources/Textures/left.png");
 		texNextArrow_ = renderer_->LoadTexture2D("Resources/Textures/Right.png");
 		texSkillPoint_ = renderer_->LoadTexture2D("Resources/Textures/SkillPoints.png");
+		texNButton_ = renderer_->LoadTexture2D("Resources/Textures/Button/N.png");
 		texPanel_ = renderer_->LoadTexture2D("Resources/Textures/white1x1.png");
 		scene->GetEventSystem().Subscribe("GainSkillPoint", [this](float pts) { skillPoints_ += static_cast<int>(pts); });
 
@@ -126,6 +128,51 @@ void SkillTree::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	if (!isOpen_) {
 		ClearText(scene);
+
+		// ★追加: 準備フェーズ中にスキルツリーの存在を知らせるUI(N.png)をお金のUIの少し下に表示する
+		if (renderer_ && PhaseSystemScript::IsPhase() == PhaseSystemScript::PhaseState::PreparationPhase && !PlayerScript::IsHelpOpen()) {
+			Engine::Renderer::SpriteDesc s;
+			// お金のUIの下あたりに配置 (1920x1080解像度を想定)
+			s.x = screenW_ - 150.0f; // 右に寄せる
+			s.y = 120.0f;
+			s.w = 90.0f; // 大きくする
+			s.h = 90.0f;
+			s.color = {2.5f, 2.5f, 2.5f, 1.0f}; // 明るくする
+
+			// スキルポイントがある時は、プレイヤーに気付かせるためにアニメーション(拡縮とカラー点滅)させる
+			if (skillPoints_ > 0) {
+				nButtonAnimTimer_ += dt;
+				float scale = 1.0f + 0.3f * std::sin(nButtonAnimTimer_ * 15.0f); // より大きく、早くバウンスさせる
+				s.w *= scale;
+				s.h *= scale;
+				
+				// より激しく発光させる
+				float colorAnim = std::max(0.0f, std::sin(nButtonAnimTimer_ * 20.0f));
+				s.color = {2.5f + colorAnim * 2.0f, 2.5f + colorAnim * 2.0f, 0.5f + colorAnim, 1.0f};
+				
+				float tx = s.x - 80.0f; // 見切れないように大幅に左へずらす
+				float ty = s.y + 60.0f;
+				// 黒いアウトラインを描画
+				renderer_->DrawString("Skill Point UP!", tx - 2.0f, ty, 0.6f, {0, 0, 0, 1});
+				renderer_->DrawString("Skill Point UP!", tx + 2.0f, ty, 0.6f, {0, 0, 0, 1});
+				renderer_->DrawString("Skill Point UP!", tx, ty - 2.0f, 0.6f, {0, 0, 0, 1});
+				renderer_->DrawString("Skill Point UP!", tx, ty + 2.0f, 0.6f, {0, 0, 0, 1});
+				renderer_->DrawString("Skill Point UP!", tx, ty, 0.6f, s.color);
+			} else {
+				float tx = s.x - 50.0f; // こちらも見切れないように左へ
+				float ty = s.y + 60.0f;
+				// 黒いアウトラインを描画
+				renderer_->DrawString("Skill Tree", tx - 2.0f, ty, 0.6f, {0, 0, 0, 1});
+				renderer_->DrawString("Skill Tree", tx + 2.0f, ty, 0.6f, {0, 0, 0, 1});
+				renderer_->DrawString("Skill Tree", tx, ty - 2.0f, 0.6f, {0, 0, 0, 1});
+				renderer_->DrawString("Skill Tree", tx, ty + 2.0f, 0.6f, {0, 0, 0, 1});
+				// スキルポイントが無いときは静かに表示
+				renderer_->DrawString("Skill Tree", tx, ty, 0.6f, {1.0f, 1.0f, 1.0f, 1.0f});
+			}
+
+			renderer_->DrawSprite(texNButton_, s);
+		}
+
 		return;
 	}
 

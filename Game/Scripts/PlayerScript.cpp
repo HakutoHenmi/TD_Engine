@@ -1266,52 +1266,7 @@ void PlayerScript::Update(entt::entity entity, GameScene* scene, float dt) {
 				uiRenderer->DrawString("ヘルプ / 操作説明", iconX + iconSize + 15.0f, iconY + (iconSize - 38.0f) * 0.5f, tabTextScale, { 1.0f, 1.0f, 1.0f, 1.0f }, fontPath);
 			}
 
-			// ==== ★追加: ロックオンレティクル & 銃レティクル ====
-			if (playerType_ == PlayerType::Gun && isSkillTreeOpen < 0.5f && !isCursorVisible_) {
-				DrawReticle(entity, scene);
-			} else if (scene && scene->GetRegistry().all_of<CameraTargetComponent>(entity)) {
-				auto& ct = scene->GetRegistry().get<CameraTargetComponent>(entity);
-				if (ct.lockedTarget != entt::null && scene->GetRegistry().valid(ct.lockedTarget)) {
-					auto& eTc = scene->GetRegistry().get<TransformComponent>(ct.lockedTarget);
-					DirectX::XMFLOAT3 targetWorldPos = eTc.translate;
-					targetWorldPos.y += 1.5f; // 敵の頭上
-
-					auto* camera = &scene->GetCamera();
-					if (camera) {
-						float sx = 0.0f, sy = 0.0f;
-						if (UISystem::WorldToScreen(targetWorldPos, *camera, sx, sy)) {
-							// ダイヤモンド型のターゲットマーカー（4つの短い線）
-							float reticleSize = 20.0f;
-							Engine::Vector4 reticleColor = {1.0f, 0.3f, 0.3f, 1.0f}; // 赤
-
-							// 外枠 (円形)
-							Engine::Renderer::SdfUIDesc rd{};
-							rd.shape = 1; // Circle
-							rd.centerPx = {sx, sy};
-							rd.sizePx = {reticleSize * 2.0f, reticleSize * 2.0f};
-							rd.lineWidth = 2.0f;
-							rd.glow = 3.0f;
-							rd.color = reticleColor;
-							rd.progress = 1.0f;
-							rd.fill = 0.0f;
-							rd.round = 0.0f;
-							uiRenderer->DrawSDFUI(rd);
-
-							// 内側のドット
-							Engine::Renderer::SdfUIDesc dotDesc{};
-							dotDesc.shape = 1;
-							dotDesc.centerPx = {sx, sy};
-							dotDesc.sizePx = {4.0f, 4.0f};
-							dotDesc.lineWidth = 0.0f;
-							dotDesc.glow = 2.0f;
-							dotDesc.color = reticleColor;
-							dotDesc.progress = 1.0f;
-							dotDesc.fill = 1.0f;
-							uiRenderer->DrawSDFUI(dotDesc);
-						}
-					}
-				}
-			}
+			// ==== レティクル描画は PlayerScript::Draw に移動しました ====
 		}
 
 			// ==== ★追加: マズルフラッシュ描画 (3Dライン) ====
@@ -2947,6 +2902,26 @@ void PlayerScript::SwitchPlayerType(entt::entity /*entity*/, GameScene* scene) {
 	if (gun != entt::null && scene->GetRegistry().all_of<MeshRendererComponent>(gun)) {
 		scene->GetRegistry().get<MeshRendererComponent>(gun).enabled = (playerType_ == PlayerType::Gun);
 	}
+
+	// ★追加: プレイヤー切り替え時に各種攻撃・移動ステートをリセットして移動速度減衰などの引き継ぎを防止する
+	isAttacking_ = false;
+	attackQueued_ = false;
+	comboCount_ = 0;
+	attackTimer_ = 0.0f;
+	currentPhase_ = AttackPhase::WindUp;
+
+	isSwordCharging_ = false;
+	swordChargeTime_ = 0.0f;
+
+	isCharging_ = false;
+	chargeTime_ = 0.0f;
+
+	// アニメーション中のフラグやタイマーもリセット
+	gunComboStep_ = 0;
+	gunComboResetTimer_ = 0.0f;
+	gunComboAnimTimer_ = 0.0f;
+	gunSubStep_ = 0;
+	gunSubTimer_ = 0.0f;
 }
 
 void PlayerScript::ExecuteSkill(entt::entity entity, GameScene* scene) {
@@ -3124,6 +3099,62 @@ void PlayerScript::ApplySkillEffects(entt::entity entity, GameScene* scene) {
 
 	playerBuffRangeRate_ = GetVar(gm, scene, "PlayerBuffRangeRate", 1.0f); // バフの範囲の変数を取得
 }
+void PlayerScript::Draw(entt::entity entity, GameScene* scene) {
+	if (!scene || scene->IsPaused()) return;
+
+	// isSkillTreeOpen の取得
+	bool isSkillTreeOpen = Game::PhaseSystemScript::isSkillTreeOpen_;
+
+	auto* uiRenderer = Engine::Renderer::GetInstance();
+	if (!uiRenderer) return;
+
+	if (playerType_ == PlayerType::Gun && !isSkillTreeOpen && !isCursorVisible_) {
+		DrawReticle(entity, scene);
+	} else if (scene->GetRegistry().all_of<CameraTargetComponent>(entity)) {
+		auto& ct = scene->GetRegistry().get<CameraTargetComponent>(entity);
+		if (ct.lockedTarget != entt::null && scene->GetRegistry().valid(ct.lockedTarget)) {
+			auto& eTc = scene->GetRegistry().get<TransformComponent>(ct.lockedTarget);
+			DirectX::XMFLOAT3 targetWorldPos = eTc.translate;
+			targetWorldPos.y += 1.5f; // 敵の頭上
+
+			auto* camera = &scene->GetCamera();
+			if (camera) {
+				float sx = 0.0f, sy = 0.0f;
+				if (UISystem::WorldToScreen(targetWorldPos, *camera, sx, sy)) {
+					// ダイヤモンド型のターゲットマーカー（4つの短い線）
+					float reticleSize = 20.0f;
+					Engine::Vector4 reticleColor = {1.0f, 0.3f, 0.3f, 1.0f}; // 赤
+
+					// 外枠 (円形)
+					Engine::Renderer::SdfUIDesc rd{};
+					rd.shape = 1; // Circle
+					rd.centerPx = {sx, sy};
+					rd.sizePx = {reticleSize * 2.0f, reticleSize * 2.0f};
+					rd.lineWidth = 2.0f;
+					rd.glow = 3.0f;
+					rd.color = reticleColor;
+					rd.progress = 1.0f;
+					rd.fill = 0.0f;
+					rd.round = 0.0f;
+					uiRenderer->DrawSDFUI(rd);
+
+					// 内側のドット
+					Engine::Renderer::SdfUIDesc dotDesc{};
+					dotDesc.shape = 1;
+					dotDesc.centerPx = {sx, sy};
+					dotDesc.sizePx = {4.0f, 4.0f};
+					dotDesc.lineWidth = 0.0f;
+					dotDesc.glow = 2.0f;
+					dotDesc.color = reticleColor;
+					dotDesc.progress = 1.0f;
+					dotDesc.fill = 1.0f;
+					uiRenderer->DrawSDFUI(dotDesc);
+				}
+			}
+		}
+	}
+}
+
 void PlayerScript::DrawUI(entt::entity /*entity*/, GameScene* /*scene*/) {
 	// ※注意: DrawUI は Renderer::EndFrame の後（ImGuiフェーズ）に呼び出されるため、
 	// ここで renderer->DrawSDFUI や DrawString などを呼んでも次のフレームの先頭でクリアされてしまい描画されません。
@@ -3182,21 +3213,21 @@ void PlayerScript::DrawSubObjectives(GameScene* scene) {
 		}
 	};
 
-	drawTask("プレイヤー切替 (T または Yボタン)", switchDone_, baseY);
+	drawTask("プレイヤー切替 (T)", switchDone_, baseY);
 	baseY += lineHeight * 1.2f;
 	
 	if (playerType_ == PlayerType::Sword) {
-		drawTask("近接スキル使用 (E または RBボタン)", swordSkillDone_, baseY);
+		drawTask("近接スキル使用 (E)", swordSkillDone_, baseY);
 		baseY += lineHeight * 1.2f;
-		drawTask("スチーム・ブースト (右クリック または B)", swordDashDone_, baseY);
+		drawTask("スチーム・ブースト (右クリック)", swordDashDone_, baseY);
 		baseY += lineHeight * 1.2f;
-		drawTask("チャージ攻撃 (左クリ長押し または Xボタン長押し)", swordChargeDone_, baseY);
+		drawTask("チャージ攻撃 (左クリ長押し)", swordChargeDone_, baseY);
 	} else {
-		drawTask("自身強化スキル (E または RBボタン)", gunSkillDone_, baseY);
+		drawTask("自身強化スキル (E)", gunSkillDone_, baseY);
 		baseY += lineHeight * 1.2f;
-		drawTask("飛行＆オート射撃 (右/左クリック または B/X)", gunFlyDone_ && gunShootDone_, baseY);
+		drawTask("飛行＆オート射撃 (右/左クリック)", gunFlyDone_ && gunShootDone_, baseY);
 		baseY += lineHeight * 1.2f;
-		drawTask("連射撃ち (左クリ長押し または Xボタン長押し)", gunChargeDone_, baseY);
+		drawTask("連射撃ち (左クリ長押し)", gunChargeDone_, baseY);
 	}
 }
 

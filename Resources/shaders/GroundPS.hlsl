@@ -63,10 +63,9 @@ float CalcShadowPCF(float4 worldPos)
 
 float4 main(VSOutput input) : SV_TARGET
 {
-    float2 uv = float2(
-        input.uv.x * m_uv_scale.x + m_uv_offset.x,
-        input.uv.y * m_uv_scale.y + m_uv_offset.y
-    );
+    // ユーザー要望によりテクスチャはタイリングせず1枚だけ貼る
+    float2 uv = input.uv;
+    
     float4 texcolor = tex.Sample(smp, uv);
 
     float3 N = normalize(input.normal);
