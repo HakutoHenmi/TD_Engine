@@ -1708,7 +1708,7 @@ void TutorialScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector3& 
 			}
 		}
 
-		if (objPath.find("Canon") != std::string::npos) {
+		if (objPath.find("Canon") != std::string::npos || objPath.find("NewCannon") != std::string::npos) {
 			hasPlacedCannon_ = true;
 			if (tutorialStep_ == TutorialStep::Step6_CannonInstall) {
 				step6_cannonCount_++;
@@ -1739,7 +1739,7 @@ void TutorialScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector3& 
 	mr.texturePath = "Resources/Textures/white1x1.png";
 	mr.shaderName = "Toon";
 
-	if (objPath.find("Canon") != std::string::npos) {
+	if (objPath.find("Canon") != std::string::npos || objPath.find("NewCannon") != std::string::npos) {
 		hasPlacedCannon_ = true;
 		if (tutorialStep_ == TutorialStep::Step6_CannonInstall) {
 			step6_cannonCount_++;
