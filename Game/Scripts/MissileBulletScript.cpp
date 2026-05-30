@@ -8,6 +8,8 @@
 
 namespace Game {
 
+static uint32_t s_impactSeHandle = 0xFFFFFFFF;
+
 float MissileBulletScript::LerpFloat(float start, float end, float t) { return start + (end - start) * t; }
 
 void MissileBulletScript::Start(entt::entity entity, GameScene* scene) {
@@ -407,6 +409,16 @@ void MissileBulletScript::CreateExplosionAttackArea(entt::entity entity, GameSce
 
 	SetVar(explosionAttackArea, scene, "Damage", damage_);
 	SetVar(explosionAttackArea, scene, "ExplosionRadius", explosionRadius_);
+
+	// 着弾音（Impact）の再生
+	if (auto* audio = Engine::Audio::GetInstance()) {
+		if (s_impactSeHandle == 0xFFFFFFFF) {
+			s_impactSeHandle = audio->Load("Resources/Audio/SE/Impact.mp3");
+		}
+		if (s_impactSeHandle != 0xFFFFFFFF) {
+			audio->Play(s_impactSeHandle, false, 0.8f * audio->GetMasterSEVolume());
+		}
+	}
 
 	// ==================== 大迫力爆発エフェクト (Impact VFX) ====================
 	if (renderer) {
