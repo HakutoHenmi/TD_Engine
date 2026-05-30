@@ -106,6 +106,7 @@ private:
 
     bool isPlaying_ = false;
 	bool isPaused_ = false; // ★追加: ポーズ状態フラグ
+	bool isExiting_ = false; // ★追加: シーン終了中フラグ
 	std::string sceneName_; // ★追加: シーン名 ("Title", "Select", "Game", "Result")
     entt::registry pendingSpawns_;
     std::vector<entt::entity> pendingDestroys_;
