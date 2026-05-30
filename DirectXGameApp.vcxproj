@@ -179,12 +179,12 @@ exit /b 0
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Game\Scripts\ClickSound.cpp" />
     <ClCompile Include="Game\Scripts\Enemy\Sandbag.cpp" />
     <ClCompile Include="Game\Scripts\Enemy\Boss.cpp" />
     <ClCompile Include="Game\Scripts\Enemy\Enchanter.cpp" />
     <ClCompile Include="Game\Scripts\ExplosionAttackArea.cpp" />
     <ClCompile Include="Game\Editor\EditorUI.cpp" />
-
     <ClCompile Include="Game\Editor\EnemySpawnerEditor.cpp" />
     <ClCompile Include="Game\main.cpp" />
     <ClCompile Include="Game\Scenes\GameScene.cpp" />
@@ -194,7 +194,6 @@ exit /b 0
     <ClCompile Include="Game\Scripts\ResultManagerScript.cpp" />
     <ClCompile Include="Game\Scripts\BaseScript.cpp" />
     <ClCompile Include="Game\Scripts\BulletScript.cpp" />
-
     <ClCompile Include="Game\Scripts\Canon.cpp" />
     <ClCompile Include="Game\Scripts\EnemyAIScript.cpp" />
     <ClCompile Include="Game\Scripts\ExperienceHopper.cpp" />
@@ -203,7 +202,6 @@ exit /b 0
     <ClCompile Include="Game\Scripts\KamikazeEnemyScript.cpp" />
     <ClCompile Include="Game\Scripts\FireworkScript.cpp" />
     <ClCompile Include="Game\Scripts\PhaseSystemScript.cpp" />
-
     <ClCompile Include="Game\Scripts\PlayerScript.cpp" />
     <ClCompile Include="Game\Scripts\PoisonAttackArea.cpp" />
     <ClCompile Include="Game\Scripts\PoisonTrap.cpp" />
@@ -235,6 +233,7 @@ exit /b 0
     <ClCompile Include="Game\Scripts\Enemy\SkyGunner.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Game\Scripts\ClickSound.h" />
     <ClInclude Include="Game\Scripts\Enemy\Boss.h" />
     <ClInclude Include="Game\Scripts\Enemy\Enchanter.h" />
     <ClInclude Include="Game\Scripts\Enemy\Enemies.h" />

@@ -1,4 +1,5 @@
-﻿#include "MissileCanonScript.h"
+#include "MissileCanonScript.h"
+#include "../../Engine/Audio.h"
 #include "HitDistortionScript.h"
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
@@ -534,6 +535,26 @@ void MissileCanonScript::FireMissile(
 	SetVar(entity, scene, "MissileGaugeRate", 0.0f);
 
 	SetVar(entity, scene, "MissileGaugeState", 2.0f);
+
+	// AudioSourceによる射撃音再生
+	if (registry.all_of<AudioSourceComponent>(entity)) {
+		auto& as = registry.get<AudioSourceComponent>(entity);
+		if (auto* audio = Engine::Audio::GetInstance()) {
+			if (as.soundHandle == 0xFFFFFFFF && !as.soundPath.empty()) {
+				as.soundHandle = audio->Load(as.soundPath);
+			}
+			if (as.soundHandle != 0xFFFFFFFF) {
+				float initialVol = as.volume;
+				if (as.category == AudioCategory::BGM) {
+					initialVol *= audio->GetMasterBGMVolume();
+				} else {
+					initialVol *= audio->GetMasterSEVolume();
+				}
+				as.voiceHandle = audio->Play(as.soundHandle, as.loop, initialVol);
+				as.isPlaying = true;
+			}
+		}
+	}
 
 	attackTimer_ = currentAttackInterval;
 }

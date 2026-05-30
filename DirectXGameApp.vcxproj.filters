@@ -7,9 +7,6 @@
     <ClCompile Include="Game\Editor\EditorUI.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
-    <ClCompile Include="Game\Editor\PipeEditor.cpp">
-      <Filter>Editor</Filter>
-    </ClCompile>
     <ClCompile Include="Game\Editor\EnemySpawnerEditor.cpp">
       <Filter>Editor</Filter>
     </ClCompile>
@@ -43,7 +40,6 @@
     <ClCompile Include="Game\Scripts\Canon.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
-    <ClCompile Include="Game\Scripts\PipeScript.cpp" />
     <ClCompile Include="Game\Scripts\PreparationCamera.cpp" />
     <ClCompile Include="Game\Scripts\EnemySpawnerScript.cpp">
       <Filter>Scripts</Filter>
@@ -66,7 +62,6 @@
     <ClCompile Include="Game\Scripts\CommunicationTestScript.cpp">
       <Filter>Scripts</Filter>
     </ClCompile>
-    <ClCompile Include="Game\Scripts\BulletTank.cpp" />
     <ClCompile Include="Game\Scripts\SkillTree.cpp" />
     <ClCompile Include="Game\EnemySystem\NavigationManager.cpp" />
     <ClCompile Include="Game\Scripts\HitDistortionScript.cpp" />
@@ -96,6 +91,8 @@
     <ClCompile Include="Game\Scripts\InstallationManager.cpp" />
     <ClCompile Include="Game\Scripts\Enemy\Enchanter.cpp" />
     <ClCompile Include="Game\Scripts\Enemy\Boss.cpp" />
+    <ClCompile Include="Game\Scripts\FireworkScript.cpp" />
+    <ClCompile Include="Game\Scripts\ClickSound.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Scenes\GameScene.h">
@@ -226,6 +223,8 @@
     <ClInclude Include="Game\Scripts\InstallationManager.h" />
     <ClInclude Include="Game\Scripts\Enemy\Enchanter.h" />
     <ClInclude Include="Game\Scripts\Enemy\Boss.h" />
+    <ClInclude Include="Game\Scripts\FireworkScript.h" />
+    <ClInclude Include="Game\Scripts\ClickSound.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Scenes">

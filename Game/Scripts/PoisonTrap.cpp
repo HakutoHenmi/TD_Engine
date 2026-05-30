@@ -1,4 +1,5 @@
 #include "PoisonTrap.h"
+#include "../../Engine/Audio.h"
 #include "ObjectTypes.h"
 #include "Scenes/GameScene.h"
 #include "ScriptEngine.h"
@@ -193,6 +194,27 @@ void PoisonTrap::Update(entt::entity entity, GameScene* scene, float dt) {
 			}
 		}
 	}
+
+	// AudioSourceによる射撃音再生
+	if (registry.all_of<AudioSourceComponent>(entity)) {
+		auto& as = registry.get<AudioSourceComponent>(entity);
+		if (auto* audio = Engine::Audio::GetInstance()) {
+			if (as.soundHandle == 0xFFFFFFFF && !as.soundPath.empty()) {
+				as.soundHandle = audio->Load(as.soundPath);
+			}
+			if (as.soundHandle != 0xFFFFFFFF) {
+				float initialVol = as.volume;
+				if (as.category == AudioCategory::BGM) {
+					initialVol *= audio->GetMasterBGMVolume();
+				} else {
+					initialVol *= audio->GetMasterSEVolume();
+				}
+				as.voiceHandle = audio->Play(as.soundHandle, as.loop, initialVol);
+				as.isPlaying = true;
+			}
+		}
+	}
+
 	CreatePoisonAttackArea(entity, scene, finalDamage, finalRange);
 
 // タイマー開始
