@@ -792,8 +792,8 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
 		if (phaseState_ != PhaseSystemScript::PreparationPhase || isPhaseTransitioning_)
 			break;
 
-		if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/Canon.prefab")) {
-			selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
+		if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/NewCannon.prefab")) {
+			selectedObjPath_ = "Resources/Prefabs/NewCannon.prefab";
 			isPlacementMode_ = true;
 			placementSelectionChangedThisFrame = true;
 		}
@@ -954,8 +954,8 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
 
 	case TutorialStep::Step15_FreePlayBattle:
 		if (phaseState_ == PhaseSystemScript::PreparationPhase && !isPhaseTransitioning_) {
-			if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/Canon.prefab")) {
-				selectedObjPath_ = "Resources/Prefabs/Canon.prefab";
+			if (key3 || InstallationManager::IsButtonPressed("Resources/Prefabs/NewCannon.prefab")) {
+				selectedObjPath_ = "Resources/Prefabs/NewCannon.prefab";
 				isPlacementMode_ = true;
 				placementSelectionChangedThisFrame = true;
 			}
@@ -1708,7 +1708,7 @@ void TutorialScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector3& 
 			}
 		}
 
-		if (objPath.find("Canon") != std::string::npos) {
+		if (objPath.find("Canon") != std::string::npos || objPath.find("NewCannon") != std::string::npos) {
 			hasPlacedCannon_ = true;
 			if (tutorialStep_ == TutorialStep::Step6_CannonInstall) {
 				step6_cannonCount_++;
@@ -1739,7 +1739,7 @@ void TutorialScript::SpawnPlacedObject(GameScene* scene, const Engine::Vector3& 
 	mr.texturePath = "Resources/Textures/white1x1.png";
 	mr.shaderName = "Toon";
 
-	if (objPath.find("Canon") != std::string::npos) {
+	if (objPath.find("Canon") != std::string::npos || objPath.find("NewCannon") != std::string::npos) {
 		hasPlacedCannon_ = true;
 		if (tutorialStep_ == TutorialStep::Step6_CannonInstall) {
 			step6_cannonCount_++;
