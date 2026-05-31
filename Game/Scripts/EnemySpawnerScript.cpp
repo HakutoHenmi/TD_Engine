@@ -172,24 +172,38 @@ void EnemySpawnerScript::Update(entt::entity spawnerEntity, GameScene* scene, fl
 
 				mr.extraTextureHandles.clear(); // 最初にクリアしておく
 				if (enemyScriptPath == "Warrior") {
-					// Warrior の場合のテクスチャ
-					mr.textureHandle = renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/Warrior_Body.png");
-					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/Warrior_Sword.png"));
-					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/Warrior_Shield.png"));
+					// Warrior の場合のテクスチャ OK
+					mr.textureHandle = renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/warrior_head.png");
+					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/wheel.png"));
+					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/body.png"));
+					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/warrior_arms.png"));
 				} 
 				else if (enemyScriptPath == "Gunner") {
-					// Gunner の場合のテクスチャ
-					mr.textureHandle = renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/Gunner_MainTex.png");
-					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/Gunner_Weapon.png"));
+					// Gunner の場合のテクスチャ OK
+					mr.textureHandle = renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/wheel.png");
+					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/body.png"));
+					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/Gunner_hone.png"));
 				} 
 				else if (enemyScriptPath == "Boss") {
 					// Boss の場合のテクスチャ
-					mr.textureHandle = renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/Boss_Texture_01.png");
-					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/Boss_Texture_02.png"));
+					mr.textureHandle = renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/wheel.png");
+					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/boss_body.png"));
+					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/shield.png"));
+					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/wheel.png"));
+					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/wheel.png"));
+					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/wheel.png"));
 
 				}
 				else if (enemyScriptPath == "Guardian") {
-				
+					// Guardian の場合　OK
+					mr.textureHandle = renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/wheel.png");
+					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/body.png"));
+					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/wheel.png"));
+					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/shield.png"));
+				}
+				else if (enemyScriptPath == "Enchanter") {
+					mr.textureHandle = renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/wheel.png");
+					mr.extraTextureHandles.push_back(renderer->LoadTexture2D("Resources/Models/3Dmodel/enemies/Enchanter_head.png"));
 				}
 				else {
 					// それ以外の敵（またはテクスチャが1枚だけの敵）
