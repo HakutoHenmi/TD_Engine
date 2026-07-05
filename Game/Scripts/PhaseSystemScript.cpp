@@ -855,14 +855,18 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 						int refundCost = 0;
 						if (registry.all_of<NameComponent>(hoverEntity)) {
 							const auto& name = registry.get<NameComponent>(hoverEntity).name;
-							if (name.find("Canon") != std::string::npos || name.find("Cannon") != std::string::npos) {
-								refundCost = canonCost_;
-							} else if (name.find("Missile") != std::string::npos) {
-								refundCost = missileCost_;
-							} else if (name.find("Poison") != std::string::npos) {
-								refundCost = poisonCost_;
-							} else if (name.find("Ice") != std::string::npos) {
-								refundCost = iceCanonCost_;
+							if (name == "NewCanon") {
+								int c = InstallationManager::GetCost("Resources/Prefabs/NewCannon.prefab");
+								refundCost = c > 0 ? c : canonCost_;
+							} else if (name == "Missile") {
+								int c = InstallationManager::GetCost("Resources/Prefabs/Missile.prefab");
+								refundCost = c > 0 ? c : missileCost_;
+							} else if (name == "Poison") {
+								int c = InstallationManager::GetCost("Resources/Prefabs/Poison.prefab");
+								refundCost = c > 0 ? c : poisonCost_;
+							} else if (name == "IceCanon") {
+								int c = InstallationManager::GetCost("Resources/Prefabs/IceCanon.prefab");
+								refundCost = c > 0 ? c : iceCanonCost_;
 							} else {
 								refundCost = 0;
 							} // 未知のオブジェクト
@@ -944,14 +948,18 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 								int entityRefund = 0;
 								if (registry.all_of<NameComponent>(rootToDelete)) {
 									const auto& name = registry.get<NameComponent>(rootToDelete).name;
-									if (name.find("Canon") != std::string::npos || name.find("Cannon") != std::string::npos) {
-										entityRefund = CalculateRefund(canonCost_);
-									} else if (name.find("Missile") != std::string::npos) {
-										entityRefund = CalculateRefund(missileCost_);
-									} else if (name.find("Poison") != std::string::npos) {
-										entityRefund = CalculateRefund(poisonCost_);
-									} else if (name.find("Ice") != std::string::npos) {
-										entityRefund = CalculateRefund(iceCanonCost_);
+									if (name == "NewCanon") {
+										int c = InstallationManager::GetCost("Resources/Prefabs/NewCannon.prefab");
+										entityRefund = CalculateRefund(c > 0 ? c : canonCost_);
+									} else if (name == "Missile") {
+										int c = InstallationManager::GetCost("Resources/Prefabs/Missile.prefab");
+										entityRefund = CalculateRefund(c > 0 ? c : missileCost_);
+									} else if (name == "Poison") {
+										int c = InstallationManager::GetCost("Resources/Prefabs/Poison.prefab");
+										entityRefund = CalculateRefund(c > 0 ? c : poisonCost_);
+									} else if (name == "IceCanon") {
+										int c = InstallationManager::GetCost("Resources/Prefabs/IceCanon.prefab");
+										entityRefund = CalculateRefund(c > 0 ? c : iceCanonCost_);
 									}
 								}
 								totalRefund += entityRefund;
