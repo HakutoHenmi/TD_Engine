@@ -46,6 +46,7 @@ public:
 	int GetBrokenShieldCount() const { return brokenShieldCount_; }
 	void IncrementBrokenShieldCount() { brokenShieldCount_++; }
 	void ResetBrokenShieldCount() { brokenShieldCount_ = 0; }
+	size_t GetCurrentBgmVoiceHandle() const { return currentBgmVoiceHandle_; }
 
 private:
 	static TutorialScript* instance_;
@@ -134,6 +135,11 @@ private:
 	// SE関連
 	uint32_t installationSeHandle_ = 0;
 	uint32_t collapseSeHandle_ = 0;
+	uint32_t tutorialClickSeHandle_ = 0;
+
+	// BGM関連
+	uint32_t preparationBgmHandle_ = 0;
+	size_t currentBgmVoiceHandle_ = 0;
 	
 	void UpdateCameraFocus(GameScene* scene, float dt);
 };

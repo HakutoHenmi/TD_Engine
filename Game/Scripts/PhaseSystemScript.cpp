@@ -197,9 +197,11 @@ void PhaseSystemScript::Start(entt::entity entity, GameScene* scene) {
 	if (auto* audio = Engine::Audio::GetInstance()) {
 		if (isPhase_ == BattlePhase) {
 			currentBgmVoiceHandle_ = audio->Play(battleBgmHandle_, true, 0.4f * audio->GetMasterBGMVolume());
+			currentBgmAssetHandle_ = battleBgmHandle_;
 			OutputDebugStringA(("[PhaseSystem] Start -> BattlePhase BGM handle: " + std::to_string(currentBgmVoiceHandle_) + "\n").c_str());
 		} else if (isPhase_ == PreparationPhase || isPhase_ == InsertPhase) {
 			currentBgmVoiceHandle_ = audio->Play(preparationBgmHandle_, true, 0.4f * audio->GetMasterBGMVolume());
+			currentBgmAssetHandle_ = preparationBgmHandle_;
 			OutputDebugStringA(("[PhaseSystem] Start -> PreparationPhase BGM handle: " + std::to_string(currentBgmVoiceHandle_) + "\n").c_str());
 		}
 	}
@@ -1088,17 +1090,42 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 
 		// BGMの切り替え
 		if (auto* audio = Engine::Audio::GetInstance()) {
-			if (currentBgmVoiceHandle_ != 0) {
-				audio->Stop(currentBgmVoiceHandle_);
-				currentBgmVoiceHandle_ = 0;
-			}
+			uint32_t targetBgm = 0;
 
 			if (isPhase_ == BattlePhase) {
-				currentBgmVoiceHandle_ = audio->Play(battleBgmHandle_, true, 0.4f * audio->GetMasterBGMVolume());
-				OutputDebugStringA(("[PhaseSystem] Update -> BattlePhase BGM handle: " + std::to_string(currentBgmVoiceHandle_) + "\n").c_str());
+				targetBgm = battleBgmHandle_;
 			} else if (isPhase_ == PreparationPhase || isPhase_ == InsertPhase) {
-				currentBgmVoiceHandle_ = audio->Play(preparationBgmHandle_, true, 0.4f * audio->GetMasterBGMVolume());
-				OutputDebugStringA(("[PhaseSystem] Update -> PreparationPhase BGM handle: " + std::to_string(currentBgmVoiceHandle_) + "\n").c_str());
+				targetBgm = preparationBgmHandle_;
+			} else if (isPhase_ == Transition) {
+				// 遷移中：もし移行先が現在のBGMと同じアセットなら、BGMは止めずに再生し続ける
+				uint32_t nextBgm = 0;
+				if (NextPhase_ == BattlePhase) {
+					nextBgm = battleBgmHandle_;
+				} else if (NextPhase_ == PreparationPhase || NextPhase_ == InsertPhase) {
+					nextBgm = preparationBgmHandle_;
+				}
+
+				if (currentBgmAssetHandle_ == nextBgm) {
+					targetBgm = currentBgmAssetHandle_;
+				} else {
+					targetBgm = 0;
+				}
+			}
+
+			if (currentBgmAssetHandle_ != targetBgm) {
+				if (currentBgmVoiceHandle_ != 0) {
+					audio->Stop(currentBgmVoiceHandle_);
+					currentBgmVoiceHandle_ = 0;
+				}
+				if (targetBgm != 0) {
+					currentBgmVoiceHandle_ = audio->Play(targetBgm, true, 0.4f * audio->GetMasterBGMVolume());
+					if (targetBgm == battleBgmHandle_) {
+						OutputDebugStringA(("[PhaseSystem] Update -> BattlePhase BGM handle: " + std::to_string(currentBgmVoiceHandle_) + "\n").c_str());
+					} else if (targetBgm == preparationBgmHandle_) {
+						OutputDebugStringA(("[PhaseSystem] Update -> PreparationPhase BGM handle: " + std::to_string(currentBgmVoiceHandle_) + "\n").c_str());
+					}
+				}
+				currentBgmAssetHandle_ = targetBgm;
 			}
 		}
 
@@ -1465,6 +1492,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 					audio->Stop(currentBgmVoiceHandle_);
 				}
 				currentBgmVoiceHandle_ = audio->Play(resultBgmHandle_, true, 0.5f);
+				currentBgmAssetHandle_ = resultBgmHandle_;
 				isResultBgmPlaying_ = true;
 			}
 
@@ -1523,6 +1551,7 @@ void PhaseSystemScript::Update(entt::entity entity, GameScene* scene, float dt) 
 						audio->Stop(currentBgmVoiceHandle_);
 					}
 					currentBgmVoiceHandle_ = audio->Play(resultBgmHandle_, true, 0.5f);
+					currentBgmAssetHandle_ = resultBgmHandle_;
 					isResultBgmPlaying_ = true;
 				}
 
@@ -2048,6 +2077,7 @@ void PhaseSystemScript::OnDestroy(entt::entity /*entity*/, GameScene* /*scene*/)
 			audio->Stop(currentBgmVoiceHandle_);
 			currentBgmVoiceHandle_ = 0;
 		}
+		currentBgmAssetHandle_ = 0;
 	}
 
 	// 次のシーンロード時に初期化順序の問題で古いフェーズ情報（特にBattlePhase）を

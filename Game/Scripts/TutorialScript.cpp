@@ -138,10 +138,14 @@ void TutorialScript::Start(entt::entity entity, GameScene* scene) {
 	if (scene) {
 		ShowStepGuide();
 
-		// SEのロード
+		// BGMとSEのロード・再生
 		if (auto* audio = Engine::Audio::GetInstance()) {
 			installationSeHandle_ = audio->Load("Resources/Audio/SE/installation.mp3");
 			collapseSeHandle_ = audio->Load("Resources/Audio/SE/Collapse.mp3");
+			tutorialClickSeHandle_ = audio->Load("Resources/Audio/SE/TutorialClick.mp3");
+
+			preparationBgmHandle_ = audio->Load("Resources/Audio/BGM/Preparation.mp3");
+			currentBgmVoiceHandle_ = audio->Play(preparationBgmHandle_, true, 0.4f * audio->GetMasterBGMVolume());
 		}
 
 		// 設置開始イベントの購読
@@ -728,6 +732,13 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (!scene || !input)
 		return;
 
+	// BGMの音量同期
+	if (auto* audio = Engine::Audio::GetInstance()) {
+		if (currentBgmVoiceHandle_ != 0) {
+			audio->SetVolume(currentBgmVoiceHandle_, 0.4f * audio->GetMasterBGMVolume());
+		}
+	}
+
 	ShowStepGuide();
 	ShowGuideText(entity, scene);
 	DrawHighlights(scene);
@@ -765,6 +776,7 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
 	if (textIt != kTutorialTexts.end()) {
 		const auto& lines = textIt->second;
 		if (keySpace) {
+			bool advanced = false;
 			// ★ SPACEキーをチュートリアルのテキスト進行で消費したフレームは、ジャンプをキャンセルする
 			if (scene) {
 				auto view = scene->GetRegistry().view<PlayerInputComponent>();
@@ -778,10 +790,12 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
 				// Step13 は「敵を倒してレベルアップしたぞ！」から「Nキーを押して～」へのみSPACEで進める
 				if (currentLineIndex_ == 0) {
 					currentLineIndex_ = 1;
+					advanced = true;
 				}
 			} else {
 				if (currentLineIndex_ < static_cast<int>(lines.size()) - 1) {
 					currentLineIndex_++;
+					advanced = true;
 				} else {
 					bool isActionStep =
 					    (tutorialStep_ == TutorialStep::Step6_CannonInstall || tutorialStep_ == TutorialStep::Step7_DeleteIntro || tutorialStep_ == TutorialStep::Step9_BuffExplanation ||
@@ -791,7 +805,16 @@ void TutorialScript::Update(entt::entity entity, GameScene* scene, float dt) {
 						int nextStepInt = static_cast<int>(tutorialStep_) + 1;
 						if (nextStepInt < static_cast<int>(TutorialStep::Count)) {
 							EnterStep(static_cast<TutorialStep>(nextStepInt));
+							advanced = true;
 						}
+					}
+				}
+			}
+
+			if (advanced) {
+				if (auto* audio = Engine::Audio::GetInstance()) {
+					if (tutorialClickSeHandle_ != 0 && tutorialClickSeHandle_ != 0xFFFFFFFF) {
+						audio->Play(tutorialClickSeHandle_, false, 0.6f * audio->GetMasterSEVolume());
 					}
 				}
 			}
@@ -1770,6 +1793,14 @@ void TutorialScript::OnDestroy(entt::entity /*entity*/, GameScene* scene) {
 	if (instance_ == this)
 		instance_ = nullptr;
 	skillTree_.Close(scene);
+
+	// BGMの停止
+	if (auto* audio = Engine::Audio::GetInstance()) {
+		if (currentBgmVoiceHandle_ != 0) {
+			audio->Stop(currentBgmVoiceHandle_);
+			currentBgmVoiceHandle_ = 0;
+		}
+	}
 }
 
 REGISTER_SCRIPT(TutorialScript);

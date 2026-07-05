@@ -9,6 +9,7 @@
 #include "../Editor/EditorUI.h"
 #include "../Scripts/ScriptEngine.h"
 #include "../Scripts/PlayerScript.h" // ★追加
+#include "../Scripts/TutorialScript.h"
 #include "../Systems/AudioSystem.h"
 #include "../Systems/CameraFollowSystem.h"
 #include "Editor/EditorUI.h" // ★追加
@@ -2316,7 +2317,7 @@ void GameScene::UpdatePauseMenu() {
 						auto& as = registry_.get<AudioSourceComponent>(e);
 						if (as.isPlaying && as.category == AudioCategory::BGM) audio->SetVolume(as.voiceHandle, as.volume * audio->GetMasterBGMVolume());
 					}
-					// ★追加: PhaseSystemScriptが直接再生しているBGMにも即座に反映
+					// ★追加: PhaseSystemScript / TutorialScriptが直接再生しているBGMにも即座に反映
 					for (auto entity : registry_.view<ScriptComponent>()) {
 						auto& sc = registry_.get<ScriptComponent>(entity);
 						for (auto& s : sc.scripts) {
@@ -2325,6 +2326,12 @@ void GameScene::UpdatePauseMenu() {
 									if (ps->currentBgmVoiceHandle_ != 0) {
 										float baseVol = ps->isResultBgmPlaying_ ? 0.5f : 0.4f;
 										audio->SetVolume(ps->currentBgmVoiceHandle_, baseVol * audio->GetMasterBGMVolume());
+									}
+								}
+							} else if (s.scriptPath == "TutorialScript" && s.instance) {
+								if (auto* ts = static_cast<TutorialScript*>(s.instance.get())) {
+									if (ts->GetCurrentBgmVoiceHandle() != 0) {
+										audio->SetVolume(ts->GetCurrentBgmVoiceHandle(), 0.4f * audio->GetMasterBGMVolume());
 									}
 								}
 							}
@@ -2338,7 +2345,7 @@ void GameScene::UpdatePauseMenu() {
 						auto& as = registry_.get<AudioSourceComponent>(e);
 						if (as.isPlaying && as.category == AudioCategory::BGM) audio->SetVolume(as.voiceHandle, as.volume * audio->GetMasterBGMVolume());
 					}
-					// ★追加: PhaseSystemScriptが直接再生しているBGMにも即座に反映
+					// ★追加: PhaseSystemScript / TutorialScriptが直接再生しているBGMにも即座に反映
 					for (auto entity : registry_.view<ScriptComponent>()) {
 						auto& sc = registry_.get<ScriptComponent>(entity);
 						for (auto& s : sc.scripts) {
@@ -2347,6 +2354,12 @@ void GameScene::UpdatePauseMenu() {
 									if (ps->currentBgmVoiceHandle_ != 0) {
 										float baseVol = ps->isResultBgmPlaying_ ? 0.5f : 0.4f;
 										audio->SetVolume(ps->currentBgmVoiceHandle_, baseVol * audio->GetMasterBGMVolume());
+									}
+								}
+							} else if (s.scriptPath == "TutorialScript" && s.instance) {
+								if (auto* ts = static_cast<TutorialScript*>(s.instance.get())) {
+									if (ts->GetCurrentBgmVoiceHandle() != 0) {
+										audio->SetVolume(ts->GetCurrentBgmVoiceHandle(), 0.4f * audio->GetMasterBGMVolume());
 									}
 								}
 							}

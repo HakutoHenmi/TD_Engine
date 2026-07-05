@@ -159,6 +159,7 @@ private:
 
 public:
 	inline static size_t currentBgmVoiceHandle_ = 0;
+	inline static uint32_t currentBgmAssetHandle_ = 0;
 	bool isResultBgmPlaying_ = false;
 	static bool isSkillTreeOpen_; // スキルツリーが開いているかどうかを管理する静的変数
 
